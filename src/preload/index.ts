@@ -1,5 +1,10 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC, type IpcApi } from '@shared/ipc'
 
-// The real window.api bridge is wired in a later task. This keeps the
-// preload bundle present so the window has a preload to load.
-contextBridge.exposeInMainWorld('api', {})
+const api: IpcApi = {
+  listSessions: () => ipcRenderer.invoke(IPC.listSessions),
+  refresh: () => ipcRenderer.invoke(IPC.refresh),
+  capabilities: () => ipcRenderer.invoke(IPC.capabilities),
+}
+
+contextBridge.exposeInMainWorld('api', api)
