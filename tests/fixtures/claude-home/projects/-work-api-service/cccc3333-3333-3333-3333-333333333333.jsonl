@@ -1,0 +1,4 @@
+{"type":"user","isMeta":true,"cwd":"/work/api-service","gitBranch":"main","timestamp":"2026-06-08T20:00:00.000Z","message":{"role":"user","content":"ignored meta line"}}
+{"type":"user","isMeta":false,"cwd":"/work/api-service","gitBranch":"main","timestamp":"2026-06-08T20:01:00.000Z","message":{"role":"user","content":"<command-name>deploy</command-name>"}}
+{"type":"assistant","cwd":"/work/api-service","gitBranch":"main","timestamp":"2026-06-08T20:02:00.000Z","message":{"role":"assistant","model":"claude-opus-4-8"}}
+{ this trailing line is not valid json

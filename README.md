@@ -19,7 +19,13 @@ Electron + React + TypeScript, dark theme only. See `CONTEXT.md` for the vocabul
 
 ```
 pnpm install
-pnpm dev      # serves the current UI prototype at http://localhost:5180
+pnpm rebuild:native   # rebuild better-sqlite3 for Electron's ABI (re-run after an Electron upgrade)
+pnpm dev              # launches the Electron app
 ```
 
-The code under `src/prototype/` is throwaway. Issues #2 and #10 fold variant B into the real Overview and delete the rest.
+`pnpm dev` opens the app and shows one row per running Claude Code session, served from an
+embedded SQLite index. `pnpm test` runs the ClaudeProvider read tests over the redacted
+`~/.claude` fixtures in `tests/fixtures/`. `pnpm typecheck` checks the main and renderer projects.
+
+The code under `src/prototype/` is throwaway and browser-only — now dormant (nothing imports it).
+Issue #10 folds Overview variant B into the real Overview and deletes the rest.
