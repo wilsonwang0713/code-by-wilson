@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { PersistedSession, SessionCandidate } from '@shared/types'
-import { normalizeModelId, contextWindowFor } from '@shared/models'
+import { normalizeModelId } from '@shared/models'
 import { parseTranscript, type TranscriptSummary } from './transcript'
 import { deriveSessionState } from './state'
 
@@ -176,7 +176,6 @@ export function summarize(c: SessionCandidate): PersistedSession {
     transcriptMtimeMs: c.transcriptMtimeMs,
     usage: t?.usage ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
     contextTokens: t?.contextTokens ?? 0,
-    contextWindow: t?.contextWindow ?? contextWindowFor(undefined),
   }
 }
 

@@ -1,9 +1,9 @@
 import type { Session, PersistedSession } from '@shared/types'
-import { equivApiValue, normalizeModelId } from '@shared/models'
+import { contextWindowFor, equivApiValue, normalizeModelId } from '@shared/models'
 import { transaction, type SqliteDb } from './driver'
 
 /** Bump when the schema changes; `migrate` rebuilds the index (a disposable cache) to match. */
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
@@ -33,8 +33,7 @@ export function migrate(db: SqliteDb): void {
         output_tokens INTEGER NOT NULL DEFAULT 0,
         cache_read_tokens INTEGER NOT NULL DEFAULT 0,
         cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
-        context_tokens INTEGER NOT NULL DEFAULT 0,
-        context_window INTEGER NOT NULL DEFAULT 200000
+        context_tokens INTEGER NOT NULL DEFAULT 0
       );
       PRAGMA user_version = ${SCHEMA_VERSION};
     `)
@@ -57,7 +56,6 @@ interface Row {
   cache_read_tokens: number
   cache_creation_tokens: number
   context_tokens: number
-  context_window: number
 }
 
 function rowToPersisted(r: Row): PersistedSession {
@@ -79,7 +77,6 @@ function rowToPersisted(r: Row): PersistedSession {
       cacheCreationTokens: r.cache_creation_tokens,
     },
     contextTokens: r.context_tokens,
-    contextWindow: r.context_window,
   }
 }
 
@@ -90,10 +87,12 @@ function pctOfWindow(tokens: number, window: number): number {
 
 /**
  * Turn a persisted snapshot into a renderer-facing Session, computing the derived display values
- * (context %, Equivalent API value) from the stored raw numbers + model — the single place that
- * formula lives. Tasks and subagents stay empty until later issues populate them.
+ * (context window, context %, Equivalent API value) from the stored raw numbers + model — the single
+ * place those formulas live. The window is a fixed per-family property of the model, so it's derived
+ * here, not stored. Tasks and subagents stay empty until later issues populate them.
  */
 export function hydrate(p: PersistedSession): Session {
+  const contextWindow = contextWindowFor(p.model)
   return {
     id: p.id,
     title: p.title,
@@ -102,8 +101,8 @@ export function hydrate(p: PersistedSession): Session {
     state: p.state,
     management: p.management,
     model: p.model,
-    contextPct: pctOfWindow(p.contextTokens, p.contextWindow),
-    contextWindow: p.contextWindow,
+    contextPct: pctOfWindow(p.contextTokens, contextWindow),
+    contextWindow,
     usage: p.usage,
     equivApiValueUsd: equivApiValue(p.usage, p.model),
     lastActivityMs: p.lastActivityMs,
@@ -115,10 +114,10 @@ export function hydrate(p: PersistedSession): Session {
 const UPSERT = `
   INSERT INTO sessions
     (id, title, project, branch, state, management, model, last_activity_ms, awaiting_user, transcript_mtime_ms,
-     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, context_tokens, context_window)
+     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, context_tokens)
   VALUES
     (@id, @title, @project, @branch, @state, @management, @model, @last_activity_ms, @awaiting_user, @transcript_mtime_ms,
-     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @context_tokens, @context_window)
+     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @context_tokens)
   ON CONFLICT(id) DO UPDATE SET
     title = excluded.title,
     project = excluded.project,
@@ -133,8 +132,7 @@ const UPSERT = `
     output_tokens = excluded.output_tokens,
     cache_read_tokens = excluded.cache_read_tokens,
     cache_creation_tokens = excluded.cache_creation_tokens,
-    context_tokens = excluded.context_tokens,
-    context_window = excluded.context_window
+    context_tokens = excluded.context_tokens
 `
 
 /**
@@ -162,7 +160,6 @@ export function upsertSessions(db: SqliteDb, snapshots: PersistedSession[]): voi
         cache_read_tokens: s.usage.cacheReadTokens,
         cache_creation_tokens: s.usage.cacheCreationTokens,
         context_tokens: s.contextTokens,
-        context_window: s.contextWindow,
       })
     }
   })

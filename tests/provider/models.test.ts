@@ -18,15 +18,10 @@ describe('normalizeModelId', () => {
 })
 
 describe('contextWindowFor', () => {
-  it('returns the standard window for a plain model string', () => {
+  it('is a fixed per-family window: Opus 1M, others 200K', () => {
+    expect(contextWindowFor('claude-opus-4-8')).toBe(1_000_000)
     expect(contextWindowFor('claude-sonnet-4-6')).toBe(200_000)
-    expect(contextWindowFor('claude-opus-4-8')).toBe(200_000)
-    expect(contextWindowFor(undefined)).toBe(200_000)
-  })
-
-  it('returns the 1M window when the raw string carries the [1m] beta tag', () => {
-    expect(contextWindowFor('claude-opus-4-8[1m]')).toBe(1_000_000)
-    expect(contextWindowFor('claude-sonnet-4-6[1m]')).toBe(1_000_000)
+    expect(contextWindowFor('claude-haiku-4-5')).toBe(200_000)
   })
 })
 

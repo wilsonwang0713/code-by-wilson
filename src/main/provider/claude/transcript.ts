@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { normalizeModelId, contextWindowFor, type ModelId } from '@shared/models'
+import { normalizeModelId, type ModelId } from '@shared/models'
 import type { Usage } from '@shared/types'
 
 export interface TranscriptSummary {
@@ -15,8 +15,6 @@ export interface TranscriptSummary {
   usage: Usage
   /** Latest turn's input + cache-read: the current context size, for context %. */
   contextTokens: number
-  /** Token window the session runs under: 1M when the model string carries "[1m]", else standard. */
-  contextWindow: number
 }
 
 // A slash-command user turn is a bundle of these envelope tags; its useful label
@@ -158,6 +156,5 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
     awaitingUser: unansweredToolUse.size > 0,
     usage: { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens },
     contextTokens,
-    contextWindow: contextWindowFor(lastModelRaw),
   }
 }

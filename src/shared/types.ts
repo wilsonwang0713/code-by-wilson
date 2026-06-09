@@ -72,8 +72,6 @@ export interface PersistedSession {
   usage: Usage
   /** Latest turn's input + cache-read: the current context size, for context %. */
   contextTokens: number
-  /** Token window the session runs under (1M when the "[1m]" beta is active, else standard). */
-  contextWindow: number
 }
 
 /**
