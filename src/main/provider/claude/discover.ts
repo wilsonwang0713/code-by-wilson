@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { Session } from '@shared/types'
 import { contextWindowFor, normalizeModelId } from '@shared/models'
@@ -119,4 +119,31 @@ function toSession(s: RawSessionFile, alive: boolean, t: TranscriptSummary | nul
     tasks: [], // later issue
     subagents: [], // later issue
   }
+}
+
+/**
+ * Map every transcript to its id and mtime in one sweep of `projects/`, so discovery is O(files)
+ * instead of the skeleton's O(sessions × projectDirs) existsSync probe per session. The filename is
+ * the session id (`<sessionId>.jsonl`); if an id appears under two project dirs, the freshest wins.
+ */
+export function indexTranscripts(claudeDir: string): Map<string, { path: string; mtimeMs: number }> {
+  const root = join(claudeDir, 'projects')
+  const out = new Map<string, { path: string; mtimeMs: number }>()
+  for (const proj of safeReaddir(root)) {
+    const dir = join(root, proj)
+    for (const name of safeReaddir(dir)) {
+      if (!name.endsWith('.jsonl')) continue
+      const id = name.slice(0, -'.jsonl'.length)
+      const path = join(dir, name)
+      let mtimeMs: number
+      try {
+        mtimeMs = statSync(path).mtimeMs
+      } catch {
+        continue
+      }
+      const prev = out.get(id)
+      if (!prev || mtimeMs > prev.mtimeMs) out.set(id, { path, mtimeMs })
+    }
+  }
+  return out
 }
