@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { Session, ProviderCapabilities } from '@shared/types'
 import { pinWaiting } from '@shared/overview'
 
@@ -41,7 +41,7 @@ export function App() {
     }
   }
 
-  const rows = pinWaiting(sessions)
+  const rows = useMemo(() => pinWaiting(sessions), [sessions])
 
   return (
     <div className="app-bg" style={{ minHeight: '100vh', padding: 24, color: 'var(--color-fg)' }}>
