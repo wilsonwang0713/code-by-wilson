@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { discoverSessions, readSessionFiles } from '../../src/main/provider/claude/discover'
+import { listCandidates, summarize, restate, readSessionFiles } from '../../src/main/provider/claude/discover'
+import type { SessionCandidate } from '@shared/types'
 
 const CLAUDE_DIR = resolve('tests/fixtures/claude-home')
 
@@ -20,166 +21,169 @@ function writeSessionFile(home: string, raw: Record<string, unknown>): void {
   mkdirSync(join(home, 'sessions'), { recursive: true })
   writeFileSync(join(home, 'sessions', `${raw.pid}.json`), JSON.stringify(raw))
 }
+function writeTranscript(home: string, proj: string, id: string, body: string, mtimeSec: number): string {
+  const dir = join(home, 'projects', proj)
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, `${id}.jsonl`)
+  writeFileSync(path, body)
+  utimesSync(path, new Date(mtimeSec * 1000), new Date(mtimeSec * 1000))
+  return path
+}
 
-describe('discoverSessions', () => {
-  it('maps a live busy session to working with skeleton defaults', () => {
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
-    const a = sessions.find((s) => s.id === 'aaaa1111-1111-1111-1111-111111111111')!
+// A candidate pointing at a real fixture transcript; cwd '' so the transcript's own cwd lines win.
+function fixtureCandidate(id: string, proj: string, over: Partial<SessionCandidate> = {}): SessionCandidate {
+  return {
+    id,
+    alive: true,
+    status: 'busy',
+    cwd: '',
+    transcriptPath: resolve(CLAUDE_DIR, 'projects', proj, `${id}.jsonl`),
+    transcriptMtimeMs: 1,
+    ...over,
+  }
+}
 
-    expect(a.title).toBe('Add a login form to the settings page')
-    expect(a.project).toBe('code-by-wire')
-    expect(a.branch).toBe('feature/login')
-    expect(a.model).toBe('claude-sonnet-4-6')
-    expect(a.management).toBe('observed')
-    expect(a.state).toBe('working') // alive + status "busy"
-    expect(a.lastActivityMs).toBe(Date.parse('2026-06-08T22:54:06.078Z'))
+describe('summarize', () => {
+  it('parses a live session transcript into a working snapshot', () => {
+    const s = summarize(fixtureCandidate('aaaa1111-1111-1111-1111-111111111111', '-work-code-by-wire'))
+    expect(s.title).toBe('Add a login form to the settings page')
+    expect(s.project).toBe('code-by-wire')
+    expect(s.branch).toBe('feature/login')
+    expect(s.model).toBe('claude-sonnet-4-6')
+    expect(s.management).toBe('observed')
+    expect(s.state).toBe('working') // alive + status busy
+    expect(s.lastActivityMs).toBe(Date.parse('2026-06-08T22:54:06.078Z'))
+    expect(s.awaitingUser).toBe(false)
+    expect(s.transcriptMtimeMs).toBe(1)
+  })
 
-    // deferred-scope defaults (issues #5, #13)
-    expect(a.usage).toEqual({
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      cacheCreationTokens: 0,
+  it('derives ended when the candidate process is gone', () => {
+    const s = summarize(fixtureCandidate('aaaa1111-1111-1111-1111-111111111111', '-work-code-by-wire', { alive: false }))
+    expect(s.state).toBe('ended')
+  })
+
+  it('derives waiting when the transcript tail is blocked on a prompt', () => {
+    const s = summarize(fixtureCandidate('dddd4444-4444-4444-4444-444444444444', '-work-checkout', { status: 'idle' }))
+    expect(s.state).toBe('waiting')
+  })
+
+  it('falls back to a registry skeleton when there is no transcript', () => {
+    const s = summarize({
+      id: 'b',
+      alive: true,
+      status: 'idle',
+      cwd: '/work/old-thing',
+      transcriptPath: undefined,
+      transcriptMtimeMs: 0,
+      updatedAt: 1780950000000,
     })
-    expect(a.equivApiValueUsd).toBe(0)
-    expect(a.contextPct).toBe(0)
-    expect(a.contextWindow).toBe(200_000)
-    expect(a.tasks).toEqual([])
-    expect(a.subagents).toEqual([])
+    expect(s.title).toBe('old-thing')
+    expect(s.project).toBe('old-thing')
+    expect(s.branch).toBeUndefined()
+    expect(s.lastActivityMs).toBe(1780950000000)
+    expect(s.state).toBe('idle')
+    expect(s.transcriptMtimeMs).toBe(0)
   })
 
-  it('maps a live quiet session with a finished turn to idle', () => {
-    // cccc3333's status is 'idle' and its transcript holds an interrupted tool_use the user walked
-    // past, so this also asserts awaitingUser does not latch on that abandoned tool (else: waiting).
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
-    const c = sessions.find((s) => s.id === 'cccc3333-3333-3333-3333-333333333333')!
-    expect(c.state).toBe('idle')
-  })
-
-  it('maps a live quiet session blocked on an unanswered prompt to waiting', () => {
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
-    const d = sessions.find((s) => s.id === 'dddd4444-4444-4444-4444-444444444444')!
-    expect(d.state).toBe('waiting')
-  })
-
-  it('maps a live session whose status field is "waiting" to waiting (no transcript needed)', () => {
-    // This is how real Claude Code reports a blocked session: status "waiting" in the
-    // session file, often with no unanswered tool_use in the transcript tail.
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
-    const e = sessions.find((s) => s.id === 'eeee5555-5555-5555-5555-555555555555')!
-    expect(e.state).toBe('waiting')
-  })
-
-  it('surfaces a dead session as ended instead of dropping it', () => {
-    // Only 1001 is alive; the rest are gone and must read as ended, not vanish.
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: (pid) => pid === 1001 })
-    const stateById = Object.fromEntries(sessions.map((s) => [s.id, s.state]))
-
-    expect(stateById['aaaa1111-1111-1111-1111-111111111111']).toBe('working') // alive + busy
-    expect(stateById['cccc3333-3333-3333-3333-333333333333']).toBe('ended') // dead
-    // Dead beats a pending prompt: 1004 is gone, so it's ended even though it's awaiting the user.
-    expect(stateById['dddd4444-4444-4444-4444-444444444444']).toBe('ended')
-  })
-
-  it('surfaces every well-formed session, alive or dead', () => {
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => false })
-    const ids = sessions.map((s) => s.id).sort()
-    expect(ids).toEqual([
-      'aaaa1111-1111-1111-1111-111111111111',
-      'bbbb2222-2222-2222-2222-222222222222',
-      'cccc3333-3333-3333-3333-333333333333',
-      'dddd4444-4444-4444-4444-444444444444',
-      'eeee5555-5555-5555-5555-555555555555',
-    ])
-    expect(sessions.every((s) => s.state === 'ended')).toBe(true)
-  })
-
-  it('keeps a session whose transcript path cannot be read, using skeleton fallbacks', () => {
+  it('falls back to skeleton when the transcript path cannot be read (a directory → EISDIR)', () => {
     const home = makeHome()
-    writeSessionFile(home, { pid: 42, sessionId: 'sess-1', cwd: '/work/widget', updatedAt: 123 })
-    // A transcript path that exists but is not a readable file (a directory → EISDIR on read).
     mkdirSync(join(home, 'projects', '-work-widget', 'sess-1.jsonl'), { recursive: true })
-
-    const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
-
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0].id).toBe('sess-1')
-    expect(sessions[0].title).toBe('widget') // basename(cwd) fallback, not a thrown error
-    expect(sessions[0].lastActivityMs).toBe(123)
-  })
-
-  it('still lists sessions when the projects directory is unreadable', () => {
-    const home = makeHome()
-    writeSessionFile(home, { pid: 7, sessionId: 'sess-x', cwd: '/work/thing', updatedAt: 99 })
-    writeFileSync(join(home, 'projects'), 'not a directory') // readdir → ENOTDIR
-
-    const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
-
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0].title).toBe('thing')
+    const s = summarize({
+      id: 'sess-1',
+      alive: true,
+      status: 'idle',
+      cwd: '/work/widget',
+      transcriptPath: join(home, 'projects', '-work-widget', 'sess-1.jsonl'),
+      transcriptMtimeMs: 7,
+      updatedAt: 123,
+    })
+    expect(s.title).toBe('widget') // basename(cwd) fallback, not a thrown error
+    expect(s.lastActivityMs).toBe(123)
   })
 
   it('falls back to "unknown" for a root cwd with no transcript', () => {
+    const s = summarize({ id: 'r', alive: true, status: undefined, cwd: '/', transcriptPath: undefined, transcriptMtimeMs: 0, updatedAt: 1 })
+    expect(s.title).toBe('unknown')
+    expect(s.project).toBe('unknown')
+  })
+})
+
+describe('restate', () => {
+  it('refreshes only state from fresh liveness, preserving the parsed fields', () => {
+    const prev = summarize(fixtureCandidate('aaaa1111-1111-1111-1111-111111111111', '-work-code-by-wire'))
+    expect(prev.state).toBe('working')
+    const dead = { ...fixtureCandidate('aaaa1111-1111-1111-1111-111111111111', '-work-code-by-wire'), alive: false }
+    const next = restate(dead, prev)
+    expect(next.state).toBe('ended')
+    expect(next.title).toBe(prev.title)
+    expect(next.transcriptMtimeMs).toBe(prev.transcriptMtimeMs)
+  })
+})
+
+describe('listCandidates', () => {
+  const NOW = 10_000_000_000 // fixed clock (ms)
+  const WINDOW = 60_000 // 60s recency window
+
+  it('unions live registry sessions with recent transcripts, keyed by id', () => {
     const home = makeHome()
-    writeSessionFile(home, { pid: 5, sessionId: 'sess-root', cwd: '/', updatedAt: 1 })
-
-    const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
-
-    expect(sessions[0].title).toBe('unknown')
-    expect(sessions[0].project).toBe('unknown')
+    writeSessionFile(home, { pid: 100, sessionId: 'live', cwd: '/w/live', status: 'busy', updatedAt: 1 })
+    writeTranscript(home, '-w-ended', 'ended', '{"type":"user","message":{"content":"hi"}}\n', NOW / 1000 - 1) // 1s ago
+    const cands = listCandidates({ claudeDir: home, isPidAlive: () => true, now: NOW, recentWindowMs: WINDOW })
+    const byId = Object.fromEntries(cands.map((c) => [c.id, c]))
+    expect(Object.keys(byId).sort()).toEqual(['ended', 'live'])
+    expect(byId['live'].alive).toBe(true)
+    expect(byId['live'].transcriptPath).toBeUndefined() // registry-only, no transcript
+    expect(byId['ended'].alive).toBe(false) // transcript only, no registry → not alive → Ended
+    expect(byId['ended'].transcriptPath).toBeDefined()
   })
 
-  it('de-duplicates sessions that resolve to the same id', () => {
+  it('drops a transcript-only session older than the recency window', () => {
     const home = makeHome()
-    writeSessionFile(home, { pid: 10, sessionId: 'same', cwd: '/work/a', updatedAt: 1 })
-    writeSessionFile(home, { pid: 11, sessionId: 'same', cwd: '/work/b', updatedAt: 2 })
-
-    const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
-
-    expect(sessions.filter((s) => s.id === 'same')).toHaveLength(1)
+    writeTranscript(home, '-w-old', 'ancient', '{"type":"user","message":{"content":"hi"}}\n', NOW / 1000 - 1000) // 1000s ago
+    const cands = listCandidates({ claudeDir: home, isPidAlive: () => true, now: NOW, recentWindowMs: WINDOW })
+    expect(cands.map((c) => c.id)).not.toContain('ancient')
   })
 
-  it('on a duplicate sessionId, keeps the freshest file (max updatedAt), not readdir order', () => {
+  it('keeps a live registry session even when its transcript is old', () => {
     const home = makeHome()
-    // The same session re-registered under a new pid; the stale file lingers with the old pid.
-    // The fresh file (max updatedAt) must win so its current status and pid surface, regardless
-    // of the order readdir happens to yield the two files in.
-    writeSessionFile(home, { pid: 999, sessionId: 'dup', cwd: '/work/stale', status: 'idle', updatedAt: 1000 })
-    writeSessionFile(home, { pid: 200, sessionId: 'dup', cwd: '/work/fresh', status: 'busy', updatedAt: 5000 })
+    writeSessionFile(home, { pid: 7, sessionId: 'oldlive', cwd: '/w/oldlive', status: 'idle', updatedAt: 1 })
+    writeTranscript(home, '-w-oldlive', 'oldlive', '{"type":"user","message":{"content":"hi"}}\n', NOW / 1000 - 5000)
+    const c = listCandidates({ claudeDir: home, isPidAlive: () => true, now: NOW, recentWindowMs: WINDOW }).find((x) => x.id === 'oldlive')!
+    expect(c).toBeDefined()
+    expect(c.alive).toBe(true)
+    expect(c.transcriptPath).toBeDefined()
+  })
 
-    const dup = discoverSessions({ claudeDir: home, isPidAlive: () => true }).filter((s) => s.id === 'dup')
+  it('marks a registry session with a dead pid as not alive', () => {
+    const home = makeHome()
+    writeSessionFile(home, { pid: 999, sessionId: 'dead', cwd: '/w/dead', status: 'idle', updatedAt: 1 })
+    const [c] = listCandidates({ claudeDir: home, isPidAlive: () => false, now: NOW, recentWindowMs: WINDOW })
+    expect(c.alive).toBe(false)
+  })
 
+  it('keeps the freshest registry file per id (max updatedAt)', () => {
+    const home = makeHome()
+    writeSessionFile(home, { pid: 999, sessionId: 'dup', cwd: '/w/stale', status: 'idle', updatedAt: 1000 })
+    writeSessionFile(home, { pid: 200, sessionId: 'dup', cwd: '/w/fresh', status: 'busy', updatedAt: 5000 })
+    const dup = listCandidates({ claudeDir: home, isPidAlive: () => true, now: NOW, recentWindowMs: WINDOW }).filter((c) => c.id === 'dup')
     expect(dup).toHaveLength(1)
-    expect(dup[0].project).toBe('fresh') // the freshest file won, not whichever sorted last
-    expect(dup[0].state).toBe('working') // and it carries that file's status 'busy', not stale 'idle'
-  })
-
-  it('reads a live session that has no transcript with skeleton fallbacks', () => {
-    // Only 1002 is alive; it has no transcript, so it leans on the session-file fields.
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: (pid) => pid === 1002 })
-    const b = sessions.find((s) => s.id === 'bbbb2222-2222-2222-2222-222222222222')!
-    expect(b.title).toBe('old-thing')
-    expect(b.project).toBe('old-thing')
-    expect(b.branch).toBeUndefined()
-    expect(b.lastActivityMs).toBe(1780950000000)
-    expect(b.state).toBe('idle') // alive, no transcript → no pending prompt → idle
+    expect(dup[0].status).toBe('busy') // the fresher file won
+    expect(dup[0].cwd).toBe('/w/fresh')
   })
 })
 
 describe('readSessionFiles', () => {
-  it('returns no sessions instead of throwing when the sessions path is not a directory', () => {
+  it('returns no sessions when the sessions path is not a directory', () => {
     const home = makeHome()
     writeFileSync(join(home, 'sessions'), 'not a directory') // readdir → ENOTDIR
-
     expect(readSessionFiles(home)).toEqual([])
   })
 
   it('skips session files whose pid is not a positive number', () => {
     const home = makeHome()
-    writeSessionFile(home, { pid: 0, sessionId: 'zero', cwd: '/work/x' })
-    writeSessionFile(home, { pid: -3, sessionId: 'neg', cwd: '/work/y' })
-    writeSessionFile(home, { pid: 9, sessionId: 'ok', cwd: '/work/z' })
-
+    writeSessionFile(home, { pid: 0, sessionId: 'zero', cwd: '/w/x' })
+    writeSessionFile(home, { pid: -3, sessionId: 'neg', cwd: '/w/y' })
+    writeSessionFile(home, { pid: 9, sessionId: 'ok', cwd: '/w/z' })
     expect(readSessionFiles(home).map((s) => s.sessionId)).toEqual(['ok'])
   })
 })

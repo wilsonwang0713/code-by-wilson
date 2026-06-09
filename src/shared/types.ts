@@ -70,6 +70,27 @@ export interface PersistedSession {
   transcriptMtimeMs: number
 }
 
+/**
+ * A session the index might track this pass, before the expensive transcript parse. Cheap to build
+ * (a directory listing plus a stat), it carries just enough for the sync to decide whether to
+ * reparse (`transcriptMtimeMs`) and how to derive state (`alive`, `status`).
+ */
+export interface SessionCandidate {
+  id: string
+  /** Is the owning process still alive? False for a transcript with no live registry entry — an Ended session. */
+  alive: boolean
+  /** The provider's raw status hint (Claude: 'busy' | 'waiting' | …), if the session has a live registry entry. */
+  status?: string
+  /** Working directory from the registry, if any. The transcript itself is the richer source once parsed. */
+  cwd: string
+  /** Absolute path to the transcript file, if one exists. */
+  transcriptPath?: string
+  /** Current transcript mtime (ms); 0 when there is no transcript. */
+  transcriptMtimeMs: number
+  /** Registry-reported last touch (ms), a fallback for last activity when there is no transcript. */
+  updatedAt?: number
+}
+
 export interface RateLimit {
   usedPct: number
   resetsAt: number
