@@ -55,6 +55,9 @@ describe('summarize', () => {
     expect(s.lastActivityMs).toBe(Date.parse('2026-06-08T22:54:06.078Z'))
     expect(s.awaitingUser).toBe(false)
     expect(s.transcriptMtimeMs).toBe(1)
+    expect(s.usage).toEqual({ inputTokens: 100, outputTokens: 50, cacheReadTokens: 10, cacheCreationTokens: 5 })
+    expect(s.contextTokens).toBe(110)
+    expect(s.contextWindow).toBe(200_000)
   })
 
   it('derives ended when the candidate process is gone', () => {

@@ -24,6 +24,9 @@ const seed: PersistedSession = {
   lastActivityMs: 1,
   awaitingUser: false,
   transcriptMtimeMs: 0,
+  usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
+  contextTokens: 0,
+  contextWindow: 200_000,
 }
 
 const provider = (listCandidates: Provider['listCandidates']): Provider => ({
