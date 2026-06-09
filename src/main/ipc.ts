@@ -17,7 +17,13 @@ export function registerIpc({ db, provider }: IpcDeps): { sync: () => void } {
 
   ipcMain.handle(IPC.listSessions, () => getSessions(db))
   ipcMain.handle(IPC.refresh, () => {
-    sync()
+    try {
+      sync()
+    } catch (err) {
+      // A failed refresh (e.g. ~/.claude briefly unreadable) must not reject to the renderer or
+      // drop the list. Serve the last-known rows and let the next Refresh retry, like launch does.
+      console.error('refresh sync failed; serving last-known rows', err)
+    }
     return getSessions(db)
   })
   ipcMain.handle(IPC.capabilities, () => provider.capabilities)

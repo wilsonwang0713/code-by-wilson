@@ -22,7 +22,25 @@ export interface CandidateDeps {
   recentWindowMs: number
 }
 
-/** List a directory, treating a missing or unreadable dir as empty rather than throwing. */
+/**
+ * List an index root (`sessions/` or `projects/`), treating a genuinely-absent one as empty. A
+ * missing dir (ENOENT) or a non-dir in its place (ENOTDIR) really is "nothing here". But a real read
+ * failure (EACCES, EIO, ELOOP, …) is NOT emptiness — swallowing it would let one unreadable sweep
+ * masquerade as an empty home, which downstream prunes the whole index. Let those propagate so the
+ * sync aborts and leaves the existing rows intact.
+ */
+function readRoot(dir: string): string[] {
+  try {
+    return readdirSync(dir)
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') return []
+    throw err
+  }
+}
+
+/** List a single project subdir, skipping it whole if it can't be read — one bad dir among many
+ *  shouldn't sink the sweep (unlike an unreadable root, which `readRoot` surfaces). */
 function safeReaddir(dir: string): string[] {
   try {
     return readdirSync(dir)
@@ -36,7 +54,7 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
   const dir = join(claudeDir, 'sessions')
 
   const out: RawSessionFile[] = []
-  for (const name of safeReaddir(dir)) {
+  for (const name of readRoot(dir)) {
     if (!name.endsWith('.json')) continue
     try {
       const j = JSON.parse(readFileSync(join(dir, name), 'utf8'))
@@ -64,7 +82,7 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
 export function indexTranscripts(claudeDir: string): Map<string, { path: string; mtimeMs: number }> {
   const root = join(claudeDir, 'projects')
   const out = new Map<string, { path: string; mtimeMs: number }>()
-  for (const proj of safeReaddir(root)) {
+  for (const proj of readRoot(root)) {
     const dir = join(root, proj)
     for (const name of safeReaddir(dir)) {
       if (!name.endsWith('.jsonl')) continue

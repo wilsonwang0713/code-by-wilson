@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { indexTranscripts } from '../../src/main/provider/claude/discover'
@@ -48,6 +48,22 @@ describe('indexTranscripts', () => {
     expect(indexTranscripts(home).size).toBe(0)
     writeFileSync(join(home, 'projects'), 'not a dir') // readdir → ENOTDIR
     expect(indexTranscripts(home).size).toBe(0)
+  })
+
+  it('propagates a genuine read failure instead of mistaking an unreadable home for an empty one', () => {
+    const home = makeHome()
+    // A self-referential symlink makes readdirSync throw ELOOP — a real failure, not "nothing here".
+    // Swallowing it would let one bad sweep look like an empty home and wipe the index downstream.
+    symlinkSync(join(home, 'projects'), join(home, 'projects'))
+    expect(() => indexTranscripts(home)).toThrow()
+  })
+
+  it('skips a single unreadable project subdir without sinking the rest of the sweep', () => {
+    const home = makeHome()
+    writeTranscript(home, '-work-good', 'sess-good', 1_000)
+    // One bad project dir (ELOOP) must be skipped, not abort the whole sweep — unlike the root.
+    symlinkSync(join(home, 'projects', '-work-bad'), join(home, 'projects', '-work-bad'))
+    expect([...indexTranscripts(home).keys()]).toEqual(['sess-good'])
   })
 
   it('keeps the freshest path when an id appears under two project dirs', () => {
