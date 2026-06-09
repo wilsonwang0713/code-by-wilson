@@ -105,6 +105,23 @@ describe('parseTranscriptEvents — events', () => {
     expect(events).toEqual([{ kind: 'subagent', agentType: 'Explore', description: 'find usages' }])
   })
 
+  it('renders an Agent tool as a subagent dispatch too', () => {
+    const { events } = parseTranscriptEvents(
+      jsonl({
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'Agent', input: { subagent_type: 'Plan', description: 'design the API' } }] },
+      }),
+    )
+    expect(events).toEqual([{ kind: 'subagent', agentType: 'Plan', description: 'design the API' }])
+  })
+
+  it('emits a tool event even when the tool_use has no id', () => {
+    const { events } = parseTranscriptEvents(
+      jsonl({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }] } }),
+    )
+    expect(events).toEqual([{ kind: 'tool', name: 'Bash', input: 'ls' }])
+  })
+
   it('skips meta user turns and tool_result-only user turns', () => {
     const { events } = parseTranscriptEvents(
       jsonl(
@@ -140,6 +157,13 @@ describe('parseTranscriptEvents — waiting + sidechain', () => {
       jsonl({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'q1', name: 'AskUserQuestion', input: { questions: [{ question: 'A?' }, { question: 'B?' }] } }] } }),
     )
     expect(waitingReason).toBe('A? · B?')
+  })
+
+  it('falls back to a generic reason for an AskUserQuestion with no questions', () => {
+    const { waitingReason } = parseTranscriptEvents(
+      jsonl({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'q1', name: 'AskUserQuestion', input: { questions: [] } }] } }),
+    )
+    expect(waitingReason).toBe('Waiting on a question')
   })
 
   it('reports a permission-style reason for a non-question pending tool', () => {

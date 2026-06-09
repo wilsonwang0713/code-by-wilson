@@ -76,8 +76,10 @@ export function parseTranscriptEvents(jsonl: string): TranscriptDoc {
 
   // Unanswered tool_use ids from the LATEST assistant turn, each mapped to its reason. Reset per
   // assistant turn (an interrupted tool the user walked past must not latch), cleared by a
-  // tool_result. A non-empty map at EOF means the tail is blocked on the user. This mirrors the latch
-  // logic in parseTranscript so the two never disagree on "is this session waiting".
+  // tool_result. A non-empty map at EOF means the tail is blocked on the user. This mirrors the
+  // intent of parseTranscript's latch logic, with one deliberate divergence: that one has no
+  // isSidechain guard, so a subagent's own turn clears the parent's pending tool there; here the
+  // sidechain skip (below) leaves it intact, which is the more correct read of "waiting on you".
   let pending = new Map<string, string>()
 
   for (const line of jsonl.split('\n')) {
