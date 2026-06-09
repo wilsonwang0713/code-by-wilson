@@ -2,13 +2,7 @@ import { useMemo, type CSSProperties } from 'react'
 import type { Session, ProviderCapabilities } from '@shared/types'
 import { pinWaiting } from '@shared/overview'
 import { formatUsd, formatRelativeTime } from '@shared/format'
-
-const STATE_LABEL: Record<Session['state'], string> = {
-  working: 'Working',
-  waiting: 'Waiting',
-  idle: 'Idle',
-  ended: 'Ended',
-}
+import { STATE_META } from './ui/meta'
 
 const cell: CSSProperties = { padding: '6px 8px' }
 const muted: CSSProperties = { ...cell, color: 'var(--color-fg-muted)' }
@@ -78,10 +72,19 @@ export function Overview({ sessions, caps, loading, onRefresh, onOpen }: Props) 
               <tr
                 key={s.id}
                 className="row-clickable"
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${s.title}`}
                 onClick={() => onOpen(s)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onOpen(s)
+                  }
+                }}
                 style={{ borderBottom: '1px solid var(--color-ink-850)' }}
               >
-                <td style={cell}>{STATE_LABEL[s.state]}</td>
+                <td style={cell}>{STATE_META[s.state].label}</td>
                 <td style={cell}>{s.title}</td>
                 <td style={muted}>{s.project}</td>
                 <td style={muted}>{s.branch ?? '—'}</td>

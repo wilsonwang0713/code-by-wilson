@@ -30,8 +30,23 @@ export interface TranscriptDoc {
   waitingReason: string | null
 }
 
-/** A TranscriptDoc plus the source file's mtime, so the renderer can skip re-rendering an unchanged
- *  poll. Returned by the IPC read; null there means the session has no transcript on disk. */
-export interface TranscriptView extends TranscriptDoc {
-  mtimeMs: number
-}
+/**
+ * The result of an on-demand transcript read. A discriminated union so a poll can answer "nothing
+ * changed" without re-shipping (or even re-parsing) the whole doc:
+ *
+ *  - `changed`   — a fresh doc, with `mtimeMs` as an opaque change token the caller echoes back as
+ *                  `since` on the next read.
+ *  - `unchanged` — the source hasn't moved since `since`; the caller keeps its current doc.
+ *  - `absent`    — no transcript for this session (registry-only, or the file is gone).
+ *  - `error`     — a transient read failure; the caller should keep its last doc and retry, NOT
+ *                  fall back to the empty state (an unreadable file isn't a missing one).
+ *
+ * `mtimeMs` is a transport-level cache token, deliberately kept out of TranscriptDoc: the domain
+ * projection says nothing about how a consumer dedupes polls, and a non-file-backed provider is free
+ * to mint its own token.
+ */
+export type TranscriptRead =
+  | { status: 'changed'; mtimeMs: number; doc: TranscriptDoc }
+  | { status: 'unchanged'; mtimeMs: number }
+  | { status: 'absent' }
+  | { status: 'error' }

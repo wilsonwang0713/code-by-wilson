@@ -183,6 +183,40 @@ describe('parseTranscriptEvents — waiting + sidechain', () => {
     expect(waitingReason).toBeNull()
   })
 
+  it('accumulates parallel tool_use across lines of one turn (same message.id), favouring the question', () => {
+    // Claude Code writes one assistant turn across several lines — one per content block — so a turn's
+    // parallel tools land on separate lines under the same message.id. Both stay pending; the actual
+    // question wins over a permission line.
+    const { waitingReason } = parseTranscriptEvents(
+      jsonl(
+        { type: 'assistant', message: { role: 'assistant', id: 'm1', content: [{ type: 'tool_use', id: 'r1', name: 'Read', input: {} }] } },
+        { type: 'assistant', message: { role: 'assistant', id: 'm1', content: [{ type: 'tool_use', id: 'q1', name: 'AskUserQuestion', input: { questions: [{ question: 'Ship it?' }] } }] } },
+      ),
+    )
+    expect(waitingReason).toBe('Ship it?')
+  })
+
+  it('keeps an earlier same-turn tool pending after a later one is answered', () => {
+    const { waitingReason } = parseTranscriptEvents(
+      jsonl(
+        { type: 'assistant', message: { role: 'assistant', id: 'm1', content: [{ type: 'tool_use', id: 'r1', name: 'Read', input: {} }] } },
+        { type: 'assistant', message: { role: 'assistant', id: 'm1', content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: {} }] } },
+        { type: 'user', isMeta: false, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'b1', content: 'done' }] } },
+      ),
+    )
+    expect(waitingReason).toBe('Permission: Read')
+  })
+
+  it('a new turn (new message.id) supersedes the previous turn’s pending tools', () => {
+    const { waitingReason } = parseTranscriptEvents(
+      jsonl(
+        { type: 'assistant', message: { role: 'assistant', id: 'm1', content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: {} }] } },
+        { type: 'assistant', message: { role: 'assistant', id: 'm2', content: [{ type: 'text', text: 'done' }] } },
+      ),
+    )
+    expect(waitingReason).toBeNull()
+  })
+
   it('does not latch on a tool the user interrupted earlier (only the latest turn counts)', () => {
     const { waitingReason } = parseTranscriptEvents(
       jsonl(

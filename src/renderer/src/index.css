@@ -56,6 +56,12 @@ body {
     var(--color-ink-950);
 }
 
-/* Overview rows drill into the workspace. */
+/* Overview rows drill into the workspace. Keyboard-reachable (role=button, tabIndex), so give focus
+   a visible ring alongside the hover tint. */
 .row-clickable { cursor: pointer; }
 .row-clickable:hover { background: var(--color-ink-925); }
+.row-clickable:focus-visible {
+  background: var(--color-ink-925);
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}

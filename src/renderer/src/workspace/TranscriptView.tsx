@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { SessionState } from '@shared/types'
-import type { TranscriptView as Doc } from '@shared/transcript'
+import type { TranscriptDoc } from '@shared/transcript'
 import { EventItem } from './events'
 
 /** How often the Observed view re-reads the transcript. A poll, not a watcher: it matches the app's
- *  request/response IPC, and an mtime guard makes an unchanged poll a no-op for React. */
+ *  request/response IPC, and the read's change token makes an unchanged poll a cheap no-op (the main
+ *  process skips the read+parse, the renderer skips the re-render). */
 const POLL_MS = 1500
+
+// doc state is tri-state: `undefined` = the first read hasn't landed (show the shell), `null` = read
+// and there's no transcript (show the empty state), a doc = render it. That collapses the old
+// separate `loaded` flag into the value itself.
+type DocState = TranscriptDoc | null | undefined
 
 export function TranscriptView({
   sessionId,
@@ -16,39 +22,61 @@ export function TranscriptView({
   project: string
   state: SessionState
 }) {
-  const [doc, setDoc] = useState<Doc | null>(null)
-  const [loaded, setLoaded] = useState(false)
-  const mtimeRef = useRef(-1)
+  const [doc, setDoc] = useState<DocState>(undefined)
+  const sinceRef = useRef<number | undefined>(undefined) // last seen change token (mtime)
+  const inFlightRef = useRef(false)
   const countRef = useRef(0)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let alive = true
-    mtimeRef.current = -1
+    sinceRef.current = undefined
+    inFlightRef.current = false
     countRef.current = 0
-    setLoaded(false)
-    setDoc(null)
+    setDoc(undefined)
 
     async function poll() {
+      // Skip while a read is in flight (a slow read on a big transcript must not let polls overlap
+      // and apply out of order) or while the window is hidden (nothing to show, no reason to read).
+      if (inFlightRef.current || document.hidden) return
+      inFlightRef.current = true
       try {
-        const v = await window.api.readTranscript(sessionId)
+        const r = await window.api.readTranscript(sessionId, sinceRef.current)
         if (!alive) return
-        setLoaded(true)
-        if (v && v.mtimeMs === mtimeRef.current) return // unchanged since last poll — skip the re-render
-        mtimeRef.current = v?.mtimeMs ?? -1
-        setDoc(v)
+        switch (r.status) {
+          case 'changed':
+            sinceRef.current = r.mtimeMs
+            setDoc(r.doc)
+            break
+          case 'unchanged':
+            break // nothing moved — hold the current doc
+          case 'absent':
+            sinceRef.current = undefined
+            setDoc(null)
+            break
+          case 'error':
+            // Transient read failure: keep the last doc and retry next poll, the same way the
+            // session list survives a failed sync. Don't fall back to the empty state.
+            break
+        }
       } catch {
-        // A transient read error (e.g. the file briefly unreadable) must not break the view; keep the
-        // last doc and let the next poll retry, the same way the session list survives a failed sync.
-        if (alive) setLoaded(true)
+        // IPC itself failed; treat like a transient error and keep the last doc.
+      } finally {
+        if (alive) inFlightRef.current = false
       }
     }
 
     void poll()
     const h = setInterval(() => void poll(), POLL_MS)
+    // Read immediately when the window comes back to the foreground, rather than waiting a full poll.
+    const onVisible = () => {
+      if (!document.hidden) void poll()
+    }
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       alive = false
       clearInterval(h)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [sessionId])
 
@@ -59,7 +87,7 @@ export function TranscriptView({
     countRef.current = n
   }, [doc])
 
-  if (loaded && !doc) {
+  if (doc === null) {
     return <Center>No transcript on disk for this session yet.</Center>
   }
 

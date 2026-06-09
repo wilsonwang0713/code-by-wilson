@@ -1,5 +1,5 @@
 import type { Session, ProviderCapabilities } from './types'
-import type { TranscriptView } from './transcript'
+import type { TranscriptRead } from './transcript'
 
 export const IPC = {
   listSessions: 'sessions:list',
@@ -12,5 +12,5 @@ export interface IpcApi {
   listSessions(): Promise<Session[]>
   refresh(): Promise<Session[]>
   capabilities(): Promise<ProviderCapabilities>
-  readTranscript(id: string): Promise<TranscriptView | null>
+  readTranscript(id: string, sinceMtimeMs?: number): Promise<TranscriptRead>
 }

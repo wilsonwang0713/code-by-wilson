@@ -34,7 +34,7 @@ const provider = (listCandidates: Provider['listCandidates']): Provider => ({
   listCandidates,
   summarize: (c) => ({ ...seed, id: c.id }),
   restate: (_c, prev) => prev,
-  readTranscript: () => null,
+  readTranscript: () => ({ status: 'absent' }),
 })
 
 describe('registerIpc refresh', () => {
@@ -59,11 +59,11 @@ describe('registerIpc refresh', () => {
 })
 
 describe('registerIpc readTranscript', () => {
-  it('delegates to the provider (null when no transcript)', () => {
+  it('delegates to the provider (absent when no transcript)', () => {
     const db = openTestDb()
     migrate(db)
     registerIpc({ db, provider: provider(() => []) })
     const handler = handlers.get(IPC.readTranscript)!
-    expect(handler({}, 'any-id')).toBeNull()
+    expect(handler({}, 'any-id')).toEqual({ status: 'absent' })
   })
 })

@@ -53,16 +53,24 @@ function diffHunk(tool: string, input: Record<string, unknown>): DiffHunk {
   return { removed: lines(input.old_string), added: lines(input.new_string) }
 }
 
+/** A pending tool_use's reason and whether it's a direct question to the user. `question` lets the
+ *  waiting-reason pick favour an actual AskUserQuestion over a permission line when a turn fires
+ *  several tools at once. */
+interface PendingReason {
+  reason: string
+  question: boolean
+}
+
 /** A waiting reason for one unanswered tool_use: the question(s) for AskUserQuestion, else a
  *  permission line naming the pending tool. */
-function reasonForTool(name: string, input: Record<string, unknown>): string {
+function reasonForTool(name: string, input: Record<string, unknown>): PendingReason {
   if (name === 'AskUserQuestion') {
     const qs = Array.isArray(input.questions)
       ? input.questions.map((q) => (typeof q?.question === 'string' ? q.question : '')).filter(Boolean)
       : []
-    return qs.length ? qs.join(' · ') : 'Waiting on a question'
+    return { reason: qs.length ? qs.join(' · ') : 'Waiting on a question', question: true }
   }
-  return `Permission: ${name}`
+  return { reason: `Permission: ${name}`, question: false }
 }
 
 /**
@@ -74,13 +82,18 @@ function reasonForTool(name: string, input: Record<string, unknown>): string {
 export function parseTranscriptEvents(jsonl: string): TranscriptDoc {
   const events: TranscriptEvent[] = []
 
-  // Unanswered tool_use ids from the LATEST assistant turn, each mapped to its reason. Reset per
-  // assistant turn (an interrupted tool the user walked past must not latch), cleared by a
-  // tool_result. A non-empty map at EOF means the tail is blocked on the user. This mirrors the
-  // intent of parseTranscript's latch logic, with one deliberate divergence: that one has no
-  // isSidechain guard, so a subagent's own turn clears the parent's pending tool there; here the
-  // sidechain skip (below) leaves it intact, which is the more correct read of "waiting on you".
-  let pending = new Map<string, string>()
+  // Unanswered tool_use ids from the LATEST assistant turn, each mapped to its reason. Reset when a
+  // NEW turn begins (keyed on message.id, not per row) and cleared by a tool_result. Claude Code
+  // writes one assistant turn across several JSONL lines — one per content block — so a turn's
+  // parallel tool_use blocks arrive on separate lines under the same id; resetting per row would
+  // drop all but the last. An interrupted tool the user walked past lives under an earlier id and is
+  // superseded by the next turn, so it never latches. A non-empty map at EOF means the tail is
+  // blocked on the user. This mirrors the intent of parseTranscript's latch logic, with one
+  // deliberate divergence: that one has no isSidechain guard, so a subagent's own turn clears the
+  // parent's pending tool there; here the sidechain skip (below) leaves it intact, which is the more
+  // correct read of "waiting on you".
+  let pending = new Map<string, PendingReason>()
+  let turn: string | undefined // message.id of the turn `pending` belongs to
 
   for (const line of jsonl.split('\n')) {
     const trimmed = line.trim()
@@ -111,7 +124,13 @@ export function parseTranscriptEvents(jsonl: string): TranscriptDoc {
     }
 
     if (row.type === 'assistant') {
-      pending = new Map() // a new turn supersedes the last; only its own tools can still block
+      // A new turn (new message.id) supersedes the last; only its own tools can still block. Lines
+      // of the same turn keep accumulating into `pending`. An id-less row is treated as its own turn.
+      const id = typeof row.message?.id === 'string' ? row.message.id : undefined
+      if (id === undefined || id !== turn) {
+        pending = new Map()
+        turn = id
+      }
       if (!Array.isArray(content)) continue
       for (const b of content) {
         if (b?.type === 'text' && typeof b.text === 'string' && b.text.trim()) {
@@ -137,6 +156,16 @@ export function parseTranscriptEvents(jsonl: string): TranscriptDoc {
     }
   }
 
-  const waitingReason = pending.size ? [...pending.values()][0] : null
-  return { events, waitingReason }
+  // Surface the actual question when a turn blocks on several tools at once; else the first pending
+  // tool in turn order. `.find` short-circuits, so no array is materialized in the common case.
+  const reasons = pending.values()
+  let pick: PendingReason | undefined
+  for (const r of reasons) {
+    if (!pick) pick = r
+    if (r.question) {
+      pick = r
+      break
+    }
+  }
+  return { events, waitingReason: pick?.reason ?? null }
 }
