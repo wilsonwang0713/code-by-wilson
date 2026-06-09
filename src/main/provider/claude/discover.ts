@@ -35,7 +35,7 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
     if (!name.endsWith('.json')) continue
     try {
       const j = JSON.parse(readFileSync(join(dir, name), 'utf8'))
-      if (typeof j.pid === 'number' && typeof j.sessionId === 'string') {
+      if (typeof j.pid === 'number' && j.pid > 0 && typeof j.sessionId === 'string') {
         out.push({
           pid: j.pid,
           sessionId: j.sessionId,
@@ -80,9 +80,11 @@ function readTranscriptSummary(
 }
 
 export function discoverSessions({ claudeDir, isPidAlive }: DiscoverDeps): Session[] {
-  return readSessionFiles(claudeDir)
-    .filter((s) => isPidAlive(s.pid))
-    .map((s) => toSession(s, readTranscriptSummary(claudeDir, s.sessionId, s.cwd)))
+  const live = readSessionFiles(claudeDir).filter((s) => isPidAlive(s.pid))
+  // Collapse duplicate sessionIds so the snapshot is unique by construction, which
+  // is what the SQLite primary key expects (last file wins) instead of aborting.
+  const unique = [...new Map(live.map((s) => [s.sessionId, s])).values()]
+  return unique.map((s) => toSession(s, readTranscriptSummary(claudeDir, s.sessionId, s.cwd)))
 }
 
 /** Minimal skeleton state. Full Working/Waiting/Idle/Ended derivation is a later issue. */
@@ -92,7 +94,7 @@ function deriveState(status: string | undefined): SessionState {
 
 function toSession(s: RawSessionFile, t: TranscriptSummary | null): Session {
   const model = t ? t.model : normalizeModelId(undefined)
-  const projectFromCwd = s.cwd ? basename(s.cwd) : 'unknown'
+  const projectFromCwd = (s.cwd && basename(s.cwd)) || 'unknown'
 
   return {
     id: s.sessionId,

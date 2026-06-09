@@ -28,6 +28,18 @@ export function deriveTitle(userPrompts: string[], cwd: string): string {
   return basename(cwd) || 'session'
 }
 
+/** A user turn's text, whether stored as a plain string or an array of content blocks. */
+function userPromptText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .filter((b) => b?.type === 'text' && typeof b?.text === 'string')
+      .map((b) => b.text)
+      .join('\n')
+  }
+  return ''
+}
+
 /**
  * Reduce a transcript's JSONL into a normalized summary. Parses line by line and
  * skips any unparseable line, so a transcript being appended to right now (a
@@ -63,8 +75,9 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
       lastModelRaw = row.message.model
     }
 
-    if (row.type === 'user' && !row.isMeta && typeof row.message?.content === 'string') {
-      userPrompts.push(row.message.content)
+    if (row.type === 'user' && !row.isMeta) {
+      const text = userPromptText(row.message?.content)
+      if (text) userPrompts.push(text)
     }
   }
 

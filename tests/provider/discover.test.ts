@@ -91,6 +91,26 @@ describe('discoverSessions', () => {
     expect(sessions).toHaveLength(1)
     expect(sessions[0].title).toBe('thing')
   })
+
+  it('falls back to "unknown" for a root cwd with no transcript', () => {
+    const home = makeHome()
+    writeSessionFile(home, { pid: 5, sessionId: 'sess-root', cwd: '/', updatedAt: 1 })
+
+    const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
+
+    expect(sessions[0].title).toBe('unknown')
+    expect(sessions[0].project).toBe('unknown')
+  })
+
+  it('de-duplicates sessions that resolve to the same id', () => {
+    const home = makeHome()
+    writeSessionFile(home, { pid: 10, sessionId: 'same', cwd: '/work/a', updatedAt: 1 })
+    writeSessionFile(home, { pid: 11, sessionId: 'same', cwd: '/work/b', updatedAt: 2 })
+
+    const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
+
+    expect(sessions.filter((s) => s.id === 'same')).toHaveLength(1)
+  })
 })
 
 describe('readSessionFiles', () => {
@@ -99,6 +119,15 @@ describe('readSessionFiles', () => {
     writeFileSync(join(home, 'sessions'), 'not a directory') // readdir → ENOTDIR
 
     expect(readSessionFiles(home)).toEqual([])
+  })
+
+  it('skips session files whose pid is not a positive number', () => {
+    const home = makeHome()
+    writeSessionFile(home, { pid: 0, sessionId: 'zero', cwd: '/work/x' })
+    writeSessionFile(home, { pid: -3, sessionId: 'neg', cwd: '/work/y' })
+    writeSessionFile(home, { pid: 9, sessionId: 'ok', cwd: '/work/z' })
+
+    expect(readSessionFiles(home).map((s) => s.sessionId)).toEqual(['ok'])
   })
 
   it('falls back to cwd basename and updatedAt when a live session has no transcript', () => {

@@ -27,6 +27,36 @@ describe('parseTranscript', () => {
     expect(s.project).toBe('api-service')
     expect(s.branch).toBe('main')
   })
+
+  it('derives a title from array-form user content (content blocks)', () => {
+    const jsonl = JSON.stringify({
+      type: 'user',
+      isMeta: false,
+      cwd: '/work/app',
+      message: { role: 'user', content: [{ type: 'text', text: 'Add pagination to the list view' }] },
+    })
+    expect(parseTranscript(jsonl).title).toBe('Add pagination to the list view')
+  })
+
+  it('ignores tool-result blocks and finds the first real text prompt', () => {
+    const jsonl = [
+      {
+        type: 'user',
+        isMeta: false,
+        cwd: '/work/app',
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'x', content: 'output' }] },
+      },
+      {
+        type: 'user',
+        isMeta: false,
+        cwd: '/work/app',
+        message: { role: 'user', content: [{ type: 'text', text: 'Fix the flaky test' }] },
+      },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).title).toBe('Fix the flaky test')
+  })
 })
 
 describe('deriveTitle', () => {
