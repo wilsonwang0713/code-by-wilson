@@ -55,3 +55,7 @@ body {
     radial-gradient(900px 500px at 0% 110%, rgba(191,128,64,0.035), transparent 55%),
     var(--color-ink-950);
 }
+
+/* Overview rows drill into the workspace. */
+.row-clickable { cursor: pointer; }
+.row-clickable:hover { background: var(--color-ink-925); }
