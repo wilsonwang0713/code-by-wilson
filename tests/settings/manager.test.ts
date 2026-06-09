@@ -123,12 +123,13 @@ describe('uninstall — restore byte-for-byte (AC #4)', () => {
     writeFileSync(settingsPath(home), original)
     const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
 
-    mgr.install()
+    const { backupPath } = mgr.install()
     expect(readRaw(home)).not.toBe(original) // proves install actually changed the file
     mgr.uninstall()
 
     expect(readRaw(home)).toBe(original) // byte-for-byte
     expect(mgr.isInstalled()).toBe(false)
+    expect(existsSync(backupPath!)).toBe(true) // backups are kept as an audit/recovery trail
   })
 
   it('restores "no settings.json" by deleting the file install created', () => {
@@ -141,5 +142,17 @@ describe('uninstall — restore byte-for-byte (AC #4)', () => {
 
     expect(existsSync(settingsPath(home))).toBe(false)
     expect(mgr.isInstalled()).toBe(false)
+  })
+
+  it('throws rather than silently leaving wrapped settings when the backup is gone', () => {
+    const home = makeHome()
+    writeFileSync(settingsPath(home), JSON.stringify({ statusLine: { type: 'command', command: 'mine' } }, null, 2))
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+
+    const { backupPath } = mgr.install()
+    rmSync(backupPath!) // the backup vanishes
+
+    expect(() => mgr.uninstall()).toThrow(/backup missing/)
+    expect(mgr.isInstalled()).toBe(true) // still wrapped — we did NOT silently clear it
   })
 })

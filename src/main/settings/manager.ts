@@ -124,6 +124,7 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
       rmSync(settingsPath, { force: true }) // restore "did not exist"
     } else {
       if (!state.backupPath || !existsSync(state.backupPath)) {
+        // leave state.json intact so a retry can still restore once the backup is back
         throw new Error(`code-by-wire: cannot restore settings.json; backup missing (${state.backupPath})`)
       }
       copyFileSync(state.backupPath, settingsPath) // byte-for-byte restore
