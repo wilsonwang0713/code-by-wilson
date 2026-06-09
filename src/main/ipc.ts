@@ -1,22 +1,29 @@
 import { ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import type { Provider } from './provider/types'
-import { getSessions, replaceSessions, type AppDb } from './db'
+import type { SqliteDb } from './db/driver'
+import { getSessions } from './db/store'
+import { syncSessions } from './sync'
 
 export interface IpcDeps {
-  db: AppDb
+  db: SqliteDb
   provider: Provider
 }
 
-export function registerIpc({ db, provider }: IpcDeps): { sync: () => Promise<void> } {
-  const sync = async (): Promise<void> => {
-    const sessions = await provider.listSessions()
-    replaceSessions(db, sessions)
+export function registerIpc({ db, provider }: IpcDeps): { sync: () => void } {
+  const sync = (): void => {
+    syncSessions(db, provider)
   }
 
   ipcMain.handle(IPC.listSessions, () => getSessions(db))
-  ipcMain.handle(IPC.refresh, async () => {
-    await sync()
+  ipcMain.handle(IPC.refresh, () => {
+    try {
+      sync()
+    } catch (err) {
+      // A failed refresh (e.g. ~/.claude briefly unreadable) must not reject to the renderer or
+      // drop the list. Serve the last-known rows and let the next Refresh retry, like launch does.
+      console.error('refresh sync failed; serving last-known rows', err)
+    }
     return getSessions(db)
   })
   ipcMain.handle(IPC.capabilities, () => provider.capabilities)

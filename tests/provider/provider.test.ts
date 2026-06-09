@@ -3,26 +3,24 @@ import { resolve } from 'node:path'
 import { createClaudeProvider } from '../../src/main/provider/claude'
 
 describe('ClaudeProvider', () => {
-  it('exposes capability flags and derives state across the fleet', async () => {
+  it('exposes capability flags and the incremental sync primitives', () => {
     const provider = createClaudeProvider({
       claudeDir: resolve('tests/fixtures/claude-home'),
       isPidAlive: (pid) => pid === 1001, // only this one is alive
+      now: () => Date.parse('2026-06-09T00:00:00.000Z'),
+      recentWindowMs: 7 * 24 * 60 * 60 * 1000,
     })
 
     expect(provider.id).toBe('claude')
-    expect(provider.capabilities).toEqual({
-      canControl: true,
-      hasRateLimits: true,
-      hasSubagents: true,
-    })
+    expect(provider.capabilities).toEqual({ canControl: true, hasRateLimits: true, hasSubagents: true })
 
-    const sessions = await provider.listSessions()
-    // Every well-formed fixture session surfaces exactly once; only 1001 is alive, so the other
-    // four read as Ended (dead sessions surface now, not dropped). Exact counts guard against a
-    // dedup miss or a spurious extra row at the provider boundary.
-    expect(sessions).toHaveLength(5)
-    const working = sessions.find((s) => s.id === 'aaaa1111-1111-1111-1111-111111111111')
-    expect(working?.state).toBe('working')
-    expect(sessions.filter((s) => s.state === 'ended')).toHaveLength(4)
+    const candidates = provider.listCandidates()
+    expect(candidates).toHaveLength(5) // every fixture session surfaces (all registry-backed)
+    const live = candidates.find((c) => c.id === 'aaaa1111-1111-1111-1111-111111111111')!
+    expect(live.alive).toBe(true) // pid 1001 is the live one
+
+    // summarize the live one → working; force it dead → ended, off the same transcript.
+    expect(provider.summarize(live).state).toBe('working')
+    expect(provider.summarize({ ...live, alive: false }).state).toBe('ended')
   })
 })

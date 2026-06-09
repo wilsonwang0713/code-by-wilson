@@ -1,7 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import type { Session } from '@shared/types'
-import { contextWindowFor, normalizeModelId } from '@shared/models'
+import type { PersistedSession, SessionCandidate } from '@shared/types'
+import { normalizeModelId } from '@shared/models'
 import { parseTranscript, type TranscriptSummary } from './transcript'
 import { deriveSessionState } from './state'
 
@@ -13,12 +13,34 @@ export interface RawSessionFile {
   updatedAt?: number
 }
 
-export interface DiscoverDeps {
+export interface CandidateDeps {
   claudeDir: string
   isPidAlive: (pid: number) => boolean
+  /** Wall-clock (ms) for the recency cut. Injected so tests are deterministic. */
+  now: number
+  /** How far back (ms) a transcript-only (Ended) session still counts as recent. */
+  recentWindowMs: number
 }
 
-/** List a directory, treating a missing or unreadable dir as empty rather than throwing. */
+/**
+ * List an index root (`sessions/` or `projects/`), treating a genuinely-absent one as empty. A
+ * missing dir (ENOENT) or a non-dir in its place (ENOTDIR) really is "nothing here". But a real read
+ * failure (EACCES, EIO, ELOOP, …) is NOT emptiness — swallowing it would let one unreadable sweep
+ * masquerade as an empty home, which downstream prunes the whole index. Let those propagate so the
+ * sync aborts and leaves the existing rows intact.
+ */
+function readRoot(dir: string): string[] {
+  try {
+    return readdirSync(dir)
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') return []
+    throw err
+  }
+}
+
+/** List a single project subdir, skipping it whole if it can't be read — one bad dir among many
+ *  shouldn't sink the sweep (unlike an unreadable root, which `readRoot` surfaces). */
 function safeReaddir(dir: string): string[] {
   try {
     return readdirSync(dir)
@@ -32,7 +54,7 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
   const dir = join(claudeDir, 'sessions')
 
   const out: RawSessionFile[] = []
-  for (const name of safeReaddir(dir)) {
+  for (const name of readRoot(dir)) {
     if (!name.endsWith('.json')) continue
     try {
       const j = JSON.parse(readFileSync(join(dir, name), 'utf8'))
@@ -52,71 +74,117 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
   return out
 }
 
-/** Find `projects/<encoded>/<sessionId>.jsonl` without depending on the cwd→dir encoding. */
-export function findTranscriptPath(claudeDir: string, sessionId: string): string | null {
-  const projects = join(claudeDir, 'projects')
-
-  for (const proj of safeReaddir(projects)) {
-    const candidate = join(projects, proj, `${sessionId}.jsonl`)
-    if (existsSync(candidate)) return candidate
+/**
+ * Map every transcript to its id and mtime in one sweep of `projects/`, so discovery is O(files)
+ * instead of the skeleton's O(sessions × projectDirs) existsSync probe per session. The filename is
+ * the session id (`<sessionId>.jsonl`); if an id appears under two project dirs, the freshest wins.
+ */
+export function indexTranscripts(claudeDir: string): Map<string, { path: string; mtimeMs: number }> {
+  const root = join(claudeDir, 'projects')
+  const out = new Map<string, { path: string; mtimeMs: number }>()
+  for (const proj of readRoot(root)) {
+    const dir = join(root, proj)
+    for (const name of safeReaddir(dir)) {
+      if (!name.endsWith('.jsonl')) continue
+      const id = name.slice(0, -'.jsonl'.length)
+      const path = join(dir, name)
+      let mtimeMs: number
+      try {
+        mtimeMs = statSync(path).mtimeMs
+      } catch {
+        continue
+      }
+      const prev = out.get(id)
+      if (!prev || mtimeMs > prev.mtimeMs) out.set(id, { path, mtimeMs })
+    }
   }
-  return null
+  return out
 }
 
-/** Parse a session's transcript, treating a missing or unreadable file as no transcript. */
-function readTranscriptSummary(
-  claudeDir: string,
-  sessionId: string,
-  cwd: string,
-): TranscriptSummary | null {
-  const path = findTranscriptPath(claudeDir, sessionId)
-  if (!path) return null
-  try {
-    return parseTranscript(readFileSync(path, 'utf8'), cwd)
-  } catch {
-    // A transcript that vanished or can't be read shouldn't sink the whole list;
-    // this session degrades to its skeleton fallbacks (basename title, updatedAt).
-    return null
-  }
-}
-
-export function discoverSessions({ claudeDir, isPidAlive }: DiscoverDeps): Session[] {
-  // Every well-formed session file becomes a row. Liveness is no longer a filter — it's a
-  // signal fed into state derivation, so a session whose process is gone reads as Ended
-  // instead of vanishing. Recency-bounded retention + incremental sync are issue #4.
-  const files = readSessionFiles(claudeDir)
-  // Collapse duplicate sessionIds so the snapshot is unique by construction, which is what the
-  // SQLite primary key expects instead of aborting. Keep the freshest file per id (max updatedAt)
-  // so the surviving row carries the current status and pid, not whichever file readdir happened
-  // to yield last.
+/** Freshest registry file per session id (max updatedAt), so a stale re-registered file can't win. */
+function registryById(claudeDir: string): Map<string, RawSessionFile> {
   const byId = new Map<string, RawSessionFile>()
-  for (const s of files) {
+  for (const s of readSessionFiles(claudeDir)) {
     const prev = byId.get(s.sessionId)
     if (!prev || (s.updatedAt ?? 0) >= (prev.updatedAt ?? 0)) byId.set(s.sessionId, s)
   }
-  return [...byId.values()].map((s) =>
-    toSession(s, isPidAlive(s.pid), readTranscriptSummary(claudeDir, s.sessionId, s.cwd)),
-  )
+  return byId
 }
 
-function toSession(s: RawSessionFile, alive: boolean, t: TranscriptSummary | null): Session {
+/**
+ * The sessions worth indexing this pass: every registry entry (live or just-reaped), plus every
+ * transcript touched within the recency window — a recent Ended session whose registry file Claude
+ * already swept. Cheap by design: no transcript is parsed here. That's `summarize`, which the sync
+ * calls only for what actually changed. A transcript older than the window with no registry entry is
+ * dropped, which is what keeps the 411MB of ancient transcripts out of the index.
+ */
+export function listCandidates({ claudeDir, isPidAlive, now, recentWindowMs }: CandidateDeps): SessionCandidate[] {
+  const registry = registryById(claudeDir)
+  const transcripts = indexTranscripts(claudeDir)
+  const cutoff = now - recentWindowMs
+
+  const ids = new Set<string>(registry.keys())
+  for (const [id, t] of transcripts) {
+    if (t.mtimeMs >= cutoff) ids.add(id)
+  }
+
+  const out: SessionCandidate[] = []
+  for (const id of ids) {
+    const raw = registry.get(id)
+    const t = transcripts.get(id)
+    out.push({
+      id,
+      alive: raw ? isPidAlive(raw.pid) : false,
+      status: raw?.status,
+      cwd: raw?.cwd ?? '',
+      transcriptPath: t?.path,
+      transcriptMtimeMs: t?.mtimeMs ?? 0,
+      updatedAt: raw?.updatedAt,
+    })
+  }
+  return out
+}
+
+/**
+ * Parse a candidate's transcript into a full snapshot. The expensive step — the sync calls it only
+ * for a new or changed transcript. A missing or unreadable transcript degrades to registry fallbacks
+ * (basename title, updatedAt), so one bad file never sinks the list.
+ */
+export function summarize(c: SessionCandidate): PersistedSession {
+  let t: TranscriptSummary | null = null
+  if (c.transcriptPath) {
+    try {
+      t = parseTranscript(readFileSync(c.transcriptPath, 'utf8'), c.cwd)
+    } catch {
+      t = null
+    }
+  }
+  const projectFromCwd = (c.cwd && basename(c.cwd)) || 'unknown'
   const model = t ? t.model : normalizeModelId(undefined)
-  const projectFromCwd = (s.cwd && basename(s.cwd)) || 'unknown'
+  const awaitingUser = t?.awaitingUser ?? false
 
   return {
-    id: s.sessionId,
+    id: c.id,
     title: t?.title ?? projectFromCwd,
     project: t?.project ?? projectFromCwd,
     branch: t?.branch,
-    state: deriveSessionState({ alive, status: s.status, awaitingUser: t?.awaitingUser ?? false }),
+    state: deriveSessionState({ alive: c.alive, status: c.status, awaitingUser }),
     management: 'observed', // managed sessions arrive with spawning (later issue)
     model,
-    contextPct: 0, // later issue
-    contextWindow: contextWindowFor(model),
-    usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }, // later issue
-    equivApiValueUsd: 0, // later issue
-    lastActivityMs: t?.lastActivityMs || s.updatedAt || 0,
-    tasks: [], // later issue
-    subagents: [], // later issue
+    lastActivityMs: t?.lastActivityMs || c.updatedAt || 0,
+    awaitingUser,
+    transcriptMtimeMs: c.transcriptMtimeMs,
+  }
+}
+
+/**
+ * Refresh only the state of a session whose transcript hasn't changed, from fresh liveness/status —
+ * no reparse. This is how a session flips to Ended: its process dies without touching the transcript,
+ * so the next sync reuses the stored snapshot but re-derives `state` as ended.
+ */
+export function restate(c: SessionCandidate, prev: PersistedSession): PersistedSession {
+  return {
+    ...prev,
+    state: deriveSessionState({ alive: c.alive, status: c.status, awaitingUser: prev.awaitingUser }),
   }
 }
