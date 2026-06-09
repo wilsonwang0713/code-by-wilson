@@ -19,6 +19,12 @@ export const TERMINAL = {
  * pauses node-pty once `highWaterChars` are in flight unacknowledged and resumes once the backlog
  * drains below `lowWaterChars`; the renderer acks consumed output in `ackChars` chunks (one IPC per
  * chunk, not per write), each ack tied to xterm finishing its write so credit reflects render speed.
+ *
+ * INVARIANT: lowWaterChars >= ackChars. The renderer only acks whole `ackChars` chunks and holds the
+ * sub-chunk remainder back, so after a burst fully drains the unacked count floors at
+ * `(total mod ackChars)`, which is always < `ackChars`. Resume fires only below `lowWaterChars`, so if
+ * `lowWaterChars` were < `ackChars` a paused pty could wedge forever with a remainder stuck above the
+ * resume line and no flush. Keeping them equal (5000) is what guarantees a paused pty always resumes.
  */
 export const FLOW = { highWaterChars: 100_000, lowWaterChars: 5_000, ackChars: 5_000 } as const
 
