@@ -48,6 +48,28 @@ export interface Session {
   subagents: Subagent[]
 }
 
+/**
+ * The narrow per-session snapshot the index actually persists. Everything a SQLite row holds and
+ * nothing the skeleton fabricates: no zeroed usage/cost/context/tasks — those are filled by
+ * `hydrate` in one place when a row is read back, so the DB stops hand-authoring defaults twice.
+ */
+export interface PersistedSession {
+  id: string
+  title: string
+  project: string
+  branch?: string
+  state: SessionState
+  management: Management
+  model: ModelId
+  lastActivityMs: number
+  /** Last parsed transcript tail left a prompt unanswered. Stored so state can be recomputed on a
+   *  sync that skips the (unchanged) transcript, without reparsing it. */
+  awaitingUser: boolean
+  /** mtime (ms) of the transcript when it was last parsed — the incremental high-water mark. A sync
+   *  reparses only when the file's current mtime exceeds this. 0 means the session has no transcript. */
+  transcriptMtimeMs: number
+}
+
 export interface RateLimit {
   usedPct: number
   resetsAt: number
