@@ -169,7 +169,7 @@ export function summarize(c: SessionCandidate): PersistedSession {
     project: t?.project ?? projectFromCwd,
     branch: t?.branch,
     state: deriveSessionState({ alive: c.alive, status: c.status, awaitingUser }),
-    management: 'observed', // managed sessions arrive with spawning (later issue)
+    management: 'observed', // default; overridden to 'managed' in createClaudeProvider for app-spawned ids
     model,
     lastActivityMs: t?.lastActivityMs || c.updatedAt || 0,
     awaitingUser,
