@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import type { Provider } from './provider/types'
 import type { SqliteDb } from './db/driver'
-import { getSessions } from './db/store'
+import { getSessions, getStats } from './db/store'
 import { syncSessions } from './sync'
 
 export interface IpcDeps {
@@ -27,6 +27,7 @@ export function registerIpc({ db, provider }: IpcDeps): { sync: () => void } {
     return getSessions(db)
   })
   ipcMain.handle(IPC.capabilities, () => provider.capabilities)
+  ipcMain.handle(IPC.stats, () => getStats(db, Date.now()))
   ipcMain.handle(IPC.readTranscript, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readTranscript(id, sinceMtimeMs),
   )

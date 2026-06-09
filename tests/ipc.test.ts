@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { Session, PersistedSession } from '@shared/types'
+import type { Stats } from '@shared/stats'
 import { IPC } from '@shared/ipc'
 import type { Provider } from '../src/main/provider/types'
 
@@ -65,5 +66,20 @@ describe('registerIpc readTranscript', () => {
     registerIpc({ db, provider: provider(() => []) })
     const handler = handlers.get(IPC.readTranscript)!
     expect(handler({}, 'any-id')).toEqual({ status: 'absent' })
+  })
+})
+
+describe('registerIpc stats', () => {
+  it('returns the index aggregates for the seeded rows', () => {
+    const db = openTestDb()
+    migrate(db)
+    upsertSessions(db, [seed]) // opus, project 'p', zero usage
+    registerIpc({ db, provider: provider(() => []) })
+
+    const handler = handlers.get(IPC.stats)!
+    const stats = handler() as Stats
+    expect(stats.weeklyActivity).toHaveLength(7)
+    expect(stats.modelMix).toEqual([{ model: 'claude-opus-4-8', sessions: 1, equivApiValueUsd: 0 }])
+    expect(stats.projectRollup).toEqual([{ project: 'p', sessions: 1, equivApiValueUsd: 0 }])
   })
 })

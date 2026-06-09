@@ -6,6 +6,7 @@ const api: AppApi = {
   listSessions: () => ipcRenderer.invoke(IPC.listSessions),
   refresh: () => ipcRenderer.invoke(IPC.refresh),
   capabilities: () => ipcRenderer.invoke(IPC.capabilities),
+  stats: () => ipcRenderer.invoke(IPC.stats),
   readTranscript: (id, sinceMtimeMs) => ipcRenderer.invoke(IPC.readTranscript, id, sinceMtimeMs),
   terminal: {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),
