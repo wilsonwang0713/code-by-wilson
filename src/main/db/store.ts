@@ -15,7 +15,7 @@ function userVersion(db: SqliteDb): number {
  * repopulates from disk. Keyed on PRAGMA user_version so every launch past the first is a no-op.
  */
 export function migrate(db: SqliteDb): void {
-  if (userVersion(db) < 1) {
+  if (userVersion(db) < SCHEMA_VERSION) {
     db.exec(`
       DROP TABLE IF EXISTS sessions;
       CREATE TABLE sessions (
