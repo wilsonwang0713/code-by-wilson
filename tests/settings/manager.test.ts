@@ -113,3 +113,33 @@ describe('install — wrap an existing statusLine (AC #1)', () => {
     expect(state.backupPath).toBeNull()
   })
 })
+
+describe('uninstall — restore byte-for-byte (AC #4)', () => {
+  it('restores arbitrary original bytes exactly (4-space indent, no trailing newline, existing statusLine)', () => {
+    const home = makeHome()
+    // Deliberately not our canonical format: byte-for-byte must hold regardless of formatting.
+    const original =
+      '{\n    "theme": "dark",\n    "statusLine": {"type":"command","command":"my-prompt","padding":2}\n}'
+    writeFileSync(settingsPath(home), original)
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+
+    mgr.install()
+    expect(readRaw(home)).not.toBe(original) // proves install actually changed the file
+    mgr.uninstall()
+
+    expect(readRaw(home)).toBe(original) // byte-for-byte
+    expect(mgr.isInstalled()).toBe(false)
+  })
+
+  it('restores "no settings.json" by deleting the file install created', () => {
+    const home = makeHome()
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+
+    mgr.install()
+    expect(existsSync(settingsPath(home))).toBe(true)
+    mgr.uninstall()
+
+    expect(existsSync(settingsPath(home))).toBe(false)
+    expect(mgr.isInstalled()).toBe(false)
+  })
+})

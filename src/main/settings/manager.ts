@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -117,7 +117,19 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
   }
 
   function uninstall(): void {
-    // implemented in Task 4
+    const state = readState()
+    if (state === null) return // nothing we installed
+
+    if (state.originalAbsent) {
+      rmSync(settingsPath, { force: true }) // restore "did not exist"
+    } else {
+      if (!state.backupPath || !existsSync(state.backupPath)) {
+        throw new Error(`code-by-wire: cannot restore settings.json; backup missing (${state.backupPath})`)
+      }
+      copyFileSync(state.backupPath, settingsPath) // byte-for-byte restore
+    }
+
+    rmSync(statePath, { force: true })
   }
 
   return { isInstalled, install, uninstall }
