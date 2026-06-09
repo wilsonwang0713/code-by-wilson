@@ -18,10 +18,13 @@ export function App() {
 
   async function load(): Promise<void> {
     setLoading(true)
-    const [s, c] = await Promise.all([window.api.listSessions(), window.api.capabilities()])
-    setSessions(s)
-    setCaps(c)
-    setLoading(false)
+    try {
+      const [s, c] = await Promise.all([window.api.listSessions(), window.api.capabilities()])
+      setSessions(s)
+      setCaps(c)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -30,8 +33,11 @@ export function App() {
 
   async function refresh(): Promise<void> {
     setLoading(true)
-    setSessions(await window.api.refresh())
-    setLoading(false)
+    try {
+      setSessions(await window.api.refresh())
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
