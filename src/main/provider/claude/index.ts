@@ -1,6 +1,7 @@
 import type { Provider } from '../types'
-import { resolveClaudeDir } from '../../claude-config'
-import { listCandidates, summarize, restate } from './discover'
+import { readTextOrNull, resolveClaudeDir } from '../../claude-config'
+import { indexTranscripts, listCandidates, summarize, restate } from './discover'
+import { parseTranscriptEvents } from './transcript-events'
 
 export interface ClaudeProviderDeps {
   claudeDir?: string
@@ -36,5 +37,15 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     listCandidates: () => listCandidates({ claudeDir, isPidAlive, now: now(), recentWindowMs }),
     summarize,
     restate,
+    readTranscript: (id) => {
+      // Resolve the transcript path by id from the projects sweep (freshest wins if an id appears
+      // twice). The per-call walk is fine for an on-demand, one-session-at-a-time read; bounding the
+      // read of a large transcript itself is issue #20.
+      const hit = indexTranscripts(claudeDir).get(id)
+      if (!hit) return null
+      const jsonl = readTextOrNull(hit.path)
+      if (jsonl === null) return null
+      return { ...parseTranscriptEvents(jsonl), mtimeMs: hit.mtimeMs }
+    },
   }
 }

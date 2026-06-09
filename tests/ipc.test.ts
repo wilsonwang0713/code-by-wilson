@@ -34,6 +34,7 @@ const provider = (listCandidates: Provider['listCandidates']): Provider => ({
   listCandidates,
   summarize: (c) => ({ ...seed, id: c.id }),
   restate: (_c, prev) => prev,
+  readTranscript: () => null,
 })
 
 describe('registerIpc refresh', () => {
