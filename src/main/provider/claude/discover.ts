@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import type { Session, SessionState } from '@shared/types'
+import type { Session } from '@shared/types'
 import { contextWindowFor, normalizeModelId } from '@shared/models'
 import { parseTranscript, type TranscriptSummary } from './transcript'
+import { deriveSessionState } from './state'
 
 export interface RawSessionFile {
   pid: number
@@ -80,19 +81,19 @@ function readTranscriptSummary(
 }
 
 export function discoverSessions({ claudeDir, isPidAlive }: DiscoverDeps): Session[] {
-  const live = readSessionFiles(claudeDir).filter((s) => isPidAlive(s.pid))
-  // Collapse duplicate sessionIds so the snapshot is unique by construction, which
-  // is what the SQLite primary key expects (last file wins) instead of aborting.
-  const unique = [...new Map(live.map((s) => [s.sessionId, s])).values()]
-  return unique.map((s) => toSession(s, readTranscriptSummary(claudeDir, s.sessionId, s.cwd)))
+  // Every well-formed session file becomes a row. Liveness is no longer a filter — it's a
+  // signal fed into state derivation, so a session whose process is gone reads as Ended
+  // instead of vanishing. Recency-bounded retention + incremental sync are issue #4.
+  const files = readSessionFiles(claudeDir)
+  // Collapse duplicate sessionIds so the snapshot is unique by construction, which is what
+  // the SQLite primary key expects (last file wins) instead of aborting.
+  const unique = [...new Map(files.map((s) => [s.sessionId, s])).values()]
+  return unique.map((s) =>
+    toSession(s, isPidAlive(s.pid), readTranscriptSummary(claudeDir, s.sessionId, s.cwd)),
+  )
 }
 
-/** Minimal skeleton state. Full Working/Waiting/Idle/Ended derivation is a later issue. */
-function deriveState(status: string | undefined): SessionState {
-  return status === 'busy' ? 'working' : 'idle'
-}
-
-function toSession(s: RawSessionFile, t: TranscriptSummary | null): Session {
+function toSession(s: RawSessionFile, alive: boolean, t: TranscriptSummary | null): Session {
   const model = t ? t.model : normalizeModelId(undefined)
   const projectFromCwd = (s.cwd && basename(s.cwd)) || 'unknown'
 
@@ -101,7 +102,7 @@ function toSession(s: RawSessionFile, t: TranscriptSummary | null): Session {
     title: t?.title ?? projectFromCwd,
     project: t?.project ?? projectFromCwd,
     branch: t?.branch,
-    state: deriveState(s.status),
+    state: deriveSessionState({ alive, status: s.status, awaitingUser: t?.awaitingUser ?? false }),
     management: 'observed', // managed sessions arrive with spawning (later issue)
     model,
     contextPct: 0, // later issue

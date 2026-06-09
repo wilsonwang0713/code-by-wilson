@@ -3,10 +3,10 @@ import { resolve } from 'node:path'
 import { createClaudeProvider } from '../../src/main/provider/claude'
 
 describe('ClaudeProvider', () => {
-  it('exposes capability flags and lists normalized sessions', async () => {
+  it('exposes capability flags and derives state across the fleet', async () => {
     const provider = createClaudeProvider({
       claudeDir: resolve('tests/fixtures/claude-home'),
-      isPidAlive: (pid) => pid === 1001,
+      isPidAlive: (pid) => pid === 1001, // only this one is alive
     })
 
     expect(provider.id).toBe('claude')
@@ -17,7 +17,9 @@ describe('ClaudeProvider', () => {
     })
 
     const sessions = await provider.listSessions()
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0].id).toBe('aaaa1111-1111-1111-1111-111111111111')
+    const working = sessions.find((s) => s.id === 'aaaa1111-1111-1111-1111-111111111111')
+    expect(working?.state).toBe('working')
+    // Dead sessions surface as Ended now, not dropped.
+    expect(sessions.filter((s) => s.state === 'ended').length).toBeGreaterThan(0)
   })
 })

@@ -22,20 +22,7 @@ function writeSessionFile(home: string, raw: Record<string, unknown>): void {
 }
 
 describe('discoverSessions', () => {
-  it('includes only sessions whose pid is alive', () => {
-    const alive = new Set([1001, 1003])
-    const sessions = discoverSessions({
-      claudeDir: CLAUDE_DIR,
-      isPidAlive: (pid) => alive.has(pid),
-    })
-    const ids = sessions.map((s) => s.id).sort()
-    expect(ids).toEqual([
-      'aaaa1111-1111-1111-1111-111111111111',
-      'cccc3333-3333-3333-3333-333333333333',
-    ])
-  })
-
-  it('maps a live session into the normalized model with skeleton defaults', () => {
+  it('maps a live busy session to working with skeleton defaults', () => {
     const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
     const a = sessions.find((s) => s.id === 'aaaa1111-1111-1111-1111-111111111111')!
 
@@ -44,10 +31,10 @@ describe('discoverSessions', () => {
     expect(a.branch).toBe('feature/login')
     expect(a.model).toBe('claude-sonnet-4-6')
     expect(a.management).toBe('observed')
-    expect(a.state).toBe('working') // status "busy"
+    expect(a.state).toBe('working') // alive + status "busy"
     expect(a.lastActivityMs).toBe(Date.parse('2026-06-08T22:54:06.078Z'))
 
-    // issue #2 scope defaults
+    // deferred-scope defaults (issues #5, #13)
     expect(a.usage).toEqual({
       inputTokens: 0,
       outputTokens: 0,
@@ -61,10 +48,39 @@ describe('discoverSessions', () => {
     expect(a.subagents).toEqual([])
   })
 
-  it('derives idle for non-busy sessions', () => {
+  it('maps a live quiet session with a finished turn to idle', () => {
     const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
     const c = sessions.find((s) => s.id === 'cccc3333-3333-3333-3333-333333333333')!
     expect(c.state).toBe('idle')
+  })
+
+  it('maps a live quiet session blocked on an unanswered prompt to waiting', () => {
+    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
+    const d = sessions.find((s) => s.id === 'dddd4444-4444-4444-4444-444444444444')!
+    expect(d.state).toBe('waiting')
+  })
+
+  it('surfaces a dead session as ended instead of dropping it', () => {
+    // Only 1001 is alive; the rest are gone and must read as ended, not vanish.
+    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: (pid) => pid === 1001 })
+    const stateById = Object.fromEntries(sessions.map((s) => [s.id, s.state]))
+
+    expect(stateById['aaaa1111-1111-1111-1111-111111111111']).toBe('working') // alive + busy
+    expect(stateById['cccc3333-3333-3333-3333-333333333333']).toBe('ended') // dead
+    // Dead beats a pending prompt: 1004 is gone, so it's ended even though it's awaiting the user.
+    expect(stateById['dddd4444-4444-4444-4444-444444444444']).toBe('ended')
+  })
+
+  it('surfaces every well-formed session, alive or dead', () => {
+    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => false })
+    const ids = sessions.map((s) => s.id).sort()
+    expect(ids).toEqual([
+      'aaaa1111-1111-1111-1111-111111111111',
+      'bbbb2222-2222-2222-2222-222222222222',
+      'cccc3333-3333-3333-3333-333333333333',
+      'dddd4444-4444-4444-4444-444444444444',
+    ])
+    expect(sessions.every((s) => s.state === 'ended')).toBe(true)
   })
 
   it('keeps a session whose transcript path cannot be read, using skeleton fallbacks', () => {
@@ -111,6 +127,17 @@ describe('discoverSessions', () => {
 
     expect(sessions.filter((s) => s.id === 'same')).toHaveLength(1)
   })
+
+  it('reads a live session that has no transcript with skeleton fallbacks', () => {
+    // Only 1002 is alive; it has no transcript, so it leans on the session-file fields.
+    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: (pid) => pid === 1002 })
+    const b = sessions.find((s) => s.id === 'bbbb2222-2222-2222-2222-222222222222')!
+    expect(b.title).toBe('old-thing')
+    expect(b.project).toBe('old-thing')
+    expect(b.branch).toBeUndefined()
+    expect(b.lastActivityMs).toBe(1780950000000)
+    expect(b.state).toBe('idle') // alive, no transcript → no pending prompt → idle
+  })
 })
 
 describe('readSessionFiles', () => {
@@ -128,17 +155,5 @@ describe('readSessionFiles', () => {
     writeSessionFile(home, { pid: 9, sessionId: 'ok', cwd: '/work/z' })
 
     expect(readSessionFiles(home).map((s) => s.sessionId)).toEqual(['ok'])
-  })
-
-  it('falls back to cwd basename and updatedAt when a live session has no transcript', () => {
-    const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: (pid) => pid === 1002 })
-    expect(sessions).toHaveLength(1)
-    const b = sessions[0]
-    expect(b.id).toBe('bbbb2222-2222-2222-2222-222222222222')
-    expect(b.title).toBe('old-thing')
-    expect(b.project).toBe('old-thing')
-    expect(b.branch).toBeUndefined()
-    expect(b.lastActivityMs).toBe(1780950000000)
-    expect(b.state).toBe('idle')
   })
 })
