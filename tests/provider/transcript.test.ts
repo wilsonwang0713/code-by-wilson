@@ -16,6 +16,7 @@ describe('parseTranscript', () => {
     expect(s.branch).toBe('feature/login')
     expect(s.model).toBe('claude-sonnet-4-6')
     expect(s.lastActivityMs).toBe(Date.parse('2026-06-08T22:54:06.078Z'))
+    expect(s.awaitingUser).toBe(false)
   })
 
   it('strips slash-command wrappers, skips meta lines, and tolerates malformed json', () => {
@@ -56,6 +57,70 @@ describe('parseTranscript', () => {
       .map((r) => JSON.stringify(r))
       .join('\n')
     expect(parseTranscript(jsonl).title).toBe('Fix the flaky test')
+  })
+
+  it('flags awaitingUser when the last turn leaves a tool use unanswered', () => {
+    const jsonl = [
+      { type: 'user', isMeta: false, cwd: '/work/app', message: { role: 'user', content: 'Run the migration' } },
+      {
+        type: 'assistant',
+        timestamp: '2026-06-09T01:00:00.000Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-opus-4-8',
+          content: [
+            { type: 'text', text: 'Running it now.' },
+            { type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'make migrate' } },
+          ],
+        },
+      },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).awaitingUser).toBe(true)
+  })
+
+  it('clears awaitingUser once the tool use has a result', () => {
+    const jsonl = [
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: {} }] } },
+      { type: 'user', isMeta: false, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'done' }] } },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).awaitingUser).toBe(false)
+  })
+
+  it('keeps awaitingUser true when only one of several tool uses is answered', () => {
+    const jsonl = [
+      {
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'toolu_1', name: 'Bash', input: {} },
+            { type: 'tool_use', id: 'toolu_2', name: 'Read', input: {} },
+          ],
+        },
+      },
+      {
+        type: 'user',
+        isMeta: false,
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: 'done' }] },
+      },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).awaitingUser).toBe(true)
+  })
+
+  it('leaves awaitingUser false for a plain completed turn', () => {
+    const jsonl = [
+      { type: 'user', isMeta: false, cwd: '/work/app', message: { role: 'user', content: 'Summarize the file' } },
+      { type: 'assistant', message: { role: 'assistant', model: 'claude-opus-4-8', content: [{ type: 'text', text: 'Here is the summary.' }] } },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).awaitingUser).toBe(false)
   })
 })
 

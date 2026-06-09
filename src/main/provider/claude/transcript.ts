@@ -8,6 +8,8 @@ export interface TranscriptSummary {
   branch?: string
   model: ModelId
   lastActivityMs: number
+  /** The last turn left a question or permission prompt unanswered (a tool_use with no result). */
+  awaitingUser: boolean
 }
 
 // A slash-command user turn is a bundle of these envelope tags; its useful label
@@ -51,6 +53,10 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
   let lastModelRaw: string | undefined
   let lastActivityMs = 0
   const userPrompts: string[] = []
+  // tool_use ids the assistant has issued but no tool_result has answered yet. A non-empty
+  // set at end of file means the last turn is blocked on the user (a permission prompt or an
+  // AskUserQuestion) — which, once the session has gone quiet, is the Waiting signal.
+  const unansweredToolUse = new Set<string>()
 
   for (const line of jsonl.split('\n')) {
     const trimmed = line.trim()
@@ -75,9 +81,30 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
       lastModelRaw = row.message.model
     }
 
-    if (row.type === 'user' && !row.isMeta) {
-      const text = userPromptText(row.message?.content)
-      if (text) userPrompts.push(text)
+    const content = row.message?.content
+    if (row.type === 'assistant' && Array.isArray(content)) {
+      for (const block of content) {
+        if (block?.type === 'tool_use' && typeof block.id === 'string') {
+          unansweredToolUse.add(block.id)
+        }
+      }
+    }
+
+    if (row.type === 'user') {
+      // A tool_result answers a pending tool_use. Clear it regardless of isMeta, mirroring the
+      // unguarded add above, so the set never leaks a stale id into a false awaitingUser.
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block?.type === 'tool_result' && typeof block.tool_use_id === 'string') {
+            unansweredToolUse.delete(block.tool_use_id)
+          }
+        }
+      }
+      // Only real (non-meta) user turns are prompts that can title the session.
+      if (!row.isMeta) {
+        const text = userPromptText(content)
+        if (text) userPrompts.push(text)
+      }
     }
   }
 
@@ -88,5 +115,6 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
     branch,
     model: normalizeModelId(lastModelRaw),
     lastActivityMs,
+    awaitingUser: unansweredToolUse.size > 0,
   }
 }
