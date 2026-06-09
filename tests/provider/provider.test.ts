@@ -17,9 +17,12 @@ describe('ClaudeProvider', () => {
     })
 
     const sessions = await provider.listSessions()
+    // Every well-formed fixture session surfaces exactly once; only 1001 is alive, so the other
+    // four read as Ended (dead sessions surface now, not dropped). Exact counts guard against a
+    // dedup miss or a spurious extra row at the provider boundary.
+    expect(sessions).toHaveLength(5)
     const working = sessions.find((s) => s.id === 'aaaa1111-1111-1111-1111-111111111111')
     expect(working?.state).toBe('working')
-    // Dead sessions surface as Ended now, not dropped.
-    expect(sessions.filter((s) => s.state === 'ended').length).toBeGreaterThan(0)
+    expect(sessions.filter((s) => s.state === 'ended')).toHaveLength(4)
   })
 })

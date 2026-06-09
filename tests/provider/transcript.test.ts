@@ -122,6 +122,34 @@ describe('parseTranscript', () => {
       .join('\n')
     expect(parseTranscript(jsonl).awaitingUser).toBe(false)
   })
+
+  it('does not latch awaitingUser on a tool_use the user interrupted earlier in the session', () => {
+    // The assistant started a tool, the user cut it off with a new prompt instead of letting it
+    // return, and the session finished cleanly. The abandoned tool_use lives in the file forever;
+    // it must not keep the session pinned to Waiting. (96% of real awaitingUser=true cases are this.)
+    const jsonl = [
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_interrupted', name: 'Read', input: {} }] } },
+      { type: 'user', isMeta: false, message: { role: 'user', content: 'actually, do this instead' } },
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Done.' }] } },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).awaitingUser).toBe(false)
+  })
+
+  it('reflects only the latest assistant turn, not an earlier abandoned tool_use', () => {
+    // Interrupted tool, then a fresh turn whose own tool gets answered. Only the last turn counts.
+    const jsonl = [
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_old', name: 'Bash', input: {} }] } },
+      { type: 'user', isMeta: false, message: { role: 'user', content: 'stop, read this first' } },
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_new', name: 'Read', input: {} }] } },
+      { type: 'user', isMeta: false, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_new', content: 'ok' }] } },
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'All set.' }] } },
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n')
+    expect(parseTranscript(jsonl).awaitingUser).toBe(false)
+  })
 })
 
 describe('deriveTitle', () => {

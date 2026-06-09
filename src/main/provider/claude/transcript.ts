@@ -53,9 +53,10 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
   let lastModelRaw: string | undefined
   let lastActivityMs = 0
   const userPrompts: string[] = []
-  // tool_use ids the assistant has issued but no tool_result has answered yet. A non-empty
+  // tool_use ids from the latest assistant turn that no tool_result has answered yet. A non-empty
   // set at end of file means the last turn is blocked on the user (a permission prompt or an
-  // AskUserQuestion) — which, once the session has gone quiet, is the Waiting signal.
+  // AskUserQuestion) — which, once the session has gone quiet, is the Waiting signal. Scoped to
+  // the latest turn (reset below) so an interrupted tool_use the user walked past doesn't latch.
   const unansweredToolUse = new Set<string>()
 
   for (const line of jsonl.split('\n')) {
@@ -82,17 +83,24 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
     }
 
     const content = row.message?.content
-    if (row.type === 'assistant' && Array.isArray(content)) {
-      for (const block of content) {
-        if (block?.type === 'tool_use' && typeof block.id === 'string') {
-          unansweredToolUse.add(block.id)
+    if (row.type === 'assistant') {
+      // A new assistant turn supersedes the last, so only its own tool_use blocks can still be
+      // blocking the user. Reset first: a tool_use the user walked past (interrupted, then typed
+      // something else) lingers earlier in the file, and accumulating it would latch awaitingUser
+      // true for the rest of the session. Only the latest turn's unanswered tools count.
+      unansweredToolUse.clear()
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block?.type === 'tool_use' && typeof block.id === 'string') {
+            unansweredToolUse.add(block.id)
+          }
         }
       }
     }
 
     if (row.type === 'user') {
-      // A tool_result answers a pending tool_use. Clear it regardless of isMeta, mirroring the
-      // unguarded add above, so the set never leaks a stale id into a false awaitingUser.
+      // A tool_result answers a pending tool_use from the current turn. Clear it regardless of
+      // isMeta so the set never leaks a stale id into a false awaitingUser.
       if (Array.isArray(content)) {
         for (const block of content) {
           if (block?.type === 'tool_result' && typeof block.tool_use_id === 'string') {
