@@ -53,3 +53,29 @@ describe('install — clean (AC #2)', () => {
     expect(mgr.isInstalled()).toBe(true)
   })
 })
+
+describe('install — backup before modification (AC #3)', () => {
+  it('writes a timestamped backup whose bytes equal the original, before modifying', () => {
+    const home = makeHome()
+    const original = JSON.stringify({ theme: 'dark' }, null, 2) + '\n'
+    writeFileSync(settingsPath(home), original)
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+
+    const { backupPath } = mgr.install()
+
+    expect(backupPath).not.toBeNull()
+    expect(backupPath!.endsWith('.bak')).toBe(true)
+    expect(backupPath!.startsWith(home)).toBe(true) // next to settings.json, easy to find by hand
+    expect(readFileSync(backupPath!, 'utf8')).toBe(original) // exact pre-install bytes
+  })
+
+  it('writes no backup when there was no settings.json to back up', () => {
+    const home = makeHome()
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+
+    const { backupPath } = mgr.install()
+
+    expect(backupPath).toBeNull()
+    expect(readdirSync(home).filter((f) => f.endsWith('.bak'))).toHaveLength(0)
+  })
+})

@@ -39,7 +39,7 @@ export interface SettingsManager {
 
 export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsManager {
   const claudeDir = deps.claudeDir ?? join(homedir(), '.claude')
-  const now = deps.now ?? Date.now
+  const now = deps.now ?? (() => Date.now())
 
   const settingsPath = join(claudeDir, 'settings.json')
   // The wrapper script the installed statusLine points at. Issue #11 materializes it; this slice only
@@ -71,10 +71,17 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
     const originalText = readSettingsRaw()
     const settings: ClaudeSettings = originalText === null ? {} : (JSON.parse(originalText) as ClaudeSettings)
 
+    let backupPath: string | null = null
+    if (originalText !== null) {
+      const stamp = new Date(now()).toISOString().replace(/[:.]/g, '-')
+      backupPath = join(claudeDir, `settings.json.${stamp}.bak`)
+      writeFileSync(backupPath, originalText, { flag: 'wx' }) // never overwrite an existing backup
+    }
+
     settings.statusLine = { type: 'command', command: appCommand }
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n')
 
-    return { wrappedExisting: false, backupPath: null }
+    return { wrappedExisting: false, backupPath }
   }
 
   function uninstall(): void {
