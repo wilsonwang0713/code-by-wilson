@@ -85,10 +85,16 @@ export function discoverSessions({ claudeDir, isPidAlive }: DiscoverDeps): Sessi
   // signal fed into state derivation, so a session whose process is gone reads as Ended
   // instead of vanishing. Recency-bounded retention + incremental sync are issue #4.
   const files = readSessionFiles(claudeDir)
-  // Collapse duplicate sessionIds so the snapshot is unique by construction, which is what
-  // the SQLite primary key expects (last file wins) instead of aborting.
-  const unique = [...new Map(files.map((s) => [s.sessionId, s])).values()]
-  return unique.map((s) =>
+  // Collapse duplicate sessionIds so the snapshot is unique by construction, which is what the
+  // SQLite primary key expects instead of aborting. Keep the freshest file per id (max updatedAt)
+  // so the surviving row carries the current status and pid, not whichever file readdir happened
+  // to yield last.
+  const byId = new Map<string, RawSessionFile>()
+  for (const s of files) {
+    const prev = byId.get(s.sessionId)
+    if (!prev || (s.updatedAt ?? 0) >= (prev.updatedAt ?? 0)) byId.set(s.sessionId, s)
+  }
+  return [...byId.values()].map((s) =>
     toSession(s, isPidAlive(s.pid), readTranscriptSummary(claudeDir, s.sessionId, s.cwd)),
   )
 }

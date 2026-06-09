@@ -49,6 +49,8 @@ describe('discoverSessions', () => {
   })
 
   it('maps a live quiet session with a finished turn to idle', () => {
+    // cccc3333's status is 'idle' and its transcript holds an interrupted tool_use the user walked
+    // past, so this also asserts awaitingUser does not latch on that abandoned tool (else: waiting).
     const sessions = discoverSessions({ claudeDir: CLAUDE_DIR, isPidAlive: () => true })
     const c = sessions.find((s) => s.id === 'cccc3333-3333-3333-3333-333333333333')!
     expect(c.state).toBe('idle')
@@ -135,6 +137,21 @@ describe('discoverSessions', () => {
     const sessions = discoverSessions({ claudeDir: home, isPidAlive: () => true })
 
     expect(sessions.filter((s) => s.id === 'same')).toHaveLength(1)
+  })
+
+  it('on a duplicate sessionId, keeps the freshest file (max updatedAt), not readdir order', () => {
+    const home = makeHome()
+    // The same session re-registered under a new pid; the stale file lingers with the old pid.
+    // The fresh file (max updatedAt) must win so its current status and pid surface, regardless
+    // of the order readdir happens to yield the two files in.
+    writeSessionFile(home, { pid: 999, sessionId: 'dup', cwd: '/work/stale', status: 'idle', updatedAt: 1000 })
+    writeSessionFile(home, { pid: 200, sessionId: 'dup', cwd: '/work/fresh', status: 'busy', updatedAt: 5000 })
+
+    const dup = discoverSessions({ claudeDir: home, isPidAlive: () => true }).filter((s) => s.id === 'dup')
+
+    expect(dup).toHaveLength(1)
+    expect(dup[0].project).toBe('fresh') // the freshest file won, not whichever sorted last
+    expect(dup[0].state).toBe('working') // and it carries that file's status 'busy', not stale 'idle'
   })
 
   it('reads a live session that has no transcript with skeleton fallbacks', () => {
