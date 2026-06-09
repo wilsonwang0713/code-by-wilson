@@ -3,7 +3,7 @@ import { IPC, type AppApi } from '@shared/ipc'
 import { TERMINAL } from '@shared/terminal'
 
 const api: AppApi = {
-  listSessions: () => ipcRenderer.invoke(IPC.listSessions),
+  overview: () => ipcRenderer.invoke(IPC.overview),
   refresh: () => ipcRenderer.invoke(IPC.refresh),
   capabilities: () => ipcRenderer.invoke(IPC.capabilities),
   readTranscript: (id, sinceMtimeMs) => ipcRenderer.invoke(IPC.readTranscript, id, sinceMtimeMs),

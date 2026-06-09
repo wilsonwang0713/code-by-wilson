@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC } from '@shared/ipc'
 import type { Provider } from './provider/types'
 import type { SqliteDb } from './db/driver'
-import { getSessions } from './db/store'
+import { getOverview } from './db/store'
 import { syncSessions } from './sync'
 
 export interface IpcDeps {
@@ -15,7 +15,7 @@ export function registerIpc({ db, provider }: IpcDeps): { sync: () => void } {
     syncSessions(db, provider)
   }
 
-  ipcMain.handle(IPC.listSessions, () => getSessions(db))
+  ipcMain.handle(IPC.overview, () => getOverview(db, Date.now()))
   ipcMain.handle(IPC.refresh, () => {
     try {
       sync()
@@ -24,7 +24,7 @@ export function registerIpc({ db, provider }: IpcDeps): { sync: () => void } {
       // drop the list. Serve the last-known rows and let the next Refresh retry, like launch does.
       console.error('refresh sync failed; serving last-known rows', err)
     }
-    return getSessions(db)
+    return getOverview(db, Date.now())
   })
   ipcMain.handle(IPC.capabilities, () => provider.capabilities)
   ipcMain.handle(IPC.readTranscript, (_e, id: string, sinceMtimeMs?: number) =>
