@@ -210,4 +210,16 @@ describe('trust-safety', () => {
     expect(result.wrappedExisting).toBe(true) // a statusLine did exist
     expect(readState(home).wrappedCommand).toBeNull() // ...but there was no string command to call through to
   })
+
+  it('surfaces a corrupt state.json on uninstall instead of silently leaving the user wrapped', () => {
+    const home = makeHome()
+    writeFileSync(settingsPath(home), JSON.stringify({ statusLine: { type: 'command', command: 'mine' } }, null, 2))
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+    mgr.install()
+
+    writeFileSync(join(home, '.code-by-wire', 'state.json'), '{ corrupt not json') // the record we rely on is broken
+
+    expect(() => mgr.uninstall()).toThrow()
+    expect(mgr.isInstalled()).toBe(true) // still wrapped — we did NOT silently pretend to uninstall
+  })
 })

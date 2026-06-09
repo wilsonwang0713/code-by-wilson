@@ -73,11 +73,16 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
   }
 
   function readState(): InstallState | null {
+    let raw: string
     try {
-      return JSON.parse(readFileSync(statePath, 'utf8')) as InstallState
-    } catch {
-      return null
+      raw = readFileSync(statePath, 'utf8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null // absent ⇒ never installed
+      throw err // a present-but-unreadable record must surface, not masquerade as "not installed"
     }
+    // A present-but-corrupt state.json must surface too: we DID install, so silently treating it as
+    // "nothing to do" would strand the user wrapped with no uninstall. Let JSON.parse throw.
+    return JSON.parse(raw) as InstallState
   }
 
   function isInstalled(): boolean {
