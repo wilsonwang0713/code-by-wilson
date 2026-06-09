@@ -39,17 +39,39 @@ export function wrap(db: RawDb): SqliteDb {
   }
 }
 
+// Per-handle nesting depth, so `transaction()` composes: the outermost call owns the real
+// BEGIN/COMMIT and inner calls become SAVEPOINTs. Keyed on the handle (one stable SqliteDb per
+// open db), not module-global, so concurrent handles don't share a counter.
+const txDepth = new WeakMap<SqliteDb, number>()
+
 /**
- * Run `fn` inside a single transaction. better-sqlite3's `db.transaction()` wrapper doesn't exist on
- * node:sqlite, so both drivers share this explicit BEGIN/COMMIT (ROLLBACK on throw) instead.
+ * Run `fn` inside a transaction. better-sqlite3's `db.transaction()` wrapper doesn't exist on
+ * node:sqlite, so both drivers share this explicit BEGIN/COMMIT (ROLLBACK on throw) instead. Calls
+ * nest: an inner `transaction()` opens a SAVEPOINT and unwinds only its own work on throw, leaving
+ * the caller's transaction intact, so composing two store writes into one atomic pass is safe.
  */
 export function transaction(db: SqliteDb, fn: () => void): void {
-  db.exec('BEGIN')
+  const depth = txDepth.get(db) ?? 0
+  const savepoint = `cbw_sp_${depth}`
+  db.exec(depth === 0 ? 'BEGIN' : `SAVEPOINT ${savepoint}`)
+  txDepth.set(db, depth + 1)
   try {
     fn()
-    db.exec('COMMIT')
+    db.exec(depth === 0 ? 'COMMIT' : `RELEASE ${savepoint}`)
   } catch (err) {
-    db.exec('ROLLBACK')
+    try {
+      if (depth === 0) {
+        db.exec('ROLLBACK')
+      } else {
+        db.exec(`ROLLBACK TO ${savepoint}`)
+        db.exec(`RELEASE ${savepoint}`)
+      }
+    } catch {
+      // SQLite may have already auto-aborted (e.g. SQLITE_FULL), in which case the unwind throws
+      // 'no transaction is active'. Swallow it so the real cause below survives.
+    }
     throw err
+  } finally {
+    txDepth.set(db, depth)
   }
 }
