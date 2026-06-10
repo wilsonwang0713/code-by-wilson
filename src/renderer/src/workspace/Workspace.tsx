@@ -113,7 +113,7 @@ function WorkspaceBody({ session: s, account, now }: { session: Session; account
         <Timeline turns={doc?.turns ?? []} now={now} />
       </div>
       <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-ink-800 bg-ink-925 p-4 lg:flex">
-        <ContextPanel context={doc?.context ?? null} contextWindow={s.contextWindow} />
+        <ContextPanel live={s.liveContext ?? null} context={doc?.context ?? null} contextPct={s.contextPct} contextWindow={s.contextWindow} />
         <CostPanel usage={s.usage} model={s.model} liveCostUsd={s.liveCostUsd} billingMode={account?.billingMode} />
         <TasksPanel tasks={tasks ?? []} />
         <SubagentTree subagents={doc?.subagents ?? []} />
