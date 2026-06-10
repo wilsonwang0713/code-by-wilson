@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatUsd, formatRelativeTime } from '@shared/format'
+import { formatUsd, formatRelativeTime, formatResetCountdown, costDisplay } from '@shared/format'
 
 describe('formatUsd', () => {
   it('uses 2 decimals under $10, 1 under $100, none above', () => {
@@ -24,5 +24,48 @@ describe('formatRelativeTime', () => {
 
   it('never goes negative for a future timestamp', () => {
     expect(formatRelativeTime(now + 5_000, now)).toBe('now')
+  })
+})
+
+describe('formatResetCountdown', () => {
+  const now = 1_781_000_000_000
+
+  it('pieces the largest two units and stays short', () => {
+    expect(formatResetCountdown(now + 2 * 3_600_000 + 14 * 60_000, now)).toBe('2h 14m')
+    expect(formatResetCountdown(now + 2 * 3_600_000, now)).toBe('2h') // exactly on the hour, no trailing 0m
+    expect(formatResetCountdown(now + 3 * 86_400_000 + 4 * 3_600_000, now)).toBe('3d 4h')
+    expect(formatResetCountdown(now + 90 * 60_000, now)).toBe('1h 30m')
+    expect(formatResetCountdown(now + 30 * 60_000, now)).toBe('30m')
+    expect(formatResetCountdown(now + 86_400_000, now)).toBe('1d') // exactly a day, no trailing 0h
+  })
+
+  it('collapses under a minute and never goes negative', () => {
+    expect(formatResetCountdown(now + 45_000, now)).toBe('<1m')
+    expect(formatResetCountdown(now - 5_000, now)).toBe('now')
+    expect(formatResetCountdown(now, now)).toBe('now')
+  })
+})
+
+describe('costDisplay', () => {
+  it('labels an API account as real spend (no tilde)', () => {
+    expect(costDisplay({ liveCostUsd: 0.5, equivApiValueUsd: 9, billingMode: 'api' })).toEqual({
+      text: '$0.50',
+      equivalent: false,
+    })
+  })
+
+  it('labels a subscription as an equivalent value (tilde)', () => {
+    expect(costDisplay({ liveCostUsd: 0.5, equivApiValueUsd: 9, billingMode: 'subscription' })).toEqual({
+      text: '~$0.50',
+      equivalent: true,
+    })
+  })
+
+  it('prefers live cost over the computed value when present', () => {
+    expect(costDisplay({ liveCostUsd: 2, equivApiValueUsd: 9, billingMode: 'subscription' }).text).toBe('~$2.00')
+  })
+
+  it('falls back to the computed equivalent value, framed as equivalent, when there is no account', () => {
+    expect(costDisplay({ equivApiValueUsd: 6.42 })).toEqual({ text: '~$6.42', equivalent: true })
   })
 })
