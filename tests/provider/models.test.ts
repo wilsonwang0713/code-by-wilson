@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeModelId, contextWindowFor, priceFor, equivApiValue } from '@shared/models'
+import { normalizeModelId, contextWindowFor, priceFor, equivApiValue, costBreakdown } from '@shared/models'
 import type { Usage } from '@shared/types'
 
 describe('normalizeModelId', () => {
@@ -55,5 +55,38 @@ describe('equivApiValue', () => {
     // (100000*5 + 20000*25 + 400000*0.5 + 10000*6.25) / 1e6 = 1.2625
     const mixed = usage({ inputTokens: 100_000, outputTokens: 20_000, cacheReadTokens: 400_000, cacheCreationTokens: 10_000 })
     expect(equivApiValue(mixed, 'claude-opus-4-8')).toBeCloseTo(1.2625)
+  })
+})
+
+describe('costBreakdown', () => {
+  const usage = (over: Partial<Usage> = {}): Usage => ({
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    ...over,
+  })
+
+  it('is all zero with no tokens', () => {
+    expect(costBreakdown(usage(), 'claude-opus-4-8')).toEqual({
+      input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, cacheSavings: 0,
+    })
+  })
+
+  it('prices each kind at its per-million rate and sums to the equivalent value', () => {
+    const mixed = usage({ inputTokens: 100_000, outputTokens: 20_000, cacheReadTokens: 400_000, cacheCreationTokens: 10_000 })
+    const b = costBreakdown(mixed, 'claude-opus-4-8')
+    expect(b.input).toBeCloseTo(0.5)      // 100k × $5/M
+    expect(b.output).toBeCloseTo(0.5)     // 20k × $25/M
+    expect(b.cacheRead).toBeCloseTo(0.2)  // 400k × $0.5/M
+    expect(b.cacheWrite).toBeCloseTo(0.0625) // 10k × $6.25/M
+    expect(b.total).toBeCloseTo(1.2625)
+    expect(b.total).toBeCloseTo(equivApiValue(mixed, 'claude-opus-4-8'))
+  })
+
+  it('reports cache-hit savings as the read discount vs full input price', () => {
+    // 1M cache-read on opus: paid $0.50, would have been $5.00 fresh → saved $4.50.
+    const b = costBreakdown(usage({ cacheReadTokens: 1_000_000 }), 'claude-opus-4-8')
+    expect(b.cacheSavings).toBeCloseTo(4.5)
   })
 })
