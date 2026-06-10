@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   FolderOpen,
   GitBranch,
   GitPullRequestArrow,
@@ -10,7 +9,6 @@ import {
   SquareDashedMousePointer,
   SquareTerminal,
   Terminal,
-  TriangleAlert,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -21,7 +19,6 @@ import {
  * (e.g. AlertTriangle was renamed TriangleAlert).
  */
 const ICONS = {
-  'arrow-left': ArrowLeft,
   'folder-open': FolderOpen,
   'git-branch': GitBranch,
   'git-pull-request-arrow': GitPullRequestArrow,
@@ -32,7 +29,6 @@ const ICONS = {
   'square-dashed-mouse-pointer': SquareDashedMousePointer,
   'square-terminal': SquareTerminal,
   terminal: Terminal,
-  'triangle-alert': TriangleAlert,
 } satisfies Record<string, LucideIcon>
 
 export type IconName = keyof typeof ICONS

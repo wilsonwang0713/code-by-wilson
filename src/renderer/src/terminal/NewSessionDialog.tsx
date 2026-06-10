@@ -27,14 +27,14 @@ export function NewSessionDialog({
   }, [busy, onCancel])
 
   // Move focus into the dialog on open and restore it to whatever had focus when it closes, so keyboard
-  // and screen-reader users aren't stranded on the now-obscured Overview behind the overlay.
+  // and screen-reader users aren't stranded on the now-obscured app behind the overlay.
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
     panelRef.current?.focus()
     return () => prev?.focus?.()
   }, [])
 
-  // Minimal focus trap: keep Tab cycling within the dialog instead of wandering to the hidden Overview.
+  // Minimal focus trap: keep Tab cycling within the dialog instead of wandering to the hidden app behind it.
   function trapTab(e: ReactKeyboardEvent<HTMLDivElement>) {
     if (e.key !== 'Tab') return
     const panel = panelRef.current
