@@ -24,10 +24,24 @@ export interface StatusLineSample {
   modelDisplayName: string | null
   /** A deliberately-named session (`--name` / `/rename`), or null when unnamed. */
   sessionName: string | null
+  /** Claude Code CLI version (stdin `version`), e.g. "2.0.14". null when omitted. */
+  version: string | null
+  /** Thinking effort level (stdin `effort.level`): 'low' | 'medium' | 'high' | 'xhigh' | 'max'. null when omitted. */
+  effortLevel: string | null
+  /** Working directory (stdin `cwd`, else `workspace.current_dir`). null when omitted. */
+  cwd: string | null
+  /** Elapsed session wall-clock in ms (stdin `cost.total_duration_ms`). null when omitted. */
+  sessionClockMs: number | null
   /** Account rate limits, present when the capture carries them (a subscription that has had its first
    *  API response). null when absent: a subscription before that response, or a session whose billing the
-   *  app can't determine. Each window may be independently absent. */
-  rateLimits: { fiveHour?: RateLimit; sevenDay?: RateLimit } | null
+   *  app can't determine. Each window may be independently absent. The two weekly sub-buckets join the
+   *  existing five_hour / seven_day windows. */
+  rateLimits: {
+    fiveHour?: RateLimit
+    sevenDay?: RateLimit
+    sevenDaySonnet?: RateLimit
+    sevenDayOpus?: RateLimit
+  } | null
 }
 
 /** The seam ipc.ts depends on: the live captures the wrapper writes. Implemented in main by a file reader. */

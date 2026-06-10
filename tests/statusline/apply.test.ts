@@ -22,6 +22,10 @@ const sample = (over: Partial<StatusLineSample> = {}): StatusLineSample => ({
   modelId: null,
   modelDisplayName: null,
   sessionName: null,
+  version: null,
+  effortLevel: null,
+  cwd: null,
+  sessionClockMs: null,
   rateLimits: null,
   ...over,
 })
