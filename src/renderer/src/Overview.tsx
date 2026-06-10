@@ -30,11 +30,8 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
   const now = Date.now()
 
   const counts = useMemo(() => stateCounts(sessions), [sessions])
-  // The strip shows every Waiting session, independent of the table's filter/sort — its whole job is
-  // to never let a sort bury them.
-  const waiting = useMemo(() => filterSessions(sessions, 'waiting'), [sessions])
   // Table pipeline: filter by the active chip, sort by the active column, then pin Waiting last so they
-  // stay on top no matter the sort.
+  // stay on top no matter the sort — Waiting is never buried, even mid-sort.
   const rows = useMemo(
     () => pinWaiting(sortSessions(filterSessions(sessions, filter), sort)),
     [sessions, filter, sort],
@@ -85,8 +82,6 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
               </button>
             ))}
           </div>
-
-          <NeedsYouStrip waiting={waiting} now={now} onOpen={onOpen} />
 
           <div className="min-h-0 flex-1 overflow-auto">
             {sessions.length === 0 ? (
@@ -206,53 +201,6 @@ function Th({
         children
       )}
     </th>
-  )
-}
-
-/** Waiting sessions as amber action cards, always above the table. Collapses to a slim reassurance
- *  line when nothing is Waiting, so the table stays high. */
-function NeedsYouStrip({ waiting, now, onOpen }: { waiting: Session[]; now: number; onOpen: (s: Session) => void }) {
-  if (waiting.length === 0) {
-    return (
-      <div className="shrink-0 border-b border-ink-800 px-5 py-2 text-[11px] text-fg-faint">
-        <span className="text-ok">✓</span> Nothing waiting on you.
-      </div>
-    )
-  }
-  return (
-    <div className="max-h-[38vh] shrink-0 overflow-y-auto border-b border-ink-800 px-5 py-3">
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-accent-bright">Needs you</h2>
-        <span className="rounded-full bg-accent/15 px-2 py-0.5 font-mono text-[11px] text-accent-bright">{waiting.length}</span>
-      </div>
-      <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-        {waiting.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => onOpen(s)}
-            className="block w-full rounded-lg border border-accent/50 bg-accent/[0.07] p-3 text-left transition-colors hover:bg-accent/[0.12]"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-fg">
-                <span className="h-2 w-2 shrink-0 animate-pulse-soft rounded-full bg-accent" />
-                <span className="truncate">{s.title}</span>
-              </span>
-              <ManagementChip kind={s.management} />
-            </div>
-            <div className="mt-1 truncate font-mono text-[11px] text-fg-faint">
-              {s.project}{s.branch ? ` · ${s.branch}` : ''}
-            </div>
-            <div className="mt-2 truncate rounded-md border border-accent/25 bg-ink-950/40 px-2.5 py-1.5 font-mono text-[12px] text-accent-bright">
-              {s.waitingReason ?? 'Waiting on you'}
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="rounded bg-accent px-2.5 py-1 text-xs font-semibold text-ink-950">Respond →</span>
-              <span className="font-mono text-[11px] text-fg-faint">{formatRelativeTime(s.lastActivityMs, now)}</span>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
   )
 }
 
