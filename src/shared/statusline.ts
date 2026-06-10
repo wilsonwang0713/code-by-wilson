@@ -1,4 +1,5 @@
 import type { Account, RateLimit, Session } from './types'
+import type { ContextBreakdown } from './transcript'
 
 /** One normalized statusLine capture for a Session, parsed from a side-channel file. Plain data so it
  *  crosses IPC cleanly. `null` fields are "the statusLine didn't report this", distinct from 0. */
@@ -13,6 +14,15 @@ export interface StatusLineSample {
   contextPct: number | null
   /** Live context window size (tokens), or null when omitted. */
   contextWindow: number | null
+  /** The capture's current-context split (current_usage): input + cache-read + cache-creation, the
+   *  live equivalent of the transcript's per-turn breakdown. null when omitted or zero-sum. */
+  liveContext: ContextBreakdown | null
+  /** The raw model identifier the statusLine reports (e.g. 'claude-opus-4-8[1m]'). null when omitted. */
+  modelId: string | null
+  /** Claude's own model label (model.display_name). null when omitted. */
+  modelDisplayName: string | null
+  /** A deliberately-named session (`--name` / `/rename`), or null when unnamed. */
+  sessionName: string | null
   /** Account rate limits — present only for a subscription; null for an API account. Each window may
    *  be independently absent (the statusLine populates them after the first API response). */
   rateLimits: { fiveHour?: RateLimit; sevenDay?: RateLimit } | null

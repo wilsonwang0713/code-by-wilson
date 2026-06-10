@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import type { RateLimit } from '@shared/types'
+import type { ContextBreakdown } from '@shared/transcript'
 import type { StatusLineReader, StatusLineSample } from '@shared/statusline'
 import { CAPTURE_STALE_MS } from '@shared/statusline'
 import { resolveClaudeDir } from '../claude-config'
@@ -33,6 +34,17 @@ function parseWindow(raw: unknown): RateLimit | undefined {
   return { usedPct, resetsAt: resetsAtSec * 1000 }
 }
 
+/** The capture's current-context split (input + cache-read + cache-creation), or null when absent or
+ *  zero-sum. output_tokens is not part of the prompt, so it's ignored, matching the transcript's usageBreakdown. */
+function parseLiveContext(raw: unknown): ContextBreakdown | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const u = raw as Record<string, unknown>
+  const input = num(u.input_tokens) ?? 0
+  const cacheRead = num(u.cache_read_input_tokens) ?? 0
+  const cacheCreation = num(u.cache_creation_input_tokens) ?? 0
+  return input + cacheRead + cacheCreation > 0 ? { input, cacheRead, cacheCreation } : null
+}
+
 /** Parse one statusLine JSON blob into a sample. Defensive: a missing/mistyped field degrades to null,
  *  never throws. Returns null only when there's no usable session id to key the capture by. */
 function parseSample(raw: string, capturedMtimeMs: number): StatusLineSample | null {
@@ -49,6 +61,7 @@ function parseSample(raw: string, capturedMtimeMs: number): StatusLineSample | n
 
   const cost = (j.cost ?? {}) as Record<string, unknown>
   const ctx = (j.context_window ?? {}) as Record<string, unknown>
+  const model = (j.model ?? {}) as Record<string, unknown>
   const rl = j.rate_limits
   let rateLimits: StatusLineSample['rateLimits'] = null
   if (rl !== null && typeof rl === 'object') {
@@ -57,6 +70,7 @@ function parseSample(raw: string, capturedMtimeMs: number): StatusLineSample | n
   }
 
   const pct = num(ctx.used_percentage)
+  const sessionName = typeof j.session_name === 'string' && j.session_name.length > 0 ? j.session_name : null
   return {
     sessionId,
     capturedMtimeMs,
@@ -65,6 +79,10 @@ function parseSample(raw: string, capturedMtimeMs: number): StatusLineSample | n
     linesRemoved: num(cost.total_lines_removed),
     contextPct: pct === null ? null : Math.min(100, Math.max(0, Math.round(pct))),
     contextWindow: num(ctx.context_window_size),
+    liveContext: parseLiveContext(ctx.current_usage),
+    modelId: typeof model.id === 'string' ? model.id : null,
+    modelDisplayName: typeof model.display_name === 'string' ? model.display_name : null,
+    sessionName,
     rateLimits,
   }
 }
