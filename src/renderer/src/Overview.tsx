@@ -64,7 +64,7 @@ export function Overview({ sessions, caps, stats, account, loading, onRefresh, o
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <Rail stats={stats} caps={caps} account={account} now={now} />
+        <Rail stats={stats} account={account} now={now} />
 
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-ink-800 px-5 py-3">
@@ -141,7 +141,7 @@ export function Overview({ sessions, caps, stats, account, loading, onRefresh, o
                             {projectLine}
                           </div>
                         </td>
-                        <td className="py-2.5 pr-3"><ModelChip model={s.model} /></td>
+                        <td className="py-2.5 pr-3"><ModelChip model={s.model} modelId={s.modelId} modelDisplayName={s.modelDisplayName} /></td>
                         <td className="py-2.5 pr-3">
                           <div className="flex items-center gap-2">
                             <Bar pct={s.contextPct} fill={ctxBar(s.contextPct)} className="w-16" />
@@ -226,16 +226,14 @@ function Th({
 }
 
 /** Left ops rail: the account rate-limit bars (subscription only), then the usage stats (This week,
- *  Model mix, By project) and a capability line. Bars are absent for an API account or when no
- *  statusLine data has arrived — ADR-0001's graceful degradation. Hidden below the `lg` breakpoint. */
+ *  Model mix, By project). Bars are absent for an API account or when no statusLine data has arrived.
+ *  ADR-0001's graceful degradation. Hidden below the `lg` breakpoint. */
 function Rail({
   stats,
-  caps,
   account,
   now,
 }: {
   stats: Stats | null
-  caps: ProviderCapabilities | null
   account: Account | null
   now: number
 }) {
@@ -314,11 +312,6 @@ function Rail({
         </>
       )}
 
-      {caps && (
-        <div className="mt-auto border-t border-ink-800 pt-3 text-[11px] text-fg-faint">
-          ClaudeProvider · control {caps.canControl ? '✓' : '✗'} · limits {caps.hasRateLimits ? '✓' : '✗'} · subagents {caps.hasSubagents ? '✓' : '✗'}
-        </div>
-      )}
     </aside>
   )
 }
