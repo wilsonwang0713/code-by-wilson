@@ -3,10 +3,12 @@ import type { Session, ModelId, Account } from '@shared/types'
 import type { OverviewData } from '@shared/ipc'
 import { mergeManaged, applyAdopting } from '@shared/managed'
 import { newSessionId } from '@shared/terminal'
-import { Overview } from './Overview'
 import { Workspace } from './workspace/Workspace'
 import { NewSessionDialog } from './terminal/NewSessionDialog'
 import { terminalStore } from './terminal/terminal-store-instance'
+import { GlobalHeader } from './ui/GlobalHeader'
+import { SessionList } from './SessionList'
+import { Icon } from './ui/icons'
 
 /** How often the session list re-syncs in the background, so an open workspace's state (and the
  *  Overview) tracks a session as it moves. Slower than the transcript poll: metadata changes less
@@ -25,6 +27,7 @@ export function App() {
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [query, setQuery] = useState('')
 
   // Sessions and account come from one overview read, so apply them together — a stale or failed
   // half can't leave the list and the account disagreeing.
@@ -147,23 +150,59 @@ export function App() {
   const all = applyAdopting(mergeManaged(sessions, drafts), adopting)
   const selected = selectedId !== null ? (all.find((s) => s.id === selectedId) ?? null) : null
 
-  if (selected) {
-    return <Workspace session={selected} account={account} onBack={() => setSelectedId(null)} onAdopt={adoptSession} />
-  }
+  // Keep a session open: select the loudest one when the list first arrives, and re-select if the open
+  // one vanishes (filtered away, pruned, or ended-and-gone). Keyed on the id list so it doesn't loop on
+  // every render; setting the same id is a no-op.
+  const ids = all.map((s) => s.id).join(',')
+  useEffect(() => {
+    if (all.length === 0) {
+      if (selectedId !== null) setSelectedId(null)
+      return
+    }
+    if (selectedId === null || !all.some((s) => s.id === selectedId)) {
+      const firstWaiting = all.find((s) => s.state === 'waiting')
+      setSelectedId((firstWaiting ?? all[0]).id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids])
 
   return (
-    <>
-      <Overview
-        sessions={all}
+    <div className="app-bg flex h-screen flex-col text-fg">
+      <GlobalHeader
+        sessionCount={all.length}
         account={account}
         loading={loading}
         onRefresh={() => void refresh()}
-        onOpen={(s) => setSelectedId(s.id)}
         onNew={() => setCreating(true)}
       />
-      {creating && (
-        <NewSessionDialog onCreate={createSession} onCancel={() => setCreating(false)} />
-      )}
-    </>
+      <div className="flex min-h-0 flex-1">
+        <SessionList sessions={all} selectedId={selectedId} onSelect={setSelectedId} query={query} onQuery={setQuery} />
+        <div className="flex min-w-0 flex-1">
+          {selected ? (
+            <Workspace key={selected.id} session={selected} account={account} embedded onAdopt={adoptSession} />
+          ) : (
+            <EmptyDetail empty={all.length === 0} loading={loading} />
+          )}
+        </div>
+      </div>
+      {creating && <NewSessionDialog onCreate={createSession} onCancel={() => setCreating(false)} />}
+    </div>
+  )
+}
+
+/** The detail pane before a session is selected, or when none exist. */
+function EmptyDetail({ empty, loading }: { empty: boolean; loading: boolean }) {
+  if (empty) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-ink-950 text-[13px] text-fg-faint">
+        {loading ? null : 'No Claude Code sessions found.'}
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2.5 bg-ink-950 text-fg-faint">
+      <Icon name="square-dashed-mouse-pointer" size={28} />
+      <p className="text-[13px]">Select a session to open it.</p>
+    </div>
   )
 }
