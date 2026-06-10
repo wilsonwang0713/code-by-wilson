@@ -3,7 +3,7 @@ import type { Provider } from '../types'
 import type { Management } from '@shared/types'
 import { readTextOrNull, resolveClaudeDir } from '../../claude-config'
 import { indexTranscripts, listCandidates, summarize, restate } from './discover'
-import { parseTranscriptEvents } from './transcript-events'
+import { parseTranscriptEventsFromRows } from './transcript-events'
 import { parseJsonlRows } from './transcript-row'
 import { buildSubagentForest, readSubagentSources, subagentsDirFor, subagentsNewestMtime } from './subagents'
 import { readTasksForSession, tasksNewestMtime } from './tasks'
@@ -89,9 +89,11 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
           pathById.delete(id)
           return { status: 'absent' } // ENOENT — genuinely gone (bounding a large read is issue #20)
         }
+        // Parse the JSONL once; the event projection and the subagent reconstruction share the rows.
+        const rows = parseJsonlRows(jsonl)
         const sources = readSubagentSources(subagentsDir)
-        const subagents = sources.length ? buildSubagentForest(parseJsonlRows(jsonl), sources) : []
-        return { status: 'changed', mtimeMs: token, doc: { ...parseTranscriptEvents(jsonl), subagents } }
+        const subagents = sources.length ? buildSubagentForest(rows, sources) : []
+        return { status: 'changed', mtimeMs: token, doc: { ...parseTranscriptEventsFromRows(rows), subagents } }
       } catch {
         // A non-ENOENT read failure (EACCES, EIO, …) is transient, not absence. Degrade like
         // summarize does: report an error so the view keeps its last doc, rather than rejecting the

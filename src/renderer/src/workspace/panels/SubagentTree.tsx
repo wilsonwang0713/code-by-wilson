@@ -25,7 +25,9 @@ function AgentNode({ agent, depth }: { agent: Subagent; depth: number }) {
         <span className="min-w-0 flex-1 truncate text-[12px] text-fg" title={agent.type}>
           {agent.type}
         </span>
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">{MODEL_SHORT[agent.model]}</span>
+        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
+          {agent.model ? MODEL_SHORT[agent.model] : '—'}
+        </span>
         <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-muted">{formatTokens(agent.tokens)}</span>
         <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-faint">
           {formatDuration(agent.durationMs)}

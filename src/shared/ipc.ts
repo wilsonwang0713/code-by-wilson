@@ -1,5 +1,5 @@
 import type { Session, ProviderCapabilities, Account, Task } from './types'
-import type { TranscriptRead } from './transcript'
+import type { TranscriptRead, ReadSettled } from './transcript'
 import type { TerminalApi } from './terminal'
 import type { Stats } from './stats'
 
@@ -26,16 +26,9 @@ export interface OverviewData extends IndexOverview {
   account: Account | null
 }
 
-/**
- * The result of an on-demand tasks read, mirroring TranscriptRead: `changed` ships the list with a
- * change token the caller echoes back as `since`; `unchanged` means the store hasn't moved; `absent`
- * means the session has no tasks dir; `error` is a transient read failure (keep the last list).
- */
-export type TaskRead =
-  | { status: 'changed'; mtimeMs: number; tasks: Task[] }
-  | { status: 'unchanged'; mtimeMs: number }
-  | { status: 'absent' }
-  | { status: 'error' }
+/** The result of an on-demand tasks read: a fresh list with a change token the caller echoes back as
+ *  `since`, or one of the shared settled outcomes (see ReadSettled). */
+export type TaskRead = { status: 'changed'; mtimeMs: number; tasks: Task[] } | ReadSettled
 
 export interface IpcApi {
   /** Read-only: the indexed sessions + stats as they stand, no sync — fast initial paint. */

@@ -14,7 +14,16 @@ function main(toolUseId: string, result?: { is_error: boolean }): any[] {
 }
 
 function agent(agentId: string, toolUseId: string, agentType: string, rows: any[]): SubagentSource {
-  return { agentId, meta: { agentType, description: '', toolUseId }, rows }
+  return { agentId, meta: { agentType, toolUseId }, rows }
+}
+
+// One assistant turn streamed across `n` rows that repeat the same message id and usage.
+function streamedTurn(id: string, model: string, inputTokens: number, outputTokens: number, n: number): any[] {
+  return Array.from({ length: n }, () => ({
+    type: 'assistant',
+    timestamp: '2026-06-04T03:00:00.000Z',
+    message: { id, model, usage: { input_tokens: inputTokens, output_tokens: outputTokens }, content: [] },
+  }))
 }
 
 describe('buildSubagentForest', () => {
@@ -71,6 +80,45 @@ describe('buildSubagentForest', () => {
       ]),
     ])
     expect(forest[0].status).toBe('failed')
+  })
+
+  it('counts a streamed turn once, keyed on message id (no per-row inflation)', () => {
+    const forest = buildSubagentForest(main('tu-1', { is_error: false }), [
+      // 5 rows, same id + usage {3, 12}: the turn's tokens are 15, not 75.
+      agent('a1', 'tu-1', 'Explore', streamedTurn('msg-1', SONNET, 3, 12, 5)),
+    ])
+    expect(forest[0].tokens).toBe(15)
+  })
+
+  it('leaves model unset for a subagent that reported no assistant model yet', () => {
+    const forest = buildSubagentForest(main('tu-1'), [
+      // a just-spawned agent: a row exists but carries no model.
+      agent('a1', 'tu-1', 'Explore', [{ type: 'user', message: { content: [] } }]),
+    ])
+    expect(forest).toEqual([{ id: 'a1', type: 'Explore', status: 'working', tokens: 0, durationMs: 0 }])
+  })
+
+  it('orders timestamp-less agents deterministically by id (no NaN comparator)', () => {
+    const noTs = (id: string) => agent(id, `tu-${id}`, 'Explore', [
+      { type: 'assistant', message: { model: SONNET, usage: { input_tokens: 1, output_tokens: 1 }, content: [] } },
+    ])
+    const forest = buildSubagentForest(
+      [...main('tu-b', { is_error: false }), ...main('tu-a', { is_error: false })],
+      [noTs('b'), noTs('a')],
+    )
+    expect(forest.map((n) => n.id)).toEqual(['a', 'b'])
+  })
+
+  it('keeps a self-referential dispatch as a root rather than a cycle', () => {
+    // A malformed meta whose toolUseId is also dispatched inside the agent's own transcript: owner would
+    // resolve to itself. The forest must stay acyclic (else the renderer recurses forever).
+    const forest = buildSubagentForest(main('tu-1', { is_error: false }), [
+      agent('loop', 'self', 'Explore', [
+        { type: 'assistant', timestamp: '2026-06-04T03:00:00.000Z', message: { model: SONNET, usage: { input_tokens: 1, output_tokens: 1 }, content: [{ type: 'tool_use', id: 'self', name: 'Task' }] } },
+      ]),
+    ])
+    expect(forest.map((n) => n.id)).toEqual(['loop'])
+    expect(forest[0].children).toBeUndefined()
   })
 
   it('returns [] when there are no subagents', () => {

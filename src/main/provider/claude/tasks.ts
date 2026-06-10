@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Task } from '@shared/types'
+import { newestMtime } from './dir-mtime'
 
 /** A task file's only fields we care about; the store also writes `description`, `activeForm`, `blocks`. */
 interface RawTask {
@@ -13,11 +14,12 @@ interface RawTask {
 /** Only numbered task files are data; `.lock` / `.highwatermark` are store bookkeeping. */
 const TASK_FILE = /^\d+\.json$/
 
-function deriveStatus(t: RawTask, completed: Set<string>): Task['status'] {
+function deriveStatus(t: RawTask, completed: Set<string>, present: Set<string>): Task['status'] {
   if (t.status === 'completed') return 'completed'
   if (t.status === 'in_progress') return 'in_progress'
-  // pending (or anything unexpected): blocked iff some dependency isn't done yet.
-  if (t.blockedBy.some((dep) => !completed.has(dep))) return 'blocked'
+  // pending (or anything unexpected): blocked iff a real dependency isn't done yet. A dep that isn't in
+  // this session's task set (deleted/renumbered) can't block — ignore it rather than latch 'blocked'.
+  if (t.blockedBy.some((dep) => present.has(dep) && !completed.has(dep))) return 'blocked'
   return 'pending'
 }
 
@@ -53,10 +55,13 @@ export function readTasksForSession(claudeDir: string, sessionId: string): Task[
     }
   }
 
-  raw.sort((a, b) => Number(a.id) - Number(b.id))
+  // Numeric order, but tolerant of a non-numeric id: localeCompare's numeric mode sorts '2' before '10'
+  // without the NaN comparator a `Number(a.id) - Number(b.id)` subtraction would yield on a bad id.
+  raw.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
   const completed = new Set(raw.filter((t) => t.status === 'completed').map((t) => t.id))
+  const present = new Set(raw.map((t) => t.id))
   return raw.map((t) => {
-    const task: Task = { id: t.id, subject: t.subject, status: deriveStatus(t, completed) }
+    const task: Task = { id: t.id, subject: t.subject, status: deriveStatus(t, completed, present) }
     if (t.blockedBy.length) task.blockedBy = t.blockedBy
     return task
   })
@@ -65,22 +70,5 @@ export function readTasksForSession(claudeDir: string, sessionId: string): Task[
 /** Newest mtime (ms) among a session's numbered task files, or 0 when the dir is absent/empty. The
  *  `readTasks` change token: rewriting any task file (add or status change) advances it. */
 export function tasksNewestMtime(claudeDir: string, sessionId: string): number {
-  const dir = join(claudeDir, 'tasks', sessionId)
-  let names: string[]
-  try {
-    names = readdirSync(dir)
-  } catch {
-    return 0
-  }
-  let newest = 0
-  for (const name of names) {
-    if (!TASK_FILE.test(name)) continue
-    try {
-      const m = statSync(join(dir, name)).mtimeMs
-      if (m > newest) newest = m
-    } catch {
-      // skip a vanished file
-    }
-  }
-  return newest
+  return newestMtime(join(claudeDir, 'tasks', sessionId), (name) => TASK_FILE.test(name))
 }

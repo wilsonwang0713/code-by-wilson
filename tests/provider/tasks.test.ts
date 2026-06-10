@@ -53,6 +53,17 @@ describe('readTasksForSession', () => {
     ])
   })
 
+  it('does not latch blocked on a dependency that is not in the task set', () => {
+    const home = makeHome()
+    const id = 'sess'
+    // blockedBy points at '9', which was deleted/renumbered and no longer exists — it cannot block.
+    writeTask(home, id, '1.json', { id: '1', subject: 'Orphan dep', status: 'pending', blocks: [], blockedBy: ['9'] })
+
+    expect(readTasksForSession(home, id)).toEqual([
+      { id: '1', subject: 'Orphan dep', status: 'pending', blockedBy: ['9'] },
+    ])
+  })
+
   it('returns [] when the session has no tasks dir', () => {
     expect(readTasksForSession(makeHome(), 'nope')).toEqual([])
   })
