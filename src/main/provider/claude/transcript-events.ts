@@ -66,7 +66,7 @@ function reasonForTool(name: string, input: Record<string, unknown>): PendingRea
  * trailing line) is fine. Subagent-internal turns (isSidechain) are dropped — the dispatch is surfaced
  * from the parent's Task tool_use, and a subagent's own tools/time don't count toward the parent turn.
  */
-export function parseTranscriptEvents(jsonl: string): TranscriptDoc {
+export function parseTranscriptEvents(jsonl: string): Omit<TranscriptDoc, 'subagents'> {
   const events: TranscriptEvent[] = []
 
   // Unanswered tool_use ids from the LATEST assistant turn, each mapped to its reason. Reset when a NEW

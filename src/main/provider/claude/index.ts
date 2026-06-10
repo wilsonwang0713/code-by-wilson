@@ -4,6 +4,8 @@ import type { Management } from '@shared/types'
 import { readTextOrNull, resolveClaudeDir } from '../../claude-config'
 import { indexTranscripts, listCandidates, summarize, restate } from './discover'
 import { parseTranscriptEvents } from './transcript-events'
+import { parseJsonlRows } from './transcript-row'
+import { buildSubagentForest, readSubagentSources, subagentsDirFor, subagentsNewestMtime } from './subagents'
 
 export interface ClaudeProviderDeps {
   claudeDir?: string
@@ -74,15 +76,21 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
           mtimeMs = hit.mtimeMs
           pathById.set(id, path)
         }
+        // The change token spans the transcript AND its subagent transcripts, so a running subagent
+        // (which appends to its own file without touching the main transcript) still re-triggers a read.
+        const subagentsDir = subagentsDirFor(path)
+        const token = Math.max(mtimeMs!, subagentsNewestMtime(subagentsDir))
         // Unchanged since the caller last saw it — skip the read AND the parse, not just the render.
-        if (mtimeMs === sinceMtimeMs) return { status: 'unchanged', mtimeMs: mtimeMs! }
+        if (token === sinceMtimeMs) return { status: 'unchanged', mtimeMs: token }
 
         const jsonl = readTextOrNull(path)
         if (jsonl === null) {
           pathById.delete(id)
           return { status: 'absent' } // ENOENT — genuinely gone (bounding a large read is issue #20)
         }
-        return { status: 'changed', mtimeMs: mtimeMs!, doc: parseTranscriptEvents(jsonl) }
+        const sources = readSubagentSources(subagentsDir)
+        const subagents = sources.length ? buildSubagentForest(parseJsonlRows(jsonl), sources) : []
+        return { status: 'changed', mtimeMs: token, doc: { ...parseTranscriptEvents(jsonl), subagents } }
       } catch {
         // A non-ENOENT read failure (EACCES, EIO, …) is transient, not absence. Degrade like
         // summarize does: report an error so the view keeps its last doc, rather than rejecting the

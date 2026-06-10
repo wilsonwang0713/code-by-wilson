@@ -6,6 +6,7 @@
  * This is a SECOND projection over the transcript, distinct from TranscriptSummary (token sums,
  * derived state). That one answers "what is this session"; this one answers "what does it look like".
  */
+import type { Subagent } from './types'
 
 /** A minimal diff: the removed and added lines of an edit, already split on newline. */
 export interface DiffHunk {
@@ -55,6 +56,10 @@ export interface TranscriptDoc {
   turns: TurnSummary[]
   /** Current context cache-state split, or null when no assistant turn has reported usage. */
   context: ContextBreakdown | null
+  /** The session's subagent forest, reconstructed from its external subagent transcripts. Roots are
+   *  dispatched from the main transcript; children nest under the agent that dispatched them. Empty
+   *  when the session spawned no subagents. */
+  subagents: Subagent[]
 }
 
 /**
