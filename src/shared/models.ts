@@ -45,19 +45,26 @@ function specById(model: ModelId): ModelSpec {
   return MODELS.find((m) => m.id === model) ?? DEFAULT_SPEC
 }
 
-/** The spec for a raw transcript model string, matched by family substring; DEFAULT_SPEC if unknown. */
-function specForRaw(raw: string | undefined): ModelSpec {
+/** The spec for a raw transcript model string, matched by family substring; null when no family matches. */
+function specForRaw(raw: string | undefined): ModelSpec | null {
   if (raw) {
     for (const spec of MODELS) {
       if (raw.includes(spec.family)) return spec
     }
   }
-  return DEFAULT_SPEC
+  return null
 }
 
-/** Map a raw transcript model string (possibly suffixed, e.g. a date stamp) to a canonical ModelId. */
+/** Map a raw model string (possibly suffixed, e.g. a date stamp or `[1m]`) to a canonical ModelId. An
+ *  unrecognized string falls to DEFAULT_SPEC, the safe Opus default for pricing and window. */
 export function normalizeModelId(raw: string | undefined): ModelId {
-  return specForRaw(raw).id
+  return (specForRaw(raw) ?? DEFAULT_SPEC).id
+}
+
+/** Whether a raw model string matches a known family. False for a model absent from the table, which the
+ *  honest label renders by its statusLine display_name rather than masquerading as the Opus fallback. */
+export function isKnownModelString(raw: string | undefined): boolean {
+  return specForRaw(raw) !== null
 }
 
 /**
