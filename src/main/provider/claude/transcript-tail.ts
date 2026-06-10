@@ -27,6 +27,9 @@ export function reasonForTool(name: string, input: Record<string, unknown>): Pen
  * A new assistant turn (new message.id) supersedes the last, so only its own tools can still block. An
  * id-less assistant row is its own turn (resets every time), matching both parsers' prior behavior. A
  * zero-sum usage block (a '<synthetic>' placeholder) leaves the last real split intact.
+ *
+ * Which rows reach the tracker is the caller's decision: the render parser excludes isSidechain
+ * (subagent-internal) turns, the summary parser includes every row.
  */
 export interface TailTracker {
   beginAssistantTurn(id: string | undefined): void
