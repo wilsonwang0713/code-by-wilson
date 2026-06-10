@@ -3,6 +3,7 @@ import type { Session, ModelId, Account } from '@shared/types'
 import type { OverviewData } from '@shared/ipc'
 import { mergeManaged, applyAdopting } from '@shared/managed'
 import { newSessionId } from '@shared/terminal'
+import { groupSessions } from '@shared/overview'
 import { Workspace } from './workspace/Workspace'
 import { NewSessionDialog } from './terminal/NewSessionDialog'
 import { terminalStore } from './terminal/terminal-store-instance'
@@ -150,9 +151,10 @@ export function App() {
   const all = applyAdopting(mergeManaged(sessions, drafts), adopting)
   const selected = selectedId !== null ? (all.find((s) => s.id === selectedId) ?? null) : null
 
-  // Keep a session open: select the loudest one when the list first arrives, and re-select if the open
-  // one vanishes (filtered away, pruned, or ended-and-gone). Keyed on the id list so it doesn't loop on
-  // every render; setting the same id is a no-op.
+  // The selection follows the unfiltered list, not the rail's `query` — filtering the rail must never
+  // yank the open session away. Re-home only when the list first arrives, the open session vanishes, or
+  // the list empties. Keyed on the id list so it can't loop on a fresh `all` each render; setting the
+  // same id is a no-op.
   const ids = all.map((s) => s.id).join(',')
   useEffect(() => {
     if (all.length === 0) {
@@ -160,10 +162,11 @@ export function App() {
       return
     }
     if (selectedId === null || !all.some((s) => s.id === selectedId)) {
-      const firstWaiting = all.find((s) => s.state === 'waiting')
-      setSelectedId((firstWaiting ?? all[0]).id)
+      // Pick the rail's top row (Waiting → Working → Idle → Ended, recent first) so the auto-opened
+      // session is the one visually at the top of the list, not an arbitrary first element of `all`.
+      const ordered = groupSessions(all, '').flatMap((g) => g.items)
+      setSelectedId((ordered[0] ?? all[0]).id)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids])
 
   return (
@@ -179,7 +182,7 @@ export function App() {
         <SessionList sessions={all} selectedId={selectedId} onSelect={setSelectedId} query={query} onQuery={setQuery} />
         <div className="flex min-w-0 flex-1">
           {selected ? (
-            <Workspace key={selected.id} session={selected} account={account} embedded onAdopt={adoptSession} />
+            <Workspace key={selected.id} session={selected} account={account} onAdopt={adoptSession} />
           ) : (
             <EmptyDetail empty={all.length === 0} loading={loading} />
           )}

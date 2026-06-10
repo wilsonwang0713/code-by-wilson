@@ -2,7 +2,6 @@ import { useState } from 'react'
 import type { Session, Account } from '@shared/types'
 import { cx, ManagementChip, StateBadge } from '../ui/atoms'
 import { Icon } from '../ui/icons'
-import { RateLimits } from '../ui/RateLimits'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from '../terminal/TerminalView'
 import { useTranscript, type DocState } from './use-transcript'
@@ -17,15 +16,11 @@ import { useTasks } from './use-tasks'
 export function Workspace({
   session: s,
   account,
-  onBack,
   onAdopt,
-  embedded = false,
 }: {
   session: Session
   account: Account | null
-  onBack?: () => void
   onAdopt: (id: string) => Promise<void>
-  embedded?: boolean
 }) {
   const isObserved = s.management === 'observed'
   const [adoptBusy, setAdoptBusy] = useState(false)
@@ -49,17 +44,6 @@ export function Workspace({
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-950 text-fg">
       <header className="flex shrink-0 items-center gap-3 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
-        {!embedded && onBack && (
-          <>
-            <button
-              onClick={onBack}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-fg-muted transition-colors hover:bg-ink-900 hover:text-fg"
-            >
-              <Icon name="arrow-left" size={14} /> Overview
-            </button>
-            <div className="h-5 w-px bg-ink-800" />
-          </>
-        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <span className="truncate text-sm font-semibold text-fg">{s.title}</span>
@@ -70,7 +54,6 @@ export function Workspace({
             {s.branch && ` · ${s.branch}`}
           </div>
         </div>
-        {!embedded && <RateLimits account={account} now={now} />}
         <ManagementChip kind={s.management} />
         {isObserved && (
           <span className="rounded bg-ink-900 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-fg-faint ring-1 ring-ink-800">
