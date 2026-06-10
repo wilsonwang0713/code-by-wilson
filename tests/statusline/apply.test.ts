@@ -168,6 +168,23 @@ describe('overlaySessions', () => {
   })
 })
 
+describe('overlaySessions — effort, clock, cwd', () => {
+  it('overlays the new core fields from the sample', () => {
+    const byId = new Map([['s1', sample({ effortLevel: 'high', sessionClockMs: 6_120_000, cwd: '/Users/me/proj' })]])
+    const [s] = overlaySessions([session({ id: 's1' })], byId)
+    expect(s.effortLevel).toBe('high')
+    expect(s.sessionClockMs).toBe(6_120_000)
+    expect(s.cwd).toBe('/Users/me/proj')
+  })
+
+  it('leaves a session with no sample untouched (no new fields)', () => {
+    const [s] = overlaySessions([session({ id: 's1' })], new Map())
+    expect(s.effortLevel).toBeUndefined()
+    expect(s.sessionClockMs).toBeUndefined()
+    expect(s.cwd).toBeUndefined()
+  })
+})
+
 describe('freshestBySession', () => {
   it('keeps the newest capture per session id', () => {
     const a = sample({ sessionId: 's1', capturedMtimeMs: 100, costUsd: 1 })

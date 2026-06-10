@@ -56,6 +56,12 @@ export interface Session {
   /** Lines added/removed this session, from the statusLine `cost` block. Absent ⇒ no sample. */
   linesAdded?: number
   linesRemoved?: number
+  /** Thinking effort level from the live capture (effort.level). Absent ⇒ no sample / not reported. */
+  effortLevel?: string
+  /** Elapsed session wall-clock in ms (cost.total_duration_ms). Absent ⇒ no sample. */
+  sessionClockMs?: number
+  /** Working directory from the live capture, used to scope the lazy git/voice reads. Absent ⇒ no sample. */
+  cwd?: string
   lastActivityMs: number
   currentTask?: string
   waitingReason?: string

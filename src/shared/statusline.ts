@@ -137,6 +137,9 @@ export function overlaySessions(sessions: Session[], byId: Map<string, StatusLin
       liveCostUsd: sample.costUsd ?? undefined,
       linesAdded: sample.linesAdded ?? undefined,
       linesRemoved: sample.linesRemoved ?? undefined,
+      effortLevel: sample.effortLevel ?? undefined,
+      sessionClockMs: sample.sessionClockMs ?? undefined,
+      cwd: sample.cwd ?? undefined,
     }
   })
 }
