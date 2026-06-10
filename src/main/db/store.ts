@@ -1,6 +1,5 @@
 import type { Session, PersistedSession } from '@shared/types'
 import { contextWindowFor, equivApiValue, normalizeModelId } from '@shared/models'
-import { computeStats, type Stats } from '@shared/stats'
 import type { IndexOverview } from '@shared/ipc'
 import { transaction, type SqliteDb } from './driver'
 
@@ -179,26 +178,15 @@ export function getSessions(db: SqliteDb): Session[] {
 }
 
 /**
- * The Overview's usage aggregates, computed from the index — `getPersisted` reads the SQLite rows,
- * never a transcript (ADR-0002). `now` is injected so the 7-day trend's day boundaries are
- * deterministic in tests.
+ * The indexed session list from a single index read, so the list the Overview renders reflects one
+ * snapshot in one IPC round trip. `getPersisted` reads the SQLite rows, never a transcript (ADR-0002).
  */
-export function getStats(db: SqliteDb, now: number): Stats {
-  return computeStats(getPersisted(db), now)
-}
-
-/**
- * Sessions and usage aggregates from a single index read, so the list the Overview renders and the
- * stats beside it always reflect the same snapshot (and the renderer makes one IPC round trip, not
- * two). One `getPersisted` pass feeds both the hydrate and the fold. `now` is injected for the
- * trend's day boundaries, exactly as `getStats` does.
- */
-export function getOverview(db: SqliteDb, now: number): IndexOverview {
+export function getOverview(db: SqliteDb): IndexOverview {
   const persisted = getPersisted(db)
   // No account here: the SQLite index holds no live statusLine data (ADR-0002). ipc.ts overlays the
   // freshest captures and derives the account before serving the renderer (the IndexOverview → OverviewData
   // seam), so the store never ships a half-built account that some other caller could read as real.
-  return { sessions: persisted.map(hydrate), stats: computeStats(persisted, now) }
+  return { sessions: persisted.map(hydrate) }
 }
 
 /** Drop every row whose id isn't in `keepIds` — sessions that aged out of the window and aren't live.

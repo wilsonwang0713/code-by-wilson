@@ -1,8 +1,6 @@
 import type { Session, ProviderCapabilities, Account, Task } from './types'
 import type { TranscriptRead, ReadSettled } from './transcript'
 import type { TerminalApi } from './terminal'
-import type { Stats } from './stats'
-
 export const IPC = {
   overview: 'overview:get',
   refresh: 'sessions:refresh',
@@ -11,12 +9,11 @@ export const IPC = {
   readTasks: 'tasks:read',
 } as const
 
-/** The index-only slice: sessions + usage aggregates from one SQLite read, so the list and the stats
- *  beside it never reflect different snapshots. The SQLite index holds no live statusLine data (ADR-0002),
- *  so the account is added later — this is what the store returns, before the overlay. */
+/** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
+ *  live statusLine data (ADR-0002), so the account is added later — this is what the store returns,
+ *  before the overlay. */
 export interface IndexOverview {
   sessions: Session[]
-  stats: Stats
 }
 
 /** What the renderer receives: the index slice plus the live statusLine overlay (ipc.ts assembles it). */
@@ -31,9 +28,9 @@ export interface OverviewData extends IndexOverview {
 export type TaskRead = { status: 'changed'; mtimeMs: number; tasks: Task[] } | ReadSettled
 
 export interface IpcApi {
-  /** Read-only: the indexed sessions + stats as they stand, no sync — fast initial paint. */
+  /** Read-only: the indexed sessions as they stand, no sync — fast initial paint. */
   overview(): Promise<OverviewData>
-  /** Sync the index against ~/.claude, then return the fresh sessions + stats from one read. */
+  /** Sync the index against ~/.claude, then return the fresh sessions from one read. */
   refresh(): Promise<OverviewData>
   capabilities(): Promise<ProviderCapabilities>
   readTranscript(id: string, sinceMtimeMs?: number): Promise<TranscriptRead>
