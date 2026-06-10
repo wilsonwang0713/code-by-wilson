@@ -26,11 +26,10 @@ export function registerIpc({ db, provider, statusLine }: IpcDeps): { sync: () =
    *  freshest-per-session map feeds both the overlay and the account, so the captures are walked once. */
   const overviewNow = (): OverviewData => {
     const now = Date.now()
-    const base = getOverview(db, now)
+    const base = getOverview(db)
     const byId = freshestBySession(reader.read())
     return {
       sessions: overlaySessions(base.sessions, byId),
-      stats: base.stats,
       account: deriveAccount(byId.values(), now, CAPTURE_STALE_MS),
     }
   }

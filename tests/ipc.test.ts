@@ -72,7 +72,7 @@ describe('registerIpc readTranscript', () => {
 })
 
 describe('registerIpc overview', () => {
-  it('returns the seeded sessions and their index aggregates from one read', () => {
+  it('returns the seeded sessions from one read', () => {
     const db = openTestDb()
     migrate(db)
     upsertSessions(db, [seed]) // opus, project 'p', zero usage
@@ -81,9 +81,6 @@ describe('registerIpc overview', () => {
     const handler = handlers.get(IPC.overview)!
     const o = handler() as OverviewData
     expect(o.sessions.map((s) => s.id)).toEqual(['seed'])
-    expect(o.stats.weeklyActivity).toHaveLength(7)
-    expect(o.stats.modelMix).toEqual([{ model: 'claude-opus-4-8', sessions: 1, equivApiValueUsd: 0 }])
-    expect(o.stats.projectRollup).toEqual([{ project: 'p', sessions: 1, equivApiValueUsd: 0 }])
   })
 })
 
