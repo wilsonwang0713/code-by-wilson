@@ -18,8 +18,8 @@ describe('normalizeModelId', () => {
 })
 
 describe('contextWindowFor', () => {
-  it('is a fixed per-family window: Opus 1M, others 200K', () => {
-    expect(contextWindowFor('claude-opus-4-8')).toBe(1_000_000)
+  it('defaults every family to the standard 200K window (the real default; [1m] is a launch override)', () => {
+    expect(contextWindowFor('claude-opus-4-8')).toBe(200_000)
     expect(contextWindowFor('claude-sonnet-4-6')).toBe(200_000)
     expect(contextWindowFor('claude-haiku-4-5')).toBe(200_000)
   })
