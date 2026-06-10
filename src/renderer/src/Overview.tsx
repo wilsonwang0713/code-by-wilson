@@ -1,10 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import type { Session, ProviderCapabilities } from '@shared/types'
+import type { Session, ProviderCapabilities, Account } from '@shared/types'
 import type { Stats } from '@shared/stats'
 import { sortSessions, filterSessions, stateCounts, ORDERED_STATES, type SortKey, type Filter } from '@shared/overview'
-import { formatUsd, formatRelativeTime } from '@shared/format'
+import { formatUsd, formatRelativeTime, costDisplay } from '@shared/format'
 import { STATE_META, MODEL_LABEL, ctxTone, ctxBar } from './ui/meta'
 import { cx, Dot, ManagementChip, ModelChip, Bar } from './ui/atoms'
+import { RateLimits } from './ui/RateLimits'
 
 /** Projects shown in the rail rollup before collapsing the rest into a "+N more" row. */
 const TOP_PROJECTS = 8
@@ -16,13 +17,14 @@ interface Props {
   sessions: Session[]
   caps: ProviderCapabilities | null
   stats: Stats | null
+  account: Account | null
   loading: boolean
   onRefresh: () => void
   onOpen: (session: Session) => void
   onNew: () => void
 }
 
-export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, onNew }: Props) {
+export function Overview({ sessions, caps, stats, account, loading, onRefresh, onOpen, onNew }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const [sort, setSort] = useState<SortKey>('default')
   // One timestamp per render for every relative-time label; the 3s background re-sync re-renders and
@@ -62,7 +64,7 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <Rail stats={stats} caps={caps} />
+        <Rail stats={stats} caps={caps} account={account} now={now} />
 
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 items-center gap-2 border-b border-ink-800 px-5 py-3">
@@ -99,7 +101,7 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
                     <Th sortable sortKey="ctx" active={sort === 'ctx'} onSort={setSort}>Context</Th>
                     <Th sortable sortKey="value" active={sort === 'value'} onSort={setSort} right>~Value</Th>
                     <Th sortable sortKey="last" active={sort === 'last'} onSort={setSort} right>Last</Th>
-                    <Th right title="Lines changed — available once the statusLine side-channel lands (#11)">Lines</Th>
+                    <Th right title="Lines added / removed this session (from the statusLine)">Lines</Th>
                     <Th>Activity</Th>
                   </tr>
                 </thead>
@@ -108,6 +110,7 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
                     const isWaiting = s.state === 'waiting'
                     const projectLine = s.branch ? `${s.project} · ${s.branch}` : s.project
                     const activity = isWaiting ? `⚠ ${s.waitingReason ?? 'Waiting on you'}` : (s.currentTask ?? '')
+                    const cost = costDisplay({ liveCostUsd: s.liveCostUsd, equivApiValueUsd: s.equivApiValueUsd, billingMode: account?.billingMode })
                     return (
                       <tr
                         key={s.id}
@@ -145,10 +148,23 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
                             <span className={cx('font-mono text-[11px] tabular-nums', ctxTone(s.contextPct))}>{s.contextPct}%</span>
                           </div>
                         </td>
-                        <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-muted">~{formatUsd(s.equivApiValueUsd)}</td>
+                        <td
+                          className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-muted"
+                          title={cost.equivalent ? 'Equivalent API value (estimate)' : 'Actual API spend'}
+                        >
+                          {cost.text}
+                        </td>
                         <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">{formatRelativeTime(s.lastActivityMs, now)}</td>
-                        {/* Lines changed: no data source until the statusLine side-channel (#11); placeholder for now. */}
-                        <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">—</td>
+                        <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+                          {s.linesAdded != null || s.linesRemoved != null ? (
+                            <span title={`+${s.linesAdded ?? 0} / −${s.linesRemoved ?? 0} lines`}>
+                              <span className="text-primary-bright">+{s.linesAdded ?? 0}</span>{' '}
+                              <span className="text-accent-bright">−{s.linesRemoved ?? 0}</span>
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td className="py-2.5 pr-5">
                           <span
                             className={cx('block max-w-[260px] truncate text-[11px]', isWaiting ? 'text-accent-bright' : 'text-fg-muted')}
@@ -209,15 +225,27 @@ function Th({
   )
 }
 
-/** Left ops rail: the usage stats we have (This week, Model mix, By project) plus a capability line.
- *  Rate-limit bars are issue #11 (no Account data reaches the renderer yet), so they are intentionally
- *  absent — ADR-0001's graceful degradation. Hidden below the `lg` breakpoint. */
-function Rail({ stats, caps }: { stats: Stats | null; caps: ProviderCapabilities | null }) {
+/** Left ops rail: the account rate-limit bars (subscription only), then the usage stats (This week,
+ *  Model mix, By project) and a capability line. Bars are absent for an API account or when no
+ *  statusLine data has arrived — ADR-0001's graceful degradation. Hidden below the `lg` breakpoint. */
+function Rail({
+  stats,
+  caps,
+  account,
+  now,
+}: {
+  stats: Stats | null
+  caps: ProviderCapabilities | null
+  account: Account | null
+  now: number
+}) {
   const weekTotal = stats ? stats.weeklyActivity.reduce((sum, d) => sum + d.equivApiValueUsd, 0) : 0
   const maxValue = stats ? Math.max(0, ...stats.weeklyActivity.map((d) => d.equivApiValueUsd)) : 0
 
   return (
     <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink-800 bg-ink-925 p-4 lg:flex">
+      {/* Account rate limits (subscription only; renders nothing otherwise) — its own bottom divider. */}
+      <RateLimits account={account} now={now} variant="rail" />
       {stats && (
         <>
           <div>

@@ -1,7 +1,7 @@
 import type { Session, PersistedSession } from '@shared/types'
 import { contextWindowFor, equivApiValue, normalizeModelId } from '@shared/models'
 import { computeStats, type Stats } from '@shared/stats'
-import type { OverviewData } from '@shared/ipc'
+import type { IndexOverview } from '@shared/ipc'
 import { transaction, type SqliteDb } from './driver'
 
 /** Bump when the schema changes; `migrate` rebuilds the index (a disposable cache) to match. */
@@ -195,8 +195,11 @@ export function getStats(db: SqliteDb, now: number): Stats {
  * two). One `getPersisted` pass feeds both the hydrate and the fold. `now` is injected for the
  * trend's day boundaries, exactly as `getStats` does.
  */
-export function getOverview(db: SqliteDb, now: number): OverviewData {
+export function getOverview(db: SqliteDb, now: number): IndexOverview {
   const persisted = getPersisted(db)
+  // No account here: the SQLite index holds no live statusLine data (ADR-0002). ipc.ts overlays the
+  // freshest captures and derives the account before serving the renderer (the IndexOverview → OverviewData
+  // seam), so the store never ships a half-built account that some other caller could read as real.
   return { sessions: persisted.map(hydrate), stats: computeStats(persisted, now) }
 }
 

@@ -1,11 +1,14 @@
-import type { Session } from '@shared/types'
+import type { Session, Account } from '@shared/types'
 import { ManagementChip, StateBadge } from '../ui/atoms'
 import { MODEL_LABEL } from '../ui/meta'
+import { RateLimits } from '../ui/RateLimits'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from '../terminal/TerminalView'
 
-export function Workspace({ session: s, onBack }: { session: Session; onBack: () => void }) {
+export function Workspace({ session: s, account, onBack }: { session: Session; account: Account | null; onBack: () => void }) {
   const isObserved = s.management === 'observed'
+  // Recomputed each render; App's 3s background re-sync re-renders this, so the countdowns tick.
+  const now = Date.now()
   return (
     <div className="flex h-screen flex-col bg-ink-950 text-fg">
       <header className="flex items-center gap-3 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
@@ -26,6 +29,7 @@ export function Workspace({ session: s, onBack }: { session: Session; onBack: ()
             {s.branch && ` · ${s.branch}`}
           </div>
         </div>
+        <RateLimits account={account} now={now} variant="compact" />
         <ManagementChip kind={s.management} />
         <span className="font-mono text-[11px] text-fg-muted">{MODEL_LABEL[s.model]}</span>
         {isObserved && (

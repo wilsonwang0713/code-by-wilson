@@ -41,6 +41,12 @@ export interface Session {
   contextWindow: number
   usage: Usage
   equivApiValueUsd: number
+  /** Live USD cost from the statusLine when a capture exists (Claude's own figure): real spend on an
+   *  API account, Equivalent API value on a subscription. Absent ⇒ no statusLine sample for this Session. */
+  liveCostUsd?: number
+  /** Lines added/removed this session, from the statusLine `cost` block. Absent ⇒ no sample. */
+  linesAdded?: number
+  linesRemoved?: number
   lastActivityMs: number
   currentTask?: string
   waitingReason?: string
@@ -96,15 +102,19 @@ export interface SessionCandidate {
 }
 
 export interface RateLimit {
+  /** Percent of the window consumed, 0–100 (the statusLine's used_percentage). */
   usedPct: number
+  /** When the window resets, epoch ms. The statusLine reports epoch seconds; the reader normalizes to ms. */
   resetsAt: number
 }
 
+/** The app-wide account, derived from the freshest statusLine capture. Billing mode is detected from
+ *  rate-limit presence (ADR-0001). The statusLine JSON carries no plan/tier, so none is modeled. */
 export interface Account {
   billingMode: 'subscription' | 'api'
-  plan: string
-  fiveHour: RateLimit
-  sevenDay: RateLimit
+  /** Present only for a subscription; an API account reports no account rate limits. */
+  fiveHour?: RateLimit
+  sevenDay?: RateLimit
 }
 
 /** What a Provider can do. Drives graceful degradation in the UI. */

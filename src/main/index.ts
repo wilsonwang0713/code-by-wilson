@@ -6,6 +6,8 @@ import { createClaudeProvider } from './provider/claude'
 import { createManagedRegistry } from './managed-registry'
 import type { ManagedRegistry } from './managed-registry'
 import { registerIpc } from './ipc'
+import { createSettingsManager } from './settings/manager'
+import { createStatusLineReader } from './statusline/reader'
 import { registerTerminalIpc } from './terminal/ipc'
 
 function createWindow(managed: ManagedRegistry): void {
@@ -37,8 +39,16 @@ app.whenReady()
     // The registry of app-spawned ids, shared by reference: the terminal IPC writes it on spawn, the
     // provider reads it to label discovered sessions Managed.
     const managed = createManagedRegistry()
+    // Wrap the user's statusLine so live cost/context and account rate limits flow to the app
+    // (ADR-0001). Idempotent and reversible; a failure must never cost the user a window.
+    try {
+      createSettingsManager().install()
+    } catch (err) {
+      console.error('statusLine install failed; live rate limits and cost will be unavailable', err)
+    }
+    const statusLine = createStatusLineReader()
     const provider = createClaudeProvider({ managed })
-    const { sync } = registerIpc({ db, provider })
+    const { sync } = registerIpc({ db, provider, statusLine })
 
     try {
       sync() // incremental parse of ~/.claude → SQLite once, before the window asks for rows
