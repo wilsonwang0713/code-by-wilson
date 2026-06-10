@@ -1,33 +1,16 @@
-import { useMemo, type CSSProperties } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Session, ProviderCapabilities } from '@shared/types'
 import type { Stats } from '@shared/stats'
-import { pinWaiting } from '@shared/overview'
+import { sortSessions, filterSessions, stateCounts, ORDERED_STATES, type SortKey, type Filter } from '@shared/overview'
 import { formatUsd, formatRelativeTime } from '@shared/format'
-import { STATE_META, MODEL_LABEL } from './ui/meta'
+import { STATE_META, MODEL_LABEL, ctxTone, ctxBar } from './ui/meta'
+import { cx, Dot, ManagementChip, ModelChip, Bar } from './ui/atoms'
 
-const cell: CSSProperties = { padding: '6px 8px' }
-const muted: CSSProperties = { ...cell, color: 'var(--color-fg-muted)' }
-const numeric: CSSProperties = { ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
-
-const statsCard: CSSProperties = {
-  flex: '1 1 220px',
-  background: 'var(--color-ink-900)',
-  border: '1px solid var(--color-ink-800)',
-  borderRadius: 8,
-  padding: '12px 14px',
-}
-const statsLabel: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  color: 'var(--color-fg-muted)',
-  marginBottom: 8,
-}
-const statsRow: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 8, padding: '2px 0', fontSize: 12 }
-
-/** Projects shown in the rollup before collapsing the rest into a "+N more" row. */
+/** Projects shown in the rail rollup before collapsing the rest into a "+N more" row. */
 const TOP_PROJECTS = 8
+
+/** Filter chips, in display order: 'all', then the states loudest-first (from ORDERED_STATES). */
+const FILTERS: Filter[] = ['all', ...ORDERED_STATES]
 
 interface Props {
   sessions: Session[]
@@ -40,197 +23,279 @@ interface Props {
 }
 
 export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, onNew }: Props) {
-  const rows = useMemo(() => pinWaiting(sessions), [sessions])
+  const [filter, setFilter] = useState<Filter>('all')
+  const [sort, setSort] = useState<SortKey>('default')
+  // One timestamp per render for every relative-time label; the 3s background re-sync re-renders and
+  // refreshes it, so sub-second drift never shows.
   const now = Date.now()
 
+  const counts = useMemo(() => stateCounts(sessions), [sessions])
+  // Table pipeline: filter by the active chip, then sort by the active column. sortSessions pins
+  // Waiting on top in the same pass, so those rows are never buried, even mid-sort.
+  const rows = useMemo(
+    () => sortSessions(filterSessions(sessions, filter), sort),
+    [sessions, filter, sort],
+  )
+
   return (
-    <div className="app-bg" style={{ minHeight: '100vh', padding: 24, color: 'var(--color-fg)' }}>
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 16 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>code-by-wire</h1>
-        <span style={{ color: 'var(--color-fg-muted)', fontSize: 13 }}>
+    <div className="app-bg flex h-screen flex-col text-fg">
+      <header className="flex shrink-0 items-center gap-4 border-b border-ink-800 px-5 py-3">
+        <h1 className="text-base font-semibold">code-by-wire</h1>
+        <span className="text-[13px] text-fg-muted">
           {sessions.length} session{sessions.length === 1 ? '' : 's'}
         </span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={onNew}
-            style={{
-              background: 'var(--color-primary)',
-              color: 'var(--color-ink-950)',
-              border: 'none',
-              borderRadius: 6,
-              padding: '4px 12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-ink-950 transition-colors hover:bg-primary-bright"
           >
-            + New session
+            ＋ New session
           </button>
           <button
             onClick={onRefresh}
             disabled={loading}
-            style={{
-              background: 'var(--color-ink-800)',
-              color: 'var(--color-fg)',
-              border: '1px solid var(--color-ink-700)',
-              borderRadius: 6,
-              padding: '4px 12px',
-              cursor: loading ? 'default' : 'pointer',
-            }}
+            className="rounded-md border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs text-fg transition-colors hover:bg-ink-750 disabled:cursor-default disabled:opacity-60"
           >
             {loading ? 'Syncing…' : 'Refresh'}
           </button>
         </div>
       </header>
 
-      {stats && <StatsSection stats={stats} />}
+      <div className="flex min-h-0 flex-1">
+        <Rail stats={stats} caps={caps} />
 
-      {sessions.length === 0 && !loading ? (
-        <p style={{ color: 'var(--color-fg-muted)' }}>No Claude Code sessions found.</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr
-              style={{
-                textAlign: 'left',
-                color: 'var(--color-fg-muted)',
-                borderBottom: '1px solid var(--color-ink-700)',
-              }}
-            >
-              <th style={cell}>State</th>
-              <th style={cell}>Title</th>
-              <th style={cell}>Project</th>
-              <th style={cell}>Branch</th>
-              <th style={cell}>Model</th>
-              <th style={numeric}>Context</th>
-              <th style={numeric}>Equiv. value</th>
-              <th style={cell}>Last activity</th>
-              <th style={cell}>Mgmt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((s) => (
-              <tr
-                key={s.id}
-                className="row-clickable"
-                role="button"
-                tabIndex={0}
-                aria-label={`Open ${s.title}`}
-                onClick={() => onOpen(s)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    onOpen(s)
-                  }
-                }}
-                style={{ borderBottom: '1px solid var(--color-ink-850)' }}
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center gap-2 border-b border-ink-800 px-5 py-3">
+            {FILTERS.map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                aria-pressed={filter === f}
+                className={cx(
+                  'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs capitalize transition-colors',
+                  filter === f ? 'bg-ink-750 text-fg' : 'text-fg-muted hover:bg-ink-850',
+                )}
               >
-                <td style={cell}>{STATE_META[s.state].label}</td>
-                <td style={cell}>{s.title}</td>
-                <td style={muted}>{s.project}</td>
-                <td style={muted}>{s.branch ?? '—'}</td>
-                <td style={cell}>{s.model}</td>
-                <td style={numeric}>{s.contextPct}%</td>
-                <td style={numeric}>{formatUsd(s.equivApiValueUsd)}</td>
-                <td style={muted}>{formatRelativeTime(s.lastActivityMs, now)}</td>
-                <td style={muted}>{s.management}</td>
-              </tr>
+                {f !== 'all' && <Dot state={f} />}
+                {f}
+                <span className="font-mono text-[10px] text-fg-faint">{counts[f]}</span>
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto">
+            {sessions.length === 0 ? (
+              // Stay blank while the first sync is in flight; only call it empty once it has finished.
+              loading ? null : <p className="px-5 py-6 text-sm text-fg-muted">No Claude Code sessions found.</p>
+            ) : rows.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-fg-muted">No {filter} sessions.</p>
+            ) : (
+              <table className="w-full border-collapse text-sm">
+                <thead className="sticky top-0 z-10 bg-ink-925 text-left">
+                  <tr className="text-[10px] uppercase tracking-wider text-fg-faint">
+                    <Th>State</Th>
+                    <Th>Session</Th>
+                    <Th>Model</Th>
+                    <Th sortable sortKey="ctx" active={sort === 'ctx'} onSort={setSort}>Context</Th>
+                    <Th sortable sortKey="value" active={sort === 'value'} onSort={setSort} right>~Value</Th>
+                    <Th sortable sortKey="last" active={sort === 'last'} onSort={setSort} right>Last</Th>
+                    <Th right title="Lines changed — available once the statusLine side-channel lands (#11)">Lines</Th>
+                    <Th>Activity</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((s) => {
+                    const isWaiting = s.state === 'waiting'
+                    const projectLine = s.branch ? `${s.project} · ${s.branch}` : s.project
+                    const activity = isWaiting ? `⚠ ${s.waitingReason ?? 'Waiting on you'}` : (s.currentTask ?? '')
+                    return (
+                      <tr
+                        key={s.id}
+                        className={cx('row-clickable border-b border-ink-800/70', isWaiting && 'bg-accent/[0.06]')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open ${s.title}`}
+                        onClick={() => onOpen(s)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onOpen(s)
+                          }
+                        }}
+                      >
+                        <td className={cx('py-2.5 pl-5 pr-3', isWaiting && 'border-l-2 border-accent')}>
+                          <span className={cx('inline-flex items-center gap-1.5 text-[11px]', STATE_META[s.state].text)}>
+                            <Dot state={s.state} />
+                            {STATE_META[s.state].label}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <div className="flex max-w-[340px] items-center gap-2">
+                            <ManagementChip kind={s.management} />
+                            <span className="min-w-0 truncate text-[13px] text-fg" title={s.title}>{s.title}</span>
+                          </div>
+                          <div className="max-w-[340px] truncate font-mono text-[10px] text-fg-faint" title={projectLine}>
+                            {projectLine}
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-3"><ModelChip model={s.model} /></td>
+                        <td className="py-2.5 pr-3">
+                          <div className="flex items-center gap-2">
+                            <Bar pct={s.contextPct} fill={ctxBar(s.contextPct)} className="w-16" />
+                            <span className={cx('font-mono text-[11px] tabular-nums', ctxTone(s.contextPct))}>{s.contextPct}%</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-muted">~{formatUsd(s.equivApiValueUsd)}</td>
+                        <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">{formatRelativeTime(s.lastActivityMs, now)}</td>
+                        {/* Lines changed: no data source until the statusLine side-channel (#11); placeholder for now. */}
+                        <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">—</td>
+                        <td className="py-2.5 pr-5">
+                          <span
+                            className={cx('block max-w-[260px] truncate text-[11px]', isWaiting ? 'text-accent-bright' : 'text-fg-muted')}
+                            title={activity}
+                          >
+                            {activity}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+/** A table header cell; sortable ones render a button that toggles to their column and show a ▼/⇅ glyph. */
+function Th({
+  children,
+  sortable,
+  sortKey,
+  active,
+  onSort,
+  right,
+  title,
+}: {
+  children: ReactNode
+  sortable?: boolean
+  sortKey?: SortKey
+  active?: boolean
+  onSort?: (k: SortKey) => void
+  right?: boolean
+  title?: string
+}) {
+  return (
+    <th
+      title={title}
+      aria-sort={sortable ? (active ? 'descending' : 'none') : undefined}
+      className={cx('whitespace-nowrap px-3 py-2.5 font-semibold', right && 'text-right')}
+    >
+      {sortable && sortKey && onSort ? (
+        <button
+          onClick={() => onSort(sortKey)}
+          className={cx('inline-flex items-center gap-1 hover:text-fg-muted', active && 'text-primary-bright', right && 'w-full justify-end')}
+        >
+          {children}
+          <span className="text-[8px]">{active ? '▼' : '⇅'}</span>
+        </button>
+      ) : (
+        children
+      )}
+    </th>
+  )
+}
+
+/** Left ops rail: the usage stats we have (This week, Model mix, By project) plus a capability line.
+ *  Rate-limit bars are issue #11 (no Account data reaches the renderer yet), so they are intentionally
+ *  absent — ADR-0001's graceful degradation. Hidden below the `lg` breakpoint. */
+function Rail({ stats, caps }: { stats: Stats | null; caps: ProviderCapabilities | null }) {
+  const weekTotal = stats ? stats.weeklyActivity.reduce((sum, d) => sum + d.equivApiValueUsd, 0) : 0
+  const maxValue = stats ? Math.max(0, ...stats.weeklyActivity.map((d) => d.equivApiValueUsd)) : 0
+
+  return (
+    <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink-800 bg-ink-925 p-4 lg:flex">
+      {stats && (
+        <>
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-fg-muted">This week</div>
+            <div className="font-mono text-xl text-fg">~{formatUsd(weekTotal)}</div>
+            <div
+              role="img"
+              aria-label={`Activity over the last 7 days, ~${formatUsd(weekTotal)} equivalent API value`}
+              className="mt-2 flex h-9 items-end gap-1"
+            >
+              {stats.weeklyActivity.map((d) => (
+                <div
+                  key={d.dayStartMs}
+                  title={`${weekdayUtc(d.dayStartMs)}: ${d.sessions} session${d.sessions === 1 ? '' : 's'} · ~${formatUsd(d.equivApiValueUsd)}`}
+                  className="flex flex-1 flex-col items-center gap-1"
+                >
+                  <div className="flex w-full flex-1 items-end">
+                    <div
+                      className="w-full rounded-sm bg-primary"
+                      style={{
+                        height: `${maxValue > 0 ? (d.equivApiValueUsd / maxValue) * 100 : 0}%`,
+                        minHeight: d.sessions > 0 ? 2 : 0,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-fg-faint">{weekdayUtc(d.dayStartMs)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-ink-800 pt-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-fg-muted">Model mix</div>
+            {stats.modelMix.length === 0 ? (
+              <span className="text-[11px] text-fg-faint">No usage yet.</span>
+            ) : (
+              <div className="space-y-1">
+                {stats.modelMix.map((m) => (
+                  <div key={m.model} className="flex items-center justify-between">
+                    <span className="text-[12px] text-fg">{MODEL_LABEL[m.model]}</span>
+                    <span className="ml-2 shrink-0 font-mono text-[10px] tabular-nums text-fg-muted">{m.sessions} · ~{formatUsd(m.equivApiValueUsd)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-ink-800 pt-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-fg-muted">By project</div>
+            {stats.projectRollup.length === 0 ? (
+              <span className="text-[11px] text-fg-faint">No usage yet.</span>
+            ) : (
+              <div className="space-y-1">
+                {stats.projectRollup.slice(0, TOP_PROJECTS).map((p) => (
+                  <div key={p.project} className="flex items-center justify-between">
+                    <span className="truncate font-mono text-[11px] text-fg">{p.project}</span>
+                    <span className="ml-2 shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">{p.sessions} · ~{formatUsd(p.equivApiValueUsd)}</span>
+                  </div>
+                ))}
+                {stats.projectRollup.length > TOP_PROJECTS && (
+                  <div className="text-[10px] text-fg-faint">+{stats.projectRollup.length - TOP_PROJECTS} more</div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {caps && (
-        <footer style={{ marginTop: 24, color: 'var(--color-fg-faint)', fontSize: 12 }}>
-          ClaudeProvider · control {caps.canControl ? '✓' : '✗'} · limits{' '}
-          {caps.hasRateLimits ? '✓' : '✗'} · subagents {caps.hasSubagents ? '✓' : '✗'}
-        </footer>
+        <div className="mt-auto border-t border-ink-800 pt-3 text-[11px] text-fg-faint">
+          ClaudeProvider · control {caps.canControl ? '✓' : '✗'} · limits {caps.hasRateLimits ? '✓' : '✗'} · subagents {caps.hasSubagents ? '✓' : '✗'}
+        </div>
       )}
-    </div>
+    </aside>
   )
 }
 
 /** Short UTC weekday label for a day bucket — UTC to match the UTC-day bucketing in computeStats. */
 function weekdayUtc(dayStartMs: number): string {
   return new Date(dayStartMs).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
-}
-
-function StatsSection({ stats }: { stats: Stats }) {
-  const weekTotal = stats.weeklyActivity.reduce((sum, d) => sum + d.equivApiValueUsd, 0)
-  const weekSessions = stats.weeklyActivity.reduce((n, d) => n + d.sessions, 0)
-  // Bars track daily Equivalent API value so the chart measures the same thing as its dollar headline.
-  const maxValue = Math.max(0, ...stats.weeklyActivity.map((d) => d.equivApiValueUsd))
-
-  return (
-    <section style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-      <div style={statsCard}>
-        <div style={statsLabel}>Activity · last 7 days</div>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>~{formatUsd(weekTotal)}</div>
-        <div
-          role="img"
-          aria-label={`Activity over the last 7 days: ${weekSessions} session${weekSessions === 1 ? '' : 's'}, ~${formatUsd(weekTotal)} equivalent API value`}
-          style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 40, marginTop: 10 }}
-        >
-          {stats.weeklyActivity.map((d) => (
-            <div
-              key={d.dayStartMs}
-              title={`${weekdayUtc(d.dayStartMs)}: ${d.sessions} session${d.sessions === 1 ? '' : 's'} · ~${formatUsd(d.equivApiValueUsd)}`}
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%' }}
-            >
-              <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${maxValue > 0 ? (d.equivApiValueUsd / maxValue) * 100 : 0}%`,
-                    minHeight: d.sessions > 0 ? 2 : 0,
-                    background: 'var(--color-primary)',
-                    borderRadius: 2,
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: 10, color: 'var(--color-fg-faint)' }}>{weekdayUtc(d.dayStartMs)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={statsCard}>
-        <div style={statsLabel}>Model mix · last 7 days</div>
-        {stats.modelMix.length === 0 ? (
-          <span style={{ fontSize: 12, color: 'var(--color-fg-faint)' }}>No usage yet.</span>
-        ) : (
-          stats.modelMix.map((m) => (
-            <div key={m.model} style={statsRow}>
-              <span>{MODEL_LABEL[m.model]}</span>
-              <span style={{ color: 'var(--color-fg-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                {m.sessions} · ~{formatUsd(m.equivApiValueUsd)}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div style={statsCard}>
-        <div style={statsLabel}>By project · last 7 days</div>
-        {stats.projectRollup.length === 0 ? (
-          <span style={{ fontSize: 12, color: 'var(--color-fg-faint)' }}>No usage yet.</span>
-        ) : (
-          <>
-            {stats.projectRollup.slice(0, TOP_PROJECTS).map((p) => (
-              <div key={p.project} style={statsRow}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.project}</span>
-                <span style={{ color: 'var(--color-fg-muted)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-                  {p.sessions} · ~{formatUsd(p.equivApiValueUsd)}
-                </span>
-              </div>
-            ))}
-            {stats.projectRollup.length > TOP_PROJECTS && (
-              <div style={{ ...statsRow, color: 'var(--color-fg-faint)' }}>
-                +{stats.projectRollup.length - TOP_PROJECTS} more
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </section>
-  )
 }
