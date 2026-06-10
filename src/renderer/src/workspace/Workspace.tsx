@@ -1,9 +1,14 @@
+import { useState } from 'react'
 import type { Session, Account } from '@shared/types'
-import { ManagementChip, StateBadge } from '../ui/atoms'
+import { cx, ManagementChip, StateBadge } from '../ui/atoms'
 import { MODEL_LABEL } from '../ui/meta'
 import { RateLimits } from '../ui/RateLimits'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from '../terminal/TerminalView'
+import { useTranscript, type DocState } from './use-transcript'
+import { ContextPanel } from './panels/ContextPanel'
+import { CostPanel } from './panels/CostPanel'
+import { Timeline } from './panels/Timeline'
 
 export function Workspace({ session: s, account, onBack }: { session: Session; account: Account | null; onBack: () => void }) {
   const isObserved = s.management === 'observed'
@@ -40,16 +45,101 @@ export function Workspace({ session: s, account, onBack }: { session: Session; a
       </header>
 
       <div className="min-h-0 flex-1">
-        {isObserved ? (
-          <div className="h-full overflow-auto">
-            <TranscriptView sessionId={s.id} project={s.project} state={s.state} />
-          </div>
-        ) : (
+        <WorkspaceBody session={s} account={account} now={now} />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The workspace body, shared by both management kinds: a center column (the live view, with the turn
+ * timeline as a lower panel) and a right rail of panels (context breakdown + cost). One transcript poll
+ * (useTranscript) feeds the center, the context panel, and the timeline — Managed sessions are spawned
+ * with `--session-id <our id>`, so the CLI writes the same transcript Observed sessions are read from,
+ * and the panels track it live as you drive the terminal. The cost panel reads the Session directly. The
+ * rail hides below the `lg` breakpoint, like the Overview's.
+ */
+function WorkspaceBody({ session: s, account, now }: { session: Session; account: Account | null; now: number }) {
+  const doc = useTranscript(s.id)
+  return (
+    <div className="flex h-full min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1">
+          <CenterView session={s} doc={doc} />
+        </div>
+        <Timeline turns={doc?.turns ?? []} now={now} />
+      </div>
+      <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-ink-800 bg-ink-925 p-4 lg:flex">
+        <ContextPanel context={doc?.context ?? null} contextWindow={s.contextWindow} />
+        <CostPanel usage={s.usage} model={s.model} liveCostUsd={s.liveCostUsd} billingMode={account?.billingMode} />
+      </aside>
+    </div>
+  )
+}
+
+type CenterTab = 'terminal' | 'transcript'
+
+/**
+ * The center column's live view, dispatched by management kind. An Observed session is read-only with no
+ * process, so it's the rendered transcript, full stop. A Managed session gets ManagedCenter's toggle.
+ */
+function CenterView({ session: s, doc }: { session: Session; doc: DocState }) {
+  if (s.management === 'observed') return <RenderedTranscript session={s} doc={doc} />
+  return <ManagedCenter session={s} doc={doc} />
+}
+
+/**
+ * A Managed session has both a live terminal (the interactive surface) and the transcript the CLI is
+ * writing, so it gets a toggle between them — default Terminal. Toggling away unmounts TerminalView, which
+ * only detaches its xterm (the store keeps the instance and its pty keeps buffering off-DOM), so toggling
+ * back restores full scrollback. Same trick as switching session tabs.
+ */
+function ManagedCenter({ session: s, doc }: { session: Session; doc: DocState }) {
+  const [tab, setTab] = useState<CenterTab>('terminal')
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <ViewTabs tab={tab} onChange={setTab} />
+      <div className="min-h-0 flex-1">
+        {tab === 'terminal' ? (
           <div className="h-full p-2">
             <TerminalView sessionId={s.id} />
           </div>
+        ) : (
+          <RenderedTranscript session={s} doc={doc} />
         )}
       </div>
+    </div>
+  )
+}
+
+/** The scrolling transcript, shared by the Observed center and the Managed Transcript tab. The read-only
+ *  banner only shows for Observed (a Managed session is driven through its terminal). */
+function RenderedTranscript({ session: s, doc }: { session: Session; doc: DocState }) {
+  return (
+    <div className="h-full overflow-auto">
+      <TranscriptView doc={doc} project={s.project} state={s.state} readOnly={s.management === 'observed'} />
+    </div>
+  )
+}
+
+const CENTER_TABS: CenterTab[] = ['terminal', 'transcript']
+
+function ViewTabs({ tab, onChange }: { tab: CenterTab; onChange: (t: CenterTab) => void }) {
+  return (
+    <div className="flex shrink-0 items-center gap-1 border-b border-ink-800 bg-ink-925 px-2 py-1.5">
+      {CENTER_TABS.map((t) => (
+        <button
+          key={t}
+          onClick={() => onChange(t)}
+          aria-pressed={tab === t}
+          className={cx(
+            'rounded px-2 py-0.5 text-xs capitalize transition-colors',
+            tab === t ? 'bg-ink-800 text-fg' : 'text-fg-muted hover:text-fg',
+          )}
+        >
+          {t}
+        </button>
+      ))}
     </div>
   )
 }

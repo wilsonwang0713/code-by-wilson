@@ -95,3 +95,33 @@ export function equivApiValue(usage: Usage, model: ModelId): number {
     1_000_000
   )
 }
+
+/** A session's Equivalent API value, split by token kind, plus the cache-hit saving. All USD. */
+export interface CostBreakdown {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  /** Sum of the four — equals equivApiValue(usage, model). */
+  total: number
+  /** USD the cache reads avoided: what they'd have cost as fresh input minus what they cost at the
+   *  cache-read rate. The headline benefit of prompt caching, always ≥ 0. Reported separately because
+   *  it isn't part of the bill — it's the counterfactual the cache avoided. Not netted against the
+   *  cache-write premium; this is the read discount alone, as Claude Code frames "cache savings". */
+  cacheSavings: number
+}
+
+/**
+ * Split a session's summed token usage into per-kind USD at the model's API rates, plus cache-hit
+ * savings. The four parts sum to equivApiValue(usage, model) (same rates, same /1e6). On a subscription
+ * this is all Equivalent API value, not money owed (see CONTEXT.md); on an API account it's real spend.
+ */
+export function costBreakdown(usage: Usage, model: ModelId): CostBreakdown {
+  const p = priceFor(model)
+  const input = (usage.inputTokens * p.input) / 1_000_000
+  const output = (usage.outputTokens * p.output) / 1_000_000
+  const cacheRead = (usage.cacheReadTokens * p.cacheRead) / 1_000_000
+  const cacheWrite = (usage.cacheCreationTokens * p.cacheWrite) / 1_000_000
+  const cacheSavings = (usage.cacheReadTokens * (p.input - p.cacheRead)) / 1_000_000
+  return { input, output, cacheRead, cacheWrite, total: input + output + cacheRead + cacheWrite, cacheSavings }
+}
