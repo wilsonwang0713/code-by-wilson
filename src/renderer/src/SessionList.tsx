@@ -1,4 +1,5 @@
-import type { Session } from '@shared/types'
+import { useState } from 'react'
+import type { Session, SessionState } from '@shared/types'
 import { groupSessions } from '@shared/overview'
 import { formatRelativeTime } from '@shared/format'
 import { cx, Dot, ManagementChip } from './ui/atoms'
@@ -26,6 +27,17 @@ export function SessionList({
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
   const now = Date.now()
   const groups = groupSessions(sessions, query)
+  // Collapsed groups, by state. Ended is collapsed by default — it's the archive, not the live work.
+  // An active filter force-expands every group so a match can't hide inside a collapsed one.
+  const [collapsed, setCollapsed] = useState<Set<SessionState>>(() => new Set<SessionState>(['ended']))
+  const filtering = query.trim() !== ''
+  const toggle = (state: SessionState): void =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(state)) next.delete(state)
+      else next.add(state)
+      return next
+    })
   return (
     <aside className="flex w-[332px] shrink-0 flex-col border-r border-ink-800 bg-ink-925">
       <div className="shrink-0 border-b border-ink-800 p-3">
@@ -43,20 +55,34 @@ export function SessionList({
         {groups.length === 0 ? (
           <p className="px-4 py-5 text-[12px] text-fg-faint">No sessions match "{query}".</p>
         ) : (
-          groups.map((g) => (
-            <div key={g.state}>
-              <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-ink-850 bg-ink-900 px-3.5 py-1.5">
-                <Dot state={g.state} />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                  {STATE_META[g.state].label}
-                </span>
-                <span className="font-mono text-[10px] text-fg-faint">{g.items.length}</span>
+          groups.map((g) => {
+            const isCollapsed = !filtering && collapsed.has(g.state)
+            return (
+              <div key={g.state}>
+                <button
+                  type="button"
+                  onClick={() => toggle(g.state)}
+                  aria-expanded={!isCollapsed}
+                  className="sticky top-0 z-10 flex w-full items-center gap-2 border-b border-ink-850 bg-ink-900 px-3.5 py-1.5 text-left transition-colors hover:bg-ink-850"
+                >
+                  <Icon
+                    name="chevron-right"
+                    size={12}
+                    className={cx('shrink-0 text-fg-faint transition-transform', !isCollapsed && 'rotate-90')}
+                  />
+                  <Dot state={g.state} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                    {STATE_META[g.state].label}
+                  </span>
+                  <span className="font-mono text-[10px] text-fg-faint">{g.items.length}</span>
+                </button>
+                {!isCollapsed &&
+                  g.items.map((s) => (
+                    <SessionRow key={s.id} session={s} selected={s.id === selectedId} now={now} onSelect={() => onSelect(s.id)} />
+                  ))}
               </div>
-              {g.items.map((s) => (
-                <SessionRow key={s.id} session={s} selected={s.id === selectedId} now={now} onSelect={() => onSelect(s.id)} />
-              ))}
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </aside>

@@ -1,4 +1,5 @@
 import {
+  ChevronRight,
   FolderOpen,
   GitBranch,
   GitPullRequestArrow,
@@ -19,6 +20,7 @@ import {
  * (e.g. AlertTriangle was renamed TriangleAlert).
  */
 const ICONS = {
+  'chevron-right': ChevronRight,
   'folder-open': FolderOpen,
   'git-branch': GitBranch,
   'git-pull-request-arrow': GitPullRequestArrow,
