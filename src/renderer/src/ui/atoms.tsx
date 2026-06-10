@@ -40,12 +40,13 @@ export function ManagementChip({ kind }: { kind: Management }) {
   )
 }
 
-/** A thin progress bar. `fill` is a Tailwind bg class; the track is fixed `bg-ink-800`. No width
- *  transition on purpose: the Overview re-syncs every few seconds, and animating every row's bar on
- *  each pass reads as noise in a dense table. */
+/** A thin progress bar. `fill` is a Tailwind bg class; the track is fixed `bg-ink-800`. The caller
+ *  sizes it via `className` (e.g. `w-16`); the base sets no width, so the caller's width applies
+ *  cleanly. No width transition on purpose: the Overview re-syncs every few seconds, and animating
+ *  every row's bar on each pass reads as noise in a dense table. */
 export function Bar({ pct, fill, className }: { pct: number; fill: string; className?: string }) {
   return (
-    <div className={cx('h-1.5 w-full overflow-hidden rounded-full bg-ink-800', className)}>
+    <div className={cx('h-1.5 overflow-hidden rounded-full bg-ink-800', className)}>
       <div className={cx('h-full rounded-full', fill)} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
     </div>
   )

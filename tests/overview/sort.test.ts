@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortSessions, pinWaiting } from '@shared/overview'
+import { sortSessions } from '@shared/overview'
 import type { Session } from '@shared/types'
 
 /** A Session with sensible defaults; override only the fields a case cares about. */
@@ -63,14 +63,14 @@ describe('sortSessions', () => {
   })
 
   it('keeps Waiting pinned on top regardless of the active sort', () => {
-    // Sorting by value scatters Waiting; pinWaiting layered on top must re-lift them, in value order.
+    // Value sort alone would scatter Waiting; sortSessions keeps them pinned, in value order.
     const xs = [
       s('a', { state: 'working', equivApiValueUsd: 9 }),
       s('b', { state: 'waiting', equivApiValueUsd: 2 }),
       s('c', { state: 'idle', equivApiValueUsd: 7 }),
       s('d', { state: 'waiting', equivApiValueUsd: 5 }),
     ]
-    const out = pinWaiting(sortSessions(xs, 'value'))
+    const out = sortSessions(xs, 'value')
     expect(out.map((x) => x.id)).toEqual(['d', 'b', 'a', 'c'])
   })
 })

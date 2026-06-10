@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Session, ProviderCapabilities } from '@shared/types'
 import type { Stats } from '@shared/stats'
-import { pinWaiting, sortSessions, filterSessions, stateCounts, type SortKey, type Filter } from '@shared/overview'
+import { sortSessions, filterSessions, stateCounts, ORDERED_STATES, type SortKey, type Filter } from '@shared/overview'
 import { formatUsd, formatRelativeTime } from '@shared/format'
 import { STATE_META, MODEL_LABEL, ctxTone, ctxBar } from './ui/meta'
 import { cx, Dot, ManagementChip, ModelChip, Bar } from './ui/atoms'
@@ -9,8 +9,8 @@ import { cx, Dot, ManagementChip, ModelChip, Bar } from './ui/atoms'
 /** Projects shown in the rail rollup before collapsing the rest into a "+N more" row. */
 const TOP_PROJECTS = 8
 
-/** Filter chips, in display order: 'all', then the four states loudest-first. */
-const FILTERS: Filter[] = ['all', 'waiting', 'working', 'idle', 'ended']
+/** Filter chips, in display order: 'all', then the states loudest-first (from ORDERED_STATES). */
+const FILTERS: Filter[] = ['all', ...ORDERED_STATES]
 
 interface Props {
   sessions: Session[]
@@ -30,10 +30,10 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
   const now = Date.now()
 
   const counts = useMemo(() => stateCounts(sessions), [sessions])
-  // Table pipeline: filter by the active chip, sort by the active column, then pin Waiting last so they
-  // stay on top no matter the sort — Waiting is never buried, even mid-sort.
+  // Table pipeline: filter by the active chip, then sort by the active column. sortSessions pins
+  // Waiting on top in the same pass, so those rows are never buried, even mid-sort.
   const rows = useMemo(
-    () => pinWaiting(sortSessions(filterSessions(sessions, filter), sort)),
+    () => sortSessions(filterSessions(sessions, filter), sort),
     [sessions, filter, sort],
   )
 
@@ -106,6 +106,8 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
                 <tbody>
                   {rows.map((s) => {
                     const isWaiting = s.state === 'waiting'
+                    const projectLine = s.branch ? `${s.project} · ${s.branch}` : s.project
+                    const activity = isWaiting ? `⚠ ${s.waitingReason ?? 'Waiting on you'}` : (s.currentTask ?? '')
                     return (
                       <tr
                         key={s.id}
@@ -127,13 +129,13 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
                             {STATE_META[s.state].label}
                           </span>
                         </td>
-                        <td className="max-w-[340px] py-2.5 pr-3">
-                          <div className="flex items-center gap-2">
+                        <td className="py-2.5 pr-3">
+                          <div className="flex max-w-[340px] items-center gap-2">
                             <ManagementChip kind={s.management} />
-                            <span className="truncate text-[13px] text-fg">{s.title}</span>
+                            <span className="min-w-0 truncate text-[13px] text-fg" title={s.title}>{s.title}</span>
                           </div>
-                          <div className="truncate font-mono text-[10px] text-fg-faint">
-                            {s.project}{s.branch ? ` · ${s.branch}` : ''}
+                          <div className="max-w-[340px] truncate font-mono text-[10px] text-fg-faint" title={projectLine}>
+                            {projectLine}
                           </div>
                         </td>
                         <td className="py-2.5 pr-3"><ModelChip model={s.model} /></td>
@@ -147,9 +149,12 @@ export function Overview({ sessions, caps, stats, loading, onRefresh, onOpen, on
                         <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">{formatRelativeTime(s.lastActivityMs, now)}</td>
                         {/* Lines changed: no data source until the statusLine side-channel (#11); placeholder for now. */}
                         <td className="py-2.5 pr-3 text-right font-mono text-[11px] tabular-nums text-fg-faint">—</td>
-                        <td className="max-w-[260px] py-2.5 pr-5">
-                          <span className={cx('block truncate text-[11px]', isWaiting ? 'text-accent-bright' : 'text-fg-muted')}>
-                            {isWaiting ? `⚠ ${s.waitingReason ?? 'Waiting on you'}` : (s.currentTask ?? '')}
+                        <td className="py-2.5 pr-5">
+                          <span
+                            className={cx('block max-w-[260px] truncate text-[11px]', isWaiting ? 'text-accent-bright' : 'text-fg-muted')}
+                            title={activity}
+                          >
+                            {activity}
                           </span>
                         </td>
                       </tr>
