@@ -197,7 +197,9 @@ export function getStats(db: SqliteDb, now: number): Stats {
  */
 export function getOverview(db: SqliteDb, now: number): OverviewData {
   const persisted = getPersisted(db)
-  return { sessions: persisted.map(hydrate), stats: computeStats(persisted, now) }
+  // account is null here: the SQLite index holds no live statusLine data (ADR-0002). ipc.ts overlays
+  // the freshest captures and derives the real account before serving the renderer.
+  return { sessions: persisted.map(hydrate), stats: computeStats(persisted, now), account: null }
 }
 
 /** Drop every row whose id isn't in `keepIds` — sessions that aged out of the window and aren't live.

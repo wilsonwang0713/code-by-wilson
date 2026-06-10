@@ -1,4 +1,4 @@
-import type { Session, ProviderCapabilities } from './types'
+import type { Session, ProviderCapabilities, Account } from './types'
 import type { TranscriptRead } from './transcript'
 import type { TerminalApi } from './terminal'
 import type { Stats } from './stats'
@@ -15,6 +15,9 @@ export const IPC = {
 export interface OverviewData {
   sessions: Session[]
   stats: Stats
+  /** App-wide account: billing mode + rate limits from the live statusLine. null when there is no
+   *  statusLine data (no captures, or all stale) — the UI reads null as "no rate-limit bars". */
+  account: Account | null
 }
 
 export interface IpcApi {
