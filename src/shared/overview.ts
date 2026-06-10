@@ -30,3 +30,15 @@ export function sortSessions(sessions: Session[], sort: SortKey): Session[] {
     return STATE_ORDER[a.state] - STATE_ORDER[b.state] || b.lastActivityMs - a.lastActivityMs
   })
 }
+
+/** Filter Sessions to a single state, or pass them all through for 'all'. Pure; returns a fresh array. */
+export function filterSessions(sessions: Session[], filter: Filter): Session[] {
+  return filter === 'all' ? sessions.slice() : sessions.filter((s) => s.state === filter)
+}
+
+/** Per-state Session counts plus the 'all' total, for the filter chips. */
+export function stateCounts(sessions: Session[]): Record<Filter, number> {
+  const counts: Record<Filter, number> = { all: sessions.length, working: 0, waiting: 0, idle: 0, ended: 0 }
+  for (const s of sessions) counts[s.state] += 1
+  return counts
+}
