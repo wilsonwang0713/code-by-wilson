@@ -23,8 +23,9 @@ export interface StatusLineSample {
   modelDisplayName: string | null
   /** A deliberately-named session (`--name` / `/rename`), or null when unnamed. */
   sessionName: string | null
-  /** Account rate limits — present only for a subscription; null for an API account. Each window may
-   *  be independently absent (the statusLine populates them after the first API response). */
+  /** Account rate limits, present when the capture carries them (a subscription that has had its first
+   *  API response). null when absent: a subscription before that response, or a session whose billing the
+   *  app can't determine. Each window may be independently absent. */
   rateLimits: { fiveHour?: RateLimit; sevenDay?: RateLimit } | null
 }
 
@@ -56,12 +57,13 @@ function liveWindow(w: RateLimit | undefined, now: number): RateLimit | undefine
 
 /**
  * The app-wide Account from the live statusLine captures within `staleMs` of `now`. Billing mode is
- * detected from rate-limit presence (ADR-0001): a capture carrying rate_limits is a subscription, one
- * without is an API account. To avoid flapping — a subscription session that hasn't had its first API
- * response yet (or an API-key session running alongside) carries no rate_limits — the account takes its
- * windows from the freshest capture that HAS them, and only reports 'api' when no fresh capture carries
- * any. Returns null when there's no recent statusLine data at all (the UI reads null as "no bars"). Each
- * window is dropped once its reset has passed, so a stale capture can't show an expired limit as current.
+ * detected from rate-limit presence (ADR-0001): a capture carrying rate_limits is a subscription; to
+ * avoid flapping (a subscription session that hasn't had its first API response yet, or an API-key
+ * session running alongside, carries no rate_limits) the account takes its windows from the freshest
+ * capture that HAS them, and reports `unknown` when no fresh capture carries any (absence is not proof
+ * of API billing). Returns null when there's no recent statusLine data at all (the UI reads null as
+ * "no bars"). Each window is dropped once its reset has passed, so a stale capture can't show an
+ * expired limit as current.
  */
 export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, staleMs: number): Account | null {
   let freshest: StatusLineSample | null = null
@@ -78,7 +80,7 @@ export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, 
       sevenDay: liveWindow(withLimits.rateLimits.sevenDay, now),
     }
   }
-  if (freshest) return { billingMode: 'api' }
+  if (freshest) return { billingMode: 'unknown' }
   return null
 }
 

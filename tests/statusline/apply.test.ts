@@ -53,8 +53,8 @@ describe('deriveAccount', () => {
     })
   })
 
-  it('reads an API account from a sample with no rate_limits (no bars)', () => {
-    expect(deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS)).toEqual({ billingMode: 'api' })
+  it('returns unknown (never api) from a sample with no rate_limits — absence is not proof of API billing', () => {
+    expect(deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS)).toEqual({ billingMode: 'unknown' })
   })
 
   it('returns null when there is no statusLine data at all', () => {
