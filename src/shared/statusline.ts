@@ -1,5 +1,6 @@
 import type { Account, RateLimit, Session } from './types'
 import type { ContextBreakdown } from './transcript'
+import { contextTotal } from './context'
 
 /** One normalized statusLine capture for a Session, parsed from a side-channel file. Plain data so it
  *  crosses IPC cleanly. `null` fields are "the statusLine didn't report this", distinct from 0. */
@@ -95,11 +96,19 @@ export function overlaySessions(sessions: Session[], byId: Map<string, StatusLin
   return sessions.map((s) => {
     const sample = byId.get(s.id)
     if (!sample) return s
+    const window = sample.contextWindow ?? s.contextWindow
+    // When the capture carries a live split but no used_percentage, fill from those exact tokens over
+    // the window rather than the stale transcript %. The Context panel shows the live split's total/window
+    // beside this %, so a transcript number there would visibly contradict the tokens next to it.
+    const liveDerivedPct =
+      sample.contextPct == null && sample.liveContext && window > 0
+        ? Math.min(100, Math.round((contextTotal(sample.liveContext) / window) * 100))
+        : null
     return {
       ...s,
       title: sample.sessionName ?? s.title,
-      contextPct: sample.contextPct ?? s.contextPct,
-      contextWindow: sample.contextWindow ?? s.contextWindow,
+      contextPct: sample.contextPct ?? liveDerivedPct ?? s.contextPct,
+      contextWindow: window,
       liveContext: sample.liveContext,
       modelId: sample.modelId ?? undefined,
       modelDisplayName: sample.modelDisplayName ?? undefined,

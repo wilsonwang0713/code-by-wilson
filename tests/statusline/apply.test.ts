@@ -117,9 +117,18 @@ describe('overlaySessions', () => {
     expect(out[0].linesAdded).toBeUndefined()
   })
 
-  it('falls back to the computed context % when the sample omitted used_percentage', () => {
+  it('falls back to the computed context % when the sample omitted used_percentage and carried no live split', () => {
     const byId = freshestBySession([sample({ sessionId: 's1', contextPct: null, costUsd: 1 })])
     expect(overlaySessions([session({ contextPct: 12 })], byId)[0].contextPct).toBe(12)
+  })
+
+  it('derives the context % from the live split over the window when the capture omitted used_percentage', () => {
+    // A capture with current_usage but no used_percentage: fill from the exact live tokens, never the
+    // stale transcript % — the Context panel shows the live total/window beside this number.
+    const byId = freshestBySession([
+      sample({ sessionId: 's1', contextPct: null, contextWindow: 200_000, liveContext: { input: 0, cacheRead: 100_000, cacheCreation: 0 } }),
+    ])
+    expect(overlaySessions([session({ contextPct: 12 })], byId)[0].contextPct).toBe(50) // 100000 / 200000
   })
 
   it('keeps a zero live cost (0 is a real value, not "missing")', () => {

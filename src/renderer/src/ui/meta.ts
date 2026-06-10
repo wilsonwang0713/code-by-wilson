@@ -52,14 +52,15 @@ export function ctxBar(pct: number): string {
 
 /** The display label for a Session's model. A recognized model (its statusLine model.id matches a known
  *  family) shows the app's clean label from `table`; a model absent from the table shows the capture's
- *  real display_name, so it never masquerades as the Opus fallback. With no capture, the clean label
- *  stands; pricing and window keep riding the normalized `model` regardless. */
+ *  real display_name — or its raw id when the capture omitted the name — so it never masquerades as the
+ *  Opus fallback. With no capture, the clean label stands; pricing and window keep riding the normalized
+ *  `model` regardless. */
 export function honestModelLabel(
   model: ModelId,
   captureModelId: string | undefined,
   captureDisplayName: string | undefined,
   table: Record<ModelId, string>,
 ): string {
-  if (captureModelId && captureDisplayName && !isKnownModelString(captureModelId)) return captureDisplayName
+  if (captureModelId && !isKnownModelString(captureModelId)) return captureDisplayName || captureModelId
   return table[model]
 }

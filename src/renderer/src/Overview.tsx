@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import type { Session, ProviderCapabilities, Account } from '@shared/types'
+import type { Session, Account } from '@shared/types'
 import type { Stats } from '@shared/stats'
 import { sortSessions, filterSessions, stateCounts, ORDERED_STATES, type SortKey, type Filter } from '@shared/overview'
 import { formatUsd, formatRelativeTime, costDisplay } from '@shared/format'
@@ -15,7 +15,6 @@ const FILTERS: Filter[] = ['all', ...ORDERED_STATES]
 
 interface Props {
   sessions: Session[]
-  caps: ProviderCapabilities | null
   stats: Stats | null
   account: Account | null
   loading: boolean
@@ -24,7 +23,7 @@ interface Props {
   onNew: () => void
 }
 
-export function Overview({ sessions, caps, stats, account, loading, onRefresh, onOpen, onNew }: Props) {
+export function Overview({ sessions, stats, account, loading, onRefresh, onOpen, onNew }: Props) {
   const [filter, setFilter] = useState<Filter>('all')
   const [sort, setSort] = useState<SortKey>('default')
   // One timestamp per render for every relative-time label; the 3s background re-sync re-renders and

@@ -119,23 +119,29 @@ export function parseTranscript(jsonl: string, fallbackCwd = ''): TranscriptSumm
         }
       }
       // The waiting signal and current-context split come from the shared tail tracker, one derivation
-      // the render parser also drives, so they can't disagree.
-      const turnId = typeof row.message?.id === 'string' ? row.message.id : undefined
-      tail.beginAssistantTurn(turnId)
-      tail.noteUsage(usage)
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if (block?.type === 'tool_use' && typeof block.id === 'string') {
-            const input = (block.input && typeof block.input === 'object' ? block.input : {}) as Record<string, unknown>
-            tail.noteToolUse(block.id, typeof block.name === 'string' ? block.name : '', input)
+      // the render parser also drives, so they can't disagree. Feed it only the parent conversation's
+      // rows (the render parser skips isSidechain too): a subagent's own pending tool or context split
+      // is internal and must not latch the parent's awaitingUser or override its current context. Token
+      // counting above stays unconditional — a subagent's usage is still real, billed cost.
+      if (!row.isSidechain) {
+        const turnId = typeof row.message?.id === 'string' ? row.message.id : undefined
+        tail.beginAssistantTurn(turnId)
+        tail.noteUsage(usage)
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block?.type === 'tool_use' && typeof block.id === 'string') {
+              const input = (block.input && typeof block.input === 'object' ? block.input : {}) as Record<string, unknown>
+              tail.noteToolUse(block.id, typeof block.name === 'string' ? block.name : '', input)
+            }
           }
         }
       }
     }
 
     if (row.type === 'user') {
-      // A tool_result answers a pending tool_use from the current turn (regardless of isMeta).
-      if (Array.isArray(content)) {
+      // A tool_result answers a pending tool_use from the current turn (regardless of isMeta). Sidechain
+      // results resolve sidechain tools, which the tracker never saw — skip them to stay in lockstep.
+      if (!row.isSidechain && Array.isArray(content)) {
         for (const block of content) {
           if (block?.type === 'tool_result' && typeof block.tool_use_id === 'string') {
             tail.resolveToolResult(block.tool_use_id)

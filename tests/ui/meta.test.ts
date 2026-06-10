@@ -10,6 +10,11 @@ describe('honestModelLabel', () => {
     expect(honestModelLabel('claude-opus-4-8', 'claude-neo-1', 'Claude Neo 1', MODEL_LABEL)).toBe('Claude Neo 1')
   })
 
+  it('shows the raw model id (never the Opus fallback) for an unrecognized model whose capture omitted display_name', () => {
+    expect(honestModelLabel('claude-opus-4-8', 'claude-neo-1', undefined, MODEL_LABEL)).toBe('claude-neo-1')
+    expect(honestModelLabel('claude-opus-4-8', 'claude-neo-1', '', MODEL_LABEL)).toBe('claude-neo-1')
+  })
+
   it('falls back to the clean label when there is no capture', () => {
     expect(honestModelLabel('claude-sonnet-4-6', undefined, undefined, MODEL_SHORT)).toBe('Sonnet')
   })

@@ -20,6 +20,27 @@ describe('summary and render projections agree (consolidated tail)', () => {
     expect(sum.contextTokens).toBe(9500) // 100 + 9000 + 400
   })
 
+  it('agree on a subagent tail: a sidechain tool_use never latches the parent waiting or its context', () => {
+    // The parent dispatches a Task, the subagent (isSidechain) runs a turn that leaves its own tool_use
+    // unanswered, then the parent's Task is answered. Render skips the sidechain row entirely; the summary
+    // must too, or its awaitingUser/context would track the subagent instead of the resolved parent.
+    const t = jsonl(
+      { type: 'user', isMeta: false, message: { role: 'user', content: 'go' } },
+      { type: 'assistant', message: { id: 'm1', role: 'assistant', model: 'claude-opus-4-8', usage: { input_tokens: 100, cache_read_input_tokens: 9000, cache_creation_input_tokens: 400 }, content: [{ type: 'tool_use', id: 'task1', name: 'Task', input: {} }] } },
+      { type: 'assistant', isSidechain: true, message: { id: 's1', role: 'assistant', model: 'claude-haiku-4-5', usage: { input_tokens: 5, cache_read_input_tokens: 50, cache_creation_input_tokens: 0 }, content: [{ type: 'tool_use', id: 'sub1', name: 'Bash', input: {} }] } },
+      { type: 'user', isMeta: false, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'task1', content: 'done' }] } },
+    )
+    const sum = parseTranscript(t)
+    const doc = parseTranscriptEvents(t)
+    expect(sum.awaitingUser).toBe(false) // parent's Task resolved; the subagent's pending tool doesn't count
+    expect(doc.waitingReason).toBeNull()
+    expect(sum.awaitingUser).toBe(doc.waitingReason !== null)
+    expect(sum.contextTokens).toBe(doc.context ? contextTotal(doc.context) : 0)
+    expect(sum.contextTokens).toBe(9500) // the parent turn's split (100 + 9000 + 400), not the subagent's 55
+    // The subagent's tokens are still real cost: input summed across all turns includes them.
+    expect(sum.usage.inputTokens).toBe(105) // 100 parent + 5 subagent
+  })
+
   it('agree that a fully-answered tail is not waiting', () => {
     const t = jsonl(
       { type: 'assistant', message: { id: 'm1', role: 'assistant', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }, content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: {} }] } },
