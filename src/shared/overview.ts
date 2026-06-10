@@ -60,3 +60,25 @@ export function stateCounts(sessions: Session[]): Record<Filter, number> {
   for (const s of sessions) byState[s.state] += 1
   return { all: sessions.length, ...byState }
 }
+
+export interface SessionGroup {
+  state: SessionState
+  items: Session[]
+}
+
+/**
+ * Group sessions for the master rail: by state in display order (Waiting → Working → Idle → Ended),
+ * filtered by a case-insensitive substring over title + project, each group's items most-recent first,
+ * empty groups dropped. Pure; returns fresh arrays.
+ */
+export function groupSessions(sessions: Session[], query: string): SessionGroup[] {
+  const q = query.trim().toLowerCase()
+  const match = (s: Session): boolean =>
+    !q || s.title.toLowerCase().includes(q) || s.project.toLowerCase().includes(q)
+  return ORDERED_STATES.map((state) => ({
+    state,
+    items: sessions
+      .filter((s) => s.state === state && match(s))
+      .sort((a, b) => b.lastActivityMs - a.lastActivityMs),
+  })).filter((g) => g.items.length > 0)
+}
