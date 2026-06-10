@@ -83,10 +83,11 @@ export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, 
 }
 
 /**
- * Overlay live statusLine numbers onto each Session that has a sample. Cost, lines, and context come
- * from the statusLine when present; a Session with no sample passes through untouched, still showing
- * its transcript-computed context % and Equivalent API value (graceful degradation, ADR-0001). A sample
- * that omitted a field falls back to the Session's computed value for that field.
+ * Overlay live statusLine numbers onto each Session that has a sample: cost, lines, context split,
+ * context %/window, model identity, and the title (a deliberately-named session_name wins over the
+ * transcript-derived title). A Session with no sample passes through untouched, still showing its
+ * transcript-computed values (graceful degradation, ADR-0001). A sample that omitted a field falls back
+ * to the Session's computed value for that field.
  */
 export function overlaySessions(sessions: Session[], byId: Map<string, StatusLineSample>): Session[] {
   return sessions.map((s) => {
@@ -94,6 +95,7 @@ export function overlaySessions(sessions: Session[], byId: Map<string, StatusLin
     if (!sample) return s
     return {
       ...s,
+      title: sample.sessionName ?? s.title,
       contextPct: sample.contextPct ?? s.contextPct,
       contextWindow: sample.contextWindow ?? s.contextWindow,
       liveContext: sample.liveContext,

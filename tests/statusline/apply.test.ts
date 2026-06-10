@@ -143,6 +143,16 @@ describe('overlaySessions', () => {
     expect(out[0].modelId).toBeUndefined()
     expect(out[0].modelDisplayName).toBeUndefined()
   })
+
+  it('prefers the capture session_name as the title', () => {
+    const byId = freshestBySession([sample({ sessionId: 's1', sessionName: 'Code review approval' })])
+    expect(overlaySessions([session({ title: 'first prompt title' })], byId)[0].title).toBe('Code review approval')
+  })
+
+  it('keeps the computed title when the capture has no session_name', () => {
+    const byId = freshestBySession([sample({ sessionId: 's1', sessionName: null })])
+    expect(overlaySessions([session({ title: 'first prompt title' })], byId)[0].title).toBe('first prompt title')
+  })
 })
 
 describe('freshestBySession', () => {
