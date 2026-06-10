@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Session, ProviderCapabilities, ModelId } from '@shared/types'
+import type { Session, ProviderCapabilities, ModelId, Account } from '@shared/types'
 import type { Stats } from '@shared/stats'
 import type { OverviewData } from '@shared/ipc'
 import { mergeManaged } from '@shared/managed'
@@ -21,6 +21,7 @@ export function App() {
   const [drafts, setDrafts] = useState<Session[]>([])
   const [caps, setCaps] = useState<ProviderCapabilities | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
+  const [account, setAccount] = useState<Account | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -30,6 +31,7 @@ export function App() {
   function applyOverview(o: OverviewData): void {
     setSessions(o.sessions)
     setStats(o.stats)
+    setAccount(o.account)
   }
 
   async function load(): Promise<void> {
@@ -111,7 +113,7 @@ export function App() {
   const selected = selectedId !== null ? (all.find((s) => s.id === selectedId) ?? null) : null
 
   if (selected) {
-    return <Workspace session={selected} onBack={() => setSelectedId(null)} />
+    return <Workspace session={selected} account={account} onBack={() => setSelectedId(null)} />
   }
 
   return (
@@ -120,6 +122,7 @@ export function App() {
         sessions={all}
         caps={caps}
         stats={stats}
+        account={account}
         loading={loading}
         onRefresh={() => void refresh()}
         onOpen={(s) => setSelectedId(s.id)}
