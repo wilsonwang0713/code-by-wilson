@@ -29,6 +29,22 @@ export function renameManaged(rows: Session[], from: string, to: string): Sessio
 }
 
 /**
+ * Migrate an Adopt override across a `/clear` rotation (the live pty moved from `from` to `to`). If the
+ * rotated id was adopting — its optimistic Managed/Working overlay still pending the next sync — move the
+ * override onto the new id: the live pty under `to` keeps the overlay until discovery confirms it Managed,
+ * while `from` (about to derive as an Ended ghost) drops it. Without this, the abandoned id keeps being
+ * forced Managed/Working and lingers as a phantom session, no longer adoptable, for the rest of the run.
+ * No-op (same reference) when `from` wasn't adopting.
+ */
+export function renameAdopting(adopting: Set<string>, from: string, to: string): Set<string> {
+  if (!adopting.has(from)) return adopting
+  const next = new Set(adopting)
+  next.delete(from)
+  next.add(to)
+  return next
+}
+
+/**
  * Apply the optimistic Adopt override. An id the user adopted this run, before the next sync relabels it,
  * is forced to Managed (and Ended → Working) so the workspace flips from the read-only Transcript to the
  * live terminal in the same beat. Unlike a draft, the row already exists, so this overrides in place. App

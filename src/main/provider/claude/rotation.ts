@@ -52,13 +52,18 @@ export interface RenamableRegistry {
  * rotation: relabel the registry (so the provider's next sync calls the pty Managed under its new id and
  * leaves the abandoned id to derive as an Ended, adoptable ghost), then fire `rename` to re-key the live
  * pty and hand the rotation to the renderer. Runs before each sync, so the relabel lands the same tick.
+ *
+ * `readRegistry` is lazy: with no Managed pty this run, nothing can have rotated, so we skip the on-disk
+ * read entirely — the common case (browsing Observed sessions, no terminal open) costs nothing.
  */
 export function applyRotations(
   managed: RenamableRegistry,
-  registry: RegistryEntry[],
+  readRegistry: () => RegistryEntry[],
   rename: (from: string, to: string) => void,
 ): Rotation[] {
-  const rotations = detectRotations(managed.entries(), registry)
+  const managedPtys = managed.entries()
+  if (managedPtys.length === 0) return []
+  const rotations = detectRotations(managedPtys, readRegistry())
   for (const { from, to } of rotations) {
     managed.rename(from, to)
     rename(from, to)

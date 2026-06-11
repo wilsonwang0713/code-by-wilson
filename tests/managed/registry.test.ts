@@ -60,4 +60,15 @@ describe('createManagedRegistry', () => {
     expect(() => reg.rename('ghost', 'x')).not.toThrow()
     expect(reg.has('x')).toBe(false)
   })
+
+  it('treats rename onto an already-managed id as a no-op, so it never clobbers another pty', () => {
+    const reg = createManagedRegistry()
+    reg.add('A', 100)
+    reg.add('B', 200)
+    reg.rename('A', 'B') // B already maps to a different live pty — don't overwrite it
+    expect(reg.entries()).toEqual([
+      { id: 'A', pid: 100 },
+      { id: 'B', pid: 200 },
+    ])
+  })
 })

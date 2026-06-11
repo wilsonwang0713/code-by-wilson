@@ -51,7 +51,7 @@ describe('applyRotations', () => {
     const managed = fakeManaged([{ id: 'A', pid: 100 }])
     const renamed: Array<[string, string]> = []
 
-    const out = applyRotations(managed, [{ pid: 100, sessionId: 'B' }], (from, to) => renamed.push([from, to]))
+    const out = applyRotations(managed, () => [{ pid: 100, sessionId: 'B' }], (from, to) => renamed.push([from, to]))
 
     expect(out).toEqual([{ from: 'A', to: 'B', pid: 100 }])
     expect(managed.entries()).toEqual([{ id: 'B', pid: 100 }]) // registry follows the pty to its new id
@@ -61,8 +61,23 @@ describe('applyRotations', () => {
   it('does nothing when no managed pty rotated', () => {
     const managed = fakeManaged([{ id: 'A', pid: 100 }])
     const renamed: Array<[string, string]> = []
-    applyRotations(managed, [{ pid: 100, sessionId: 'A' }], (from, to) => renamed.push([from, to]))
+    applyRotations(managed, () => [{ pid: 100, sessionId: 'A' }], (from, to) => renamed.push([from, to]))
     expect(managed.entries()).toEqual([{ id: 'A', pid: 100 }])
     expect(renamed).toEqual([])
+  })
+
+  it('skips the registry read entirely when nothing is managed — the common no-terminal case', () => {
+    const managed = fakeManaged([])
+    let reads = 0
+    const out = applyRotations(
+      managed,
+      () => {
+        reads++
+        return []
+      },
+      () => {},
+    )
+    expect(reads).toBe(0) // nothing this run controls → nothing can have rotated, so don't read sessions/
+    expect(out).toEqual([])
   })
 })

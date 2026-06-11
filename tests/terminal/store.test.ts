@@ -124,6 +124,16 @@ describe('createTerminalStore', () => {
     expect(h.store.get('b')).toBeDefined()
   })
 
+  it('rename: credits in-flight output acked after the rotation instead of leaking the flow-control credit', () => {
+    const h = harness()
+    h.store.create('a')
+    h.route('a', 'x'.repeat(FLOW.ackChars + 10)) // output arrives under the old id; its ack callback is pending
+    const inFlightCb = h.made[0].writes[0].cb!
+    h.store.rename('a', 'b') // a /clear rotates a->b while that write is still mid-parse
+    inFlightCb() // xterm finishes parsing AFTER the rename
+    expect(h.api.ack).toHaveBeenCalledWith('b', FLOW.ackChars) // credited under the live id, not dropped
+  })
+
   it('rename: is a no-op for an unknown id', () => {
     const h = harness()
     h.store.create('a')

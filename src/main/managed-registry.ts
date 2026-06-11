@@ -18,7 +18,8 @@ export interface ManagedRegistry {
   /** Every managed id paired with its pty pid — the input to rotation detection. */
   entries(): ManagedPty[]
   /** Re-key a still-living managed pty from its old session id to the new one (a `/clear` rotation),
-   *  keeping the same pid. A no-op if `from` isn't managed. */
+   *  keeping the same pid. A no-op if `from` isn't managed or `to` is already a live managed id (so a
+   *  rotation never clobbers another pty's entry) — matching the same guard the manager/store renames use. */
   rename(from: string, to: string): void
 }
 
@@ -35,7 +36,7 @@ export function createManagedRegistry(): ManagedRegistry {
     entries: () => [...pidById].map(([id, pid]) => ({ id, pid })),
     rename: (from, to) => {
       const pid = pidById.get(from)
-      if (pid === undefined) return
+      if (pid === undefined || pidById.has(to)) return // `from` isn't managed, or `to` is already a live pty
       pidById.delete(from)
       pidById.set(to, pid)
     },

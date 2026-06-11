@@ -75,7 +75,7 @@ app.whenReady()
     // registry and re-key the live pty + renderer, so the rotated session stays Managed instead of being
     // re-derived as a read-only Observed one.
     const reconcile = (): void => {
-      applyRotations(managed, readSessionFiles(claudeDir), renameInWindow)
+      applyRotations(managed, () => readSessionFiles(claudeDir), renameInWindow)
     }
     const { sync } = registerIpc({ db, provider, statusLine, accountEmail, beforeSync: reconcile })
 
