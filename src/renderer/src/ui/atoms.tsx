@@ -1,16 +1,22 @@
 import type { Management, SessionState } from '@shared/types'
 import { STATE_META } from './meta'
+import { glyphClass, glyphPulses, glyphTitle } from './session-glyph'
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ')
 }
 
-export function Dot({ state }: { state: SessionState }) {
-  const m = STATE_META[state]
-  const live = state === 'working' || state === 'waiting'
+/** The session glyph: color = state, fill = management. Pass `management` for a session dot (filled when
+ *  managed, hollow ring when observed, with a "state · management" tooltip); omit it for the state-group
+ *  headers, which are about state alone and stay filled. */
+export function Dot({ state, management }: { state: SessionState; management?: Management }) {
+  const cls = glyphClass(state, management ?? 'managed')
   return (
-    <span className={cx('relative inline-flex h-2 w-2 rounded-full', m.dot)}>
-      {live && <span className={cx('absolute inset-0 rounded-full animate-pulse-soft', m.dot)} />}
+    <span
+      title={management ? glyphTitle(state, management) : undefined}
+      className={cx('relative inline-flex h-2 w-2 rounded-full', cls)}
+    >
+      {glyphPulses(state) && <span className={cx('absolute inset-0 rounded-full', cls, 'animate-pulse-soft')} />}
     </span>
   )
 }
