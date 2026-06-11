@@ -1,7 +1,22 @@
 {
   "name": "code-by-wire",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "A dark desktop app that monitors and controls local Claude Code sessions.",
+  "author": "luojiahai",
+  "license": "MIT",
+  "homepage": "https://github.com/luojiahai/code-by-wire",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luojiahai/code-by-wire.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luojiahai/code-by-wire/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.2",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -11,7 +26,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "rebuild:native": "electron-rebuild -f -w better-sqlite3,node-pty"
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3,node-pty",
+    "icon": "electron scripts/make-icon.mjs",
+    "dist": "electron-vite build && electron-builder --mac --publish never"
   },
   "dependencies": {
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
@@ -35,6 +52,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.0.0",
+    "electron-builder": "^26.15.2",
     "electron-vite": "^5.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.6.0",

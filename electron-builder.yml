@@ -1,0 +1,26 @@
+appId: io.github.luojiahai.code-by-wire
+productName: code-by-wire
+copyright: Copyright © 2026 luojiahai
+# Native modules are rebuilt explicitly via `pnpm rebuild:native`; don't let
+# electron-builder run its own (it misbehaves under pnpm).
+npmRebuild: false
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - "**/*.node"
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.png
+  identity: null # unsigned: skip code signing entirely
+  target:
+    - target: dmg
+dmg:
+  title: ${productName} ${version}
+publish:
+  provider: github
+  owner: luojiahai
+  repo: code-by-wire
