@@ -11,6 +11,9 @@ import { CostPanel } from './panels/CostPanel'
 import { Timeline } from './panels/Timeline'
 import { TasksPanel } from './panels/TasksPanel'
 import { SubagentTree } from './panels/SubagentTree'
+import { TokensPanel } from './panels/TokensPanel'
+import { TokenSpeedPanel } from './panels/TokenSpeedPanel'
+import { GitPanel } from './panels/GitPanel'
 import { useTasks } from './use-tasks'
 import { useMetrics, type MetricsState } from './use-metrics'
 import { SessionHeaderStats } from './SessionHeaderStats'
@@ -92,8 +95,6 @@ export function Workspace({
  * timeline; the cost panel reads the Session directly. The rail hides below `lg`.
  */
 function WorkspaceBody({ session: s, account, now, metrics }: { session: Session; account: Account | null; now: number; metrics: MetricsState }) {
-  // metrics is threaded here for the rail panels task — not consumed yet.
-  void metrics
   const doc = useTranscript(s.id)
   const tasks = useTasks(s.id)
   return (
@@ -108,6 +109,9 @@ function WorkspaceBody({ session: s, account, now, metrics }: { session: Session
         <SessionPanel session={s} />
         <ContextPanel live={s.liveContext ?? null} context={doc?.context ?? null} contextPct={s.contextPct} contextWindow={s.contextWindow} />
         <CostPanel usage={s.usage} model={s.model} liveCostUsd={s.liveCostUsd} billingMode={account?.billingMode} />
+        <TokensPanel usage={s.usage} />
+        <TokenSpeedPanel speed={metrics ? metrics.tokenSpeed : null} />
+        <GitPanel git={metrics ? metrics.git : null} />
         <TasksPanel tasks={tasks ?? []} />
         <SubagentTree subagents={doc?.subagents ?? []} />
       </aside>

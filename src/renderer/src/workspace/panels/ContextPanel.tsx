@@ -39,7 +39,7 @@ export function ContextPanel({
       </PanelSection>
     )
   }
-  const { total, pct, segments } = view
+  const { total, pct } = view
   return (
     <PanelSection>
       <div className="flex items-baseline justify-between gap-2">
@@ -48,17 +48,7 @@ export function ContextPanel({
           {pct}% · {formatTokens(total)} / {formatTokens(contextWindow)}
         </span>
       </div>
-      <Bar pct={pct} fill={ctxBar(pct)} className="w-full" />
-      <dl className="space-y-1 pt-0.5">
-        {segments.map((s) => (
-          <div key={s.key} className="flex items-baseline justify-between gap-2">
-            <dt className="text-[11px] text-fg-muted">{s.label}</dt>
-            <dd className="shrink-0 font-mono text-[11px] tabular-nums text-fg-faint">
-              {formatTokens(s.tokens)} · {s.pct}%
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <Bar pct={pct} fill={ctxBar(pct)} className="mt-1.5 w-full" />
     </PanelSection>
   )
 }
