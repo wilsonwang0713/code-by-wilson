@@ -1,4 +1,4 @@
-<h1><img src="docs/assets/wire-mark.svg" alt="" height="32" align="left" hspace="14">code-by-wire</h1>
+# code-by-wire
 
 **The cockpit for local Claude Code.**
 
