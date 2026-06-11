@@ -51,15 +51,28 @@ function parseSample(raw: string, capturedMtimeMs: number): StatusLineSample | n
   const cost = (j.cost ?? {}) as Record<string, unknown>
   const ctx = (j.context_window ?? {}) as Record<string, unknown>
   const model = (j.model ?? {}) as Record<string, unknown>
+  const effort = (j.effort ?? {}) as Record<string, unknown>
+  const workspace = (j.workspace ?? {}) as Record<string, unknown>
   const rl = j.rate_limits
   let rateLimits: StatusLineSample['rateLimits'] = null
   if (rl !== null && typeof rl === 'object') {
     const r = rl as Record<string, unknown>
-    rateLimits = { fiveHour: parseWindow(r.five_hour), sevenDay: parseWindow(r.seven_day) }
+    rateLimits = {
+      fiveHour: parseWindow(r.five_hour),
+      sevenDay: parseWindow(r.seven_day),
+      sevenDaySonnet: parseWindow(r.seven_day_sonnet),
+      sevenDayOpus: parseWindow(r.seven_day_opus),
+    }
   }
 
   const pct = num(ctx.used_percentage)
   const sessionName = typeof j.session_name === 'string' && j.session_name.length > 0 ? j.session_name : null
+  const cwd =
+    typeof j.cwd === 'string' && j.cwd.length > 0
+      ? j.cwd
+      : typeof workspace.current_dir === 'string' && (workspace.current_dir as string).length > 0
+        ? (workspace.current_dir as string)
+        : null
   return {
     sessionId,
     capturedMtimeMs,
@@ -72,6 +85,10 @@ function parseSample(raw: string, capturedMtimeMs: number): StatusLineSample | n
     modelId: typeof model.id === 'string' ? model.id : null,
     modelDisplayName: typeof model.display_name === 'string' ? model.display_name : null,
     sessionName,
+    version: typeof j.version === 'string' && j.version.length > 0 ? j.version : null,
+    effortLevel: typeof effort.level === 'string' && (effort.level as string).length > 0 ? (effort.level as string) : null,
+    cwd,
+    sessionClockMs: num(cost.total_duration_ms),
     rateLimits,
   }
 }

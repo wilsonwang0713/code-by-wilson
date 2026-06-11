@@ -37,6 +37,7 @@ const provider = (listCandidates: Provider['listCandidates']): Provider => ({
   restate: (_c, prev) => prev,
   readTranscript: () => ({ status: 'absent' }),
   readTasks: () => ({ status: 'absent' }),
+  readMetrics: () => ({ status: 'absent' }),
   resolveAdoptTarget: () => null,
 })
 
@@ -96,6 +97,10 @@ const lineSample = (over: Partial<StatusLineSample> = {}): StatusLineSample => (
   modelId: null,
   modelDisplayName: null,
   sessionName: null,
+  version: null,
+  effortLevel: null,
+  cwd: null,
+  sessionClockMs: null,
   rateLimits: null,
   ...over,
 })
@@ -151,5 +156,48 @@ describe('registerIpc overview — statusLine overlay', () => {
 
     const o = handlers.get(IPC.overview)!() as OverviewData
     expect(o.account).toBeNull()
+  })
+})
+
+describe('registerIpc overview — account email', () => {
+  it('attaches the email to the account when accountEmail dep is provided', () => {
+    const db = openTestDb()
+    migrate(db)
+    upsertSessions(db, [seed])
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      statusLine: reader([
+        lineSample({
+          sessionId: 'seed',
+          rateLimits: { fiveHour: { usedPct: 20, resetsAt: Date.now() + 3_600_000 } },
+        }),
+      ]),
+      accountEmail: () => 'me@example.com',
+    })
+
+    const o = handlers.get(IPC.overview)!() as OverviewData
+    expect(o.account?.email).toBe('me@example.com')
+  })
+
+  it('leaves account.email undefined when no accountEmail dep is provided', () => {
+    const db = openTestDb()
+    migrate(db)
+    upsertSessions(db, [seed])
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      statusLine: reader([
+        lineSample({
+          sessionId: 'seed',
+          rateLimits: { fiveHour: { usedPct: 20, resetsAt: Date.now() + 3_600_000 } },
+        }),
+      ]),
+      // no accountEmail dep
+    })
+
+    const o = handlers.get(IPC.overview)!() as OverviewData
+    expect(o.account).not.toBeNull() // subscription account exists
+    expect(o.account?.email).toBeUndefined()
   })
 })

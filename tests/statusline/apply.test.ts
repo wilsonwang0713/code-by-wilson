@@ -22,6 +22,10 @@ const sample = (over: Partial<StatusLineSample> = {}): StatusLineSample => ({
   modelId: null,
   modelDisplayName: null,
   sessionName: null,
+  version: null,
+  effortLevel: null,
+  cwd: null,
+  sessionClockMs: null,
   rateLimits: null,
   ...over,
 })
@@ -161,6 +165,23 @@ describe('overlaySessions', () => {
   it('keeps the computed title when the capture has no session_name', () => {
     const byId = freshestBySession([sample({ sessionId: 's1', sessionName: null })])
     expect(overlaySessions([session({ title: 'first prompt title' })], byId)[0].title).toBe('first prompt title')
+  })
+})
+
+describe('overlaySessions — effort, clock, cwd', () => {
+  it('overlays the new core fields from the sample', () => {
+    const byId = new Map([['s1', sample({ effortLevel: 'high', sessionClockMs: 6_120_000, cwd: '/Users/me/proj' })]])
+    const [s] = overlaySessions([session({ id: 's1' })], byId)
+    expect(s.effortLevel).toBe('high')
+    expect(s.sessionClockMs).toBe(6_120_000)
+    expect(s.cwd).toBe('/Users/me/proj')
+  })
+
+  it('leaves a session with no sample untouched (no new fields)', () => {
+    const [s] = overlaySessions([session({ id: 's1' })], new Map())
+    expect(s.effortLevel).toBeUndefined()
+    expect(s.sessionClockMs).toBeUndefined()
+    expect(s.cwd).toBeUndefined()
   })
 })
 
