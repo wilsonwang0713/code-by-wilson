@@ -13,7 +13,8 @@ export interface Segment {
 const clampPct = (n: number): number => Math.min(100, Math.max(0, n))
 const round2 = (n: number): number => Math.round(n * 100) / 100
 
-/** Each value as its percentage share of the total. All-zero (or empty) yields zeros — no NaN. */
+/** Each value as its percentage share of the total. Assumes all values ≥ 0. All-zero (or empty) yields
+ *  zeros — no NaN. */
 export function segmentPercents(values: number[]): number[] {
   const total = values.reduce((a, b) => a + b, 0)
   if (total <= 0) return values.map(() => 0)

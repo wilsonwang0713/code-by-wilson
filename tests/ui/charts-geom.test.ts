@@ -13,6 +13,10 @@ describe('segmentPercents', () => {
   it('treats a single value as the whole bar', () => {
     expect(segmentPercents([7])).toEqual([100])
   })
+
+  it('returns [] for an empty input', () => {
+    expect(segmentPercents([])).toEqual([])
+  })
 })
 
 describe('ringGradient', () => {
@@ -47,6 +51,10 @@ describe('donutGradient', () => {
 
   it('falls back to a solid track when the total is zero', () => {
     expect(donutGradient([{ value: 0, color: 'A' }], 'TRACK')).toBe('conic-gradient(TRACK 0% 100%)')
+  })
+
+  it('falls back to a solid track for empty segments', () => {
+    expect(donutGradient([], 'T')).toBe('conic-gradient(T 0% 100%)')
   })
 })
 
