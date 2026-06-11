@@ -29,6 +29,8 @@ export interface TerminalHandle {
   fit: FitLike
   wrapper: HTMLElement
   opened: boolean
+  /** The keystroke→pty subscription, kept so `rename` can rebind it to a new id (a `/clear` rotation). */
+  inputSub: { dispose(): void }
 }
 
 export interface TerminalStoreDeps {
@@ -42,6 +44,10 @@ export interface TerminalStore {
    *  survives every tab switch until `dispose`. */
   create(id: string): TerminalHandle
   get(id: string): TerminalHandle | undefined
+  /** Re-key a live terminal from `from` to `to` (a `/clear` rotation), so pushed output and the user's
+   *  keystrokes follow the rotated session id onto the SAME xterm — no flicker, scrollback intact. No-op
+   *  if `from` has no handle or `to` is already taken. */
+  rename(from: string, to: string): void
   /** Close a terminal for good: dispose the xterm and forget the id. */
   dispose(id: string): void
 }
@@ -93,12 +99,25 @@ export function createTerminalStore({ api, createTerminal }: TerminalStoreDeps):
       const existing = handles.get(id)
       if (existing) return existing
       const { term, fit, wrapper } = createTerminal()
-      const handle: TerminalHandle = { term, fit, wrapper, opened: false }
+      const inputSub = term.onData((data) => api.write(id, data)) // user keystrokes → pty (independent of DOM attach)
+      const handle: TerminalHandle = { term, fit, wrapper, opened: false, inputSub }
       handles.set(id, handle)
-      term.onData((data) => api.write(id, data)) // user keystrokes → pty (independent of DOM attach)
       return handle
     },
     get: (id) => handles.get(id),
+    rename(from, to) {
+      if (from === to) return
+      const h = handles.get(from)
+      if (!h || handles.has(to)) return // unknown source, or target already in use → no-op
+      handles.delete(from)
+      handles.set(to, h)
+      const pend = pendingAck.get(from)
+      pendingAck.delete(from)
+      if (pend !== undefined) pendingAck.set(to, pend)
+      // Rebind keystrokes to the new id; the old closure captured `from`.
+      h.inputSub.dispose()
+      h.inputSub = h.term.onData((data) => api.write(to, data))
+    },
     dispose(id) {
       const h = handles.get(id)
       if (!h) return

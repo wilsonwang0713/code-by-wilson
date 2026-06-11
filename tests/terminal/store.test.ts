@@ -44,6 +44,7 @@ function harness() {
       exitRouter = cb
       return () => {}
     },
+    onRename: () => () => {}, // the store exposes rename() directly; App drives it, not this channel
   }
   const made: ReturnType<typeof fakeXterm>[] = []
   const store = createTerminalStore({
@@ -105,6 +106,30 @@ describe('createTerminalStore', () => {
     h.exit('a', 0)
     expect(h.store.get('a')).toBeDefined() // handle kept so the scrollback stays readable
     expect(h.made[0].writes.at(-1)?.data).toContain('exited')
+  })
+
+  it('rename: migrates a live handle to a new id so output and keystrokes follow, freeing the old id', () => {
+    const h = harness()
+    h.store.create('a')
+    h.store.rename('a', 'b')
+
+    h.route('b', 'after')
+    expect(h.made[0].writes.at(-1)?.data).toBe('after') // same xterm receives output under the new id
+
+    h.made[0].typeInput('x')
+    expect(h.api.write).toHaveBeenCalledWith('b', 'x') // keystrokes now write under the new id
+
+    expect(h.store.get('a')).toBeUndefined() // old id freed
+    expect(h.store.get('b')).toBe(h.store.get('b')) // and the handle lives under the new id
+    expect(h.store.get('b')).toBeDefined()
+  })
+
+  it('rename: is a no-op for an unknown id', () => {
+    const h = harness()
+    h.store.create('a')
+    expect(() => h.store.rename('ghost', 'b')).not.toThrow()
+    expect(h.store.get('a')).toBeDefined()
+    expect(h.store.get('b')).toBeUndefined()
   })
 
   it('dispose() tears down the terminal and forgets the id', () => {
