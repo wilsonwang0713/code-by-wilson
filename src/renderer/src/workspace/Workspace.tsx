@@ -28,14 +28,14 @@ export function Workspace({
   onAdopt: (id: string) => Promise<void>
 }) {
   const isObserved = s.management === 'observed'
-  // Recomputed each render; App's 3s background re-sync re-renders this, so the rail clock ticks.
+  // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now()
   const metrics = useMetrics(s.id)
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-950 text-fg">
       <header className="flex shrink-0 items-center gap-3 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="min-w-0 truncate text-sm font-semibold text-fg">{s.title}</span>
             <button
               type="button"
@@ -85,6 +85,7 @@ function SessionIdChip({ id }: { id: string }) {
   }
   return (
     <button
+      type="button"
       onClick={copy}
       title={`Copy session id (${id})`}
       className="inline-flex shrink-0 items-center gap-1 rounded border border-ink-700 bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint transition-colors hover:border-ink-600 hover:text-fg-muted"
