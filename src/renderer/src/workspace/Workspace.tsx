@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Session, Account } from '@shared/types'
-import { cx, ManagementChip, StateBadge } from '../ui/atoms'
+import { cx } from '../ui/atoms'
 import { Icon } from '../ui/icons'
 import { TranscriptView } from './TranscriptView'
 import { TerminalView } from '../terminal/TerminalView'
@@ -17,6 +17,7 @@ import { useTasks } from './use-tasks'
 import { useMetrics, type MetricsState } from './use-metrics'
 import { SessionPanel } from './panels/SessionPanel'
 import { HeaderActions } from './HeaderActions'
+import { ModeLabel } from './ModeLabel'
 
 export function Workspace({
   session: s,
@@ -27,7 +28,6 @@ export function Workspace({
   account: Account | null
   onAdopt: (id: string) => Promise<void>
 }) {
-  const isObserved = s.management === 'observed'
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now()
   const metrics = useMetrics(s.id)
@@ -49,13 +49,7 @@ export function Workspace({
             <SessionIdChip id={s.id} />
           </div>
           <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px]">
-            <StateBadge state={s.state} />
-            <ManagementChip kind={s.management} />
-            {isObserved && (
-              <span className="rounded bg-ink-900 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-fg-faint ring-1 ring-ink-800">
-                read-only
-              </span>
-            )}
+            <ModeLabel session={s} />
             <span className="text-ink-700">·</span>
             <span className="min-w-0 truncate font-mono text-fg-faint">
               {s.project}
