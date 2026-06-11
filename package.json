@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "rebuild:native": "electron-rebuild -f -w better-sqlite3,node-pty"
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3,node-pty",
+    "icon": "electron scripts/make-icon.mjs"
   },
   "dependencies": {
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
