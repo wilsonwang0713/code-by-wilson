@@ -49,6 +49,20 @@ describe('donutGradient', () => {
     ).toBe('conic-gradient(A 0% 33.33%, B 33.33% 66.67%, C 66.67% 100%)')
   })
 
+  it('keeps a trailing zero-value segment zero-width while the last visible arc still reaches 100% (the cache-write=0 cost donut)', () => {
+    expect(
+      donutGradient(
+        [
+          { value: 1, color: 'A' },
+          { value: 1, color: 'B' },
+          { value: 2, color: 'C' },
+          { value: 0, color: 'D' },
+        ],
+        'T',
+      ),
+    ).toBe('conic-gradient(A 0% 25%, B 25% 50%, C 50% 100%, D 100% 100%)')
+  })
+
   it('falls back to a solid track when the total is zero', () => {
     expect(donutGradient([{ value: 0, color: 'A' }], 'TRACK')).toBe('conic-gradient(TRACK 0% 100%)')
   })
@@ -62,6 +76,10 @@ describe('ratePct', () => {
   it('is the value as a percentage of the reference max', () => {
     expect(ratePct(88, 640)).toBe(13.75)
     expect(ratePct(640, 640)).toBe(100)
+  })
+
+  it('rounds the percentage to two decimals', () => {
+    expect(ratePct(1, 3)).toBe(33.33)
   })
 
   it('clamps over the max and guards a zero max', () => {

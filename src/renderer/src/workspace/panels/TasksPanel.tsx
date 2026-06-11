@@ -23,12 +23,15 @@ export function TasksPanel({ tasks }: { tasks: Task[] }) {
   const done = tasks.filter((t) => t.status === 'completed').length
   return (
     <PanelSection>
-      <div className="flex items-baseline justify-between gap-2">
-        <PanelHeading>Tasks</PanelHeading>
-        <span className="font-mono text-[10px] tabular-nums text-fg-faint">
-          {done}/{tasks.length}
-        </span>
-      </div>
+      <PanelHeading
+        right={
+          <span className="font-mono text-[10px] tabular-nums text-fg-faint">
+            {done}/{tasks.length}
+          </span>
+        }
+      >
+        Tasks
+      </PanelHeading>
       <ul className="space-y-1">
         {tasks.map((t) => (
           <li key={t.id} className="flex items-baseline gap-2">

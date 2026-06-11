@@ -1,5 +1,6 @@
 import type { Usage } from '@shared/types'
 import { formatTokensShort } from '@shared/format'
+import { Swatch } from '../../ui/atoms'
 import { StackedBar } from '../../ui/charts'
 import { TOKEN_SEGMENT_COLORS } from '../../ui/meta'
 import { PanelSection, PanelHeading } from './chrome'
@@ -29,7 +30,7 @@ export function TokensPanel({ usage }: { usage: Usage }) {
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
         {legend.map((l) => (
           <span key={l.label} className="flex items-center gap-1.5">
-            <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: l.color }} />
+            <Swatch color={l.color} />
             <span className="text-fg-muted">{l.label}</span>
             <span className="font-mono tabular-nums text-fg">{formatTokensShort(l.value)}</span>
           </span>

@@ -47,8 +47,8 @@ export function barFill(pct: number, high = 85): string {
 
 /**
  * The context ring's fill color as a CSS var: sky (wire) while roomy, amber from 70%, bright amber from
- * 85%. Mirrors the 70/85 fill thresholds `barFill` uses, so the ring and any bar never disagree on
- * "how full".
+ * 85% — the same 70/85 breakpoints as `ctxTone`, so the ring's color and the % text inside it never
+ * disagree on "how full".
  */
 export function ctxColor(pct: number): string {
   if (pct >= 85) return 'var(--color-accent-bright)'

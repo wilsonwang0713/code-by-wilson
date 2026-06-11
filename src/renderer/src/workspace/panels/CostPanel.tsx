@@ -31,11 +31,13 @@ export function CostPanel({
     const b = costBreakdown(usage, model)
     return {
       headline: costDisplay({ liveCostUsd, equivApiValueUsd: b.total, billingMode }),
+      // Color rides on each row so the donut and the legend key off one pairing — no zip-by-index that
+      // could drift if a row is added or reordered.
       rows: [
-        { label: 'Input', value: b.input },
-        { label: 'Output', value: b.output },
-        { label: 'Cache read', value: b.cacheRead },
-        { label: 'Cache write', value: b.cacheWrite },
+        { label: 'Input', value: b.input, color: COST_SEGMENT_COLORS[0] },
+        { label: 'Output', value: b.output, color: COST_SEGMENT_COLORS[1] },
+        { label: 'Cache read', value: b.cacheRead, color: COST_SEGMENT_COLORS[2] },
+        { label: 'Cache write', value: b.cacheWrite, color: COST_SEGMENT_COLORS[3] },
       ],
       cacheSavings: b.cacheSavings,
     }
@@ -56,15 +58,15 @@ export function CostPanel({
         Cost
       </PanelHeading>
       <div className="flex items-center gap-3.5">
-        <Donut segments={rows.map((r, i) => ({ value: r.value, color: COST_SEGMENT_COLORS[i] }))} />
+        <Donut segments={rows.map((r) => ({ value: r.value, color: r.color }))} />
         <div className="flex-1 space-y-1">
-          {rows.map((r, i) => (
+          {rows.map((r) => (
             <MetricRow
               key={r.label}
               label={r.label}
               value={`~${formatUsd(r.value)}`}
               tone="text-fg-faint"
-              swatch={COST_SEGMENT_COLORS[i]}
+              swatch={r.color}
             />
           ))}
         </div>
