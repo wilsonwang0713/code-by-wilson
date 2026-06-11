@@ -1,7 +1,15 @@
 {
   "name": "code-by-wire",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "A dark desktop app that monitors and controls local Claude Code sessions.",
+  "author": "luojiahai",
+  "license": "MIT",
+  "homepage": "https://github.com/luojiahai/code-by-wire",
+  "repository": { "type": "git", "url": "https://github.com/luojiahai/code-by-wire.git" },
+  "bugs": { "url": "https://github.com/luojiahai/code-by-wire/issues" },
+  "engines": { "node": ">=22" },
+  "packageManager": "pnpm@10.33.2",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
