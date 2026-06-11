@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- Intel (`x64`) builds. Releases are Apple Silicon (`arm64`) only.
+
 ## [0.1.0] - 2026-06-11
 
 ### Added
