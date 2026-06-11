@@ -27,7 +27,10 @@ export function PanelHeading({
   if (!info && !right) {
     return <h2 className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">{children}</h2>
   }
-  const label = typeof children === 'string' ? `About ${children}` : 'About this metric'
+  // A stable id from the (static) panel title, so the focusable info button can point screen readers at
+  // the description via aria-describedby — the CSS reveal alone never reaches the accessibility tree.
+  const title = typeof children === 'string' ? children : undefined
+  const tooltipId = info ? `panel-info-${(title ?? 'metric').toLowerCase().replace(/\s+/g, '-')}` : undefined
   return (
     <div className="group relative flex items-center justify-between gap-2">
       <span className="flex items-center gap-1.5">
@@ -35,7 +38,8 @@ export function PanelHeading({
         {info && (
           <button
             type="button"
-            aria-label={label}
+            aria-label={title ? `About ${title}` : 'About this metric'}
+            aria-describedby={tooltipId}
             className="inline-flex h-[14px] w-[14px] items-center justify-center rounded-full text-fg-faint transition-colors hover:text-fg-muted focus-visible:text-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
           >
             <Icon name="info" size={12} />
@@ -45,8 +49,9 @@ export function PanelHeading({
       {right}
       {info && (
         <span
-          role="note"
-          className="pointer-events-none absolute left-0 right-0 top-full z-20 mt-1.5 hidden rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg group-hover:block group-focus-within:block"
+          role="tooltip"
+          id={tooltipId}
+          className="absolute left-0 right-0 top-full z-20 mt-1.5 hidden rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg group-hover:block group-focus-within:block"
         >
           {info}
         </span>

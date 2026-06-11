@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { cx } from './atoms'
-import { donutGradient, ringGradient, segmentPercents, ratePct, type Segment } from './charts-geom'
+import { donutGradient, ringGradient, segmentPercents, type Segment } from './charts-geom'
 
 // The default ring/donut track and the center hole. The mask punches a transparent core into the
 // conic ring; the centered children sit in a separate, unmasked layer.
@@ -84,7 +84,8 @@ export function StackedBar({
   )
 }
 
-/** One labeled throughput row: label, a mini-bar scaled to a reference max, a right-aligned value. */
+/** One labeled throughput row: label, a mini-bar, a right-aligned value. `pct` is the already-scaled
+ *  0..100 fill (the caller derives it via ratePct against the reference rate); we clamp defensively. */
 export function RateBar({
   label,
   value,
@@ -100,7 +101,10 @@ export function RateBar({
     <div className="mt-1.5 flex items-center gap-2">
       <span className="w-12 shrink-0 text-[12px] text-fg-muted">{label}</span>
       <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink-850">
-        <span className="block h-full rounded-full" style={{ width: `${ratePct(pct, 100)}%`, background: color }} />
+        <span
+          className="block h-full rounded-full"
+          style={{ width: `${Math.min(100, Math.max(0, pct))}%`, background: color }}
+        />
       </span>
       <span className="w-[52px] shrink-0 text-right font-mono text-[12px] tabular-nums text-fg">{value}</span>
     </div>
