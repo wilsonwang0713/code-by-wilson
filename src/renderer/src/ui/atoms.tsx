@@ -47,6 +47,12 @@ export function ManagementChip({ kind }: { kind: Management }) {
   )
 }
 
+/** A small colored square that keys a legend row to its diagram segment. `color` is any CSS color
+ *  string (a token var, a color-mix). Shared by the cost/token legends so the key never drifts. */
+export function Swatch({ color }: { color: string }) {
+  return <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: color }} />
+}
+
 /** A thin progress bar. `fill` is a Tailwind bg class; the track is fixed `bg-ink-850`. The caller
  *  sizes it via `className` (e.g. `w-16`). No width transition: the list re-syncs every few seconds
  *  and animating every bar reads as noise. */

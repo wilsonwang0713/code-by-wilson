@@ -45,10 +45,34 @@ export function barFill(pct: number, high = 85): string {
   return 'bg-primary/70'
 }
 
-/** Tailwind fill for the context bar: sky when roomy, amber as it fills. */
-export function ctxBar(pct: number): string {
-  return barFill(pct, 85)
+/**
+ * The context ring's fill color as a CSS var: sky (wire) while roomy, amber from 70%, bright amber from
+ * 85% — the same 70/85 breakpoints as `ctxTone`, so the ring's color and the % text inside it never
+ * disagree on "how full".
+ */
+export function ctxColor(pct: number): string {
+  if (pct >= 85) return 'var(--color-accent-bright)'
+  if (pct >= 70) return 'var(--color-accent)'
+  return 'var(--color-primary)'
 }
+
+/**
+ * Semantic composition palette: blue = fresh spend/work, green = cache. Used by the cost donut + legend
+ * and the token stacked bar + legend, so the diagram and its legend always agree. CSS var strings (and
+ * one color-mix for the dim cache-write) so a retone stays in index.css.
+ */
+export const COST_SEGMENT_COLORS = [
+  'var(--color-primary)', // Input — fresh
+  'var(--color-primary-bright)', // Output — fresh
+  'var(--color-ok)', // Cache read
+  'color-mix(in srgb, var(--color-ok) 55%, transparent)', // Cache write — dim
+] as const
+
+export const TOKEN_SEGMENT_COLORS = [
+  'var(--color-primary)', // Input
+  'var(--color-primary-bright)', // Output
+  'var(--color-ok)', // Cached
+] as const
 
 /** The display label for a Session's model. A recognized model (its statusLine model.id matches a known
  *  family) shows the app's clean label from `table`; a model absent from the table shows the capture's

@@ -50,10 +50,11 @@ export function SubagentTree({ subagents }: { subagents: Subagent[] }) {
   if (subagents.length === 0) return null
   return (
     <PanelSection>
-      <div className="flex items-baseline justify-between gap-2">
-        <PanelHeading>Subagents</PanelHeading>
-        <span className="font-mono text-[10px] tabular-nums text-fg-faint">{countAgents(subagents)}</span>
-      </div>
+      <PanelHeading
+        right={<span className="font-mono text-[10px] tabular-nums text-fg-faint">{countAgents(subagents)}</span>}
+      >
+        Subagents
+      </PanelHeading>
       <ul className="space-y-1">
         {subagents.map((a) => (
           <AgentNode key={a.id} agent={a} depth={0} />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { honestModelLabel, MODEL_LABEL, MODEL_SHORT } from '../../src/renderer/src/ui/meta'
+import { honestModelLabel, MODEL_LABEL, MODEL_SHORT, ctxColor } from '../../src/renderer/src/ui/meta'
 
 describe('honestModelLabel', () => {
   it('shows the clean label for a recognized model (the [1m] tag still matches opus)', () => {
@@ -17,5 +17,22 @@ describe('honestModelLabel', () => {
 
   it('falls back to the clean label when there is no capture', () => {
     expect(honestModelLabel('claude-sonnet-4-6', undefined, undefined, MODEL_SHORT)).toBe('Sonnet')
+  })
+})
+
+describe('ctxColor — context ring fill, same thresholds as barFill', () => {
+  it('is sky (wire) while roomy, below 70%', () => {
+    expect(ctxColor(0)).toBe('var(--color-primary)')
+    expect(ctxColor(69)).toBe('var(--color-primary)')
+  })
+
+  it('warms to amber from 70%', () => {
+    expect(ctxColor(70)).toBe('var(--color-accent)')
+    expect(ctxColor(84)).toBe('var(--color-accent)')
+  })
+
+  it('brightens at 85% and above', () => {
+    expect(ctxColor(85)).toBe('var(--color-accent-bright)')
+    expect(ctxColor(100)).toBe('var(--color-accent-bright)')
   })
 })
