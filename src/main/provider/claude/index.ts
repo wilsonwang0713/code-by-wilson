@@ -102,8 +102,8 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
   // time; the full sweep runs only on the first read or after the file moves/vanishes.
   const pathById = new Map<string, string>()
   // Stable per session: firstTranscriptCwd is the first row's cwd and never changes for a transcript, so
-  // caching it lets an unchanged poll compute the metrics token (transcript mtime + git state) without
-  // re-reading the JSONL — parity with readTranscript's token-before-read.
+  // caching it lets a poll compute the metrics token (mtime + git/voice/remote) without re-reading the
+  // JSONL — parity with readTranscript's token-before-read.
   const cwdById = new Map<string, string>()
   // Token speed is a pure function of the transcript rows, so cache it by the file mtime: a git/voice/
   // remote-only change (mtime unmoved) then rebuilds metrics without re-reading or re-parsing the JSONL.
@@ -138,6 +138,25 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     return { gone: false, speed: cacheSpeed(id, mtimeMs, jsonl) }
   }
 
+  // Resolve the transcript file for `id`: the cached path (re-stat'd) or a fresh projects/ sweep (freshest
+  // wins if an id appears twice). Returns the path + its mtime, or null when nothing resolves. Owns
+  // pathById and invalidates via forgetSession on a vanished file, so readTranscript and readMetrics can't
+  // disagree on the id→file mapping.
+  const resolveTranscript = (id: string): { path: string; mtimeMs: number } | null => {
+    const cached = pathById.get(id)
+    if (cached !== undefined) {
+      try {
+        return { path: cached, mtimeMs: statSync(cached).mtimeMs }
+      } catch {
+        forgetSession(id) // moved/deleted — fall through to a fresh sweep
+      }
+    }
+    const hit = indexTranscripts(claudeDir).get(id)
+    if (!hit) return null
+    pathById.set(id, hit.path)
+    return { path: hit.path, mtimeMs: hit.mtimeMs }
+  }
+
   return {
     id: 'claude',
     // What Claude Code can do; the surfaces land in later issues, but the capability contract is stable.
@@ -148,29 +167,13 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     resolveAdoptTarget: (id) => resolveAdoptTarget({ claudeDir, isPidAlive, id }),
     readTranscript: (id, sinceMtimeMs) => {
       try {
-        // Fast path: stat the last-known file for this id, avoiding a projects/ sweep per poll.
-        let path = pathById.get(id)
-        let mtimeMs: number | undefined
-        if (path !== undefined) {
-          try {
-            mtimeMs = statSync(path).mtimeMs
-          } catch {
-            forgetSession(id) // moved/deleted — fall through to a fresh sweep
-            path = undefined
-          }
-        }
-        // Slow path: resolve by id from the projects sweep (freshest wins if an id appears twice).
-        if (path === undefined) {
-          const hit = indexTranscripts(claudeDir).get(id)
-          if (!hit) return { status: 'absent' }
-          path = hit.path
-          mtimeMs = hit.mtimeMs
-          pathById.set(id, path)
-        }
+        const resolved = resolveTranscript(id)
+        if (!resolved) return { status: 'absent' }
+        const { path, mtimeMs } = resolved
         // The change token spans the transcript AND its subagent transcripts, so a running subagent
         // (which appends to its own file without touching the main transcript) still re-triggers a read.
         const subagentsDir = subagentsDirFor(path)
-        const token = Math.max(mtimeMs!, subagentsNewestMtime(subagentsDir))
+        const token = Math.max(mtimeMs, subagentsNewestMtime(subagentsDir))
         // Unchanged since the caller last saw it — skip the read AND the parse, not just the render.
         if (token === sinceMtimeMs) return { status: 'unchanged', mtimeMs: token }
 
@@ -203,32 +206,17 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     },
     readMetrics: (id, sinceMtimeMs): MetricsRead => {
       try {
-        // --- path resolution: identical to readTranscript (pathById fast-path → indexTranscripts sweep) ---
-        let path = pathById.get(id)
-        let mtimeMs: number | undefined
-        if (path !== undefined) {
-          try {
-            mtimeMs = statSync(path).mtimeMs
-          } catch {
-            forgetSession(id)
-            path = undefined
-          }
-        }
-        if (path === undefined) {
-          const hit = indexTranscripts(claudeDir).get(id)
-          if (!hit) return { status: 'absent' }
-          path = hit.path
-          mtimeMs = hit.mtimeMs
-          pathById.set(id, path)
-        }
+        const resolved = resolveTranscript(id)
+        if (!resolved) return { status: 'absent' }
+        const { path, mtimeMs } = resolved
 
         // --- fast unchanged path: cwd is known, so read the sources and token WITHOUT parsing the JSONL ---
         const cachedCwd = cwdById.get(id)
         if (cachedCwd !== undefined) {
           const sources = readSources(cachedCwd, claudeDir, id)
-          const hashed = metricsToken(mtimeMs!, sources)
+          const hashed = metricsToken(mtimeMs, sources)
           if (hashed === sinceMtimeMs) return { status: 'unchanged', mtimeMs: hashed }
-          const speed = readSpeed(id, path, mtimeMs!)
+          const speed = readSpeed(id, path, mtimeMs)
           if (speed.gone) {
             forgetSession(id)
             return { status: 'absent' }
@@ -247,10 +235,10 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         // next poll rather than pinning git/voice to null for the session's life.
         if (cwd) cwdById.set(id, cwd)
         const sources = readSources(cwd, claudeDir, id)
-        const hashed = metricsToken(mtimeMs!, sources)
+        const hashed = metricsToken(mtimeMs, sources)
         if (hashed === sinceMtimeMs) return { status: 'unchanged', mtimeMs: hashed }
         // We already hold the JSONL here, so compute + cache the speed from it directly.
-        return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(cacheSpeed(id, mtimeMs!, jsonl), sources) }
+        return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(cacheSpeed(id, mtimeMs, jsonl), sources) }
       } catch {
         return { status: 'error' }
       }

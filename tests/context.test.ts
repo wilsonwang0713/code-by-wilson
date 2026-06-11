@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ContextBreakdown } from '@shared/transcript'
-import { contextTotal, contextSegments, contextView } from '@shared/context'
+import { contextTotal, contextView } from '@shared/context'
 
 const ctx = (over: Partial<ContextBreakdown> = {}): ContextBreakdown => ({
   input: 0,
@@ -15,20 +15,6 @@ describe('contextTotal', () => {
   })
 })
 
-describe('contextSegments', () => {
-  it('labels each part with its share of the in-use total, largest first', () => {
-    expect(contextSegments(ctx({ input: 2, cacheRead: 78_533, cacheCreation: 2175 }))).toEqual([
-      { key: 'cacheRead', label: 'Cached · stable', tokens: 78_533, pct: 97 },
-      { key: 'cacheCreation', label: 'New this turn', tokens: 2175, pct: 3 },
-      { key: 'input', label: 'Fresh input', tokens: 2, pct: 0 },
-    ])
-  })
-
-  it('yields zero-pct segments for an empty context, never NaN', () => {
-    expect(contextSegments(ctx()).map((s) => s.pct)).toEqual([0, 0, 0])
-  })
-})
-
 describe('contextView', () => {
   it('prefers the live split and the captured percentage', () => {
     const live = ctx({ input: 2, cacheRead: 203_420, cacheCreation: 2770 })
@@ -36,7 +22,6 @@ describe('contextView', () => {
     expect(view).toEqual({
       total: 206_192,
       pct: 21, // straight from used_percentage, NOT 206192/1_000_000
-      segments: contextSegments(live),
     })
   })
 
@@ -48,7 +33,7 @@ describe('contextView', () => {
   it('falls back to the transcript split over the window when there is no live split', () => {
     const fallback = ctx({ input: 0, cacheRead: 80_000, cacheCreation: 0 })
     const view = contextView({ live: null, fallback, capturedPct: null, window: 200_000 })
-    expect(view).toEqual({ total: 80_000, pct: 40, segments: contextSegments(fallback) })
+    expect(view).toEqual({ total: 80_000, pct: 40 })
   })
 
   it('is null when neither source has any context', () => {
