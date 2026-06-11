@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Icon } from '../ui/icons'
 import { OPEN_IN_ITEMS, OPEN_IN_GROUP_LABELS, type OpenInGroup } from './open-in-items'
 
@@ -10,6 +10,7 @@ const GROUP_ORDER: OpenInGroup[] = ['files', 'github']
 export function OpenInMenu() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menuId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -34,19 +35,21 @@ export function OpenInMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-700 hover:text-fg"
+        aria-controls={menuId}
+        className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-700 hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       >
         Open in
         <Icon name="chevron-down" size={13} />
       </button>
       {open && (
         <div
+          id={menuId}
           role="menu"
           className="absolute right-0 top-full z-30 mt-1.5 w-56 rounded-lg border border-ink-700 bg-ink-900 p-1.5 shadow-xl"
         >
           {GROUP_ORDER.map((group) => (
             <div key={group} className="py-1 first:pt-0.5">
-              <div className="px-2 pb-1 text-[9px] uppercase tracking-wider text-fg-faint">
+              <div role="presentation" className="px-2 pb-1 text-[9px] uppercase tracking-wider text-fg-faint">
                 {OPEN_IN_GROUP_LABELS[group]}
               </div>
               {OPEN_IN_ITEMS.filter((i) => i.group === group).map((item) => (

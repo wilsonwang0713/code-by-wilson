@@ -37,6 +37,7 @@ export function HeaderActions({
         <>
           {adoptError && <span className="text-[11px] text-danger">{adoptError}</span>}
           <button
+            type="button"
             onClick={() => void handleAdopt()}
             disabled={adoptBusy}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[12px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
