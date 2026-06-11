@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import type { Session, SessionState } from '@shared/types'
+import type { Session, SessionState, Account } from '@shared/types'
+import { RailAccount } from './ui/RailAccount'
+import { RailFooter } from './ui/RailFooter'
 import { groupSessions } from '@shared/overview'
 import { formatRelativeTime } from '@shared/format'
 import { cx, Dot, ManagementChip } from './ui/atoms'
@@ -17,12 +19,14 @@ export function SessionList({
   onSelect,
   query,
   onQuery,
+  account,
 }: {
   sessions: Session[]
   selectedId: string | null
   onSelect: (id: string) => void
   query: string
   onQuery: (q: string) => void
+  account?: Account | null
 }) {
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
   const now = Date.now()
@@ -40,6 +44,7 @@ export function SessionList({
     })
   return (
     <aside className="flex w-[332px] shrink-0 flex-col border-r border-ink-800 bg-ink-925">
+      <RailAccount account={account ?? null} now={now} />
       <div className="shrink-0 border-b border-ink-800 p-3">
         <div className="flex h-8 items-center gap-2 rounded-md border border-ink-700 bg-well px-2.5">
           <Icon name="search" size={14} className="shrink-0 text-fg-faint" />
@@ -88,6 +93,7 @@ export function SessionList({
           })
         )}
       </div>
+      <RailFooter version={account?.version} />
     </aside>
   )
 }
