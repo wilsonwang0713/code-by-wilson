@@ -10,7 +10,7 @@ const OPTIONS = {
   fontFamily: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
   fontSize: 12,
   cursorBlink: true,
-  theme: { background: '#070809', foreground: '#e8ecf3', cursor: '#2dd4bf' },
+  theme: { background: '#080808', foreground: '#e8ecf3', cursor: '#2dd4bf' },
 } as const
 
 /**

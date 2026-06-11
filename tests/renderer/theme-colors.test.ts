@@ -59,3 +59,13 @@ describe('cockpit theme — graphite surfaces (not warm, not cool)', () => {
     expect(spread(token('accent')), 'amber Waiting').toBeGreaterThan(20)
   })
 })
+
+describe('terminal well matches the theme', () => {
+  it('xterm background is graphite and equals --color-well', () => {
+    const xterm = readFileSync(join(root, 'src/renderer/src/terminal/xterm-factory.ts'), 'utf8')
+    const m = /background:\s*'(#[0-9a-fA-F]{6})'/.exec(xterm)
+    expect(m, 'xterm theme background hex').toBeTruthy()
+    expect(spread(m![1])).toBeLessThanOrEqual(1)
+    expect(m![1].toLowerCase()).toBe(token('well').toLowerCase())
+  })
+})
