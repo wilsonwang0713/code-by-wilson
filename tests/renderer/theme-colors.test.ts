@@ -39,7 +39,7 @@ describe('cockpit theme — graphite surfaces (not warm, not cool)', () => {
   })
 
   it('surfaces get strictly lighter from well -> ink-700', () => {
-    const lum = SURFACE_STACK.map((n) => rgb(token(n))[0]) // equal-RGB, so any channel tracks lightness
+    const lum = SURFACE_STACK.map((n) => rgb(token(n))[0]) // near-equal RGB (spread <= 1), so the red channel tracks lightness
     for (let i = 1; i < lum.length; i++) {
       expect(lum[i], `${SURFACE_STACK[i]} should be lighter than ${SURFACE_STACK[i - 1]}`).toBeGreaterThan(lum[i - 1])
     }
