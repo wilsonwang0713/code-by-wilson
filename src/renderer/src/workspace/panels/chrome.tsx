@@ -39,7 +39,9 @@ export function PanelHeading({
         {info && (
           // The `group` scopes the hover/focus reveal to the button (and the popover itself); the popover
           // stays `absolute` against the outer relative strip, so left-0/right-0 still span its full width.
-          <span className="group">
+          // inline-flex + items-center hugs the wrapper to the button so it centers on the heading text
+          // instead of riding the inline strut's baseline.
+          <span className="group inline-flex items-center">
             <button
               type="button"
               aria-label={title ? `About ${title}` : 'About this metric'}
