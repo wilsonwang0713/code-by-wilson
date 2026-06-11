@@ -30,11 +30,20 @@ export const MODEL_SHORT: Record<ModelId, string> = {
   'claude-haiku-4-5': 'Haiku',
 }
 
+/** Below this %, the context gauge is noise; at or above it the sidebar row surfaces the number and
+ *  ctxTone warms it to amber. One constant so the "show it" gate and the color never disagree. */
+export const CONTEXT_WARN_PCT = 70
+
 /** Tailwind text tone for a context %: muted when roomy, amber and brightening as it fills. */
 export function ctxTone(pct: number): string {
   if (pct >= 85) return 'text-accent-bright'
-  if (pct >= 70) return 'text-accent'
+  if (pct >= CONTEXT_WARN_PCT) return 'text-accent'
   return 'text-fg-muted'
+}
+
+/** The context % earns a spot in a sidebar row only once it crosses the warning threshold. */
+export function isContextHigh(pct: number): boolean {
+  return pct >= CONTEXT_WARN_PCT
 }
 
 /** Tailwind fill for a progress bar: sky (wire) when roomy, amber as it fills, bright at/over `high`.

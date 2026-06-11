@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { honestModelLabel, MODEL_LABEL, MODEL_SHORT, ctxColor } from '../../src/renderer/src/ui/meta'
+import { honestModelLabel, MODEL_LABEL, MODEL_SHORT, ctxColor, isContextHigh, CONTEXT_WARN_PCT } from '../../src/renderer/src/ui/meta'
 
 describe('honestModelLabel', () => {
   it('shows the clean label for a recognized model (the [1m] tag still matches opus)', () => {
@@ -34,5 +34,16 @@ describe('ctxColor — context ring fill, same thresholds as barFill', () => {
   it('brightens at 85% and above', () => {
     expect(ctxColor(85)).toBe('var(--color-accent-bright)')
     expect(ctxColor(100)).toBe('var(--color-accent-bright)')
+  })
+})
+
+describe('isContextHigh — the sidebar only shows the % once it warms to amber', () => {
+  it('is the 70% warning threshold, matching ctxTone', () => {
+    expect(CONTEXT_WARN_PCT).toBe(70)
+    expect(isContextHigh(0)).toBe(false)
+    expect(isContextHigh(69)).toBe(false)
+    expect(isContextHigh(70)).toBe(true)
+    expect(isContextHigh(85)).toBe(true)
+    expect(isContextHigh(100)).toBe(true)
   })
 })
