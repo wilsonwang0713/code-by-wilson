@@ -1,21 +1,29 @@
 # code-by-wire
 
-**Control and monitor local coding agents.** A dark macOS desktop app that
-watches your local Claude Code sessions, surfaces the data Claude Code keeps out
-of sight in `~/.claude`, and keeps many sessions in one place instead of
+**The cockpit for local Claude Code.**
+
+A desktop app that watches your local Claude Code sessions, surfaces the data
+they keep out of sight in `~/.claude`, and keeps them in one place instead of
 scattered across terminal windows.
 
-[![CI](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire)](https://github.com/luojiahai/code-by-wire/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/luojiahai/code-by-wire/ci.yml?style=flat-square&label=CI)](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire?style=flat-square)](https://github.com/luojiahai/code-by-wire/releases)
 
-Electron + React + TypeScript, dark theme only. One row per session with its
-live state (Working, Waiting, Idle, Ended), and panels for the transcript,
-tasks, tokens, cost, and git.
+![Electron](https://img.shields.io/badge/Electron-2C2E3B?style=flat-square&logo=electron&logoColor=9FEAF9)
+![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)
 
-<!-- Add a screenshot at docs/assets/screenshot.png and uncomment:
-![code-by-wire](docs/assets/screenshot.png)
--->
+## Features
+
+- **Every session, one view.** One row per session, with its live state.
+- **States that surface what needs you.** Working, Waiting, Idle, Ended. Waiting is loudest.
+- **The full transcript.** Messages, tool calls, and results, reconstructed from `~/.claude`.
+- **Tokens, cost & context.** The usage Claude Code keeps hidden, plus equivalent API value for subscription accounts.
+- **Tasks, subagents & git.** A session's task list, its subagent tree, and its repo state.
+- **Observe, then adopt.** Read any session you didn't spawn; adopt an ended one to drive it.
 
 ## Install
 
