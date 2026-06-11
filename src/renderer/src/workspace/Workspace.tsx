@@ -51,15 +51,13 @@ export function Workspace({
       <header className="flex shrink-0 items-center gap-3 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
-            <span className="truncate text-sm font-semibold text-fg">{s.title}</span>
+            <span className="min-w-0 truncate text-sm font-semibold text-fg">{s.title}</span>
+            <SessionIdChip id={s.id} />
             <StateBadge state={s.state} />
           </div>
-          <div className="flex min-w-0 items-center gap-2 font-mono text-[11px] text-fg-faint">
-            <span className="truncate">
-              {s.project}
-              {s.branch && ` · ${s.branch}`}
-            </span>
-            <SessionIdChip id={s.id} />
+          <div className="truncate font-mono text-[11px] text-fg-faint">
+            {s.project}
+            {s.branch && ` · ${s.branch}`}
           </div>
         </div>
         <SessionHeaderStats session={s} metrics={metrics} />
@@ -105,10 +103,10 @@ function SessionIdChip({ id }: { id: string }) {
     <button
       onClick={copy}
       title={`Copy session id (${id})`}
-      className="inline-flex shrink-0 items-center gap-1 text-fg-faint transition-colors hover:text-fg-muted"
+      className="inline-flex shrink-0 items-center gap-1 rounded border border-ink-700 bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] text-fg-faint transition-colors hover:border-ink-600 hover:text-fg-muted"
     >
       <span>{short}</span>
-      <Icon name={copied ? 'check' : 'copy'} size={11} />
+      <Icon name={copied ? 'check' : 'copy'} size={10} />
     </button>
   )
 }
