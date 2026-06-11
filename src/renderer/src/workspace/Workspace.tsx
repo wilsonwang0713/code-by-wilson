@@ -6,7 +6,6 @@ import { TranscriptView } from './TranscriptView'
 import { TerminalView } from '../terminal/TerminalView'
 import { useTranscript, type DocState } from './use-transcript'
 import { ContextPanel } from './panels/ContextPanel'
-import { SessionPanel } from './panels/SessionPanel'
 import { CostPanel } from './panels/CostPanel'
 import { Timeline } from './panels/Timeline'
 import { TasksPanel } from './panels/TasksPanel'
@@ -55,9 +54,12 @@ export function Workspace({
             <span className="truncate text-sm font-semibold text-fg">{s.title}</span>
             <StateBadge state={s.state} />
           </div>
-          <div className="truncate font-mono text-[11px] text-fg-faint">
-            {s.project}
-            {s.branch && ` · ${s.branch}`}
+          <div className="flex min-w-0 items-center gap-2 font-mono text-[11px] text-fg-faint">
+            <span className="truncate">
+              {s.project}
+              {s.branch && ` · ${s.branch}`}
+            </span>
+            <SessionIdChip id={s.id} />
           </div>
         </div>
         <SessionHeaderStats session={s} metrics={metrics} />
@@ -89,6 +91,28 @@ export function Workspace({
   )
 }
 
+/** The short session id with a one-click copy: `a3f9…7c21` plus a copy glyph that flips to a check for a
+ *  beat. The full id goes to the clipboard. Lives in the header so the rail needn't carry a Session row. */
+function SessionIdChip({ id }: { id: string }) {
+  const short = id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id
+  const [copied, setCopied] = useState(false)
+  function copy() {
+    void navigator.clipboard?.writeText(id)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1200)
+  }
+  return (
+    <button
+      onClick={copy}
+      title={`Copy session id (${id})`}
+      className="inline-flex shrink-0 items-center gap-1 text-fg-faint transition-colors hover:text-fg-muted"
+    >
+      <span>{short}</span>
+      <Icon name={copied ? 'check' : 'copy'} size={11} />
+    </button>
+  )
+}
+
 /**
  * The workspace body: a center column (the live view with the turn timeline below it) and a right rail
  * of telemetry panels. One transcript poll (useTranscript) feeds the center, the context panel, and the
@@ -106,7 +130,6 @@ function WorkspaceBody({ session: s, account, now, metrics }: { session: Session
         <Timeline turns={doc?.turns ?? []} now={now} />
       </div>
       <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-ink-800 bg-ink-925 p-4 lg:flex">
-        <SessionPanel session={s} />
         <ContextPanel live={s.liveContext ?? null} context={doc?.context ?? null} contextPct={s.contextPct} contextWindow={s.contextWindow} />
         <CostPanel usage={s.usage} model={s.model} liveCostUsd={s.liveCostUsd} billingMode={account?.billingMode} />
         <TokensPanel usage={s.usage} />
