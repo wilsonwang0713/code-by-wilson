@@ -13,7 +13,7 @@ import { firstTranscriptCwd } from './transcript'
 import { readGit } from '../../git/read-git'
 import { readVoiceEnabled } from '../../settings/voice'
 import { readRemoteControl } from '../../settings/remote-control'
-import type { GitInfo, MetricsRead, SessionMetrics } from '@shared/metrics'
+import type { GitInfo, MetricsRead, SessionMetrics, TokenSpeed } from '@shared/metrics'
 
 export interface ClaudeProviderDeps {
   claudeDir?: string
@@ -70,9 +70,9 @@ function metricsToken(mtimeMs: number, s: MetricsSources): number {
   return hashToken(`${mtimeMs}|${gitTokenStr(s.git)}|${s.voice}|${s.remote}`)
 }
 
-/** Assemble the lazy SessionMetrics from the parsed transcript rows and the already-read sources. */
-function buildMetrics(rows: any[], s: MetricsSources): SessionMetrics {
-  return { tokenSpeed: computeTokenSpeed(rows, SPEED_WINDOW_MS), git: s.git, voiceEnabled: s.voice, remoteControl: s.remote }
+/** Assemble the lazy SessionMetrics from the precomputed token speed and the already-read sources. */
+function buildMetrics(tokenSpeed: TokenSpeed | null, s: MetricsSources): SessionMetrics {
+  return { tokenSpeed, git: s.git, voiceEnabled: s.voice, remoteControl: s.remote }
 }
 
 /** A pid is alive if signalling it succeeds, or fails only because we lack permission. */
@@ -105,13 +105,37 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
   // caching it lets an unchanged poll compute the metrics token (transcript mtime + git state) without
   // re-reading the JSONL — parity with readTranscript's token-before-read.
   const cwdById = new Map<string, string>()
+  // Token speed is a pure function of the transcript rows, so cache it by the file mtime: a git/voice/
+  // remote-only change (mtime unmoved) then rebuilds metrics without re-reading or re-parsing the JSONL.
+  const speedById = new Map<string, { mtimeMs: number; speed: TokenSpeed | null }>()
 
-  // Drop both caches for a session together: cwdById must never outlive its pathById entry, or a
-  // re-resolved path (a moved/resumed transcript) would pair with a stale cwd. readTranscript shares
-  // pathById, so it invalidates through here too.
+  // Drop every per-session cache together: cwdById/speedById must never outlive their pathById entry, or a
+  // re-resolved path (a moved/resumed transcript) would pair with a stale cwd or speed. readTranscript
+  // shares pathById, so it invalidates through here too.
   const forgetSession = (id: string): void => {
     pathById.delete(id)
     cwdById.delete(id)
+    speedById.delete(id)
+  }
+
+  // Compute + cache the token speed from already-read JSONL.
+  const cacheSpeed = (id: string, mtimeMs: number, jsonl: string): TokenSpeed | null => {
+    const speed = computeTokenSpeed(parseJsonlRows(jsonl), SPEED_WINDOW_MS)
+    speedById.set(id, { mtimeMs, speed })
+    return speed
+  }
+  // Token speed for a session, re-reading+parsing the JSONL only when the mtime moved. `gone` when the
+  // file vanished mid-read, so the caller can report absent.
+  const readSpeed = (
+    id: string,
+    path: string,
+    mtimeMs: number,
+  ): { gone: true } | { gone: false; speed: TokenSpeed | null } => {
+    const cached = speedById.get(id)
+    if (cached && cached.mtimeMs === mtimeMs) return { gone: false, speed: cached.speed }
+    const jsonl = readTextOrNull(path)
+    if (jsonl === null) return { gone: true }
+    return { gone: false, speed: cacheSpeed(id, mtimeMs, jsonl) }
   }
 
   return {
@@ -204,12 +228,12 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
           const sources = readSources(cachedCwd, claudeDir, id)
           const hashed = metricsToken(mtimeMs!, sources)
           if (hashed === sinceMtimeMs) return { status: 'unchanged', mtimeMs: hashed }
-          const jsonl = readTextOrNull(path)
-          if (jsonl === null) {
+          const speed = readSpeed(id, path, mtimeMs!)
+          if (speed.gone) {
             forgetSession(id)
             return { status: 'absent' }
           }
-          return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(parseJsonlRows(jsonl), sources) }
+          return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(speed.speed, sources) }
         }
 
         // --- cwd unknown (first read for this id): read the file to resolve it ---
@@ -225,7 +249,8 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         const sources = readSources(cwd, claudeDir, id)
         const hashed = metricsToken(mtimeMs!, sources)
         if (hashed === sinceMtimeMs) return { status: 'unchanged', mtimeMs: hashed }
-        return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(parseJsonlRows(jsonl), sources) }
+        // We already hold the JSONL here, so compute + cache the speed from it directly.
+        return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(cacheSpeed(id, mtimeMs!, jsonl), sources) }
       } catch {
         return { status: 'error' }
       }

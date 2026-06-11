@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createClaudeProvider } from '../src/main/provider/claude'
 import { tempHomes } from './helpers/temp-home'
@@ -39,7 +39,7 @@ const turn = (id: string, cwd: string | undefined) => [
   },
 ]
 
-function scaffold(): { claudeDir: string; id: string } {
+function scaffold(): { claudeDir: string; id: string; repo: string } {
   const claudeDir = makeHome()
   const repo = makeHome()
   git(repo, 'init', '-q', '-b', 'main')
@@ -63,7 +63,7 @@ function scaffold(): { claudeDir: string; id: string } {
     },
   ]
   writeFileSync(join(projDir, `${id}.jsonl`), rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
-  return { claudeDir, id }
+  return { claudeDir, id, repo }
 }
 
 describe.skipIf(process.platform === 'win32')('provider.readMetrics', () => {
@@ -147,5 +147,33 @@ describe.skipIf(process.platform === 'win32')('provider.readMetrics', () => {
     expect(after.status).toBe('changed')
     if (after.status !== 'changed') return
     expect(after.metrics.git?.branch).toBe('develop') // re-resolved to the new cwd, not the stale repoA
+  })
+
+  it('reuses the cached token speed when only git moves, not the transcript', () => {
+    const { claudeDir, id, repo } = scaffold()
+    const projFile = join(claudeDir, 'projects', 'proj', `${id}.jsonl`)
+    const FIXED = new Date('2026-06-11T12:00:00.000Z')
+    utimesSync(projFile, FIXED, FIXED)
+
+    const provider = createClaudeProvider({ claudeDir })
+    const first = provider.readMetrics(id)
+    if (first.status !== 'changed') throw new Error('expected changed')
+    expect(first.metrics.tokenSpeed?.outputTps).toBeCloseTo(100, 5) // 1000 / 10s
+
+    // Rewrite the transcript with very different usage, but restore the mtime so the speed cache key (the
+    // file mtime) is unchanged. A re-parse would read 9999 t/s; the mtime-keyed cache must not.
+    const rows = turn(id, repo)
+    rows[1] = { ...rows[1], message: { id: 'm9', usage: { input_tokens: 0, output_tokens: 9999 } } }
+    writeFileSync(projFile, rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
+    utimesSync(projFile, FIXED, FIXED)
+
+    // Stage a file: .git/index mtime moves, so the git portion of the token moves and forces a rebuild.
+    writeFileSync(join(repo, 'b.txt'), 'hello\n')
+    git(repo, 'add', 'b.txt')
+
+    const second = provider.readMetrics(id, first.mtimeMs)
+    expect(second.status).toBe('changed') // git moved → token moved
+    if (second.status !== 'changed') return
+    expect(second.metrics.tokenSpeed?.outputTps).toBeCloseTo(100, 5) // cached by mtime, not reparsed to 999.9
   })
 })

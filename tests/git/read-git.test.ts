@@ -47,4 +47,11 @@ describe.skipIf(process.platform === 'win32')('readGit', () => {
     expect(g.insertions).toBe(2)
     expect(g.deletions).toBe(0)
   })
+
+  it('serves a cached glance within the TTL after an unstaged edit (HEAD/index unmoved)', () => {
+    const dir = initRepo()
+    expect(readGit(dir)!.dirty).toBe(false)
+    writeFileSync(join(dir, 'a.txt'), 'one\ntwo\n') // unstaged edit; doesn't touch .git/HEAD or .git/index
+    expect(readGit(dir)!.dirty).toBe(false) // cached: HEAD/index mtime unchanged, within the 5s TTL
+  })
 })
