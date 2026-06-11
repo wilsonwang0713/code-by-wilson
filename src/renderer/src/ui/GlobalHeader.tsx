@@ -22,15 +22,21 @@ export function GlobalHeader({ onNew }: { onNew: () => void }) {
       )}
       style={{ height: HEADER_HEIGHT_PX, paddingLeft: isMac ? MAC_TRAFFIC_LIGHT_INSET_PX : 16 }}
     >
+      {/* Equal-weight spacers flank the wordmark so it centers in the usable bar (between the macOS
+          traffic-light inset and the action), with the action pinned right. Everything stays in flow,
+          so on a narrow window the wordmark and button can never overlap the way an absolute center would. */}
+      <div className="flex-1" />
       <Wordmark />
-      <button
-        type="button"
-        onClick={onNew}
-        className="no-drag ml-auto inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors hover:bg-primary-bright"
-      >
-        <Icon name="plus" size={14} />
-        New session
-      </button>
+      <div className="flex flex-1 justify-end">
+        <button
+          type="button"
+          onClick={onNew}
+          className="no-drag inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors hover:bg-primary-bright"
+        >
+          <Icon name="plus" size={14} />
+          New session
+        </button>
+      </div>
     </header>
   )
 }
