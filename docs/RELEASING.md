@@ -1,30 +1,11 @@
 # Releasing
 
-The app ships as an unsigned macOS `.dmg`, one per architecture (Apple Silicon
-`arm64` and Intel `x64`), attached to a GitHub release. Builds run in CI on real
-macOS runners; you never build a release on your own machine.
+The app ships as an unsigned macOS `.dmg` for Apple Silicon (`arm64`), attached
+to a GitHub release. The build runs in CI on a macOS runner; you never build a
+release on your own machine.
 
-The flow is driven entirely by pushing a `vX.Y.Z` tag. `electron-builder` does
-the rest: it builds each dmg and uploads it to a **draft** GitHub release that it
-creates for the tag. You review the draft, then publish it.
-
-## The one rule that matters
-
-**Never create the GitHub release yourself.** No `gh release create`, no
-"Draft a new release" in the web UI before CI runs.
-
-`electron-builder` publishes into a *draft* release. If a *published* release
-already exists for the tag, it refuses every upload with:
-
-```
-GitHub release not created  reason=existing type not compatible with publishing type
-  existingType=release publishingType=draft
-skipped publishing  file=code-by-wire-X.Y.Z-arm64.dmg  reason=...
-```
-
-The build step still exits 0, so the job goes **green with zero assets
-attached**. The release looks done and ships nothing. Push the tag and let CI
-own release creation.
+The whole flow is driven by pushing a `vX.Y.Z` tag. CI builds the dmg and uploads
+it to a **draft** GitHub release. You review the draft, then publish it.
 
 ## Cut a release
 
@@ -49,33 +30,42 @@ own release creation.
 
 4. **Wait for CI.** The run does:
    - `verify`: fails fast if the tag doesn't equal `v` + `package.json` version.
-     Cheap guard before any mac runner spins up.
-   - `release` matrix, **one arch at a time** (`max-parallel: 1`): `macos-14`
-     builds `arm64`, `macos-13` builds `x64`. Each runs install →
-     `rebuild:native` → `build` → `electron-builder --publish always`. The first
-     leg creates the draft release; both attach their dmg + blockmap, and
-     `latest-mac.yml` lands for auto-update.
+     Cheap guard before the mac runner spins up.
+   - `release` on `macos-14`: install → `rebuild:native` → `build` →
+     `electron-builder --publish never`, then a `gh` step creates the draft
+     release once and uploads the dmg, its blockmap, and `latest-mac.yml`.
 
-   Intel (`macos-13`, `x64`) runners are scarce and being retired by GitHub, so
-   that leg can sit **queued for 10-30+ min** before it even starts. That's
-   normal, not a hang. Check the job status: `queued` with no runner means it's
-   waiting in line; `in_progress` means it's actually building.
+5. **Publish the draft.** Releases → find the draft → confirm the notes match the
+   changelog → **Publish release**.
 
-5. **Publish the draft.** Once both legs are green: Releases → find the draft →
-   confirm the notes match the changelog → **Publish release**.
+## Why CI uploads the assets by hand
+
+Don't "simplify" the release job back to `electron-builder --publish always`. Its
+GitHub publisher uploads files in parallel, and a draft release can't be looked
+up by tag, so each upload races to create its own draft. v0.1.0's first run
+produced **two** draft releases with the dmg, blockmap, and `latest-mac.yml`
+scattered across them, and the job still went green looking like a clean release.
+
+So the job builds with `--publish never` and uploads through `gh` instead: it
+creates the draft once (or reuses it on a re-run) and uploads with `--clobber`,
+which is deterministic and idempotent.
+
+## Apple Silicon only
+
+Releases are `arm64` only. The Intel (`x64`) leg was dropped: GitHub's `macos-13`
+runners queue for 10-30+ min and are on the way out, and the user base is Apple
+Silicon. Bringing x64 back means adding a second runner leg and reconciling the
+two `latest-mac.yml` manifests into one.
 
 ## Verify a published release
-
-Both dmgs and the auto-update manifest should be attached:
 
 ```
 GH_HOST=github.com gh release view vX.Y.Z -R luojiahai/code-by-wire
 ```
 
-Expect `code-by-wire-X.Y.Z-arm64.dmg` (+ `.blockmap`),
-`code-by-wire-X.Y.Z.dmg` (+ `.blockmap`), and `latest-mac.yml`. An empty asset
-list means an upload was skipped (see the rule above) — read the
-`electron-builder` step log for the reason.
+Expect `code-by-wire-X.Y.Z-arm64.dmg` (+ `.blockmap`) and `latest-mac.yml`. An
+empty asset list means the upload step didn't run or failed. Read the release
+job log.
 
 ## Build a dmg locally (testing only, no publish)
 
@@ -92,15 +82,20 @@ launch with a native-module ABI mismatch.
 
 ## Recovering a botched release
 
-If a release published with no assets (the trap above), don't fight it in place:
+If a release ends up wrong (empty, or assets split across duplicate drafts from
+an old `--publish always` run):
 
-1. Delete the empty release, keeping the tag:
-   `GH_HOST=github.com gh release delete vX.Y.Z -R luojiahai/code-by-wire`
-   (leave the git tag alone).
-2. Re-trigger CI by re-pushing the tag:
-   `git push origin :refs/tags/vX.Y.Z && git push origin vX.Y.Z`.
-3. With no release present, `electron-builder` creates a fresh draft and uploads
-   into it. Publish that draft.
+1. The dmg may already be on GitHub, just attached to the wrong/duplicate draft.
+   Download each asset by id:
+   `GH_HOST=github.com gh api repos/luojiahai/code-by-wire/releases/assets/<id> -H "Accept: application/octet-stream" > <name>`.
+2. Delete the bad release(s), keeping the git tag:
+   `GH_HOST=github.com gh api -X DELETE repos/luojiahai/code-by-wire/releases/<release_id>`.
+3. Assemble one clean release from the downloaded files:
+   `GH_HOST=github.com gh release create vX.Y.Z -R luojiahai/code-by-wire --latest --title "code-by-wire vX.Y.Z" --notes "..." <files>`.
+
+   Or, to rebuild from scratch, re-push the tag
+   (`git push origin :refs/tags/vX.Y.Z && git push origin vX.Y.Z`) and let CI
+   produce a fresh draft.
 
 ## Code signing
 
