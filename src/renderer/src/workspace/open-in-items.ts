@@ -25,3 +25,14 @@ export const OPEN_IN_GROUP_LABELS: Record<OpenInGroup, string> = {
   files: 'Editor & files',
   github: 'GitHub',
 }
+
+/** The same targets pre-grouped for the menu, in the order each group first appears in OPEN_IN_ITEMS.
+ *  The render reads this instead of a hand-kept order list, so the group sequence can't drift from the
+ *  items it orders, and the per-group filter runs once here rather than on every render. */
+export const OPEN_IN_GROUPS: { group: OpenInGroup; label: string; items: OpenInItem[] }[] = [
+  ...new Set(OPEN_IN_ITEMS.map((i) => i.group)),
+].map((group) => ({
+  group,
+  label: OPEN_IN_GROUP_LABELS[group],
+  items: OPEN_IN_ITEMS.filter((i) => i.group === group),
+}))

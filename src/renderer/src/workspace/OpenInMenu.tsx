@@ -1,8 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Icon } from '../ui/icons'
-import { OPEN_IN_ITEMS, OPEN_IN_GROUP_LABELS, type OpenInGroup } from './open-in-items'
-
-const GROUP_ORDER: OpenInGroup[] = ['files', 'github']
+import { OPEN_IN_GROUPS } from './open-in-items'
 
 /** The header's "Open in" dropdown. The trigger toggles a grouped menu of open targets. Every item is a
  *  disabled placeholder for now (its tooltip says so); wiring lands later. The menu closes on an outside
@@ -35,7 +33,7 @@ export function OpenInMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-controls={menuId}
+        aria-controls={open ? menuId : undefined}
         className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-700 hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       >
         Open in
@@ -47,12 +45,12 @@ export function OpenInMenu() {
           role="menu"
           className="absolute right-0 top-full z-30 mt-1.5 w-56 rounded-lg border border-ink-700 bg-ink-900 p-1.5 shadow-xl"
         >
-          {GROUP_ORDER.map((group) => (
+          {OPEN_IN_GROUPS.map(({ group, label, items }) => (
             <div key={group} className="py-1 first:pt-0.5">
               <div role="presentation" className="px-2 pb-1 text-[9px] uppercase tracking-wider text-fg-faint">
-                {OPEN_IN_GROUP_LABELS[group]}
+                {label}
               </div>
-              {OPEN_IN_ITEMS.filter((i) => i.group === group).map((item) => (
+              {items.map((item) => (
                 <button
                   key={item.key}
                   type="button"

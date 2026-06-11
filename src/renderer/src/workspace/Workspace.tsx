@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Session, Account } from '@shared/types'
 import { cx, ManagementChip, StateBadge } from '../ui/atoms'
 import { Icon } from '../ui/icons'
@@ -78,10 +78,15 @@ export function Workspace({
 function SessionIdChip({ id }: { id: string }) {
   const short = id.length > 12 ? `${id.slice(0, 4)}…${id.slice(-4)}` : id
   const [copied, setCopied] = useState(false)
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(resetTimer.current), [])
   function copy() {
     void navigator.clipboard?.writeText(id)
     setCopied(true)
-    setTimeout(() => setCopied(false), 1200)
+    // Restart the timer each copy so a quick second click keeps the check glyph for its full beat
+    // instead of the first timer flipping it back early; the effect above clears it on unmount.
+    clearTimeout(resetTimer.current)
+    resetTimer.current = setTimeout(() => setCopied(false), 1200)
   }
   return (
     <button
