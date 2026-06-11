@@ -1,21 +1,41 @@
-# code-by-wire
+`desktop control · claude code`
 
-**Control and monitor local coding agents.** A dark macOS desktop app that
-watches your local Claude Code sessions, surfaces the data Claude Code keeps out
-of sight in `~/.claude`, and keeps many sessions in one place instead of
+<h1><img src="docs/assets/wire-mark.svg" alt="" height="32" align="left" hspace="14">code-by-wire</h1>
+
+**The cockpit for local Claude Code.**
+
+A desktop app that watches your local Claude Code sessions, surfaces the data
+they keep out of sight in `~/.claude`, and keeps them in one place instead of
 scattered across terminal windows.
 
 [![CI](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire)](https://github.com/luojiahai/code-by-wire/releases)
 
-Electron + React + TypeScript, dark theme only. One row per session with its
-live state (Working, Waiting, Idle, Ended), and panels for the transcript,
-tasks, tokens, cost, and git.
+![Working](https://img.shields.io/badge/Working-2dd4bf?style=flat-square)
+![Waiting](https://img.shields.io/badge/Waiting-f0a93b?style=flat-square)
+![Idle](https://img.shields.io/badge/Idle-58a6ff?style=flat-square)
+![Ended](https://img.shields.io/badge/Ended-6e7681?style=flat-square)
 
-<!-- Add a screenshot at docs/assets/screenshot.png and uncomment:
-![code-by-wire](docs/assets/screenshot.png)
--->
+<img src="docs/assets/hero.svg" alt="code-by-wire — sessions, live states, and per-session panels" width="100%">
+
+<!-- Replace the hero with a real capture when ready: save the app window as
+     docs/assets/screenshot.png and point the src above at it. -->
+
+## Features
+
+<table>
+  <tr>
+    <td width="33%"><b>Every session, one view</b><br>One row per session, with its live state.</td>
+    <td width="33%"><b>States that surface what needs you</b><br>Working, Waiting, Idle, Ended. Waiting is loudest.</td>
+    <td width="33%"><b>The full transcript</b><br>Messages, tool calls, and results, reconstructed from <code>~/.claude</code>.</td>
+  </tr>
+  <tr>
+    <td><b>Tokens, cost &amp; context</b><br>The usage Claude Code keeps hidden, plus equivalent API value for subscription accounts.</td>
+    <td><b>Tasks, subagents &amp; git</b><br>A session's task list, its subagent tree, and its repo state.</td>
+    <td><b>Observe, then adopt</b><br>Read any session you didn't spawn; adopt an ended one to drive it.</td>
+  </tr>
+</table>
 
 ## Install
 
