@@ -51,7 +51,8 @@ export function App() {
   }, [])
 
   // Background re-sync so session state stays live. Silent (no loading spinner) and paused while the
-  // window is hidden, so it doesn't flicker the Refresh button or burn a sweep nobody's looking at.
+  // window is hidden, so it doesn't burn a sweep nobody's looking at. The visibilitychange effect
+  // below covers the gap, firing one sync the moment the window comes back.
   useEffect(() => {
     let alive = true
     async function tick(): Promise<void> {
