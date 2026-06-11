@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { ContextBreakdown } from '@shared/transcript'
 import { contextView } from '@shared/context'
-import { formatTokens, formatTokensShort } from '@shared/format'
+import { formatTokensShort } from '@shared/format'
 import { cx } from '../../ui/atoms'
 import { Ring } from '../../ui/charts'
 import { ctxColor, ctxTone } from '../../ui/meta'
@@ -49,12 +49,10 @@ export function ContextPanel({
       <div className="flex items-center gap-3.5">
         <Ring pct={pct} fill={ctxColor(pct)}>
           <span className={cx('font-mono text-[19px] font-bold tabular-nums', ctxTone(pct))}>{pct}%</span>
-          <span className="mt-0.5 font-mono text-[9px] text-fg-faint">
-            {formatTokensShort(total)} / {formatTokensShort(contextWindow)}
-          </span>
         </Ring>
-        <div className="flex-1">
-          <MetricRow label="Free" value={formatTokens(free)} />
+        <div className="flex-1 space-y-0.5">
+          <MetricRow label="Used" value={`${formatTokensShort(total)} / ${formatTokensShort(contextWindow)}`} />
+          <MetricRow label="Free" value={formatTokensShort(free)} />
         </div>
       </div>
     </PanelSection>
