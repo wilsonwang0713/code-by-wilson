@@ -20,7 +20,7 @@ function createWindow(
   managed: ManagedRegistry,
   resolveAdoptTarget: (id: string) => { alive: boolean; cwd: string } | null,
   registerRename: (rename: (from: string, to: string) => void) => void,
-  childEnv: NodeJS.ProcessEnv | undefined,
+  childEnv: (() => NodeJS.ProcessEnv) | undefined,
 ): void {
   // The renderer header is a fixed HEADER_HEIGHT_PX tall and doubles as the title bar. On macOS we hide
   // the native title bar but KEEP the traffic lights (titleBarStyle 'hidden', never frame:false — the
@@ -99,9 +99,13 @@ app.whenReady()
 
     // A packaged .app launched from Finder inherits launchd's bare PATH, not the user's shell PATH, so
     // `claude` (under ~/.local/bin etc.) wouldn't be found and every Managed session would die at spawn.
-    // Recover the real PATH once here and hand it to each window's terminal IPC. In dev the inherited
-    // PATH already carries `claude`, so leave the env untouched (and skip the one-shot shell probe).
-    const childEnv = app.isPackaged ? { ...process.env, PATH: shellPath() } : undefined
+    // Recover the real PATH and hand it to each window's terminal IPC — but lazily, on the first spawn,
+    // so the synchronous shell probe never blocks the first window's paint; memoized so only that spawn
+    // pays it. In dev the inherited PATH already carries `claude`, so leave the env untouched (no probe).
+    let recoveredEnv: NodeJS.ProcessEnv | undefined
+    const childEnv = app.isPackaged
+      ? (): NodeJS.ProcessEnv => (recoveredEnv ??= { ...process.env, PATH: shellPath() })
+      : undefined
     createWindow(managed, provider.resolveAdoptTarget, registerRename, childEnv)
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0)

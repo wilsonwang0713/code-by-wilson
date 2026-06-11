@@ -50,25 +50,31 @@ export function resolveShellPath(deps: ResolvePathDeps): string {
   return deduped.join(':')
 }
 
-/** Run the login+interactive shell and read PATH out of its env. Delimiters fence the value off from
- *  any rc-file banner the interactive shell prints, and a short timeout keeps a wedged shell from
- *  stalling startup. Any failure returns null so the caller falls back to the well-known dirs. */
+const DELIM = '__CBW_PATH_DELIM__'
+
+/** Pull the fenced PATH out of the probe's stdout. The value sits between two delimiters so an rc-file
+ *  banner the interactive shell prints (before or after it) can't be mistaken for PATH. Exported so the
+ *  parse is unit-tested without spawning a real shell. Returns null when the fence or value is missing. */
+export function parseProbedPath(out: string): string | null {
+  const start = out.indexOf(DELIM)
+  const end = out.indexOf(DELIM, start + DELIM.length)
+  if (start === -1 || end === -1) return null
+  return out.slice(start + DELIM.length, end).trim() || null
+}
+
+/** Run the login+interactive shell and print just its PATH, fenced by delimiters. `printenv PATH` reads
+ *  the colon-joined env var directly, so it's right for every shell (fish stores PATH as a list that
+ *  `"$PATH"` would join with spaces, not colons). A short timeout keeps a wedged shell from stalling the
+ *  first spawn; any failure returns null so the caller falls back to the well-known dirs. */
 function probeLoginShell(shell: string): string | null {
-  const DELIM = '__CBW_PATH_DELIM__'
   try {
-    const out = execFileSync(shell, ['-ilc', `printf %s "${DELIM}"; env; printf %s "${DELIM}"`], {
+    const out = execFileSync(shell, ['-ilc', `printf %s "${DELIM}"; printenv PATH; printf %s "${DELIM}"`], {
       encoding: 'utf8',
       timeout: 5_000,
       stdio: ['ignore', 'pipe', 'ignore'],
       env: { ...process.env, TERM: 'dumb', DISABLE_AUTO_UPDATE: 'true', GIT_TERMINAL_PROMPT: '0' },
     })
-    const start = out.indexOf(DELIM)
-    const end = out.indexOf(DELIM, start + DELIM.length)
-    if (start === -1 || end === -1) return null
-    for (const line of out.slice(start + DELIM.length, end).split('\n')) {
-      if (line.startsWith('PATH=')) return line.slice('PATH='.length) || null
-    }
-    return null
+    return parseProbedPath(out)
   } catch {
     return null
   }

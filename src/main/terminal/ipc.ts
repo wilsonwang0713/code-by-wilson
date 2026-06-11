@@ -45,10 +45,10 @@ export function registerTerminalIpc({
   window: BrowserWindow
   managed: ManagedRegistry
   resolveAdoptTarget: (id: string) => { alive: boolean; cwd: string } | null
-  /** Env for spawned `claude` sessions, carrying the PATH `claude` lives on. Resolved once at startup
-   *  (see `shellPath`) because a packaged .app inherits launchd's bare PATH, not the user's shell PATH.
-   *  Omitted in tests/dev, where the manager falls back to the inherited `process.env`. */
-  env?: NodeJS.ProcessEnv
+  /** Returns the env for spawned `claude` sessions, carrying the PATH `claude` lives on. Called lazily on
+   *  the first spawn (see `shellPath`) and memoized, because a packaged .app inherits launchd's bare PATH,
+   *  not the user's shell PATH. Omitted in tests/dev, where the manager falls back to `process.env`. */
+  env?: () => NodeJS.ProcessEnv
 }): { rename: (from: string, to: string) => void } {
   const manager = createTerminalManager({
     send: (id, data) => {
