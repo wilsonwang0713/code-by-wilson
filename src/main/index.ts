@@ -19,7 +19,7 @@ function createWindow(
   resolveAdoptTarget: (id: string) => { alive: boolean; cwd: string } | null,
   registerRename: (rename: (from: string, to: string) => void) => void,
 ): void {
-  // The renderer header is a fixed 44px tall and doubles as the title bar. On macOS we hide the
+  // The renderer header is a fixed 48px tall and doubles as the title bar. On macOS we hide the
   // native title bar but KEEP the traffic lights (titleBarStyle 'hidden', never frame:false — the
   // same choice VS Code makes), float them into the header, and offset native sheets (the directory
   // picker) below the header so they don't clip under it. Windows/Linux keep their default frame.
@@ -34,7 +34,7 @@ function createWindow(
       sandbox: false,
     },
   })
-  if (isMac) win.setSheetOffset(44)
+  if (isMac) win.setSheetOffset(48)
 
   // Managed-terminal IPC is per-window: the manager pushes pty output to this window's renderer and
   // kills its ptys when the window closes. Its `rename` (the /clear follow) is handed to the sync

@@ -24,7 +24,7 @@ export function GlobalHeader({ onNew }: { onNew: () => void }) {
   return (
     <header
       className={cx(
-        'title-bar drag-region flex h-11 shrink-0 select-none items-center overflow-hidden border-b border-ink-800 bg-ink-925 pr-4',
+        'title-bar drag-region flex h-12 shrink-0 select-none items-center overflow-hidden border-b border-ink-800 bg-ink-925 pr-4',
         isMac ? 'pl-24' : 'pl-4',
       )}
     >
