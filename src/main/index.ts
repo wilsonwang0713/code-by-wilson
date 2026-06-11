@@ -19,15 +19,22 @@ function createWindow(
   resolveAdoptTarget: (id: string) => { alive: boolean; cwd: string } | null,
   registerRename: (rename: (from: string, to: string) => void) => void,
 ): void {
+  // The renderer header is a fixed 44px tall and doubles as the title bar. On macOS we hide the
+  // native title bar but KEEP the traffic lights (titleBarStyle 'hidden', never frame:false — the
+  // same choice VS Code makes), float them into the header, and offset native sheets (the directory
+  // picker) below the header so they don't clip under it. Windows/Linux keep their default frame.
+  const isMac = process.platform === 'darwin'
   const win = new BrowserWindow({
     width: 1100,
     height: 720,
     backgroundColor: '#0c0c0d',
+    ...(isMac ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 16, y: 16 } } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
     },
   })
+  if (isMac) win.setSheetOffset(44)
 
   // Managed-terminal IPC is per-window: the manager pushes pty output to this window's renderer and
   // kills its ptys when the window closes. Its `rename` (the /clear follow) is handed to the sync
