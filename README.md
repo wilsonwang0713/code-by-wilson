@@ -11,7 +11,7 @@ Electron + React + TypeScript, dark theme only. See `CONTEXT.md` for the vocabul
 3. Grab the lowest-numbered open `ready-for-agent` issue and build it. Issue **#2** (the walking skeleton) is the entry point; everything else hangs off it.
 4. The PRD and issues live as GitHub issues. This machine's `gh` defaults to a work host, so always target the repo explicitly:
    ```
-   GH_HOST=github.com gh issue view <n> -R luojiahai/code-by-wire-source
+   GH_HOST=github.com gh issue view <n> -R luojiahai/code-by-wire
    ```
    Full conventions in `docs/agents/issue-tracker.md`.
 
