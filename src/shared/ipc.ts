@@ -50,4 +50,7 @@ export type AppApi = IpcApi & {
   /** The host platform (`process.platform`), so the renderer can branch macOS-only chrome (the
    *  frameless title bar reserves space for the traffic lights only on darwin). */
   platform: string
+  /** Current web zoom factor (`webFrame.getZoomFactor()`), so the title bar can counter-zoom to a
+   *  fixed physical size and keep the macOS traffic lights (OS-drawn, immune to web zoom) aligned. */
+  getZoomFactor(): number
 }
