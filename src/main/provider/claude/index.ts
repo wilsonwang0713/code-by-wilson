@@ -13,7 +13,7 @@ import { firstTranscriptCwd } from './transcript'
 import { readGit } from '../../git/read-git'
 import { readVoiceEnabled } from '../../settings/voice'
 import { readRemoteControl } from '../../settings/remote-control'
-import type { MetricsRead, SessionMetrics } from '@shared/metrics'
+import type { GitInfo, MetricsRead, SessionMetrics } from '@shared/metrics'
 
 export interface ClaudeProviderDeps {
   claudeDir?: string
@@ -38,6 +38,23 @@ function hashToken(s: string): number {
     h = Math.imul(h, 16777619)
   }
   return h >>> 0
+}
+
+/** The git portion of the metrics change token: a compact string of the state that should re-trigger a
+ *  recompute, or 'nogit' when the cwd isn't a repo. */
+function gitTokenStr(git: GitInfo | null): string {
+  return git ? `${git.sha}:${git.insertions}:${git.deletions}:${git.dirty}:${git.ahead}:${git.behind}` : 'nogit'
+}
+
+/** Assemble the lazy SessionMetrics for a session from its parsed transcript rows, resolved cwd, and the
+ *  already-computed git glance. */
+function buildMetrics(rows: any[], cwd: string, git: GitInfo | null, claudeDir: string, id: string): SessionMetrics {
+  return {
+    tokenSpeed: computeTokenSpeed(rows, SPEED_WINDOW_MS),
+    git,
+    voiceEnabled: cwd ? readVoiceEnabled(cwd, claudeDir) : null,
+    remoteControl: readRemoteControl(claudeDir, id),
+  }
 }
 
 /** A pid is alive if signalling it succeeds, or fails only because we lack permission. */
@@ -66,6 +83,10 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
   // so caching the path lets a steady poll stat ONE file instead of re-walking all of projects/ each
   // time; the full sweep runs only on the first read or after the file moves/vanishes.
   const pathById = new Map<string, string>()
+  // Stable per session: firstTranscriptCwd is the first row's cwd and never changes for a transcript, so
+  // caching it lets an unchanged poll compute the metrics token (transcript mtime + git state) without
+  // re-reading the JSONL — parity with readTranscript's token-before-read.
+  const cwdById = new Map<string, string>()
 
   return {
     id: 'claude',
@@ -132,6 +153,7 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     },
     readMetrics: (id, sinceMtimeMs): MetricsRead => {
       try {
+        // --- path resolution: identical to readTranscript (pathById fast-path → indexTranscripts sweep) ---
         let path = pathById.get(id)
         let mtimeMs: number | undefined
         if (path !== undefined) {
@@ -139,6 +161,7 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
             mtimeMs = statSync(path).mtimeMs
           } catch {
             pathById.delete(id)
+            cwdById.delete(id)
             path = undefined
           }
         }
@@ -149,27 +172,37 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
           mtimeMs = hit.mtimeMs
           pathById.set(id, path)
         }
+
+        // --- fast unchanged path: if cwd is known, compute the token WITHOUT reading the JSONL ---
+        const cachedCwd = cwdById.get(id)
+        if (cachedCwd !== undefined) {
+          const git = cachedCwd ? readGit(cachedCwd) : null
+          const hashed = hashToken(`${mtimeMs}|${gitTokenStr(git)}`)
+          if (hashed === sinceMtimeMs) return { status: 'unchanged', mtimeMs: hashed }
+          // Token moved — fall through to a full read+parse below, reusing this git value.
+          const jsonl = readTextOrNull(path)
+          if (jsonl === null) {
+            pathById.delete(id)
+            cwdById.delete(id)
+            return { status: 'absent' }
+          }
+          const rows = parseJsonlRows(jsonl)
+          return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(rows, cachedCwd, git, claudeDir, id) }
+        }
+
+        // --- cwd unknown (first read for this id): read the file to resolve it ---
         const jsonl = readTextOrNull(path)
         if (jsonl === null) {
           pathById.delete(id)
           return { status: 'absent' }
         }
         const cwd = firstTranscriptCwd(jsonl)
+        cwdById.set(id, cwd)
         const git = cwd ? readGit(cwd) : null
-        const gitToken = git
-          ? `${git.sha}:${git.insertions}:${git.deletions}:${git.dirty}:${git.ahead}:${git.behind}`
-          : 'nogit'
-        const hashed = hashToken(`${mtimeMs}|${gitToken}`)
+        const hashed = hashToken(`${mtimeMs}|${gitTokenStr(git)}`)
         if (hashed === sinceMtimeMs) return { status: 'unchanged', mtimeMs: hashed }
-
         const rows = parseJsonlRows(jsonl)
-        const metrics: SessionMetrics = {
-          tokenSpeed: computeTokenSpeed(rows, SPEED_WINDOW_MS),
-          git,
-          voiceEnabled: cwd ? readVoiceEnabled(cwd, claudeDir) : null,
-          remoteControl: readRemoteControl(claudeDir, id),
-        }
-        return { status: 'changed', mtimeMs: hashed, metrics }
+        return { status: 'changed', mtimeMs: hashed, metrics: buildMetrics(rows, cwd, git, claudeDir, id) }
       } catch {
         return { status: 'error' }
       }
