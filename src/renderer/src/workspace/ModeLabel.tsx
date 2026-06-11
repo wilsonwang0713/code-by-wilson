@@ -21,9 +21,9 @@ export function ModeLabel({ session: s }: { session: Session }) {
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-ink-700 text-fg-faint transition-colors hover:text-fg-muted"
+        className="inline-flex h-[14px] w-[14px] items-center justify-center rounded-full text-fg-faint transition-colors hover:text-fg-muted focus-visible:text-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
       >
-        <Icon name="info" size={9} />
+        <Icon name="info" size={12} />
       </button>
       {open && (
         <div
