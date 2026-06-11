@@ -2,7 +2,7 @@
   "name": "code-by-wire",
   "private": true,
   "version": "0.1.0",
-  "description": "A dark desktop app that monitors and controls local Claude Code sessions.",
+  "description": "The cockpit for local coding agents.",
   "author": "luojiahai",
   "license": "MIT",
   "homepage": "https://github.com/luojiahai/code-by-wire",
@@ -14,9 +14,9 @@
     "url": "https://github.com/luojiahai/code-by-wire/issues"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@11.5.3",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -58,13 +58,5 @@
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
     "vitest": "^2.1.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "node-pty",
-      "electron",
-      "esbuild"
-    ]
   }
 }

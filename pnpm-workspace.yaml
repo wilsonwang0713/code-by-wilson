@@ -1,0 +1,12 @@
+# pnpm v11 reads project settings from here, not the "pnpm" field in
+# package.json. allowBuilds replaces the old onlyBuiltDependencies list: it names
+# the dependencies allowed to run install/build scripts — our native modules and
+# Electron's binary download.
+allowBuilds:
+  better-sqlite3: true
+  node-pty: true
+  electron: true
+  esbuild: true
+  # Windows-installer tooling pulled in transitively by electron-builder. This is
+  # a mac-only app, so its build scripts never need to run.
+  electron-winstaller: false
