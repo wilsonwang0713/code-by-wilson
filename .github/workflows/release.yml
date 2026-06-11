@@ -8,9 +8,28 @@ permissions:
   contents: write
 
 jobs:
+  # electron-builder derives the release from package.json, not the pushed tag.
+  # Fail fast and cheap if they disagree, before any mac runner spins up.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match package.json version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag $tag does not match package.json version $pkg"
+            exit 1
+          fi
+
   release:
+    needs: verify
     strategy:
       fail-fast: false
+      # Both legs publish to the same release, so run them one at a time:
+      # concurrent publishes race on release creation and the shared latest-mac.yml.
+      max-parallel: 1
       matrix:
         include:
           - os: macos-14
