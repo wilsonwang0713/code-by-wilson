@@ -1,48 +1,21 @@
 import type { Management, SessionState } from '@shared/types'
-import { STATE_META } from './meta'
+import { glyphClass, glyphPulses, glyphTitle } from './session-glyph'
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ')
 }
 
-export function Dot({ state }: { state: SessionState }) {
-  const m = STATE_META[state]
-  const live = state === 'working' || state === 'waiting'
-  return (
-    <span className={cx('relative inline-flex h-2 w-2 rounded-full', m.dot)}>
-      {live && <span className={cx('absolute inset-0 rounded-full animate-pulse-soft', m.dot)} />}
-    </span>
-  )
-}
-
-export function StateBadge({ state }: { state: SessionState }) {
-  const m = STATE_META[state]
-  return (
-    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide', m.text)}>
-      <Dot state={state} />
-      {m.label}
-    </span>
-  )
-}
-
-/** Managed shows a filled square marker on a sky tint; Observed shows a hollow ring on a hairline. */
-export function ManagementChip({ kind }: { kind: Management }) {
-  const managed = kind === 'managed'
+/** The session glyph: color = state, fill = management. Pass `management` for a session dot (filled when
+ *  managed, hollow ring when observed, with a "state · management" tooltip); omit it for the state-group
+ *  headers, which are about state alone and stay filled. */
+export function Dot({ state, management }: { state: SessionState; management?: Management }) {
+  const cls = glyphClass(state, management ?? 'managed')
   return (
     <span
-      className={cx(
-        'inline-flex items-center gap-1.5 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-        managed ? 'bg-primary/12 text-primary-bright ring-1 ring-primary/30' : 'text-fg-faint ring-1 ring-ink-800',
-      )}
-      title={managed ? 'Managed — spawned and driven by code-by-wire' : 'Observed — running elsewhere, read-only'}
+      title={management ? glyphTitle(state, management) : undefined}
+      className={cx('relative inline-flex h-2 w-2 rounded-full', cls)}
     >
-      <span
-        className={cx(
-          'h-1.5 w-1.5',
-          managed ? 'rounded-[2px] bg-primary' : 'rounded-full border-[1.5px] border-fg-faint',
-        )}
-      />
-      {managed ? 'managed' : 'observed'}
+      {glyphPulses(state) && <span className={cx('absolute inset-0 rounded-full', cls, 'animate-pulse-soft')} />}
     </span>
   )
 }

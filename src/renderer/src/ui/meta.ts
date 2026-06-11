@@ -3,18 +3,20 @@ import { isKnownModelString } from '@shared/models'
 
 export interface StateMeta {
   label: string
-  /** Tailwind bg class for the status dot. */
+  /** Tailwind bg class for the filled (managed) dot. */
   dot: string
+  /** Tailwind border class for the hollow (observed) ring. Literal so Tailwind's scanner emits it. */
+  ring: string
   /** Tailwind text class for the label. */
   text: string
 }
 
 /** Per-state display metadata. Working = teal, Waiting = amber, Idle = slate, Ended = faint. */
 export const STATE_META: Record<SessionState, StateMeta> = {
-  working: { label: 'Working', dot: 'bg-working', text: 'text-working-bright' },
-  waiting: { label: 'Waiting', dot: 'bg-accent', text: 'text-accent-bright' },
-  idle: { label: 'Idle', dot: 'bg-idle', text: 'text-fg-muted' },
-  ended: { label: 'Ended', dot: 'bg-ink-600', text: 'text-fg-faint' },
+  working: { label: 'Working', dot: 'bg-working', ring: 'border-working', text: 'text-working-bright' },
+  waiting: { label: 'Waiting', dot: 'bg-accent', ring: 'border-accent', text: 'text-accent-bright' },
+  idle: { label: 'Idle', dot: 'bg-idle', ring: 'border-idle', text: 'text-fg-muted' },
+  ended: { label: 'Ended', dot: 'bg-ink-600', ring: 'border-ink-600', text: 'text-fg-faint' },
 }
 
 export const MODEL_LABEL: Record<ModelId, string> = {
@@ -30,11 +32,20 @@ export const MODEL_SHORT: Record<ModelId, string> = {
   'claude-haiku-4-5': 'Haiku',
 }
 
+/** Below this %, the context gauge is noise; at or above it the sidebar row surfaces the number and
+ *  ctxTone warms it to amber. One constant so the "show it" gate and the color never disagree. */
+export const CONTEXT_WARN_PCT = 70
+
 /** Tailwind text tone for a context %: muted when roomy, amber and brightening as it fills. */
 export function ctxTone(pct: number): string {
   if (pct >= 85) return 'text-accent-bright'
-  if (pct >= 70) return 'text-accent'
+  if (pct >= CONTEXT_WARN_PCT) return 'text-accent'
   return 'text-fg-muted'
+}
+
+/** The context % earns a spot in a sidebar row only once it crosses the warning threshold. */
+export function isContextHigh(pct: number): boolean {
+  return pct >= CONTEXT_WARN_PCT
 }
 
 /** Tailwind fill for a progress bar: sky (wire) when roomy, amber as it fills, bright at/over `high`.
