@@ -1,31 +1,75 @@
 # code-by-wire
 
-A dark desktop app that monitors and controls local Claude Code sessions. It surfaces the data Claude Code keeps out of sight in `~/.claude` and keeps many sessions in one place instead of scattered across terminal windows.
+**Control and monitor local coding agents.** A dark macOS desktop app that
+watches your local Claude Code sessions, surfaces the data Claude Code keeps out
+of sight in `~/.claude`, and keeps many sessions in one place instead of
+scattered across terminal windows.
 
-Electron + React + TypeScript, dark theme only. See `CONTEXT.md` for the vocabulary and `docs/adr/` for the locked architectural decisions.
+[![CI](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml/badge.svg)](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire)](https://github.com/luojiahai/code-by-wire/releases)
 
-## Start here (fresh session or agent)
+Electron + React + TypeScript, dark theme only. One row per session with its
+live state (Working, Waiting, Idle, Ended), and panels for the transcript,
+tasks, tokens, cost, and git.
 
-1. Read `CONTEXT.md` (the glossary) and `docs/adr/` (the three locked decisions: statusLine over hooks, incremental SQLite index, provider-adapter model).
-2. Skim `src/prototype/` for the chosen design. Overview variant B won; see `src/prototype/NOTES.md` for the verdict.
-3. Grab the lowest-numbered open `ready-for-agent` issue and build it. Issue **#2** (the walking skeleton) is the entry point; everything else hangs off it.
-4. The PRD and issues live as GitHub issues. This machine's `gh` defaults to a work host, so always target the repo explicitly:
+<!-- Add a screenshot at docs/assets/screenshot.png and uncomment:
+![code-by-wire](docs/assets/screenshot.png)
+-->
+
+## Install
+
+1. Download the latest `.dmg` from
+   [Releases](https://github.com/luojiahai/code-by-wire/releases).
+2. Open it and drag code-by-wire to Applications.
+3. The build is **unsigned**, so the first launch needs one extra step. Either
+   right-click the app and choose **Open**, or clear the quarantine flag:
+
    ```
-   GH_HOST=github.com gh issue view <n> -R luojiahai/code-by-wire
+   xattr -dr com.apple.quarantine /Applications/code-by-wire.app
    ```
-   Full conventions in `docs/agents/issue-tracker.md`.
+
+## Requirements
+
+- macOS (Apple Silicon or Intel)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
+  locally, so there are sessions to observe and control
 
 ## Develop
 
 ```
 pnpm install
-pnpm rebuild:native   # rebuild better-sqlite3 for Electron's ABI (re-run after an Electron upgrade)
-pnpm dev              # launches the Electron app
+pnpm rebuild:native   # rebuild better-sqlite3 + node-pty for Electron's ABI
+pnpm dev              # launch the app
 ```
 
-`pnpm dev` opens the app and shows one row per running Claude Code session, served from an
-embedded SQLite index. `pnpm test` runs the ClaudeProvider read tests over the redacted
-`~/.claude` fixtures in `tests/fixtures/`. `pnpm typecheck` checks the main and renderer projects.
+`pnpm test` runs the provider read tests over the redacted `~/.claude` fixtures
+in `tests/fixtures/`. `pnpm typecheck` checks the main and renderer projects.
+`pnpm dist` packages a local `.dmg` into `release/`.
 
-The code under `src/prototype/` is throwaway and browser-only — now dormant (nothing imports it).
-Issue #10 folds Overview variant B into the real Overview and deletes the rest.
+## How this is built
+
+code-by-wire is built almost entirely by Claude Code agents working GitHub
+issues. The vocabulary and the settled decisions are documented so an agent (or
+a human) can pick up cold:
+
+- `CONTEXT.md` — the glossary the product is built around.
+- `docs/adr/` — the locked architectural decisions (statusLine over hooks,
+  incremental SQLite index, provider-adapter model).
+- `docs/agents/` — how issues, triage labels, and domain docs are managed.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+
+## Project layout
+
+```
+src/
+  main/       Electron main process: providers, db, git, terminal, sync
+  preload/    the IPC bridge
+  renderer/   React UI (session list, workspace panels, terminal)
+  shared/     types and helpers shared across processes
+```
+
+## License
+
+[MIT](LICENSE)
