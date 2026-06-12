@@ -9,6 +9,7 @@ export const IPC = {
   readTranscript: 'transcript:read',
   readTasks: 'tasks:read',
   readMetrics: 'metrics:read',
+  fullscreen: 'window:fullscreen',
 } as const
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -53,4 +54,8 @@ export type AppApi = IpcApi & {
   /** Current web zoom factor (`webFrame.getZoomFactor()`), so the title bar can counter-zoom to a
    *  fixed physical size and keep the macOS traffic lights (OS-drawn, immune to web zoom) aligned. */
   getZoomFactor(): number
+  /** Subscribe to native macOS fullscreen changes. Main pushes the new state on every
+   *  enter/leave-full-screen and on each load; the callback receives it, and the returned fn
+   *  unsubscribes for effect cleanup. Off macOS main never sends, so the state stays false. */
+  onFullscreenChange(cb: (isFullscreen: boolean) => void): () => void
 }
