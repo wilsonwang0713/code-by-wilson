@@ -15,11 +15,15 @@ export function GitPanel({ git }: { git: GitInfo | null | undefined }) {
   return (
     <PanelSection>
       <PanelHeading>Git</PanelHeading>
-      <MetricRow label="Branch" value={git.branch} tone="text-fg" />
-      <MetricRow label="Changes" value={changes} />
-      <MetricRow label="Ahead / behind" value={ahead} />
-      <MetricRow label="SHA" value={git.sha} tone="text-fg-muted" />
-      <MetricRow label="Status" value={git.dirty ? '✗ dirty' : '✓ clean'} tone={git.dirty ? 'text-danger' : 'text-ok'} />
+      {/* Rows in their own tight group (space-y-1, matching the Cost/Context legends) so they don't
+          inherit PanelSection's looser space-y-2 and stand out from the rest of the rail. */}
+      <div className="space-y-1">
+        <MetricRow label="Branch" value={git.branch} tone="text-fg" />
+        <MetricRow label="Changes" value={changes} />
+        <MetricRow label="Ahead / behind" value={ahead} />
+        <MetricRow label="SHA" value={git.sha} tone="text-fg-muted" />
+        <MetricRow label="Status" value={git.dirty ? '✗ dirty' : '✓ clean'} tone={git.dirty ? 'text-danger' : 'text-ok'} />
+      </div>
     </PanelSection>
   )
 }
