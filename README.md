@@ -1,5 +1,7 @@
 # Code-by-wire (CBW)
 
+English | [简体中文](README.zh-CN.md)
+
 [![CI](https://img.shields.io/github/actions/workflow/status/luojiahai/code-by-wire/ci.yml?style=flat-square&label=CI)](https://github.com/luojiahai/code-by-wire/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire?style=flat-square)](https://github.com/luojiahai/code-by-wire/releases)
@@ -82,17 +84,6 @@ pnpm dev              # launch the app
 
 `pnpm test` runs the provider read tests over the redacted `~/.claude` fixtures
 in `tests/fixtures/`. `pnpm typecheck` checks the main and renderer projects.
-
-## How this is built
-
-Code-by-wire is built almost entirely by Claude Code agents working GitHub
-issues. The vocabulary and the settled decisions are documented so an agent (or
-a human) can pick up cold:
-
-- `CONTEXT.md`: the glossary the product is built around.
-- `docs/adr/`: the locked architectural decisions (statusLine over hooks,
-  incremental SQLite index, provider-adapter model).
-- `docs/agents/`: how issues, triage labels, and domain docs are managed.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
