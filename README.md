@@ -12,7 +12,7 @@ scattered across terminal windows.
 
 ## Preview
 
-<img width="2880" height="1800" alt="screenshot" src="https://github.com/user-attachments/assets/aa601314-73bd-4c14-829a-6ad06bab4185" />
+![code-by-wire](docs/assets/preview.png)
 
 ## Features
 
