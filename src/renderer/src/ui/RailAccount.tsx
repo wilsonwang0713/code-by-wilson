@@ -6,7 +6,7 @@ import { railAccountModel } from './rail-account'
 
 /** The account block pinned at the top of the rail. Two modes (railAccountModel decides which):
  *  subscription shows email + plan + rate-limit gauges with reset countdowns; api shows the configured
- *  endpoint host + plan + Auth/Via rows. Renders nothing when there's no account data to show. `now` comes
+ *  endpoint host + plan. Renders nothing when there's no account data to show. `now` comes
  *  from the rail's render clock so the subscription countdowns tick with the 3s background sync. Memoized so
  *  a burst of filter keystrokes (which re-render the rail) doesn't rebuild the block — `account` is stable
  *  across them and `now` is floored to the second by the caller. */
@@ -19,16 +19,6 @@ export const RailAccount = memo(function RailAccount({ account, now }: { account
       <div className="shrink-0 border-b border-ink-800 p-3">
         <div className="truncate font-mono text-[12.5px] font-medium text-fg">{view.baseUrl}</div>
         <div className="mt-0.5 text-[11px] text-fg-faint">{view.plan}</div>
-        {view.fields.length > 0 && (
-          <div className="mt-3 flex flex-col gap-[7px]">
-            {view.fields.map((f) => (
-              <div key={f.key} className="flex items-baseline gap-2.5">
-                <span className="w-11 shrink-0 text-[10px] uppercase tracking-wide text-fg-faint">{f.key}</span>
-                <span className="flex-1 truncate font-mono text-[11px] text-fg-muted">{f.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     )
   }
