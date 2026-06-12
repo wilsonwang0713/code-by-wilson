@@ -11,6 +11,11 @@ const api: AppApi = {
   readMetrics: (id, sinceMtimeMs) => ipcRenderer.invoke(IPC.readMetrics, id, sinceMtimeMs),
   platform: process.platform,
   getZoomFactor: () => webFrame.getZoomFactor(),
+  onFullscreenChange: (cb) => {
+    const handler = (_e: IpcRendererEvent, isFullscreen: boolean) => cb(isFullscreen)
+    ipcRenderer.on(IPC.fullscreen, handler)
+    return () => ipcRenderer.removeListener(IPC.fullscreen, handler)
+  },
   terminal: {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),
     adopt: (req) => ipcRenderer.invoke(TERMINAL.adopt, req),
