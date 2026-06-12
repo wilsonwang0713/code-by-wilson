@@ -73,32 +73,24 @@ describe('railAccountModel — subscription', () => {
 })
 
 describe('railAccountModel — api', () => {
-  it('builds the api view: bare host, plan label, auth + provider fields', () => {
+  it('builds the api view from base URL and plan, ignoring auth and provider', () => {
     const acc: Account = {
       billingMode: 'api',
       apiBaseUrl: 'https://api.portkey.ai',
       apiAuthMethod: 'token',
       apiProvider: 'bedrock-use1-nonprod',
     }
+    // auth method and provider are intentionally no longer surfaced in the rail
     expect(railAccountModel(acc, NOW)).toEqual({
       mode: 'api',
       baseUrl: 'api.portkey.ai',
       plan: 'Claude · API',
-      fields: [
-        { key: 'Auth', value: 'token' },
-        { key: 'Via', value: 'bedrock-use1-nonprod' },
-      ],
     })
   })
 
-  it("labels apiKey auth as 'API key'", () => {
-    const acc: Account = { billingMode: 'api', apiBaseUrl: 'https://x', apiAuthMethod: 'apiKey' }
-    expect(railAccountModel(acc, NOW)).toMatchObject({ fields: [{ key: 'Auth', value: 'API key' }] })
-  })
-
-  it('renders base URL alone with empty fields when no extras are present', () => {
+  it('renders base URL and plan with no extra rows', () => {
     const acc: Account = { billingMode: 'api', apiBaseUrl: 'https://api.portkey.ai' }
-    expect(railAccountModel(acc, NOW)).toEqual({ mode: 'api', baseUrl: 'api.portkey.ai', plan: 'Claude · API', fields: [] })
+    expect(railAccountModel(acc, NOW)).toEqual({ mode: 'api', baseUrl: 'api.portkey.ai', plan: 'Claude · API' })
   })
 
   it('returns null for api billing with no base URL configured', () => {

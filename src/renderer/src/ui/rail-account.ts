@@ -10,17 +10,11 @@ export interface RailGauge {
   reset: string | null
 }
 
-/** One key/value row in the API block (Auth, Via). */
-export interface RailField {
-  key: string
-  value: string
-}
-
 /** The resolved view for the rail's account block — one of two mutually exclusive modes. Subscription
- *  carries the login email and rate-limit gauges; api carries the endpoint host and config fields. */
+ *  carries the login email and rate-limit gauges; api carries just the endpoint host. */
 export type RailAccountView =
   | { mode: 'subscription'; email: string | null; plan: string; gauges: RailGauge[] }
-  | { mode: 'api'; baseUrl: string; plan: string; fields: RailField[] }
+  | { mode: 'api'; baseUrl: string; plan: string }
 
 function planLabel(billingMode: Account['billingMode']): string {
   if (billingMode === 'subscription') return 'Claude · subscription'
@@ -48,8 +42,8 @@ function bareHost(url: string): string {
  * - subscription: the 5h and weekly windows (each with a reset countdown) plus the per-model weekly
  *   buckets (percent-only), and the login email. Returns null when there's neither an email nor a window
  *   (ADR-0001 graceful degradation).
- * - api: the configured endpoint as a bare host, plus Auth and Via rows when their config is present.
- *   Requires a base URL; an api account without one has nothing to surface.
+ * - api: the configured endpoint as a bare host. Requires a base URL; an api account without one has
+ *   nothing to surface.
  *
  * Anything else (an 'unknown' account, or 'api' with no base URL) returns null, so the block disappears
  * rather than show a window-less subscription or mislabel gateway billing with a stale email.
@@ -69,10 +63,7 @@ export function railAccountModel(account: Account | null, now: number): RailAcco
   }
 
   if (account.billingMode === 'api' && account.apiBaseUrl) {
-    const fields: RailField[] = []
-    if (account.apiAuthMethod) fields.push({ key: 'Auth', value: account.apiAuthMethod === 'token' ? 'token' : 'API key' })
-    if (account.apiProvider) fields.push({ key: 'Via', value: account.apiProvider })
-    return { mode: 'api', baseUrl: bareHost(account.apiBaseUrl), plan: planLabel(account.billingMode), fields }
+    return { mode: 'api', baseUrl: bareHost(account.apiBaseUrl), plan: planLabel(account.billingMode) }
   }
 
   return null
