@@ -144,7 +144,7 @@ function ManagedCenter({ session: s, doc }: { session: Session; doc: DocState })
       <ViewTabs tab={tab} onChange={setTab} />
       <div className="min-h-0 flex-1">
         {tab === 'terminal' ? (
-          <div className="h-full p-2.5">
+          <div className="h-full">
             <TerminalView sessionId={s.id} />
           </div>
         ) : (

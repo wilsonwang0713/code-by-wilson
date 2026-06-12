@@ -33,6 +33,28 @@ function attachWebgl(term: Terminal): void {
   }
 }
 
+/** Fade the viewport scrollbar in while the user scrolls, out after a short idle beat. The thumb is
+ *  transparent at rest (see index.css); toggling `is-scrolling` reveals it. Pure visual sugar, so it
+ *  silently no-ops if the viewport isn't there. Lives in this seam alongside the WebGL wiring because
+ *  it needs the post-open DOM. Returns a teardown that drops the listener and any pending idle timer,
+ *  run from the wrapped `term.dispose` so a disposed terminal doesn't leave a timer holding the
+ *  detached viewport alive. */
+function attachScrollbarAutohide(parent: HTMLElement): () => void {
+  const viewport = parent.querySelector('.xterm-viewport')
+  if (!(viewport instanceof HTMLElement)) return () => {}
+  let idle: ReturnType<typeof setTimeout> | undefined
+  const onScroll = () => {
+    viewport.classList.add('is-scrolling')
+    clearTimeout(idle)
+    idle = setTimeout(() => viewport.classList.remove('is-scrolling'), 900)
+  }
+  viewport.addEventListener('scroll', onScroll)
+  return () => {
+    viewport.removeEventListener('scroll', onScroll)
+    clearTimeout(idle)
+  }
+}
+
 /**
  * Build a real xterm Terminal + FitAddon and a detached wrapper div the terminal lives in. The wrapper
  * is what moves between workspace containers on attach/detach, so the rendered DOM and buffer persist
@@ -47,9 +69,18 @@ export function createXterm(): { term: XtermLike; fit: FitLike; wrapper: HTMLEle
   // the renderer attaches itself right after — keeping all GPU-renderer wiring in this seam, with the
   // view and store untouched. open() is called once (guarded by handle.opened in the view).
   const open = term.open.bind(term)
+  let disposeAutohide: () => void = () => {}
   term.open = (parent: HTMLElement) => {
     open(parent)
     attachWebgl(term)
+    disposeAutohide = attachScrollbarAutohide(parent)
+  }
+  // Wrap dispose the same way as open: tear down the scroll listener/timer the autohide attached.
+  // (xterm disposes loadAddon'd addons like WebGL itself; this raw DOM listener it doesn't know about.)
+  const dispose = term.dispose.bind(term)
+  term.dispose = () => {
+    disposeAutohide()
+    dispose()
   }
   const wrapper = document.createElement('div')
   wrapper.style.height = '100%'

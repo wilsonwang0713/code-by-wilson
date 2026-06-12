@@ -1,6 +1,7 @@
 import { Wordmark, cx } from './atoms'
 import { useZoomFactor } from './use-zoom-factor'
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_INSET_PX } from '@shared/chrome'
+import { isMacPlatform } from '@shared/platform'
 
 /**
  * The frameless app's title bar: a draggable strip carrying the wordmark. On macOS it reserves a left
@@ -11,7 +12,7 @@ import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_INSET_PX } from '@shared/chrome'
  * identity, rate limits, and the New session action now live in the rail, so this bar is just brand.
  */
 export function GlobalHeader() {
-  const isMac = window.api.platform === 'darwin'
+  const isMac = isMacPlatform(window.api.platform)
   useZoomFactor(isMac)
   return (
     <header

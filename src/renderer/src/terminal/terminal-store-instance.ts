@@ -1,3 +1,4 @@
+import { isMacPlatform } from '@shared/platform'
 import { createTerminalStore } from './terminal-store'
 import { createXterm } from './xterm-factory'
 
@@ -6,4 +7,5 @@ import { createXterm } from './xterm-factory'
 export const terminalStore = createTerminalStore({
   api: window.api.terminal,
   createTerminal: createXterm,
+  isMac: isMacPlatform(window.api.platform),
 })
