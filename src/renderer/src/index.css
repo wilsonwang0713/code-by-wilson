@@ -80,6 +80,30 @@ body {
 *::-webkit-scrollbar-thumb:hover { background: #3b3b3c; }
 *::-webkit-scrollbar-track { background: transparent; }
 
+/* The terminal well: borderless and padded, with an auto-hiding scrollbar pinned to the trailing edge.
+   8px of padding on .xterm gives the content breathing room; FitAddon reads this padding when it sizes
+   the grid, so cols/rows fit the padded area. .xterm-viewport is absolutely positioned inset:0 and
+   ignores the padding, so its scrollbar lands flush at the right edge while the text stays 8px clear. */
+.xterm { padding: 8px; }
+
+/* Transparent so the #080808 well (the container's bg-well) shows through during overscroll, instead of
+   xterm's default #000 viewport background flashing a different black. */
+.xterm .xterm-viewport { background: transparent; }
+
+/* Auto-hide overlay: the thumb is invisible at rest and fades in on hover or while scrolling. The
+   .is-scrolling class is toggled from xterm-factory on scroll, cleared after an idle beat. This
+   overrides the global always-on scrollbar above, just for the terminal viewport. */
+.xterm .xterm-viewport::-webkit-scrollbar { width: 8px; } /* slimmer than the app-wide 10px */
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 8px;
+  transition: background 0.3s ease;
+}
+.xterm .xterm-viewport:hover::-webkit-scrollbar-thumb,
+.xterm .xterm-viewport.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 /* The cockpit plate: flat graphite with two whisper-faint signal washes — cool top-right, warm
    lower-left. No banding, no purple gradients. */
 .app-bg {

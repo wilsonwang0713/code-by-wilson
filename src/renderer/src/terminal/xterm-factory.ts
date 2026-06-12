@@ -33,6 +33,21 @@ function attachWebgl(term: Terminal): void {
   }
 }
 
+/** Fade the viewport scrollbar in while the user scrolls, out after a short idle beat. The thumb is
+ *  transparent at rest (see index.css); toggling `is-scrolling` reveals it. Pure visual sugar, so it
+ *  silently no-ops if the viewport isn't there. Lives in this seam alongside the WebGL wiring because
+ *  it needs the post-open DOM. */
+function attachScrollbarAutohide(parent: HTMLElement): void {
+  const viewport = parent.querySelector('.xterm-viewport')
+  if (!(viewport instanceof HTMLElement)) return
+  let idle: ReturnType<typeof setTimeout> | undefined
+  viewport.addEventListener('scroll', () => {
+    viewport.classList.add('is-scrolling')
+    clearTimeout(idle)
+    idle = setTimeout(() => viewport.classList.remove('is-scrolling'), 900)
+  })
+}
+
 /**
  * Build a real xterm Terminal + FitAddon and a detached wrapper div the terminal lives in. The wrapper
  * is what moves between workspace containers on attach/detach, so the rendered DOM and buffer persist
@@ -50,6 +65,7 @@ export function createXterm(): { term: XtermLike; fit: FitLike; wrapper: HTMLEle
   term.open = (parent: HTMLElement) => {
     open(parent)
     attachWebgl(term)
+    attachScrollbarAutohide(parent)
   }
   const wrapper = document.createElement('div')
   wrapper.style.height = '100%'
