@@ -100,11 +100,17 @@ export function createTerminalManager(
     if (terms.has(id)) return; // idempotent — a double start of one id is a no-op
     // Resolve the child env here, not at construction: the PATH probe behind `deps.env` is a synchronous
     // shell spawn we keep off the startup path, so it runs (once, memoized) on the first real spawn.
+    // Declare COLORTERM=truecolor on top: the pty's TERM is only xterm-256color (see pty-process), so
+    // without this claude's color detection caps below 24-bit and quantizes its mascot orange to the
+    // nearest 256-cube index — a visibly muted shade. A Finder-launched .app inherits launchd's bare env
+    // (no COLORTERM), which is why this only bites the packaged build; dev and real terminals carry it.
+    // Force it (not a default) because our WebGL terminal genuinely is 24-bit capable, so the declaration
+    // is ours to make, not the launching shell's.
     const pty = createPty({
       file: command.file,
       args: command.args,
       cwd,
-      env: deps.env?.() ?? process.env,
+      env: { ...(deps.env?.() ?? process.env), COLORTERM: "truecolor" },
       cols,
       rows,
     });
