@@ -11,7 +11,7 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import { readTextOrNull, resolveClaudeDir } from '../claude-config'
-import { wrapperScript } from './wrapper'
+import { recoverWrappedCommand, wrapperScript } from './wrapper'
 
 /** The Claude Code statusLine block. `additionalProperties: false` upstream means we must not stash our
  *  own fields inside it — bookkeeping lives in our own state file instead. While installed we replace this
@@ -174,17 +174,6 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
     writeFileAtomic(wrapperPath, wrapperScript({ wrappedCommand }), 0o755)
   }
 
-  /** Recover the user's original statusLine command from the on-disk wrapper script, used to self-heal a
-   *  wrapped settings.json whose state.json vanished. The wrapper bakes the command into its call-through
-   *  line (`cat "$src" | <cmd>`), so that line is the source of truth. Returns null when the wrapper is gone
-   *  (whole .code-by-wire dir wiped) or was capture-only (no original command) — both reinstall clean. */
-  function recoverWrappedCommand(): string | null {
-    const src = readTextOrNull(wrapperPath)
-    if (src === null) return null
-    const m = src.match(/^cat "\$src" \| (.+)$/m)
-    return m ? m[1].trim() : null
-  }
-
   function isInstalled(): boolean {
     let parsed: ClaudeSettings | null
     try {
@@ -199,7 +188,7 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
    *  record state.json, and point the statusLine at our wrapper. The single source of the wrap, reused by the
    *  self-heal path with a reconstructed (raw, parsed) so a recovered original is backed up, not the wrapped
    *  bytes. `raw === null` means there was no settings.json; uninstall restores that by deleting the file. */
-  function freshInstall(raw: string | null, parsed: ClaudeSettings | null, healed: boolean): InstallResult {
+  function freshInstall(raw: string | null, parsed: ClaudeSettings | null): Omit<InstallResult, 'healed'> {
     const originalAbsent = raw === null
     const original = parsed?.statusLine
     const wrappedExisting = original !== undefined
@@ -213,7 +202,11 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
     let backupPath: string | null = null
     let mode: number | undefined
     if (raw !== null) {
-      mode = existsSync(settingsPath) ? statSync(settingsPath).mode & 0o777 : undefined
+      try {
+        mode = statSync(settingsPath).mode & 0o777
+      } catch {
+        mode = undefined // settings.json vanished between read and stat; back up without an explicit mode
+      }
       backupPath = freeBackupPath(iso)
       writeFileSync(backupPath, raw, { flag: 'wx', mode }) // never overwrite an existing backup
       if (mode !== undefined) chmodSync(backupPath, mode) // keep a 0600 secret at 0600, not the default 0644
@@ -225,7 +218,7 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
     const next: ClaudeSettings = { ...(parsed ?? {}), statusLine: { type: 'command', command: appCommand } }
     writeFileAtomic(settingsPath, JSON.stringify(next, null, 2) + '\n', mode) // mode preserved while wrapped
 
-    return { wrappedExisting, backupPath, healed }
+    return { wrappedExisting, backupPath }
   }
 
   function install(): InstallResult {
@@ -241,15 +234,15 @@ export function createSettingsManager(deps: SettingsManagerDeps = {}): SettingsM
       // Wrapped on disk but the record vanished. Re-wrapping as-is would wrap our own wrapper (recursion) and
       // lose the user's original. Instead recover their command from the wrapper script and reinstall clean:
       // reconstruct the pre-install settings so freshInstall backs up the original, not the wrapped bytes.
-      const recovered = recoverWrappedCommand()
-      const healedSettings: ClaudeSettings = { ...(parsed as ClaudeSettings) }
-      if (recovered !== null) healedSettings.statusLine = { type: 'command', command: recovered }
-      else delete healedSettings.statusLine
+      const wrapperSrc = readTextOrNull(wrapperPath)
+      const recovered = wrapperSrc === null ? null : recoverWrappedCommand(wrapperSrc)
+      const statusLine = recovered !== null ? { type: 'command', command: recovered } : undefined
+      const healedSettings: ClaudeSettings = { ...(parsed as ClaudeSettings), statusLine }
       const healedRaw = JSON.stringify(healedSettings, null, 2) + '\n'
-      return freshInstall(healedRaw, healedSettings, true)
+      return { ...freshInstall(healedRaw, healedSettings), healed: true }
     }
 
-    return freshInstall(raw, parsed, false)
+    return { ...freshInstall(raw, parsed), healed: false }
   }
 
   function uninstall(): void {

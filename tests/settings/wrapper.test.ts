@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { wrapperScript } from '../../src/main/settings/wrapper'
+import { recoverWrappedCommand, wrapperScript } from '../../src/main/settings/wrapper'
 import { createSettingsManager } from '../../src/main/settings/manager'
 import { tempHomes } from '../helpers/temp-home'
 
@@ -24,6 +24,26 @@ describe('wrapperScript (pure source)', () => {
     expect(src).not.toContain('| my-prompt')
     expect(src).not.toContain('cat "$src" |')
     expect(src).toContain('exit 0')
+  })
+})
+
+describe('recoverWrappedCommand (exact inverse of the bake)', () => {
+  it('round-trips a plain command, verbatim including an internal pipe', () => {
+    const cmd = 'npx ccusage statusline | head -1'
+    expect(recoverWrappedCommand(wrapperScript({ wrappedCommand: cmd }))).toBe(cmd)
+  })
+
+  it('round-trips a multi-line command the old first-line regex would have truncated', () => {
+    const cmd = 'foo --opt \\\n  --more'
+    expect(recoverWrappedCommand(wrapperScript({ wrappedCommand: cmd }))).toBe(cmd)
+  })
+
+  it('returns null for a capture-only wrapper (no original command)', () => {
+    expect(recoverWrappedCommand(wrapperScript({ wrappedCommand: null }))).toBeNull()
+  })
+
+  it('returns null for unrecognized text rather than guessing', () => {
+    expect(recoverWrappedCommand('not a wrapper')).toBeNull()
   })
 })
 
