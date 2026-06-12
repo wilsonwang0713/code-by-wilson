@@ -231,7 +231,7 @@ export function readSubagentSources(dir: string): SubagentSource[] {
     } catch {
       continue;
     }
-    let rows: any[] = [];
+    let rows: any[];
     try {
       rows = parseJsonlRows(
         readFileSync(join(dir, `agent-${agentId}.jsonl`), "utf8"),

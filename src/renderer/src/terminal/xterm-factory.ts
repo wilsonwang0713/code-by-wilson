@@ -90,5 +90,5 @@ export function createXterm(): {
   const wrapper = document.createElement("div");
   wrapper.style.height = "100%";
   wrapper.style.width = "100%";
-  return { term: term as unknown as XtermLike, fit, wrapper };
+  return { term: term, fit, wrapper };
 }

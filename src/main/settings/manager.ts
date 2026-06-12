@@ -141,6 +141,7 @@ export function createSettingsManager(
     } catch (err) {
       throw new Error(
         `code-by-wire: cannot create ${appDir}: ${(err as Error).message}`,
+        { cause: err },
       );
     }
   }
@@ -161,7 +162,7 @@ export function createSettingsManager(
    *  A symlinked target (settings.json linked into a dotfiles repo) is written THROUGH instead, since a
    *  rename would replace the link with a regular file; this keeps the original write-through behavior. */
   function writeFileAtomic(path: string, data: string, mode?: number): void {
-    let isSymlink = false;
+    let isSymlink: boolean;
     try {
       isSymlink = lstatSync(path).isSymbolicLink();
     } catch {
@@ -270,7 +271,7 @@ export function createSettingsManager(
           ? { type: "command", command: recovered }
           : undefined;
       const healedSettings: ClaudeSettings = {
-        ...(parsed as ClaudeSettings),
+        ...parsed,
         statusLine,
       };
       const healedRaw = JSON.stringify(healedSettings, null, 2) + "\n";

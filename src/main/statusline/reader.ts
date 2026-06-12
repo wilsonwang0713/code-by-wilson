@@ -77,8 +77,8 @@ function parseSample(
     typeof j.cwd === "string" && j.cwd.length > 0
       ? j.cwd
       : typeof workspace.current_dir === "string" &&
-          (workspace.current_dir as string).length > 0
-        ? (workspace.current_dir as string)
+          workspace.current_dir.length > 0
+        ? workspace.current_dir
         : null;
   return {
     sessionId,
@@ -97,8 +97,8 @@ function parseSample(
     version:
       typeof j.version === "string" && j.version.length > 0 ? j.version : null,
     effortLevel:
-      typeof effort.level === "string" && (effort.level as string).length > 0
-        ? (effort.level as string)
+      typeof effort.level === "string" && effort.level.length > 0
+        ? effort.level
         : null,
     cwd,
     sessionClockMs: num(cost.total_duration_ms),

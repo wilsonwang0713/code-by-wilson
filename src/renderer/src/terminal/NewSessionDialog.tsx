@@ -140,7 +140,7 @@ export function NewSessionDialog({
             Cancel
           </button>
           <button
-            onClick={create}
+            onClick={() => void create()}
             disabled={!cwd || busy}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
           >

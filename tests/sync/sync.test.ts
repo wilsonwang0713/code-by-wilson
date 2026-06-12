@@ -157,11 +157,11 @@ describe("syncSessions", () => {
     // After the upsert has run, make the prune statement throw. Upsert and prune share one
     // transaction now, so the advanced 'a' and the new 'z' must roll back with the failed prune.
     const realPrepare = db.prepare.bind(db);
-    db.prepare = ((sql: string) => {
+    db.prepare = (sql: string) => {
       if (/DELETE FROM sessions WHERE/i.test(sql))
         throw new Error("prune boom");
       return realPrepare(sql);
-    }) as typeof db.prepare;
+    };
     expect(() =>
       syncSessions(
         db,

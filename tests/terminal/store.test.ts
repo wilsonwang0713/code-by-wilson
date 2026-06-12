@@ -141,6 +141,8 @@ describe("createTerminalStore", () => {
     const evt = keydown({ key: "ArrowLeft", metaKey: true }); // cmd+left → line start
     const handled = h.made[0].pressKey(evt);
     expect(handled).toBe(false); // we sent it; xterm must not also emit its own sequence
+    // preventDefault is a vi.fn() mock on the event; asserting on the reference is intentional.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(evt.preventDefault).toHaveBeenCalled();
     expect(h.api.write).toHaveBeenCalledWith("a", "\x01"); // Ctrl-A
   });
@@ -152,7 +154,10 @@ describe("createTerminalStore", () => {
     const copy = keydown({ key: "c", metaKey: true }); // cmd+C stays copy
     expect(h.made[0].pressKey(plain)).toBe(true);
     expect(h.made[0].pressKey(copy)).toBe(true);
+    // preventDefault is a vi.fn() mock on each event; asserting on the references is intentional.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(plain.preventDefault).not.toHaveBeenCalled(); // must not swallow the browser default
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(copy.preventDefault).not.toHaveBeenCalled();
     expect(h.api.write).not.toHaveBeenCalled(); // the key handler sent nothing for either
   });
@@ -240,6 +245,8 @@ describe("createTerminalStore", () => {
     const h = harness();
     h.store.create("a");
     h.store.dispose("a");
+    // term.dispose is a vi.fn() mock; asserting on the reference is intentional.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(h.made[0].term.dispose).toHaveBeenCalled();
     expect(h.store.get("a")).toBeUndefined();
   });

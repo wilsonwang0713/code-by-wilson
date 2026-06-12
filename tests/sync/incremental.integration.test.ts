@@ -108,6 +108,8 @@ describe("incremental sync (real provider, scratch SQLite)", () => {
       now: () => NOW,
       recentWindowMs: WINDOW,
     });
+    // base.summarize is an arrow on a plain object (no `this`); wrapping it in a spy is a deliberate reference.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     const summarize = vi.fn(base.summarize);
     const provider = { ...base, summarize };
 

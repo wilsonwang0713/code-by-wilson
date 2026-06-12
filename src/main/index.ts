@@ -79,15 +79,15 @@ function createWindow(
   win.on("closed", () => registerRename(() => {}));
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    win.loadURL(process.env.ELECTRON_RENDERER_URL);
+    void win.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    win.loadFile(join(__dirname, "../renderer/index.html"));
+    void win.loadFile(join(__dirname, "../renderer/index.html"));
   }
 }
 
 app
   .whenReady()
-  .then(async () => {
+  .then(() => {
     const db = openDb(join(app.getPath("userData"), "index.db"));
     migrate(db); // bring the index schema up to date before the first sync
     // The registry of app-spawned ids, shared by reference: the terminal IPC writes it on spawn, the
@@ -172,7 +172,7 @@ app
       : undefined;
     createWindow(
       managed,
-      provider.resolveAdoptTarget,
+      (id) => provider.resolveAdoptTarget(id),
       registerRename,
       childEnv,
     );
@@ -180,7 +180,7 @@ app
       if (BrowserWindow.getAllWindows().length === 0)
         createWindow(
           managed,
-          provider.resolveAdoptTarget,
+          (id) => provider.resolveAdoptTarget(id),
           registerRename,
           childEnv,
         );

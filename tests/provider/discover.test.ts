@@ -16,7 +16,10 @@ const makeHome = tempHomes("cbw-");
 
 function writeSessionFile(home: string, raw: Record<string, unknown>): void {
   mkdirSync(join(home, "sessions"), { recursive: true });
-  writeFileSync(join(home, "sessions", `${raw.pid}.json`), JSON.stringify(raw));
+  writeFileSync(
+    join(home, "sessions", `${String(raw.pid)}.json`),
+    JSON.stringify(raw),
+  );
 }
 function writeTranscript(
   home: string,
