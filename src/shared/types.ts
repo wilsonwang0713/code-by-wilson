@@ -137,6 +137,13 @@ export interface Account {
   version?: string
   /** Logged-in account email, read from ~/.claude.json by the ipc layer (not derived from samples). */
   email?: string
+  /** API-billing endpoint, read from settings.json env by the ipc layer. Present only when billingMode
+   *  is 'api' (a base URL configured and no live subscription window). The renderer shows it as a bare host. */
+  apiBaseUrl?: string
+  /** How the API endpoint authenticates — present only alongside apiBaseUrl when an auth env var is set. */
+  apiAuthMethod?: 'token' | 'apiKey'
+  /** Upstream provider behind the gateway (e.g. a Portkey x-portkey-provider value). Present only when set. */
+  apiProvider?: string
 }
 
 /** What a Provider can do. Drives graceful degradation in the UI. */
