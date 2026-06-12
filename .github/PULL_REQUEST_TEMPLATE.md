@@ -8,6 +8,8 @@
 
 ## Checklist
 
+- [ ] `pnpm format:check` passes
+- [ ] `pnpm lint` passes
 - [ ] `pnpm typecheck` passes
 - [ ] `pnpm test` passes
 - [ ] Commits follow Conventional Commits
