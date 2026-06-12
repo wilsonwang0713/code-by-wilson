@@ -6,4 +6,5 @@ import { createXterm } from './xterm-factory'
 export const terminalStore = createTerminalStore({
   api: window.api.terminal,
   createTerminal: createXterm,
+  isMac: window.api.platform === 'darwin',
 })

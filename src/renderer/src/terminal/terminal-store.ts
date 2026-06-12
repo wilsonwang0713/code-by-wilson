@@ -1,11 +1,15 @@
 /// <reference lib="dom" />
 import { FLOW, type TerminalApi } from '@shared/terminal'
+import { macEditSequence } from './key-bindings'
 
 /** The xterm surface the store and the view actually use. Declared structurally so a real
  *  `@xterm/xterm` Terminal satisfies it AND a test fake can stand in without loading xterm. */
 export interface XtermLike {
   write(data: string, callback?: () => void): void
   onData(cb: (data: string) => void): { dispose(): void }
+  /** Intercept keys before xterm processes them. Return false to suppress xterm's own handling (we
+   *  send our own bytes); true to let xterm proceed. Real `@xterm/xterm` Terminal provides this. */
+  attachCustomKeyEventHandler(handler: (e: KeyboardEvent) => boolean): void
   dispose(): void
   open(element: HTMLElement): void
   focus(): void
@@ -38,6 +42,8 @@ export interface TerminalStoreDeps {
   api: TerminalApi
   /** Build a fresh xterm + fit + wrapper. Injected so the store is testable without a real DOM. */
   createTerminal: () => { term: XtermLike; fit: FitLike; wrapper: HTMLElement }
+  /** True on macOS. Gates the cmd/option editing keys so we never hijack Super+arrow elsewhere. */
+  isMac: boolean
 }
 
 export interface TerminalStore {
@@ -61,7 +67,7 @@ export interface TerminalStore {
  * FLOW.ackChars messages so it's not one IPC per write. This is VSCode's ack-on-xterm-parse loop,
  * scaled down.
  */
-export function createTerminalStore({ api, createTerminal }: TerminalStoreDeps): TerminalStore {
+export function createTerminalStore({ api, createTerminal, isMac }: TerminalStoreDeps): TerminalStore {
   const handles = new Map<string, TerminalHandle>()
   const pendingAck = new Map<string, number>() // consumed-but-unsent ack chars, per id
 
@@ -106,6 +112,18 @@ export function createTerminalStore({ api, createTerminal }: TerminalStoreDeps):
       const handle: TerminalHandle = { id, term, fit, wrapper, opened: false }
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.
       term.onData((data) => api.write(handle.id, data))
+      // macOS text-editing keys the Claude Code prompt understands but xterm won't emit on its own:
+      // cmd/option + arrows and deletes → readline control bytes (see key-bindings). Reads handle.id
+      // so input still follows a /clear rename. Mac-only so we never hijack Super+arrow elsewhere.
+      if (isMac) {
+        term.attachCustomKeyEventHandler((e) => {
+          const seq = macEditSequence(e)
+          if (seq === null) return true // not ours — plain keys, copy/paste, etc.
+          e.preventDefault()
+          api.write(handle.id, seq)
+          return false // we sent the bytes; stop xterm emitting its own sequence
+        })
+      }
       handles.set(id, handle)
       return handle
     },

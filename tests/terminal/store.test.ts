@@ -2,10 +2,15 @@ import { describe, it, expect, vi } from 'vitest'
 import { FLOW } from '../../src/shared/terminal'
 import { createTerminalStore, type XtermLike } from '../../src/renderer/src/terminal/terminal-store'
 
-/** A fake xterm that records writes (with their ack callbacks) and user-input wiring. */
+/** A fake xterm that records writes (with their ack callbacks), user-input wiring, and the custom
+ *  key handler the store attaches. */
 function fakeXterm() {
   const writes: Array<{ data: string; cb?: () => void }> = []
   let inputCb: (d: string) => void = () => {}
+  let keyHandler: (e: KeyboardEvent) => boolean = () => true
+  const attachKeyHandler = vi.fn((h: (e: KeyboardEvent) => boolean) => {
+    keyHandler = h
+  })
   const term: XtermLike = {
     write: (data, cb) => {
       writes.push({ data, cb })
@@ -14,6 +19,7 @@ function fakeXterm() {
       inputCb = cb
       return { dispose: () => {} }
     },
+    attachCustomKeyEventHandler: attachKeyHandler,
     dispose: vi.fn(),
     open: () => {},
     focus: () => {},
@@ -22,10 +28,16 @@ function fakeXterm() {
     cols: 80,
     rows: 24,
   }
-  return { term, writes, typeInput: (d: string) => inputCb(d) }
+  return {
+    term,
+    writes,
+    attachKeyHandler,
+    typeInput: (d: string) => inputCb(d),
+    pressKey: (e: KeyboardEvent) => keyHandler(e),
+  }
 }
 
-function harness() {
+function harness(isMac = true) {
   let dataRouter: (id: string, d: string) => void = () => {}
   let exitRouter: (id: string, c: number) => void = () => {}
   const api = {
@@ -49,6 +61,7 @@ function harness() {
   const made: ReturnType<typeof fakeXterm>[] = []
   const store = createTerminalStore({
     api,
+    isMac,
     createTerminal: () => {
       const f = fakeXterm()
       made.push(f)
@@ -56,6 +69,19 @@ function harness() {
     },
   })
   return { store, api, made, route: (id: string, d: string) => dataRouter(id, d), exit: (id: string, c: number) => exitRouter(id, c) }
+}
+
+/** A minimal stand-in for the KeyboardEvent xterm hands the custom key handler. */
+function keydown(props: { key: string; metaKey?: boolean; altKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }): KeyboardEvent {
+  return {
+    type: 'keydown',
+    key: props.key,
+    metaKey: props.metaKey ?? false,
+    altKey: props.altKey ?? false,
+    ctrlKey: props.ctrlKey ?? false,
+    shiftKey: props.shiftKey ?? false,
+    preventDefault: vi.fn(),
+  } as unknown as KeyboardEvent
 }
 
 describe('createTerminalStore', () => {
@@ -88,6 +114,50 @@ describe('createTerminalStore', () => {
     h.store.create('a')
     h.made[0].typeInput('ls\r')
     expect(h.api.write).toHaveBeenCalledWith('a', 'ls\r')
+  })
+
+  it('translates a mac editing combo to readline bytes and writes them to the pty', () => {
+    const h = harness()
+    h.store.create('a')
+    const evt = keydown({ key: 'ArrowLeft', metaKey: true }) // cmd+left → line start
+    const handled = h.made[0].pressKey(evt)
+    expect(handled).toBe(false) // we sent it; xterm must not also emit its own sequence
+    expect(evt.preventDefault).toHaveBeenCalled()
+    expect(h.api.write).toHaveBeenCalledWith('a', '\x01') // Ctrl-A
+  })
+
+  it('lets non-editing keys through without sending or preventing default', () => {
+    const h = harness()
+    h.store.create('a')
+    const plain = keydown({ key: 'a' }) // plain letter
+    const copy = keydown({ key: 'c', metaKey: true }) // cmd+C stays copy
+    expect(h.made[0].pressKey(plain)).toBe(true)
+    expect(h.made[0].pressKey(copy)).toBe(true)
+    expect(plain.preventDefault).not.toHaveBeenCalled() // must not swallow the browser default
+    expect(copy.preventDefault).not.toHaveBeenCalled()
+    expect(h.api.write).not.toHaveBeenCalled() // the key handler sent nothing for either
+  })
+
+  it('passes a keyup of an editing combo through (only keydown sends)', () => {
+    const h = harness()
+    h.store.create('a')
+    const up = { ...keydown({ key: 'ArrowLeft', metaKey: true }), type: 'keyup' } as unknown as KeyboardEvent
+    expect(h.made[0].pressKey(up)).toBe(true)
+    expect(h.api.write).not.toHaveBeenCalled()
+  })
+
+  it('editing keys follow a /clear rename onto the new id', () => {
+    const h = harness()
+    h.store.create('a')
+    h.store.rename('a', 'b')
+    h.made[0].pressKey(keydown({ key: 'ArrowRight', altKey: true })) // option+right → word forward
+    expect(h.api.write).toHaveBeenCalledWith('b', '\x1bf') // Esc-f, under the rotated id
+  })
+
+  it('does not attach the editing handler on non-mac platforms', () => {
+    const h = harness(false)
+    h.store.create('a')
+    expect(h.made[0].attachKeyHandler).not.toHaveBeenCalled()
   })
 
   it('acks consumed output in 5k chunks once xterm finishes the write', () => {
