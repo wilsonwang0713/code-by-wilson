@@ -199,9 +199,9 @@ export function App() {
 
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
-      <GlobalHeader onNew={() => setCreating(true)} />
+      <GlobalHeader />
       <div className="flex min-h-0 flex-1">
-        <SessionList sessions={all} selectedId={selectedId} onSelect={setSelectedId} query={query} onQuery={setQuery} account={account} />
+        <SessionList sessions={all} selectedId={selectedId} onSelect={setSelectedId} onNew={() => setCreating(true)} query={query} onQuery={setQuery} account={account} />
         <div className="flex min-w-0 flex-1">
           {selected ? (
             <Workspace key={selected.id} session={selected} account={account} onAdopt={adoptSession} />

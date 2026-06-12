@@ -17,6 +17,7 @@ export function SessionList({
   sessions,
   selectedId,
   onSelect,
+  onNew,
   query,
   onQuery,
   account,
@@ -24,6 +25,7 @@ export function SessionList({
   sessions: Session[]
   selectedId: string | null
   onSelect: (id: string) => void
+  onNew: () => void
   query: string
   onQuery: (q: string) => void
   account?: Account | null
@@ -48,6 +50,16 @@ export function SessionList({
   return (
     <aside className="flex w-[332px] shrink-0 flex-col border-r border-ink-800 bg-ink-925">
       <RailAccount account={account ?? null} now={accountClock} />
+      <div className="shrink-0 border-b border-ink-800 p-3">
+        <button
+          type="button"
+          onClick={onNew}
+          className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 text-[13px] font-semibold text-primary-bright transition-colors hover:border-primary/60 hover:bg-primary/20"
+        >
+          <Icon name="plus" size={14} />
+          New session
+        </button>
+      </div>
       <div className="shrink-0 border-b border-ink-800 p-3">
         <div className="flex h-8 items-center gap-2 rounded-md border border-ink-700 bg-well px-2.5">
           <Icon name="search" size={14} className="shrink-0 text-fg-faint" />
