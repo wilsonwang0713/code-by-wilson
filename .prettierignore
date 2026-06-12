@@ -1,0 +1,7 @@
+out/
+dist/
+release/
+pnpm-lock.yaml
+.claude/skills/
+CHANGELOG.md
+docs/superpowers/

@@ -28,7 +28,9 @@
     "test:watch": "vitest",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3,node-pty",
     "icon": "electron scripts/make-icon.mjs",
-    "dist": "electron-vite build && electron-builder --mac --publish never"
+    "dist": "electron-vite build && electron-builder --mac --publish never",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
