@@ -7,6 +7,7 @@ import { join } from 'node:path'
 const root = join(__dirname, '..', '..')
 const css = readFileSync(join(root, 'src/renderer/src/index.css'), 'utf8')
 const view = readFileSync(join(root, 'src/renderer/src/terminal/TerminalView.tsx'), 'utf8')
+const workspace = readFileSync(join(root, 'src/renderer/src/workspace/Workspace.tsx'), 'utf8')
 
 describe('terminal chrome — borderless, padded, edge scrollbar', () => {
   it('the container has no border or radius and keeps the well background', () => {
@@ -26,5 +27,11 @@ describe('terminal chrome — borderless, padded, edge scrollbar', () => {
     expect(css).toMatch(/\.xterm\s+\.xterm-viewport\s*\{[^}]*background:\s*transparent/)
     expect(css, 'thumb revealed on hover/scroll via is-scrolling').toContain('is-scrolling')
     expect(css).toMatch(/\.xterm-viewport[^{]*::-webkit-scrollbar-thumb/)
+  })
+
+  it('lets the terminal fill its wrapper with no outer padding (only the 8px inside it)', () => {
+    const m = /className="([^"]*)"[^>]*>\s*<TerminalView/.exec(workspace)
+    expect(m, 'wrapper div around TerminalView in Workspace.tsx').toBeTruthy()
+    expect(m![1], 'no outer padding/margin on the terminal wrapper').not.toMatch(/\b[pm][xytrbl]?-/)
   })
 })
