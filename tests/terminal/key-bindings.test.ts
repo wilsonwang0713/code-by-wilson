@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { macEditSequence, type EditKey } from '../../src/renderer/src/terminal/key-bindings'
 
-/** Build an EditKey, keydown with no modifiers by default. */
+/** Build an EditKey, keydown with no modifiers and no IME composition by default. */
 function key(over: Partial<EditKey> & { key: string }): EditKey {
-  return { type: 'keydown', metaKey: false, altKey: false, ctrlKey: false, shiftKey: false, ...over }
+  return { type: 'keydown', metaKey: false, altKey: false, ctrlKey: false, shiftKey: false, isComposing: false, ...over }
 }
 
 describe('macEditSequence — readline bytes for the Claude Code prompt', () => {
@@ -39,5 +39,11 @@ describe('macEditSequence — readline bytes for the Claude Code prompt', () => 
     expect(macEditSequence(key({ key: 'ArrowLeft', ctrlKey: true }))).toBeNull()
     expect(macEditSequence(key({ key: 'ArrowLeft', metaKey: true, altKey: true }))).toBeNull() // ambiguous
     expect(macEditSequence(key({ key: 'ArrowLeft', metaKey: true, type: 'keyup' }))).toBeNull() // only keydown sends
+  })
+
+  it('ignores an otherwise-mapped combo while an IME composition is active', () => {
+    // Mid-composition the keystroke must reach xterm's composition handler, not become a readline byte.
+    expect(macEditSequence(key({ key: 'ArrowLeft', altKey: true, isComposing: true }))).toBeNull()
+    expect(macEditSequence(key({ key: 'Backspace', metaKey: true, isComposing: true }))).toBeNull()
   })
 })

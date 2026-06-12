@@ -154,10 +154,12 @@ describe('createTerminalStore', () => {
     expect(h.api.write).toHaveBeenCalledWith('b', '\x1bf') // Esc-f, under the rotated id
   })
 
-  it('does not attach the editing handler on non-mac platforms', () => {
+  it('does not attach the editing handler on non-mac platforms, but still forwards typed input', () => {
     const h = harness(false)
     h.store.create('a')
     expect(h.made[0].attachKeyHandler).not.toHaveBeenCalled()
+    h.made[0].typeInput('x') // ordinary keystrokes still reach the pty via onData, no editing map in the way
+    expect(h.api.write).toHaveBeenCalledWith('a', 'x')
   })
 
   it('acks consumed output in 5k chunks once xterm finishes the write', () => {

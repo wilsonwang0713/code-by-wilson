@@ -7,6 +7,9 @@ export interface EditKey {
   altKey: boolean
   ctrlKey: boolean
   shiftKey: boolean
+  /** True while an IME composition is active (real `KeyboardEvent.isComposing`). We bail in that
+   *  window so the keystroke reaches xterm's composition handler instead of becoming a readline byte. */
+  isComposing: boolean
 }
 
 /**
@@ -16,10 +19,14 @@ export interface EditKey {
  * The prompt is readline-style: it does NOT interpret xterm's arrow-modifier sequences (`\x1b[1;3D`
  * for option+arrow, `\x1b[1;5D` for ctrl+arrow), so a raw xterm terminal leaves option+arrow inert.
  * We send the raw readline bytes instead. Only keydown is translated. Shift combos (selection — not a
- * thing in this prompt), ctrl combos, ambiguous cmd+option, and everything unmapped return null.
+ * thing in this prompt), ctrl combos, ambiguous cmd+option, keys mid-IME-composition, and everything
+ * unmapped return null.
  */
 export function macEditSequence(e: EditKey): string | null {
   if (e.type !== 'keydown') return null
+  // Mid-composition (CJK/dead-key): let xterm's composition handler own the key. We run before it, so
+  // translating here would inject a readline byte into the middle of an IME session and corrupt it.
+  if (e.isComposing) return null
   if (e.ctrlKey || e.shiftKey) return null
   const cmd = e.metaKey && !e.altKey
   const opt = e.altKey && !e.metaKey
