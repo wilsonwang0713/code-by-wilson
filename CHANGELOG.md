@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-12
+
+### Changed
+
+- Releases are now signed with a Developer ID certificate and notarized by
+  Apple, so the downloaded `.dmg` opens without a Gatekeeper warning.
+
 ## [0.1.1] - 2026-06-12
 
 ### Added
@@ -45,6 +52,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/luojiahai/code-by-wire/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/luojiahai/code-by-wire/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.0
