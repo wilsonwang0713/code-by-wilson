@@ -15,19 +15,14 @@ sight. One pane instead of a dozen terminal windows.
 
 ## The name
 
-Fly-by-wire replaced the mechanical linkages between a pilot's stick and the
-control surfaces with an electronic interface. The pilot still flies. They just
-command intent, and the computers handle the execution.
+Fly-by-wire didn't take the plane away from the pilot. It put a computer
+between the stick and the control surfaces, so the pilot commands intent and the
+machine handles execution. The pilot still flies, just more capable and more
+precise.
 
-Code-by-wire is that idea for software. You stop typing every keystroke and
-start commanding intent. The agent executes, and the cockpit keeps you in the
-loop: live state, the full transcript, and the controls to take over the moment
-you need to.
-
-None of that takes the human out of the seat. Fly-by-wire never flew the plane
-for the pilot. It made one pilot more capable and more precise. Code-by-wire
-makes the same bet: you stay pilot in command. The tooling amplifies what you
-can do, then gets out of your way.
+Code-by-wire is that idea for software. You command intent, the agent executes,
+and you stay pilot in command: live state, the full transcript, and the controls
+to take over whenever you want.
 
 ## Preview
 
