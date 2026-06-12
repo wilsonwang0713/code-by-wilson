@@ -10,6 +10,10 @@ A desktop app that puts every Claude Code session in one place: live state,
 transcript, terminal, and the cost and context telemetry the CLI keeps out of
 sight. One pane instead of a dozen terminal windows.
 
+[![Download for macOS](https://img.shields.io/badge/Download%20for%20macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/luojiahai/code-by-wire/releases/latest)
+
+Apple Silicon, signed and notarized.
+
 ## Preview
 
 ![code-by-wire](docs/assets/preview.png)
@@ -25,15 +29,10 @@ sight. One pane instead of a dozen terminal windows.
 
 ## Install
 
-1. Download the latest `.dmg` from
-   [Releases](https://github.com/luojiahai/code-by-wire/releases).
+1. [Download the latest `.dmg`](https://github.com/luojiahai/code-by-wire/releases/latest).
 2. Open it and drag code-by-wire to Applications.
-3. The build is **unsigned**, so the first launch needs one extra step. Either
-   right-click the app and choose **Open**, or clear the quarantine flag:
-
-   ```
-   xattr -dr com.apple.quarantine /Applications/code-by-wire.app
-   ```
+3. Launch it. The app is signed and notarized by Apple, so it opens straight
+   away, no Gatekeeper warning and no quarantine workaround.
 
 ## Requirements
 
