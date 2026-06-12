@@ -114,6 +114,20 @@ describe("createTerminalManager", () => {
     ]);
   });
 
+  it("declares truecolor capability (COLORTERM) so claude emits 24-bit color, not a muted 256-color approximation", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    // A Finder-launched .app inherits launchd's bare env (no COLORTERM), and the pty's TERM is only
+    // xterm-256color — so claude's color detection caps below truecolor and quantizes its mascot
+    // orange to the nearest 256-cube index. Declaring COLORTERM=truecolor (our WebGL terminal really
+    // is 24-bit capable) restores the exact color. Layered on top of the resolved env, overriding any
+    // inherited value, since the capability is ours to declare, not the launching shell's.
+    expect(h.ptys[0].state.spawnedWith!.env).toMatchObject({
+      PATH: "/usr/bin",
+      COLORTERM: "truecolor",
+    });
+  });
+
   it("reports the pty pid alongside the id, so the registry can anchor Managed-ness to the process", () => {
     const h = harness();
     h.manager.spawn(REQ);
