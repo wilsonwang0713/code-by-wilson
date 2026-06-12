@@ -21,6 +21,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Simplified the account rail to host and plan, dropping Auth and Via.
 - Made the terminal borderless with an edge scrollbar so it fills its panel.
 - Trimmed the global header to 40px.
+- Anchored the wordmark top-left, sliding into the corner in fullscreen once the
+  traffic lights clear.
+- Tightened the Session and Git panel row spacing to match the rail.
 
 ### Removed
 
