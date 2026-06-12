@@ -23,12 +23,15 @@ Re-run `pnpm rebuild:native` after any Electron upgrade.
 ## Before you push
 
 ```
+pnpm format:check
+pnpm lint
 pnpm typecheck
 pnpm test
 ```
 
-Both must pass. `pnpm test` runs the provider read tests over the redacted
-`~/.claude` fixtures in `tests/fixtures/`.
+All four must pass. `pnpm format` rewrites files in place; `pnpm lint:fix`
+auto-fixes what it can. `pnpm test` runs the provider read tests over the
+redacted `~/.claude` fixtures in `tests/fixtures/`.
 
 ## Commits and PRs
 
