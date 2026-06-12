@@ -12,7 +12,7 @@
 Code-by-wire 是一款桌面应用，把每一个 agentic 编码会话都集中到一处：实时状态、完整记录、
 终端，以及 CLI 默默藏起来的成本与上下文遥测。一块面板，取代十几个终端窗口。
 
-[![Download for macOS (Apple Silicon)](https://img.shields.io/badge/Download%20for%20macOS%20%28Apple%20Silicon%29-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/luojiahai/code-by-wire/releases/latest)
+[![下载 macOS 版（Apple Silicon）](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%20macOS%20%E7%89%88%EF%BC%88Apple%20Silicon%EF%BC%89-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/luojiahai/code-by-wire/releases/latest)
 
 ## 名字的由来
 
