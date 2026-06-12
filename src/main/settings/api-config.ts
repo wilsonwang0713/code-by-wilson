@@ -1,17 +1,10 @@
 import { join } from 'node:path'
+import type { ApiConfig } from '@shared/types'
 import { readTextOrNull } from '../claude-config'
 
-/** API-billing identity read from settings.json env. Present only when a base URL is configured — the
- *  absence of ANTHROPIC_BASE_URL means there's no API endpoint to surface, so the reader returns null. */
-export interface ApiConfig {
-  /** The configured endpoint, verbatim from ANTHROPIC_BASE_URL. The renderer strips the scheme for display. */
-  baseUrl: string
-  /** How the gateway authenticates — an auth token vs an API key. Omitted when neither env var is set. */
-  authMethod?: 'token' | 'apiKey'
-  /** Upstream provider from the x-portkey-provider entry of ANTHROPIC_CUSTOM_HEADERS, '@' stripped.
-   *  Omitted when the header is absent. */
-  provider?: string
-}
+// ApiConfig lives in @shared/types because deriveAccount (shared) consumes it. Re-exported here so callers
+// that read the config keep importing the reader and its type from one place.
+export type { ApiConfig }
 
 /** Pull the x-portkey-provider value out of an ANTHROPIC_CUSTOM_HEADERS string. The string is one or more
  *  `Name: value` entries separated by newlines or commas; only that one entry is read, its leading '@' and

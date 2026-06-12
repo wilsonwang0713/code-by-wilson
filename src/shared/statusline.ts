@@ -1,4 +1,4 @@
-import type { Account, RateLimit, Session } from './types'
+import type { Account, ApiConfig, RateLimit, Session } from './types'
 import type { ContextBreakdown } from './transcript'
 import { contextTotal } from './context'
 
@@ -71,17 +71,29 @@ function liveWindow(w: RateLimit | undefined, now: number): RateLimit | undefine
 }
 
 /**
- * The app-wide Account from the live statusLine captures within `staleMs` of `now`. Billing mode is
- * detected from rate-limit presence (ADR-0001): a capture carrying rate_limits is a subscription; to
- * avoid flapping (a subscription session that hasn't had its first API response yet, or an API-key
- * session running alongside, carries no rate_limits) the account takes its windows from the freshest
- * capture that HAS them, and reports `unknown` when no fresh capture carries any (absence is not proof
- * of API billing). Returns null when there's no recent statusLine data at all (the UI reads null as
- * "no bars"). Each window is dropped once its reset has passed, so a stale capture can't show an
- * expired limit as current; and once a capture's windows have ALL expired it no longer counts as a
- * subscription at all — the account falls back to `unknown` rather than a window-less 'subscription'.
+ * The app-wide Account from the live statusLine captures within `staleMs` of `now`, plus the configured
+ * `apiConfig` (read from settings.json by the main process). Billing mode is decided here, in one place:
+ *
+ * - subscription: rate-limit presence is the signal (ADR-0001). A capture carrying rate_limits is a
+ *   subscription; the account takes its windows from the freshest capture that HAS them. To avoid flapping
+ *   (a subscription session before its first API response, or an API-key session running alongside, carries
+ *   no rate_limits) a newer no-limits capture can't override an older with-limits one. Each window is dropped
+ *   once its reset has passed, so a stale capture can't show an expired limit as current.
+ * - unknown: no live window AND no API endpoint to surface. Reached when every window has expired (a
+ *   dormant subscriber — still a subscriber, just idle), or when no capture carries rate_limits and no base
+ *   URL is configured. The block disappears rather than show a window-less 'subscription'.
+ * - api: ONLY when no capture ever carried rate_limits (no subscription evidence at all) and `apiConfig`
+ *   has a base URL. A capture with rate_limits — even all-expired — is proof of a subscription, so a dormant
+ *   subscriber is NEVER relabeled API billing just because a base URL happens to be configured.
+ *
+ * Returns null when there's no recent statusLine data at all (the UI reads null as "no bars").
  */
-export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, staleMs: number): Account | null {
+export function deriveAccount(
+  samples: Iterable<StatusLineSample>,
+  now: number,
+  staleMs: number,
+  apiConfig: ApiConfig | null = null,
+): Account | null {
   let freshest: StatusLineSample | null = null
   let withLimits: StatusLineSample | null = null
   for (const s of samples) {
@@ -94,9 +106,9 @@ export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, 
     const sevenDay = liveWindow(withLimits.rateLimits.sevenDay, now)
     const sevenDaySonnet = liveWindow(withLimits.rateLimits.sevenDaySonnet, now)
     const sevenDayOpus = liveWindow(withLimits.rateLimits.sevenDayOpus, now)
-    // A still-live window is the only proof of a current subscription. Once every window has passed its
-    // reset, the capture is stale evidence — a long-idle account, or one that has since switched providers
-    // — so fall through to 'unknown' rather than keep the 'subscription' label with no live window behind it.
+    // A still-live window is the only proof of a *current* subscription. Once every window has passed its
+    // reset, fall through — but `withLimits` stays set, so the api branch below knows this is a dormant
+    // subscriber and won't relabel it API billing.
     if (fiveHour || sevenDay || sevenDaySonnet || sevenDayOpus) {
       const acc: Account = { billingMode: 'subscription', fiveHour, sevenDay, sevenDaySonnet, sevenDayOpus }
       if (freshest?.version) acc.version = freshest.version
@@ -104,7 +116,17 @@ export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, 
     }
   }
   if (freshest) {
-    const acc: Account = { billingMode: 'unknown' }
+    // Promote to api only when there's no subscription evidence at all (`withLimits` null — no capture ever
+    // carried rate_limits) and an endpoint is configured. A dormant subscriber (withLimits set, all expired)
+    // falls to 'unknown' instead, so its cost never mislabels as 'Actual API spend'.
+    let acc: Account
+    if (!withLimits && apiConfig) {
+      acc = { billingMode: 'api', apiBaseUrl: apiConfig.baseUrl }
+      if (apiConfig.authMethod) acc.apiAuthMethod = apiConfig.authMethod
+      if (apiConfig.provider) acc.apiProvider = apiConfig.provider
+    } else {
+      acc = { billingMode: 'unknown' }
+    }
     if (freshest.version) acc.version = freshest.version
     return acc
   }

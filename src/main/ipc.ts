@@ -44,25 +44,14 @@ export function registerIpc({ db, provider, statusLine, accountEmail, apiConfig,
     const now = Date.now()
     const base = getOverview(db)
     const byId = freshestBySession(reader.read())
-    const account = deriveAccount(byId.values(), now, CAPTURE_STALE_MS)
-    if (account) {
-      if (account.billingMode === 'subscription') {
-        // Subscription identity: the oauthAccount email (ADR-0001). Read only here — beside gateway
-        // billing it would mislabel, so a non-subscription account never gets it.
-        const email = readEmail()
-        if (email) account.email = email
-      } else {
-        // Not a live subscription. If a base URL is configured, this is API billing — promote the
-        // account from 'unknown' to 'api' and surface the endpoint. Subscription wins, so this branch
-        // is only reached when no live rate-limit window exists.
-        const api = readApi()
-        if (api) {
-          account.billingMode = 'api'
-          account.apiBaseUrl = api.baseUrl
-          if (api.authMethod) account.apiAuthMethod = api.authMethod
-          if (api.provider) account.apiProvider = api.provider
-        }
-      }
+    // deriveAccount owns the whole billing decision: subscription (live window) vs api (a base URL and no
+    // rate_limits evidence) vs unknown. Pass the configured endpoint so it can surface api billing in one place.
+    const account = deriveAccount(byId.values(), now, CAPTURE_STALE_MS, readApi())
+    if (account?.billingMode === 'subscription') {
+      // Subscription identity: the oauthAccount email (ADR-0001). Attached only here, only for a
+      // subscription — beside gateway billing it would mislabel, so a non-subscription account never gets it.
+      const email = readEmail()
+      if (email) account.email = email
     }
     return {
       sessions: overlaySessions(base.sessions, byId),

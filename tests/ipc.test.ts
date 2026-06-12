@@ -237,6 +237,30 @@ describe('registerIpc overview — api billing', () => {
     expect(o.account?.apiBaseUrl).toBeUndefined()
   })
 
+  it('does not relabel a dormant subscription (all windows expired) as api even when apiConfig is present', () => {
+    // Regression: a real subscription gone idle still writes captures carrying rate_limits whose windows
+    // have reset. deriveAccount returns 'unknown', but the rate_limits history proves the account is a
+    // subscriber, not API billing. Promoting it to 'api' just because a base URL is configured would flip
+    // every session's cost label from '~equivalent value' to 'Actual API spend'.
+    const db = openTestDb()
+    migrate(db)
+    upsertSessions(db, [seed])
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      statusLine: reader([
+        lineSample({
+          sessionId: 'seed',
+          rateLimits: { fiveHour: { usedPct: 80, resetsAt: Date.now() - 1 }, sevenDay: { usedPct: 40, resetsAt: Date.now() - 1 } },
+        }),
+      ]),
+      apiConfig: () => ({ baseUrl: 'https://api.portkey.ai' }),
+    })
+    const o = handlers.get(IPC.overview)!() as OverviewData
+    expect(o.account?.billingMode).toBe('unknown')
+    expect(o.account?.apiBaseUrl).toBeUndefined()
+  })
+
   it('leaves an unknown account untouched when apiConfig returns null (no base URL configured)', () => {
     const db = openTestDb()
     migrate(db)

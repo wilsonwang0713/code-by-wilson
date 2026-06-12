@@ -131,6 +131,40 @@ describe('deriveAccount', () => {
   })
 })
 
+describe('deriveAccount — api billing', () => {
+  it('promotes to api when no capture carries rate_limits and a base URL is configured', () => {
+    const api = { baseUrl: 'https://api.portkey.ai', authMethod: 'token' as const, provider: 'bedrock-use1-nonprod' }
+    expect(deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS, api)).toEqual({
+      billingMode: 'api',
+      apiBaseUrl: 'https://api.portkey.ai',
+      apiAuthMethod: 'token',
+      apiProvider: 'bedrock-use1-nonprod',
+    })
+  })
+
+  it('does NOT relabel a dormant subscriber as api: a capture that carried rate_limits (all expired) stays unknown', () => {
+    // The mixed Opus-subscription + gateway case. The freshest with-limits capture has every window past
+    // its reset, so it is not a *live* subscription — but the rate_limits history proves the account IS a
+    // subscriber, just idle. Relabeling it API billing would wrongly flip the cost label to 'Actual API spend'.
+    const s = sample({ rateLimits: { fiveHour: { usedPct: 80, resetsAt: NOW - 1 }, sevenDay: { usedPct: 40, resetsAt: NOW - 1 } } })
+    expect(deriveAccount([s], NOW, STALE_MS, { baseUrl: 'https://api.portkey.ai' })).toEqual({ billingMode: 'unknown' })
+  })
+
+  it('keeps subscription over api when a window is live and a base URL is also configured (subscription wins)', () => {
+    const s = sample({ rateLimits: { fiveHour: { usedPct: 20, resetsAt: NOW + 3_600_000 } } })
+    expect(deriveAccount([s], NOW, STALE_MS, { baseUrl: 'https://api.portkey.ai' })?.billingMode).toBe('subscription')
+  })
+
+  it('carries the CLI version onto a promoted api account, like the unknown fallback does', () => {
+    const api = { baseUrl: 'https://api.portkey.ai' }
+    expect(deriveAccount([sample({ rateLimits: null, version: '2.0.14' })], NOW, STALE_MS, api)).toEqual({
+      billingMode: 'api',
+      apiBaseUrl: 'https://api.portkey.ai',
+      version: '2.0.14',
+    })
+  })
+})
+
 describe('overlaySessions', () => {
   it('overlays live cost, lines, and context onto a Session that has a sample', () => {
     const byId = freshestBySession([
