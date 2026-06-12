@@ -1,3 +1,23 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development
+
+- Package manager is **pnpm** (pinned), Node 24. Use `pnpm`, never `npm`.
+- After `pnpm install` or any Electron upgrade, run `pnpm rebuild:native` — `better-sqlite3` and `node-pty` are native modules and must be rebuilt against Electron's ABI, or the app crashes on launch.
+- `pnpm typecheck` runs two passes: `tsconfig.node.json` (main/preload/shared/tests) and `tsconfig.web.json` (React renderer, JSX). Test-reachable types must live in JSX-free `.ts` so they pass under the node config.
+- Before pushing, run `pnpm format` and `pnpm lint` — CI's lint job runs `format:check` then `lint` and fails on either.
+
+## Code style
+
+- `no-unsafe-*` lint rules are intentionally downgraded to warn for `src/main/provider/claude/` — those readers consume `any` from external transcript JSON. Don't "fix" the warnings.
+
+## Commits & PRs
+
+- Conventional Commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `ci`, `build`, `test`), optional scope.
+- No `Co-Authored-By` trailer in commits and no footer in PR bodies — match the clean existing history.
+
 ## Agent skills
 
 ### Issue tracker
