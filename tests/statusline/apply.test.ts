@@ -109,6 +109,26 @@ describe('deriveAccount', () => {
     })
     expect(deriveAccount([s], NOW, STALE_MS)).toEqual({ billingMode: 'unknown', version: '2.0.14' })
   })
+
+  it('stays subscription on a lone live per-model window — any one live window is proof enough', () => {
+    // The 5h and weekly windows have both reset, but the per-model Opus bucket is still live. A single
+    // live window keeps the account 'subscription'; this exercises the sevenDayOpus term of the OR that
+    // a fiveHour/sevenDay-only test would leave unchecked.
+    const s = sample({
+      rateLimits: {
+        fiveHour: { usedPct: 80, resetsAt: NOW - 1 },
+        sevenDay: { usedPct: 40, resetsAt: NOW - 1 },
+        sevenDayOpus: { usedPct: 55, resetsAt: NOW + 86_400_000 },
+      },
+    })
+    expect(deriveAccount([s], NOW, STALE_MS)).toEqual({
+      billingMode: 'subscription',
+      fiveHour: undefined, // reset → dropped
+      sevenDay: undefined, // reset → dropped
+      sevenDaySonnet: undefined,
+      sevenDayOpus: { usedPct: 55, resetsAt: NOW + 86_400_000 },
+    })
+  })
 })
 
 describe('overlaySessions', () => {

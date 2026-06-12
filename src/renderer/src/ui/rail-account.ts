@@ -51,6 +51,9 @@ export function railAccountModel(account: Account | null, now: number): RailAcco
   if (account.sevenDaySonnet) gauges.push(gauge('Sonnet', account.sevenDaySonnet, now, false))
   if (account.sevenDayOpus) gauges.push(gauge('Opus', account.sevenDayOpus, now, false))
   const email = account.email ?? null
-  if (!email && gauges.length === 0) return null // subscription with nothing live to show (windows all expired)
+  // Defensive: deriveAccount only labels a capture 'subscription' when at least one window is still live,
+  // so a subscription reaching here always has a gauge. This guards the degenerate no-email/no-window
+  // shape (e.g. a hand-built Account) rather than any state the live derivation produces.
+  if (!email && gauges.length === 0) return null
   return { email, plan: planLabel(account.billingMode), gauges }
 }
