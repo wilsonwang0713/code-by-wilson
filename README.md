@@ -24,6 +24,11 @@ start commanding intent. The agent executes, and the cockpit keeps you in the
 loop: live state, the full transcript, and the controls to take over the moment
 you need to.
 
+None of that takes the human out of the seat. Fly-by-wire never flew the plane
+for the pilot. It made one pilot more capable and more precise. Code-by-wire
+makes the same bet: you stay pilot in command. The tooling amplifies what you
+can do, then gets out of your way.
+
 ## Preview
 
 ![code-by-wire](docs/assets/preview.png)
