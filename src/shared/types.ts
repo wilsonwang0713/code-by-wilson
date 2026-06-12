@@ -137,6 +137,26 @@ export interface Account {
   version?: string
   /** Logged-in account email, read from ~/.claude.json by the ipc layer (not derived from samples). */
   email?: string
+  /** API-billing endpoint from settings.json env. Present only when billingMode is 'api' — a base URL is
+   *  configured AND no capture ever carried rate_limits (no subscription evidence). The renderer shows it
+   *  as a bare host. */
+  apiBaseUrl?: string
+  /** How the API endpoint authenticates — present only alongside apiBaseUrl when an auth env var is set. */
+  apiAuthMethod?: 'token' | 'apiKey'
+  /** Upstream provider behind the gateway (e.g. a Portkey x-portkey-provider value). Present only when set. */
+  apiProvider?: string
+}
+
+/** API-billing identity read from settings.json env (by the main process), then fed to deriveAccount as the
+ *  endpoint to surface when no subscription evidence exists. Present only when a base URL is configured. */
+export interface ApiConfig {
+  /** The configured endpoint, from ANTHROPIC_BASE_URL. The renderer strips the scheme for display. */
+  baseUrl: string
+  /** How the gateway authenticates — an auth token vs an API key. Omitted when neither env var is set. */
+  authMethod?: 'token' | 'apiKey'
+  /** Upstream provider from the x-portkey-provider entry of ANTHROPIC_CUSTOM_HEADERS, '@' stripped.
+   *  Omitted when the header is absent. */
+  provider?: string
 }
 
 /** What a Provider can do. Drives graceful degradation in the UI. */
