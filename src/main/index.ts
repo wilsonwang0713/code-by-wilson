@@ -63,7 +63,10 @@ app.whenReady()
     // Wrap the user's statusLine so live cost/context and account rate limits flow to the app
     // (ADR-0001). Idempotent and reversible; a failure must never cost the user a window.
     try {
-      createSettingsManager().install()
+      const result = createSettingsManager().install()
+      if (result.healed) {
+        console.warn('statusLine state.json was missing; recovered the original command from the wrapper and reinstalled')
+      }
     } catch (err) {
       console.error('statusLine install failed; live rate limits and cost will be unavailable', err)
     }

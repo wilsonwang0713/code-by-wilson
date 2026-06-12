@@ -233,19 +233,41 @@ describe('trust-safety — desync between settings.json and state.json', () => {
     expect(mgr.isInstalled()).toBe(true) // still wrapped — a missing record must not read as "not installed"
   })
 
-  it('install refuses to reinstall over a wrapped settings.json with no state record', () => {
+  it('install self-heals a wrapped settings.json with no state record by recovering from the wrapper', () => {
     const home = makeHome()
     writeFileSync(settingsPath(home), JSON.stringify({ statusLine: { type: 'command', command: 'mine' } }, null, 2))
     const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
-    const first = mgr.install()
+    mgr.install()
 
-    rmSync(join(home, '.code-by-wire', 'state.json'))
+    rmSync(join(home, '.code-by-wire', 'state.json')) // the record vanishes while the wrapper survives
 
-    // Must not fabricate a clean-install result over an already-wrapped file.
-    expect(() => mgr.install()).toThrow(/install record|wrapped/i)
-    // ...and must not mint a second backup behind the user's back.
-    expect(readdirSync(home).filter((f) => f.endsWith('.bak'))).toHaveLength(1)
-    expect(first.backupPath).not.toBeNull()
+    const healed = mgr.install()
+    expect(healed.healed).toBe(true)
+    expect(healed.wrappedExisting).toBe(true)
+    expect(mgr.isInstalled()).toBe(true) // still wrapped, now consistent again
+
+    // state.json is rebuilt with the original command recovered from the wrapper, not our own wrapper path.
+    expect(readState(home).wrappedCommand).toBe('mine')
+    // ...and the new backup holds the reconstructed original, so uninstall can still restore it.
+    expect(JSON.parse(readFileSync(healed.backupPath!, 'utf8')).statusLine.command).toBe('mine')
+
+    mgr.uninstall()
+    expect(readJson(home).statusLine.command).toBe('mine')
+  })
+
+  it('install self-heals to a clean reinstall when the wrapper is also gone (nothing to recover)', () => {
+    const home = makeHome()
+    writeFileSync(settingsPath(home), JSON.stringify({ statusLine: { type: 'command', command: 'mine' } }, null, 2))
+    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW })
+    mgr.install()
+
+    rmSync(join(home, '.code-by-wire'), { recursive: true }) // state.json AND wrapper both wiped
+
+    const healed = mgr.install()
+    expect(healed.healed).toBe(true)
+    expect(healed.wrappedExisting).toBe(false) // no original recoverable
+    expect(mgr.isInstalled()).toBe(true)
+    expect(readState(home).wrappedCommand).toBeNull() // capture-only; the lost original is gone for good
   })
 
   it('uninstall surfaces a structurally wrong (but valid JSON) state.json', () => {
