@@ -98,6 +98,17 @@ describe('deriveAccount', () => {
       sevenDay: { usedPct: 40, resetsAt: NOW + 86_400_000 },
     })
   })
+
+  it('falls back to unknown when every window has expired — stale limits are not proof of a current subscription', () => {
+    // A subscription session from a while ago: its 5h and 7d windows have both passed their reset. The
+    // capture is still within the staleness window but no longer evidences a live subscription, so the
+    // account must not keep the 'subscription' label (e.g. after the user switched to API/gateway billing).
+    const s = sample({
+      version: '2.0.14',
+      rateLimits: { fiveHour: { usedPct: 80, resetsAt: NOW - 1 }, sevenDay: { usedPct: 40, resetsAt: NOW - 1 } },
+    })
+    expect(deriveAccount([s], NOW, STALE_MS)).toEqual({ billingMode: 'unknown', version: '2.0.14' })
+  })
 })
 
 describe('overlaySessions', () => {

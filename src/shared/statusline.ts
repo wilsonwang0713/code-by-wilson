@@ -78,7 +78,8 @@ function liveWindow(w: RateLimit | undefined, now: number): RateLimit | undefine
  * capture that HAS them, and reports `unknown` when no fresh capture carries any (absence is not proof
  * of API billing). Returns null when there's no recent statusLine data at all (the UI reads null as
  * "no bars"). Each window is dropped once its reset has passed, so a stale capture can't show an
- * expired limit as current.
+ * expired limit as current; and once a capture's windows have ALL expired it no longer counts as a
+ * subscription at all — the account falls back to `unknown` rather than a window-less 'subscription'.
  */
 export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, staleMs: number): Account | null {
   let freshest: StatusLineSample | null = null
@@ -89,15 +90,18 @@ export function deriveAccount(samples: Iterable<StatusLineSample>, now: number, 
     if (s.rateLimits && (!withLimits || s.capturedMtimeMs > withLimits.capturedMtimeMs)) withLimits = s
   }
   if (withLimits?.rateLimits) {
-    const acc: Account = {
-      billingMode: 'subscription',
-      fiveHour: liveWindow(withLimits.rateLimits.fiveHour, now),
-      sevenDay: liveWindow(withLimits.rateLimits.sevenDay, now),
-      sevenDaySonnet: liveWindow(withLimits.rateLimits.sevenDaySonnet, now),
-      sevenDayOpus: liveWindow(withLimits.rateLimits.sevenDayOpus, now),
+    const fiveHour = liveWindow(withLimits.rateLimits.fiveHour, now)
+    const sevenDay = liveWindow(withLimits.rateLimits.sevenDay, now)
+    const sevenDaySonnet = liveWindow(withLimits.rateLimits.sevenDaySonnet, now)
+    const sevenDayOpus = liveWindow(withLimits.rateLimits.sevenDayOpus, now)
+    // A still-live window is the only proof of a current subscription. Once every window has passed its
+    // reset, the capture is stale evidence — a long-idle account, or one that has since switched providers
+    // — so fall through to 'unknown' rather than keep the 'subscription' label with no live window behind it.
+    if (fiveHour || sevenDay || sevenDaySonnet || sevenDayOpus) {
+      const acc: Account = { billingMode: 'subscription', fiveHour, sevenDay, sevenDaySonnet, sevenDayOpus }
+      if (freshest?.version) acc.version = freshest.version
+      return acc
     }
-    if (freshest?.version) acc.version = freshest.version
-    return acc
   }
   if (freshest) {
     const acc: Account = { billingMode: 'unknown' }
