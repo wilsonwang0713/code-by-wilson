@@ -17,7 +17,7 @@ const snap = (over: Partial<PersistedSession> = {}): PersistedSession => ({
   branch: "main",
   state: "idle",
   management: "observed",
-  model: "claude-opus-4-8",
+  model: "opus",
   lastActivityMs: 1000,
   awaitingUser: false,
   transcriptMtimeMs: 500,
@@ -73,7 +73,7 @@ describe("store", () => {
   });
 
   it("hydrates a zero-usage snapshot to zero cost and context", () => {
-    const s = hydrate(snap({ model: "claude-sonnet-4-6" }));
+    const s = hydrate(snap({ model: "sonnet" }));
     expect(s.contextPct).toBe(0);
     expect(s.contextWindow).toBe(200_000);
     expect(s.usage).toEqual({
@@ -83,14 +83,14 @@ describe("store", () => {
       cacheCreationTokens: 0,
     });
     expect(s.equivApiValueUsd).toBe(0);
-    expect(s.model).toBe("claude-sonnet-4-6");
+    expect(s.model).toBe("sonnet");
     expect(s.state).toBe("idle");
   });
 
   it("computes context % and Equivalent API value from real usage", () => {
     const s = hydrate(
       snap({
-        model: "claude-opus-4-8",
+        model: "opus",
         usage: {
           inputTokens: 100_000,
           outputTokens: 20_000,
@@ -108,7 +108,7 @@ describe("store", () => {
 
   it("derives the 200K default window for an uncaptured Opus session", () => {
     const s = hydrate(
-      snap({ model: "claude-opus-4-8", contextTokens: 50_000 }),
+      snap({ model: "opus", contextTokens: 50_000 }),
     );
     expect(s.contextWindow).toBe(200_000);
     expect(s.contextPct).toBe(25); // 50000 / 200000
@@ -118,7 +118,7 @@ describe("store", () => {
     // A Sonnet/Haiku session on the 1M beta is modeled with a 200K window, so its real context can
     // run past that. Context % must not render above 100.
     const s = hydrate(
-      snap({ model: "claude-sonnet-4-6", contextTokens: 600_000 }),
+      snap({ model: "sonnet", contextTokens: 600_000 }),
     );
     expect(s.contextWindow).toBe(200_000);
     expect(s.contextPct).toBe(100);

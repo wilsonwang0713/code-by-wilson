@@ -1,4 +1,4 @@
-import { familyFor, type Family } from "@shared/models";
+import type { Family } from "@shared/models";
 
 export interface ClaudeCommand {
   file: string;
@@ -7,11 +7,11 @@ export interface ClaudeCommand {
 
 /**
  * Argv to spawn a fresh Managed session: `claude` pinned to `id` (so the app can correlate the process
- * to its Transcript at `projects/<cwd-slug>/<id>.jsonl`) on `model`. The CLI alias is the model's
- * family name (`opus`/`sonnet`/`haiku`) straight from the MODELS table — an alias, not a dated string,
- * so the flag keeps working as versions roll, and the session's real model is re-derived from the
- * transcript anyway. The executable is the `CBW_CLAUDE_BIN` override else `claude` on PATH, resolved by
- * node-pty. cwd and env are spawn options, not argv, so this stays a pure function of its inputs.
+ * to its Transcript at `projects/<cwd-slug>/<id>.jsonl`) on `model`. The `--model` flag is the family
+ * alias (`opus`/`sonnet`/`haiku`/`fable`) the picker chose — an alias, not a dated string, so it keeps
+ * working as versions roll; the session's real model is re-derived from the transcript. The executable
+ * is the `CBW_CLAUDE_BIN` override else `claude` on PATH, resolved by node-pty. cwd and env are spawn
+ * options, not argv, so this stays a pure function of its inputs.
  */
 export function buildClaudeCommand(opts: {
   id: string;
@@ -20,7 +20,7 @@ export function buildClaudeCommand(opts: {
 }): ClaudeCommand {
   return {
     file: opts.bin ?? process.env.CBW_CLAUDE_BIN ?? "claude",
-    args: ["--session-id", opts.id, "--model", familyFor(opts.model)],
+    args: ["--session-id", opts.id, "--model", opts.model],
   };
 }
 

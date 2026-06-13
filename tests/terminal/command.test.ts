@@ -8,23 +8,23 @@ import { newSessionId } from "../../src/shared/terminal";
 describe("buildClaudeCommand", () => {
   it("pins the session id and maps the model to a stable CLI alias", () => {
     expect(
-      buildClaudeCommand({ id: "sid-1", model: "claude-opus-4-8" }),
+      buildClaudeCommand({ id: "sid-1", model: "opus" }),
     ).toEqual({
       file: "claude",
       args: ["--session-id", "sid-1", "--model", "opus"],
     });
     expect(
-      buildClaudeCommand({ id: "sid-2", model: "claude-sonnet-4-6" }).args,
+      buildClaudeCommand({ id: "sid-2", model: "sonnet" }).args,
     ).toEqual(["--session-id", "sid-2", "--model", "sonnet"]);
     expect(
-      buildClaudeCommand({ id: "sid-3", model: "claude-haiku-4-5" }).args,
+      buildClaudeCommand({ id: "sid-3", model: "haiku" }).args,
     ).toContain("haiku");
   });
 
   it("honors an explicit bin override (the executable, not the args)", () => {
     const cmd = buildClaudeCommand({
       id: "x",
-      model: "claude-opus-4-8",
+      model: "opus",
       bin: "/opt/bin/claude",
     });
     expect(cmd.file).toBe("/opt/bin/claude");

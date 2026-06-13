@@ -1,6 +1,6 @@
 import type { Session } from "@shared/types";
 import { formatClock } from "@shared/format";
-import { honestModelLabel, MODEL_LABEL } from "../../ui/meta";
+import { honestModelLabel, FAMILY_LABEL } from "../../ui/meta";
 import { PanelSection, PanelHeading } from "./chrome";
 import { MetricRow } from "./MetricRow";
 
@@ -12,7 +12,7 @@ export function SessionPanel({ session: s }: { session: Session }) {
     s.model,
     s.modelId,
     s.modelDisplayName,
-    MODEL_LABEL,
+    FAMILY_LABEL,
   );
   const clock = s.sessionClockMs != null ? formatClock(s.sessionClockMs) : null;
   return (

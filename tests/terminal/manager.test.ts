@@ -88,7 +88,7 @@ function harness() {
 const REQ = {
   id: "sess-1",
   cwd: "/work/app",
-  model: "claude-sonnet-4-6" as const,
+  model: "sonnet" as const,
   cols: 80,
   rows: 30,
 };

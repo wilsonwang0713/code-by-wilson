@@ -4,9 +4,8 @@ import {
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import type { Family } from "@shared/types";
-import { MODEL_IDS } from "@shared/models";
-import { MODEL_LABEL } from "../ui/meta";
+import { FAMILIES, type Family } from "@shared/models";
+import { FAMILY_LABEL } from "../ui/meta";
 import { Icon } from "../ui/icons";
 
 /** The create-a-Managed-session form: choose a directory (native picker) and a model, then spawn. */
@@ -18,7 +17,7 @@ export function NewSessionDialog({
   onCancel: () => void;
 }) {
   const [cwd, setCwd] = useState<string | null>(null);
-  const [model, setModel] = useState<Family>("claude-sonnet-4-6");
+  const [model, setModel] = useState<Family>("sonnet");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -125,9 +124,9 @@ export function NewSessionDialog({
             onChange={(e) => setModel(e.target.value as Family)}
             className="w-full appearance-none rounded-md border border-ink-700 bg-well py-2 pl-2.5 pr-8 text-[13px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
           >
-            {MODEL_IDS.map((id) => (
+            {FAMILIES.map((id) => (
               <option key={id} value={id}>
-                {MODEL_LABEL[id]}
+                {FAMILY_LABEL[id]}
               </option>
             ))}
           </select>

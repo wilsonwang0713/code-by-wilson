@@ -89,7 +89,7 @@ describe("readTranscript — subagents", () => {
         id: "a1",
         type: "Explore",
         status: "done",
-        model: "claude-sonnet-4-6",
+        model: "sonnet",
         tokens: 30,
         durationMs: 4000,
       },

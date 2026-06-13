@@ -1,5 +1,5 @@
-import type { Family, SessionState } from "@shared/types";
-import { isKnownModelString } from "@shared/models";
+import type { SessionState } from "@shared/types";
+import { isKnownModelString, type Family } from "@shared/models";
 
 export interface StateMeta {
   label: string;
@@ -39,17 +39,12 @@ export const STATE_META: Record<SessionState, StateMeta> = {
   },
 };
 
-export const MODEL_LABEL: Record<Family, string> = {
-  "claude-opus-4-8": "Opus 4.8",
-  "claude-sonnet-4-6": "Sonnet 4.6",
-  "claude-haiku-4-5": "Haiku 4.5",
-};
-
-/** Compact model label for the dense table's Model column. */
-export const MODEL_SHORT: Record<Family, string> = {
-  "claude-opus-4-8": "Opus",
-  "claude-sonnet-4-6": "Sonnet",
-  "claude-haiku-4-5": "Haiku",
+/** The display name for each family. The exact version, when known, is appended by `modelLabel`. */
+export const FAMILY_LABEL: Record<Family, string> = {
+  opus: "Opus",
+  sonnet: "Sonnet",
+  haiku: "Haiku",
+  fable: "Fable",
 };
 
 /** Below this %, the context gauge is noise; at or above it the sidebar row surfaces the number and

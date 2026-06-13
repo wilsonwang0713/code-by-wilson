@@ -11,7 +11,7 @@ const s = (
   project: "p",
   state: "working",
   management,
-  model: "claude-sonnet-4-6",
+  model: "sonnet",
   contextPct: 0,
   contextWindow: 200_000,
   usage: {

@@ -13,7 +13,7 @@ function s(
     project: "code-by-wire",
     state,
     management: "managed",
-    model: "claude-sonnet-4-6",
+    model: "sonnet",
     contextPct: 10,
     contextWindow: 200000,
     usage: {
