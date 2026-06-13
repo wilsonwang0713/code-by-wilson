@@ -311,6 +311,31 @@ describe("analytics store", () => {
     expect(hasAnyTurns(db)).toBe(true);
   });
 
+  it("keeps unknown-time (ts=0) turns in all-time but excludes them from windows", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // ts=0 is the unknown-time sentinel (an unparseable transcript timestamp).
+      turn({
+        messageId: "no-time",
+        ts: 0,
+        usage: {
+          inputTokens: 7,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    // All-time keeps it; any positive window bound drops it (a turn with no known time can't be placed
+    // in a calendar window). hasAnyTurns still sees it, so the view shows zeroed cards, not the empty state.
+    expect(readTotals(db).turns).toBe(1);
+    expect(readTotals(db).inputTokens).toBe(7);
+    expect(readTotals(db, 1).turns).toBe(0);
+    expect(readTotals(db, 1).inputTokens).toBe(0);
+    expect(hasAnyTurns(db)).toBe(true);
+  });
+
   it("counts an unrecognized model's tokens but gives it n/a cost", () => {
     const db = openTestDb();
     migrateAnalytics(db);

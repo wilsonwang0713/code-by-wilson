@@ -184,6 +184,11 @@ export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
   // null/undefined → all-time (no bound). A number → an inclusive lower bound on ts (the window's start,
   // computed local-day-aware by the caller via rangeSinceMs). `bind` is spread into get/all: an empty
   // array calls them with no params, a single object binds @since.
+  //
+  // A turn whose timestamp didn't parse is stored ts=0 (the unknown-time sentinel — see turns.ts). Every
+  // windowed bound is a positive epoch, so those turns fall out of dated ranges and survive only in
+  // all-time. That's deliberate: a turn with no known time can't honestly be placed in a calendar window
+  // (exact data only). The consequence is that all-time can exceed the sum of the windows — by design.
   const where = sinceMs != null ? "WHERE ts >= @since" : "";
   const bind = sinceMs != null ? [{ since: sinceMs }] : [];
 
