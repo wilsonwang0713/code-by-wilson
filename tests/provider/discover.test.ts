@@ -64,7 +64,7 @@ describe("summarize", () => {
     expect(s.title).toBe("Add a login form to the settings page");
     expect(s.project).toBe("code-by-wire");
     expect(s.branch).toBe("feature/login");
-    expect(s.model).toBe("claude-sonnet-4-6");
+    expect(s.model).toBe("sonnet");
     expect(s.management).toBe("observed");
     expect(s.state).toBe("working"); // alive + status busy
     expect(s.lastActivityMs).toBe(Date.parse("2026-06-08T22:54:06.078Z"));

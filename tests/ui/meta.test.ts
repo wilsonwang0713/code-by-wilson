@@ -1,55 +1,65 @@
 import { describe, it, expect } from "vitest";
 import {
-  honestModelLabel,
-  MODEL_LABEL,
-  MODEL_SHORT,
+  modelLabel,
   ctxColor,
   isContextHigh,
   CONTEXT_WARN_PCT,
   STATE_META,
 } from "../../src/renderer/src/ui/meta";
 
-describe("honestModelLabel", () => {
-  it("shows the clean label for a recognized model (the [1m] tag still matches opus)", () => {
-    expect(
-      honestModelLabel(
-        "claude-opus-4-8",
-        "claude-opus-4-8[1m]",
-        "Opus 4.8 (1M context)",
-        MODEL_LABEL,
-      ),
-    ).toBe("Opus 4.8");
+describe("modelLabel", () => {
+  it("shows Family (raw) for a recognized model", () => {
+    expect(modelLabel("opus", "claude-opus-4-8", "Opus 4.8 (1M context)")).toBe(
+      "Opus (claude-opus-4-8)",
+    );
   });
-
-  it("shows the capture's display_name for a model absent from the table", () => {
-    expect(
-      honestModelLabel(
-        "claude-opus-4-8",
-        "claude-neo-1",
-        "Claude Neo 1",
-        MODEL_LABEL,
-      ),
-    ).toBe("Claude Neo 1");
+  it("surfaces the [1m] tag verbatim", () => {
+    expect(modelLabel("opus", "claude-opus-4-8[1m]", undefined)).toBe(
+      "Opus (claude-opus-4-8[1m])",
+    );
   });
-
-  it("shows the raw model id (never the Opus fallback) for an unrecognized model whose capture omitted display_name", () => {
+  it("shows the full provider-prefixed id", () => {
     expect(
-      honestModelLabel(
-        "claude-opus-4-8",
-        "claude-neo-1",
-        undefined,
-        MODEL_LABEL,
-      ),
-    ).toBe("claude-neo-1");
-    expect(
-      honestModelLabel("claude-opus-4-8", "claude-neo-1", "", MODEL_LABEL),
-    ).toBe("claude-neo-1");
+      modelLabel("opus", "global.anthropic.claude-opus-4-7", undefined),
+    ).toBe("Opus (global.anthropic.claude-opus-4-7)");
   });
-
-  it("falls back to the clean label when there is no capture", () => {
+  it("labels Fable correctly", () => {
+    expect(modelLabel("fable", "claude-fable-5", "Claude Fable 5")).toBe(
+      "Fable (claude-fable-5)",
+    );
+  });
+  it("shows the capture display_name for a raw matching no family", () => {
+    expect(modelLabel("fable", "claude-neo-1", "Claude Neo 1")).toBe(
+      "Claude Neo 1",
+    );
+  });
+  it("shows the raw id when an unknown model omitted display_name", () => {
+    expect(modelLabel("fable", "claude-neo-1", undefined)).toBe("claude-neo-1");
+  });
+  it("shows bare family when there is no raw", () => {
+    expect(modelLabel("sonnet", undefined, undefined)).toBe("Sonnet");
+  });
+  it("shows Unknown when there is no raw and the family is not vouched for", () => {
+    expect(modelLabel("opus", undefined, undefined, { known: false })).toBe(
+      "Unknown",
+    );
+  });
+  it("trusts the family with no raw when vouched for (a Managed session)", () => {
+    expect(modelLabel("opus", undefined, undefined, { known: true })).toBe(
+      "Opus",
+    );
+  });
+  it("shows the real id, not Unknown, even when not vouched for, if a raw exists", () => {
     expect(
-      honestModelLabel("claude-sonnet-4-6", undefined, undefined, MODEL_SHORT),
-    ).toBe("Sonnet");
+      modelLabel("sonnet", "global.anthropic.claude-sonnet-4-6", undefined, {
+        known: false,
+      }),
+    ).toBe("Sonnet (global.anthropic.claude-sonnet-4-6)");
+  });
+  it("shows bare family in compact mode", () => {
+    expect(
+      modelLabel("opus", "claude-opus-4-8", undefined, { compact: true }),
+    ).toBe("Opus");
   });
 });
 

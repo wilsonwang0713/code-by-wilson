@@ -1,65 +1,44 @@
-import {
-  useState,
-  useEffect,
-  useRef,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
-import type { ModelId } from "@shared/types";
-import { MODEL_IDS } from "@shared/models";
-import { MODEL_LABEL } from "../ui/meta";
+import { useState, useEffect, useRef } from "react";
+import { FAMILIES, type Family, type ModelDefaults } from "@shared/models";
+import { FAMILY_LABEL } from "../ui/meta";
 import { Icon } from "../ui/icons";
+import { ModalShell } from "../ui/ModalShell";
 
 /** The create-a-Managed-session form: choose a directory (native picker) and a model, then spawn. */
 export function NewSessionDialog({
   onCreate,
   onCancel,
 }: {
-  onCreate: (cwd: string, model: ModelId) => void | Promise<void>;
+  onCreate: (cwd: string, model: Family) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const [cwd, setCwd] = useState<string | null>(null);
-  const [model, setModel] = useState<ModelId>("claude-sonnet-4-6");
+  const [model, setModel] = useState<Family>("sonnet");
+  const [defaults, setDefaults] = useState<ModelDefaults | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const userPickedModel = useRef(false);
 
+  // Fetch the configured model defaults once on mount: per-family overrides for the picker labels,
+  // and the default family to pre-select.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [busy, onCancel]);
-
-  // Move focus into the dialog on open and restore it to whatever had focus when it closes, so keyboard
-  // and screen-reader users aren't stranded on the now-obscured app behind the overlay.
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
-    return () => prev?.focus?.();
+    void window.api
+      .modelDefaults()
+      .then((d) => {
+        setDefaults(d);
+        if (!userPickedModel.current) {
+          // Pre-select the configured default, else keep "sonnet", then clamp to the allowlist so the
+          // picker can never preselect (and Create can never spawn) a model availableModels excludes.
+          let next: Family = d.default ?? "sonnet";
+          if (d.allowed && !d.allowed.includes(next))
+            next = d.allowed[0] ?? next;
+          setModel(next);
+        }
+      })
+      .catch(() => {
+        /* keep defaults null; picker falls back to FAMILIES + bare labels */
+      });
   }, []);
-
-  // Minimal focus trap: keep Tab cycling within the dialog instead of wandering to the hidden app behind it.
-  function trapTab(e: ReactKeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "Tab") return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const focusable = Array.from(
-      panel.querySelectorAll<HTMLElement>(
-        'button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      ),
-    ).filter((el) => !el.hasAttribute("disabled"));
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
 
   async function pick() {
     const dir = await window.api.terminal.pickDirectory();
@@ -79,83 +58,81 @@ export function NewSessionDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
-      onClick={busy ? undefined : onCancel}
+    <ModalShell
+      labelledBy="new-session-title"
+      widthClass="w-[28rem]"
+      closeDisabled={busy}
+      onClose={onCancel}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-session-title"
-        tabIndex={-1}
-        className="w-[28rem] rounded-xl border border-ink-700 bg-ink-900 p-5 text-fg shadow-2xl outline-none"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={trapTab}
-      >
-        <div id="new-session-title" className="text-sm font-semibold">
-          New Managed session
-        </div>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-fg-faint">
-          Spawns <span className="font-mono">claude</span> in the chosen
-          directory and drives it from a live terminal.
-        </p>
-
-        <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
-          Directory
-        </label>
-        <div className="mt-1.5 flex items-center gap-2">
-          <button
-            onClick={() => void pick()}
-            className="inline-flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-925 px-2.5 py-1 text-[12px] transition-colors hover:bg-ink-850"
-          >
-            <Icon name="folder-open" size={13} /> Choose…
-          </button>
-          <span className="truncate font-mono text-[12px] text-fg-faint">
-            {cwd ?? "No directory chosen"}
-          </span>
-        </div>
-
-        <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
-          Model
-        </label>
-        <div className="relative mt-1.5">
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value as ModelId)}
-            className="w-full appearance-none rounded-md border border-ink-700 bg-well py-2 pl-2.5 pr-8 text-[13px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-          >
-            {MODEL_IDS.map((id) => (
-              <option key={id} value={id}>
-                {MODEL_LABEL[id]}
-              </option>
-            ))}
-          </select>
-          <Icon
-            name="chevron-down"
-            size={14}
-            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-muted"
-          />
-        </div>
-
-        {error && <p className="mt-3 text-[12px] text-danger">{error}</p>}
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="rounded-md px-3 py-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => void create()}
-            disabled={!cwd || busy}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
-          >
-            <Icon name="plus" size={13} />
-            {busy ? "Starting…" : "Create"}
-          </button>
-        </div>
+      <div id="new-session-title" className="text-sm font-semibold">
+        New Managed session
       </div>
-    </div>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-fg-faint">
+        Spawns <span className="font-mono">claude</span> in the chosen directory
+        and drives it from a live terminal.
+      </p>
+
+      <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
+        Directory
+      </label>
+      <div className="mt-1.5 flex items-center gap-2">
+        <button
+          onClick={() => void pick()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-925 px-2.5 py-1 text-[12px] transition-colors hover:bg-ink-850"
+        >
+          <Icon name="folder-open" size={13} /> Choose…
+        </button>
+        <span className="truncate font-mono text-[12px] text-fg-faint">
+          {cwd ?? "No directory chosen"}
+        </span>
+      </div>
+
+      <label className="mt-4 block text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
+        Model
+      </label>
+      <div className="relative mt-1.5">
+        <select
+          value={model}
+          onChange={(e) => {
+            userPickedModel.current = true;
+            setModel(e.target.value as Family);
+          }}
+          className="w-full appearance-none rounded-md border border-ink-700 bg-well py-2 pl-2.5 pr-8 text-[13px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+        >
+          {(defaults?.allowed ?? FAMILIES).map((id) => {
+            const override = defaults?.overrides[id];
+            return (
+              <option key={id} value={id}>
+                {FAMILY_LABEL[id]}
+                {override ? ` (${override})` : ""}
+              </option>
+            );
+          })}
+        </select>
+        <Icon
+          name="chevron-down"
+          size={14}
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-muted"
+        />
+      </div>
+
+      {error && <p className="mt-3 text-[12px] text-danger">{error}</p>}
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          onClick={onCancel}
+          className="rounded-md px-3 py-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => void create()}
+          disabled={!cwd || busy}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
+        >
+          <Icon name="plus" size={13} />
+          {busy ? "Starting…" : "Create"}
+        </button>
+      </div>
+    </ModalShell>
   );
 }

@@ -19,18 +19,22 @@ export function MetricRow({
   swatch?: string;
 }) {
   const empty = value === null || value === undefined || value === "";
+  // The value span truncates, so a long value (a branch name, a provider-prefixed model id) clips. Default
+  // the row's hover title to the value itself when it's a plain string, so the full text stays reachable
+  // without every caller having to pass `title` by hand.
+  const hoverTitle = title ?? (typeof value === "string" ? value : undefined);
   return (
     <div
       className="flex items-baseline justify-between gap-3 py-0.5"
-      title={title}
+      title={hoverTitle}
     >
-      <span className="flex items-center gap-1.5 text-[12px] text-fg-muted">
+      <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-fg-muted">
         {swatch && <Swatch color={swatch} />}
         {label}
       </span>
       <span
         className={cx(
-          "font-mono text-[12px] tabular-nums",
+          "min-w-0 truncate font-mono text-[12px] tabular-nums",
           empty ? "text-ink-600" : (tone ?? "text-fg"),
         )}
       >

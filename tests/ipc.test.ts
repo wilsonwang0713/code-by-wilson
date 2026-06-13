@@ -26,7 +26,7 @@ const seed: PersistedSession = {
   branch: undefined,
   state: "idle",
   management: "observed",
-  model: "claude-opus-4-8",
+  model: "opus",
   lastActivityMs: 1,
   awaitingUser: false,
   transcriptMtimeMs: 0,

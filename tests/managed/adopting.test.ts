@@ -8,7 +8,7 @@ const s = (id: string, over: Partial<Session> = {}): Session => ({
   project: "p",
   state: "ended",
   management: "observed",
-  model: "claude-sonnet-4-6",
+  model: "sonnet",
   contextPct: 0,
   contextWindow: 200_000,
   usage: {

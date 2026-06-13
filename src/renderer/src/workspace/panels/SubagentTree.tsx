@@ -1,7 +1,7 @@
 import type { Subagent } from "@shared/types";
 import { formatDuration, formatTokens } from "@shared/format";
 import { cx } from "../../ui/atoms";
-import { MODEL_SHORT } from "../../ui/meta";
+import { FAMILY_LABEL } from "../../ui/meta";
 import { PanelSection, PanelHeading } from "./chrome";
 
 const GLYPH: Record<Subagent["status"], string> = {
@@ -46,7 +46,7 @@ function AgentNode({ agent, depth }: { agent: Subagent; depth: number }) {
           {agent.type}
         </span>
         <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
-          {agent.model ? MODEL_SHORT[agent.model] : "—"}
+          {agent.model ? FAMILY_LABEL[agent.model] : "—"}
         </span>
         <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-muted">
           {formatTokens(agent.tokens)}

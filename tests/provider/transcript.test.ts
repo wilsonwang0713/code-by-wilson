@@ -21,7 +21,7 @@ describe("parseTranscript", () => {
     expect(s.project).toBe("code-by-wire");
     expect(s.cwd).toBe("/work/code-by-wire");
     expect(s.branch).toBe("feature/login");
-    expect(s.model).toBe("claude-sonnet-4-6");
+    expect(s.model).toBe("sonnet");
     expect(s.lastActivityMs).toBe(Date.parse("2026-06-08T22:54:06.078Z"));
     expect(s.awaitingUser).toBe(false);
     // The fixture's single assistant turn carries usage {input:100, output:50, cache_read:10, cache_creation:5}.
@@ -41,7 +41,7 @@ describe("parseTranscript", () => {
       ),
     );
     expect(s.title).toBe("deploy");
-    expect(s.model).toBe("claude-opus-4-8");
+    expect(s.model).toBe("opus");
     expect(s.project).toBe("api-service");
     expect(s.branch).toBe("main");
   });
@@ -482,7 +482,7 @@ describe("parseTranscript", () => {
     ]
       .map((r) => JSON.stringify(r))
       .join("\n");
-    expect(parseTranscript(jsonl).model).toBe("claude-sonnet-4-6");
+    expect(parseTranscript(jsonl).model).toBe("sonnet");
   });
 
   it("keeps the last real context size when a trailing turn carries zero usage", () => {

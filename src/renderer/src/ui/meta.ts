@@ -1,5 +1,5 @@
-import type { ModelId, SessionState } from "@shared/types";
-import { isKnownModelString } from "@shared/models";
+import type { SessionState } from "@shared/types";
+import { isKnownModelString, type Family } from "@shared/models";
 
 export interface StateMeta {
   label: string;
@@ -39,17 +39,12 @@ export const STATE_META: Record<SessionState, StateMeta> = {
   },
 };
 
-export const MODEL_LABEL: Record<ModelId, string> = {
-  "claude-opus-4-8": "Opus 4.8",
-  "claude-sonnet-4-6": "Sonnet 4.6",
-  "claude-haiku-4-5": "Haiku 4.5",
-};
-
-/** Compact model label for the dense table's Model column. */
-export const MODEL_SHORT: Record<ModelId, string> = {
-  "claude-opus-4-8": "Opus",
-  "claude-sonnet-4-6": "Sonnet",
-  "claude-haiku-4-5": "Haiku",
+/** The display name for each family. The exact version, when known, is appended by `modelLabel`. */
+export const FAMILY_LABEL: Record<Family, string> = {
+  opus: "Opus",
+  sonnet: "Sonnet",
+  haiku: "Haiku",
+  fable: "Fable",
 };
 
 /** Below this %, the context gauge is noise; at or above it the sidebar row surfaces the number and
@@ -105,18 +100,23 @@ export const TOKEN_SEGMENT_COLORS = [
   "var(--color-ok)", // Cached
 ] as const;
 
-/** The display label for a Session's model. A recognized model (its statusLine model.id matches a known
- *  family) shows the app's clean label from `table`; a model absent from the table shows the capture's
- *  real display_name — or its raw id when the capture omitted the name — so it never masquerades as the
- *  Opus fallback. With no capture, the clean label stands; pricing and window keep riding the normalized
- *  `model` regardless. */
-export function honestModelLabel(
-  model: ModelId,
-  captureModelId: string | undefined,
-  captureDisplayName: string | undefined,
-  table: Record<ModelId, string>,
+/** A session's model label: the family name, plus the real resolved id in parens when we have one.
+ *  `raw` is the live statusLine modelId else the persisted transcript modelRaw. A raw that matches no
+ *  known family shows the capture's display_name (or the raw) rather than a faked family. `compact`
+ *  drops the parens for dense rows. With no raw at all, `known: false` yields "Unknown" (the family is
+ *  only the normalize fallback); the default trusts the family. */
+export function modelLabel(
+  family: Family,
+  raw: string | undefined,
+  displayName: string | undefined,
+  opts?: { compact?: boolean; known?: boolean },
 ): string {
-  if (captureModelId && !isKnownModelString(captureModelId))
-    return captureDisplayName || captureModelId;
-  return table[model];
+  if (raw && !isKnownModelString(raw)) return displayName || raw;
+  // No real model string was ever recorded. Trust the family only when the caller vouches for it (a
+  // Managed session ran the picked alias). Otherwise the family is just the normalize fallback, so say
+  // "Unknown" rather than guessing — e.g. an Ended session that errored before any real turn.
+  if (!raw && opts?.known === false) return "Unknown";
+  const label = FAMILY_LABEL[family];
+  if (opts?.compact || !raw) return label;
+  return `${label} (${raw})`;
 }
