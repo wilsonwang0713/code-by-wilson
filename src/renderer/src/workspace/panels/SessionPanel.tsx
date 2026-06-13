@@ -1,6 +1,6 @@
 import type { Session } from "@shared/types";
 import { formatClock } from "@shared/format";
-import { honestModelLabel, FAMILY_LABEL } from "../../ui/meta";
+import { modelLabel } from "../../ui/meta";
 import { PanelSection, PanelHeading } from "./chrome";
 import { MetricRow } from "./MetricRow";
 
@@ -8,12 +8,7 @@ import { MetricRow } from "./MetricRow";
  *  Effort and Clock are lazy — MetricRow renders a muted em-dash until the capture reports them, so
  *  the empty-state rule comes for free. Voice and Remote were dropped in the redesign. */
 export function SessionPanel({ session: s }: { session: Session }) {
-  const model = honestModelLabel(
-    s.model,
-    s.modelId,
-    s.modelDisplayName,
-    FAMILY_LABEL,
-  );
+  const model = modelLabel(s.model, s.modelId ?? s.modelRaw, s.modelDisplayName);
   const clock = s.sessionClockMs != null ? formatClock(s.sessionClockMs) : null;
   return (
     <PanelSection>

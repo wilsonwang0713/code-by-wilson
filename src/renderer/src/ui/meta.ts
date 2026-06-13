@@ -100,18 +100,18 @@ export const TOKEN_SEGMENT_COLORS = [
   "var(--color-ok)", // Cached
 ] as const;
 
-/** The display label for a Session's model. A recognized model (its statusLine model.id matches a known
- *  family) shows the app's clean label from `table`; a model absent from the table shows the capture's
- *  real display_name — or its raw id when the capture omitted the name — so it never masquerades as the
- *  Opus fallback. With no capture, the clean label stands; pricing and window keep riding the normalized
- *  `model` regardless. */
-export function honestModelLabel(
-  model: Family,
-  captureModelId: string | undefined,
-  captureDisplayName: string | undefined,
-  table: Record<Family, string>,
+/** A session's model label: the family name, plus the real resolved id in parens when we have one.
+ *  `raw` is the live statusLine modelId else the persisted transcript modelRaw. A raw that matches no
+ *  known family shows the capture's display_name (or the raw) rather than a faked family. `compact`
+ *  drops the parens for dense rows. */
+export function modelLabel(
+  family: Family,
+  raw: string | undefined,
+  displayName: string | undefined,
+  opts?: { compact?: boolean },
 ): string {
-  if (captureModelId && !isKnownModelString(captureModelId))
-    return captureDisplayName || captureModelId;
-  return table[model];
+  if (raw && !isKnownModelString(raw)) return displayName || raw;
+  const label = FAMILY_LABEL[family];
+  if (opts?.compact || !raw) return label;
+  return `${label} (${raw})`;
 }

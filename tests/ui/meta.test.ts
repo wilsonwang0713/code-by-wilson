@@ -1,54 +1,48 @@
 import { describe, it, expect } from "vitest";
 import {
-  honestModelLabel,
-  FAMILY_LABEL,
+  modelLabel,
   ctxColor,
   isContextHigh,
   CONTEXT_WARN_PCT,
   STATE_META,
 } from "../../src/renderer/src/ui/meta";
 
-describe("honestModelLabel", () => {
-  it("shows the clean label for a recognized model (the [1m] tag still matches opus)", () => {
+describe("modelLabel", () => {
+  it("shows Family (raw) for a recognized model", () => {
     expect(
-      honestModelLabel(
-        "opus",
-        "claude-opus-4-8[1m]",
-        "Opus 4.8 (1M context)",
-        FAMILY_LABEL,
-      ),
+      modelLabel("opus", "claude-opus-4-8", "Opus 4.8 (1M context)"),
+    ).toBe("Opus (claude-opus-4-8)");
+  });
+  it("surfaces the [1m] tag verbatim", () => {
+    expect(modelLabel("opus", "claude-opus-4-8[1m]", undefined)).toBe(
+      "Opus (claude-opus-4-8[1m])",
+    );
+  });
+  it("shows the full provider-prefixed id", () => {
+    expect(
+      modelLabel("opus", "global.anthropic.claude-opus-4-7", undefined),
+    ).toBe("Opus (global.anthropic.claude-opus-4-7)");
+  });
+  it("labels Fable correctly", () => {
+    expect(modelLabel("fable", "claude-fable-5", "Claude Fable 5")).toBe(
+      "Fable (claude-fable-5)",
+    );
+  });
+  it("shows the capture display_name for a raw matching no family", () => {
+    expect(modelLabel("fable", "claude-neo-1", "Claude Neo 1")).toBe(
+      "Claude Neo 1",
+    );
+  });
+  it("shows the raw id when an unknown model omitted display_name", () => {
+    expect(modelLabel("fable", "claude-neo-1", undefined)).toBe("claude-neo-1");
+  });
+  it("shows bare family when there is no raw", () => {
+    expect(modelLabel("sonnet", undefined, undefined)).toBe("Sonnet");
+  });
+  it("shows bare family in compact mode", () => {
+    expect(
+      modelLabel("opus", "claude-opus-4-8", undefined, { compact: true }),
     ).toBe("Opus");
-  });
-
-  it("shows the capture's display_name for a model absent from the table", () => {
-    expect(
-      honestModelLabel(
-        "opus",
-        "claude-neo-1",
-        "Claude Neo 1",
-        FAMILY_LABEL,
-      ),
-    ).toBe("Claude Neo 1");
-  });
-
-  it("shows the raw model id (never the fallback) for an unrecognized model whose capture omitted display_name", () => {
-    expect(
-      honestModelLabel(
-        "opus",
-        "claude-neo-1",
-        undefined,
-        FAMILY_LABEL,
-      ),
-    ).toBe("claude-neo-1");
-    expect(
-      honestModelLabel("opus", "claude-neo-1", "", FAMILY_LABEL),
-    ).toBe("claude-neo-1");
-  });
-
-  it("falls back to the clean label when there is no capture", () => {
-    expect(
-      honestModelLabel("sonnet", undefined, undefined, FAMILY_LABEL),
-    ).toBe("Sonnet");
   });
 });
 
