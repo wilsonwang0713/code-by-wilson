@@ -47,7 +47,14 @@ export function NewSessionDialog({
       .modelDefaults()
       .then((d) => {
         setDefaults(d);
-        if (d.default && !userPickedModel.current) setModel(d.default);
+        if (!userPickedModel.current) {
+          // Pre-select the configured default, else keep "sonnet", then clamp to the allowlist so the
+          // picker can never preselect (and Create can never spawn) a model availableModels excludes.
+          let next: Family = d.default ?? "sonnet";
+          if (d.allowed && !d.allowed.includes(next))
+            next = d.allowed[0] ?? next;
+          setModel(next);
+        }
       })
       .catch(() => {
         /* keep defaults null; picker falls back to FAMILIES + bare labels */
