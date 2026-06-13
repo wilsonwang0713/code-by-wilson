@@ -103,14 +103,19 @@ export const TOKEN_SEGMENT_COLORS = [
 /** A session's model label: the family name, plus the real resolved id in parens when we have one.
  *  `raw` is the live statusLine modelId else the persisted transcript modelRaw. A raw that matches no
  *  known family shows the capture's display_name (or the raw) rather than a faked family. `compact`
- *  drops the parens for dense rows. */
+ *  drops the parens for dense rows. With no raw at all, `known: false` yields "Unknown" (the family is
+ *  only the normalize fallback); the default trusts the family. */
 export function modelLabel(
   family: Family,
   raw: string | undefined,
   displayName: string | undefined,
-  opts?: { compact?: boolean },
+  opts?: { compact?: boolean; known?: boolean },
 ): string {
   if (raw && !isKnownModelString(raw)) return displayName || raw;
+  // No real model string was ever recorded. Trust the family only when the caller vouches for it (a
+  // Managed session ran the picked alias). Otherwise the family is just the normalize fallback, so say
+  // "Unknown" rather than guessing — e.g. an Ended session that errored before any real turn.
+  if (!raw && opts?.known === false) return "Unknown";
   const label = FAMILY_LABEL[family];
   if (opts?.compact || !raw) return label;
   return `${label} (${raw})`;

@@ -39,6 +39,23 @@ describe("modelLabel", () => {
   it("shows bare family when there is no raw", () => {
     expect(modelLabel("sonnet", undefined, undefined)).toBe("Sonnet");
   });
+  it("shows Unknown when there is no raw and the family is not vouched for", () => {
+    expect(modelLabel("opus", undefined, undefined, { known: false })).toBe(
+      "Unknown",
+    );
+  });
+  it("trusts the family with no raw when vouched for (a Managed session)", () => {
+    expect(modelLabel("opus", undefined, undefined, { known: true })).toBe(
+      "Opus",
+    );
+  });
+  it("shows the real id, not Unknown, even when not vouched for, if a raw exists", () => {
+    expect(
+      modelLabel("sonnet", "global.anthropic.claude-sonnet-4-6", undefined, {
+        known: false,
+      }),
+    ).toBe("Sonnet (global.anthropic.claude-sonnet-4-6)");
+  });
   it("shows bare family in compact mode", () => {
     expect(
       modelLabel("opus", "claude-opus-4-8", undefined, { compact: true }),
