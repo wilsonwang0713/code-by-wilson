@@ -196,29 +196,69 @@ function Totals({ totals }: { totals: StatsTotals }) {
   );
 }
 
-/** The per-model breakdown (#111): a donut sized by each model's input+output share beside a table of total
- *  tokens and Equivalent API value per raw model id. The donut excludes cache tokens on purpose —
- *  cache-read volume dwarfs fresh tokens, so totalTokens would let a heavily-cached model swamp the chart.
- *  An unrecognized id shows n/a cost while its tokens still count; a turn with no recorded model rows as
- *  "Unknown". Color is paired onto each row so the donut and the table legend read off one source — no
- *  zip-by-index that could drift if rows reorder. */
+/** A press-to-flip pill for the By-model token metric (#111), shown in the panel header. Off (default)
+ *  counts input + output only; on adds cache-read and cache-creation. Styled like RangeFilter's pressed
+ *  state. */
+function CacheToggle({
+  on,
+  onChange,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      aria-pressed={on}
+      title="Count cache-read and cache-creation tokens in the token figures (cost always includes them)"
+      className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
+        on
+          ? "border-ink-700 bg-ink-700 text-fg"
+          : "border-ink-800 bg-ink-900 text-fg-faint hover:text-fg-muted"
+      }`}
+    >
+      Include cache
+    </button>
+  );
+}
+
+/** The per-model breakdown (#111): a donut sized by each model's token share beside a table of tokens and
+ *  Equivalent API value per raw model id. The "Include cache" toggle picks the token metric for both the
+ *  donut and the Tokens column together, so the donut share always matches the visible numbers. It defaults
+ *  to off (input + output) because cache-read volume dwarfs fresh tokens and would swamp the donut. Cost is
+ *  unaffected; it always reflects every token at its rate. An unrecognized id shows n/a cost while its
+ *  tokens still count; a turn with no recorded model rows as "Unknown". Color is paired onto each row so the
+ *  donut and the table legend read off one source, no zip-by-index that could drift if rows reorder. */
 function ByModel({ rows }: { rows: StatsByModel[] }) {
-  // Nothing worth charting: every model in the window recorded turns but no tokens (e.g. only synthetic or
-  // errored turns). Skip the whole panel rather than show a table of zeros beside a blank ring.
+  const [includeCache, setIncludeCache] = useState(false);
+  // Skip on a window with no tokens at all, judged on the full total so flipping the toggle never makes the
+  // whole panel vanish; at worst the donut hides on a pure-cache window in exclude mode (below).
   if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const colored = rows.map((r, i) => ({
-    ...r,
-    color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
-  }));
-  // The donut sizes on input+output. When that's zero for every row (a pure cache-read window) it would be
-  // a featureless track, so drop it and let the table stand alone.
-  const segments = colored.map((r) => ({
-    value: r.inputTokens + r.outputTokens,
-    color: r.color,
-  }));
+  const tokensOf = (r: StatsByModel) =>
+    includeCache ? r.totalTokens : r.inputTokens + r.outputTokens;
+  // Re-rank by the displayed metric so the table reads biggest-first and the donut colors pair to it; ties
+  // break by raw id for stability. Color is assigned after the sort so it tracks the row, not the model.
+  const ranked = rows
+    .map((r) => ({ ...r, tokens: tokensOf(r) }))
+    .sort(
+      (a, b) =>
+        b.tokens - a.tokens ||
+        (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
+    )
+    .map((r, i) => ({
+      ...r,
+      color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
+    }));
+  // When the chosen metric is zero for every row (a pure cache-read window in exclude mode) the donut would
+  // be a featureless track, so drop it and let the table stand alone.
+  const segments = ranked.map((r) => ({ value: r.tokens, color: r.color }));
   const hasDonut = segments.some((s) => s.value > 0);
   return (
-    <StatsPanel title="By model">
+    <StatsPanel
+      title="By model"
+      right={<CacheToggle on={includeCache} onChange={setIncludeCache} />}
+    >
       <div className="flex items-center gap-4">
         {hasDonut && <Donut segments={segments} />}
         <table className="min-w-0 flex-1 text-[12px]">
@@ -238,7 +278,7 @@ function ByModel({ rows }: { rows: StatsByModel[] }) {
           <tbody>
             {/* Key on the raw id (unique per GROUP BY row); the null "Unknown" bucket gets a NUL sentinel a
                 real model id can never be, so it can't collide with a model whose raw string is "unknown". */}
-            {colored.map((r) => (
+            {ranked.map((r) => (
               <tr
                 key={r.modelRaw ?? "\u0000"}
                 className="border-t border-ink-850"
@@ -252,7 +292,7 @@ function ByModel({ rows }: { rows: StatsByModel[] }) {
                   </span>
                 </td>
                 <td className="py-1 text-right font-mono tabular-nums text-fg-muted">
-                  {formatTokensShort(r.totalTokens)}
+                  {formatTokensShort(r.tokens)}
                 </td>
                 <td className="py-1 text-right font-mono tabular-nums text-fg-muted">
                   {r.equivApiValueUsd == null
