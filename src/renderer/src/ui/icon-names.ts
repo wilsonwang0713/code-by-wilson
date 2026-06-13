@@ -6,6 +6,7 @@
  * can never drift: add a name here without a glyph there (or vice versa) and the typecheck fails.
  */
 export type IconName =
+  | "chart-column"
   | "check"
   | "chevron-down"
   | "chevron-right"

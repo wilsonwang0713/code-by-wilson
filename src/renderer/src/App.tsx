@@ -15,6 +15,8 @@ import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
 import { SessionList } from "./SessionList";
 import { Icon } from "./ui/icons";
+import { StatsView } from "./stats/StatsView";
+import { OVERVIEW_ID } from "./stats/sentinel";
 
 /** How often the session list re-syncs in the background, so an open workspace's state (and the
  *  Overview) tracks a session as it moves. Slower than the transcript poll: metadata changes less
@@ -199,8 +201,11 @@ export function App() {
     () => applyAdopting(mergeManaged(sessions, drafts), adopting),
     [sessions, drafts, adopting],
   );
+  const isOverview = selectedId === OVERVIEW_ID;
   const selected =
-    selectedId !== null ? (all.find((s) => s.id === selectedId) ?? null) : null;
+    !isOverview && selectedId !== null
+      ? (all.find((s) => s.id === selectedId) ?? null)
+      : null;
 
   // The selection follows the unfiltered list, not the rail's `query` — filtering the rail must never
   // yank the open session away. Re-home only when the list first arrives, the open session vanishes, or
@@ -209,10 +214,15 @@ export function App() {
   const ids = useMemo(() => all.map((s) => s.id).join(","), [all]);
   useEffect(() => {
     if (all.length === 0) {
-      if (selectedId !== null) setSelectedId(null);
+      // Overview is a valid selection even with no sessions (it shows the empty state); only clear a
+      // stale *session* selection.
+      if (selectedId !== null && !isOverview) setSelectedId(null);
       return;
     }
-    if (selectedId === null || !all.some((s) => s.id === selectedId)) {
+    if (
+      !isOverview &&
+      (selectedId === null || !all.some((s) => s.id === selectedId))
+    ) {
       // Pick the rail's top row (Waiting → Working → Idle → Ended, recent first) so the auto-opened
       // session is the one visually at the top of the list, not an arbitrary first element of `all`.
       const ordered = groupSessions(all, "").flatMap((g) => g.items);
@@ -234,7 +244,9 @@ export function App() {
           account={account}
         />
         <div className="flex min-w-0 flex-1">
-          {selected ? (
+          {isOverview ? (
+            <StatsView />
+          ) : selected ? (
             <Workspace
               key={selected.id}
               session={selected}
