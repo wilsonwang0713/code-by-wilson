@@ -66,6 +66,9 @@ export interface StatsSnapshot {
    *  scoped totals, so picking a range with no turns shows zeroed cards rather than "No usage yet" when
    *  there is history outside the window. */
   hasAnyTurns: boolean;
+  /** The per-model breakdown (#111), scoped to the same range as `totals`, ordered by tokens descending.
+   *  Empty when there is no store, the scan errors, or the window holds no turns. */
+  byModel: StatsByModel[];
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -75,6 +78,7 @@ export function emptySnapshot(): StatsSnapshot {
     totals: emptyTotals(),
     progress: { filesTotal: 0, filesDone: 0, done: true },
     hasAnyTurns: false,
+    byModel: [],
   };
 }
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { IPC } from "@shared/ipc";
-import type { StatsSnapshot, StatsRange } from "@shared/stats";
+import type { StatsSnapshot, StatsRange, StatsByModel } from "@shared/stats";
 import type { Provider } from "../src/main/provider/types";
 
 // Capture the handlers registerIpc registers, without a real Electron ipcMain (same shape as ipc.test.ts).
@@ -156,6 +156,7 @@ describe("registerIpc stats:read", () => {
       },
       progress: { filesTotal: 0, filesDone: 0, done: true },
       hasAnyTurns: false,
+      byModel: [],
     });
   });
 
@@ -198,6 +199,66 @@ describe("registerIpc stats:read", () => {
     expect(turnsFor("90d")).toBe(2);
     expect(turnsFor("7d")).toBe(1);
     expect(turnsFor()).toBe(3); // a missing range falls back to all-time, not the product 30d default
+  });
+
+  it("returns a per-model breakdown scoped to the requested range", () => {
+    const home = makeHome();
+    mkdirSync(join(home, "projects"), { recursive: true }); // empty: the seeds survive the scan
+
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    upsertTurns(analyticsDb, [
+      // in 7d: opus, 1M input → $5.
+      {
+        messageId: "recent",
+        sessionId: "s1",
+        ts: now - 60 * 60_000,
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/w",
+        project: "w",
+      },
+      // outside 7d: sonnet, 100 days ago → only all-time sees it.
+      {
+        messageId: "old",
+        sessionId: "s2",
+        ts: now - 100 * DAY,
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/w",
+        project: "w",
+      },
+    ]);
+
+    const db = openTestDb();
+    migrate(db);
+    registerIpc({ db, provider, analyticsDb, claudeDir: home });
+
+    const byModelFor = (range?: StatsRange): StatsByModel[] =>
+      (handlers.get(IPC.readStats)!(null, range) as StatsSnapshot).byModel;
+
+    const all = byModelFor("all");
+    expect(all.map((r) => r.modelRaw).sort()).toEqual([
+      "claude-opus-4-8",
+      "claude-sonnet-4-6",
+    ]);
+
+    const week = byModelFor("7d");
+    expect(week).toHaveLength(1); // the 100-day-old sonnet is out of the window
+    expect(week[0].modelRaw).toBe("claude-opus-4-8");
+    expect(week[0].equivApiValueUsd).toBeCloseTo(5);
   });
 
   it("with a store but no claude dir, serves last-known totals and reports done", () => {
