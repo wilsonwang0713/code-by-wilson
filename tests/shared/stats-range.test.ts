@@ -16,26 +16,39 @@ describe("rangeSinceMs", () => {
   });
 
   it("today is the start of the current local day", () => {
-    expect(rangeSinceMs("today", NOON)).toBe(new Date(2026, 5, 14, 0, 0, 0, 0).getTime());
+    expect(rangeSinceMs("today", NOON)).toBe(
+      new Date(2026, 5, 14, 0, 0, 0, 0).getTime(),
+    );
   });
 
   it("7d starts six local days before today (seven inclusive days)", () => {
-    expect(rangeSinceMs("7d", NOON)).toBe(new Date(2026, 5, 8, 0, 0, 0, 0).getTime());
+    expect(rangeSinceMs("7d", NOON)).toBe(
+      new Date(2026, 5, 8, 0, 0, 0, 0).getTime(),
+    );
   });
 
   it("30d starts twenty-nine local days before today", () => {
-    expect(rangeSinceMs("30d", NOON)).toBe(new Date(2026, 4, 16, 0, 0, 0, 0).getTime());
+    expect(rangeSinceMs("30d", NOON)).toBe(
+      new Date(2026, 4, 16, 0, 0, 0, 0).getTime(),
+    );
   });
 
   it("90d starts eighty-nine local days before today", () => {
-    expect(rangeSinceMs("90d", NOON)).toBe(new Date(2026, 2, 17, 0, 0, 0, 0).getTime());
+    expect(rangeSinceMs("90d", NOON)).toBe(
+      new Date(2026, 2, 17, 0, 0, 0, 0).getTime(),
+    );
   });
 
   it("snaps to local midnight regardless of the time of day", () => {
     const lateNight = new Date(2026, 5, 14, 23, 59, 59, 999).getTime();
     const ms = rangeSinceMs("today", lateNight)!;
     const d = new Date(ms);
-    expect([d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()]).toEqual([0, 0, 0, 0]);
+    expect([
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds(),
+      d.getMilliseconds(),
+    ]).toEqual([0, 0, 0, 0]);
     expect(ms).toBeLessThanOrEqual(lateNight);
   });
 });

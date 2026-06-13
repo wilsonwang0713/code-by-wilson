@@ -14,7 +14,12 @@ import {
 import { getOverview } from "./db/store";
 import { readTotals, emptyTotals, hasAnyTurns } from "./db/analytics";
 import { scanStep } from "./analytics/scan";
-import type { StatsTotals, StatsSnapshot, ScanProgress, StatsRange } from "@shared/stats";
+import type {
+  StatsTotals,
+  StatsSnapshot,
+  ScanProgress,
+  StatsRange,
+} from "@shared/stats";
 import { emptySnapshot, rangeSinceMs } from "@shared/stats";
 import { syncSessions } from "./sync";
 
@@ -138,7 +143,10 @@ export function registerIpc({
     try {
       return hasAnyTurns(adb);
     } catch (err) {
-      console.error("stats hasAnyTurns check failed; treating store as empty", err);
+      console.error(
+        "stats hasAnyTurns check failed; treating store as empty",
+        err,
+      );
       return false;
     }
   };

@@ -215,9 +215,36 @@ describe("analytics store", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      turn({ messageId: "old", ts: 1000, usage: { inputTokens: 1, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
-      turn({ messageId: "edge", ts: 2000, usage: { inputTokens: 10, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
-      turn({ messageId: "new", ts: 3000, usage: { inputTokens: 100, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+      turn({
+        messageId: "old",
+        ts: 1000,
+        usage: {
+          inputTokens: 1,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "edge",
+        ts: 2000,
+        usage: {
+          inputTokens: 10,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "new",
+        ts: 3000,
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
     ]);
     // since == the edge turn's ts: the edge is included (>=), the older one excluded.
     const scoped = readTotals(db, 2000);
@@ -231,7 +258,10 @@ describe("analytics store", () => {
   it("counts all-time with no bound (a null bound matches the no-arg call)", () => {
     const db = openTestDb();
     migrateAnalytics(db);
-    upsertTurns(db, [turn({ messageId: "a", ts: 1000 }), turn({ messageId: "b", ts: 9_999_999 })]);
+    upsertTurns(db, [
+      turn({ messageId: "a", ts: 1000 }),
+      turn({ messageId: "b", ts: 9_999_999 }),
+    ]);
     expect(readTotals(db).turns).toBe(2);
     expect(readTotals(db, null).turns).toBe(2);
   });
@@ -241,11 +271,31 @@ describe("analytics store", () => {
     migrateAnalytics(db);
     upsertTurns(db, [
       // out of window: a different session, 1M opus input ($5) — must not leak into the scoped value.
-      turn({ messageId: "old", sessionId: "s-old", ts: 1000, modelRaw: "claude-opus-4-8",
-        usage: { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+      turn({
+        messageId: "old",
+        sessionId: "s-old",
+        ts: 1000,
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
       // in window: a sonnet turn, 1M input ($3).
-      turn({ messageId: "new", sessionId: "s-new", ts: 5000, modelRaw: "claude-sonnet-4-6",
-        usage: { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+      turn({
+        messageId: "new",
+        sessionId: "s-new",
+        ts: 5000,
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
     ]);
     const scoped = readTotals(db, 5000);
     expect(scoped.sessions).toBe(1); // only s-new is active in the window

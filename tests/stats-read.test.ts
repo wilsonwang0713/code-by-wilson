@@ -172,7 +172,12 @@ describe("registerIpc stats:read", () => {
       sessionId: id,
       ts,
       modelRaw: "claude-opus-4-8",
-      usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
       cwd: "/w",
       project: "w",
     });
