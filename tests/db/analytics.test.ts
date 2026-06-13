@@ -60,7 +60,10 @@ describe("analytics store", () => {
     upsertProcessedFile(db, "/a.jsonl", 1, 1);
     migrateAnalytics(db); // already at v2 → the guard skips the block; nothing is wiped
     expect(readTotals(db).turns).toBe(1);
-    expect(readProcessedFiles(db).get("/a.jsonl")).toEqual({ mtime: 1, lines: 1 });
+    expect(readProcessedFiles(db).get("/a.jsonl")).toEqual({
+      mtime: 1,
+      lines: 1,
+    });
   });
 
   it("clears turns once on the v1 → v2 upgrade (id-less surrogate scheme changed)", () => {
