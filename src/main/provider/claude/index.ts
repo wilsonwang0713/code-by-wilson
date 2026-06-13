@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import type { Provider } from "../types";
-import type { Management } from "@shared/types";
+import type { Management, PersistedSession } from "@shared/types";
+import type { Family } from "@shared/models";
 import { readTextOrNull, resolveClaudeDir } from "../../claude-config";
 import {
   indexTranscripts,
@@ -38,8 +39,13 @@ export interface ClaudeProviderDeps {
   /** How recent (ms) an Ended session's transcript must be to surface; defaults to 7 days. */
   recentWindowMs?: number;
   /** The authority for Managed-ness: a discovered session is Managed iff this run spawned its id.
-   *  Defaults to "nothing is Managed", so a provider built without it labels everything Observed. */
-  managed?: { has(id: string): boolean };
+   *  Defaults to "nothing is Managed", so a provider built without it labels everything Observed.
+   *  `modelOf` returns the alias we spawned that id on, so summarize can front it before the first
+   *  real assistant turn records a model (see `pickedModel`). */
+  managed?: {
+    has(id: string): boolean;
+    modelOf?(id: string): Family | undefined;
+  };
 }
 
 const DEFAULT_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -127,6 +133,17 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
   const management = (id: string): Management =>
     managed.has(id) ? "managed" : "observed";
 
+  // A Managed session whose transcript hasn't recorded a real model yet — the gap between sending the
+  // first prompt (which writes a user turn) and the first assistant turn landing — has no modelRaw, so
+  // normalizeModelId(undefined) falls to the Opus fallback. That fallback briefly overrides the alias we
+  // actually spawned on, a visible Sonnet → Opus → Sonnet flicker in the Session panel. Front the picked
+  // alias from the registry until a real turn lands a modelRaw; once it does, the transcript's true model
+  // wins untouched. Observed sessions have no picked alias to vouch for, so they keep the honest fallback.
+  const pickedModel = (id: string, s: PersistedSession): Family =>
+    s.modelRaw === undefined && managed.has(id)
+      ? (managed.modelOf?.(id) ?? s.model)
+      : s.model;
+
   // Last-resolved transcript path per session id. The Observed view polls one session every ~1.5s,
   // so caching the path lets a steady poll stat ONE file instead of re-walking all of projects/ each
   // time; the full sweep runs only on the first read or after the file moves/vanishes.
@@ -203,7 +220,14 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     capabilities: { canControl: true, hasRateLimits: true, hasSubagents: true },
     listCandidates: () =>
       listCandidates({ claudeDir, isPidAlive, now: now(), recentWindowMs }),
-    summarize: (c) => ({ ...summarize(c), management: management(c.id) }),
+    summarize: (c) => {
+      const s = summarize(c);
+      return {
+        ...s,
+        management: management(c.id),
+        model: pickedModel(c.id, s),
+      };
+    },
     restate: (c, prev) => ({
       ...restate(c, prev),
       management: management(c.id),

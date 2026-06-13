@@ -75,7 +75,7 @@ export function registerTerminalIpc({
       if (!window.isDestroyed())
         window.webContents.send(TERMINAL.exit, id, code);
     },
-    onSpawned: (id, pid) => managed.add(id, pid),
+    onSpawned: (id, pid, model) => managed.add(id, pid, model),
     onClosed: (id) => managed.remove(id),
     // The composition root: this is the one place node-pty is injected, so the manager (and its tests)
     // stay free of the native addon.

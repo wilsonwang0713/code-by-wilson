@@ -71,4 +71,32 @@ describe("createManagedRegistry", () => {
       { id: "B", pid: 200 },
     ]);
   });
+
+  it("remembers the picked model so the provider can front it before the first real turn", () => {
+    const reg = createManagedRegistry();
+    reg.add("x", 100, "sonnet");
+    expect(reg.modelOf("x")).toBe("sonnet");
+    expect(reg.modelOf("unknown")).toBeUndefined();
+  });
+
+  it("has no picked model for an Adopt (added without one — the CLI restores the model)", () => {
+    const reg = createManagedRegistry();
+    reg.add("x", 100);
+    expect(reg.modelOf("x")).toBeUndefined();
+  });
+
+  it("forgets the picked model on remove", () => {
+    const reg = createManagedRegistry();
+    reg.add("x", 100, "sonnet");
+    reg.remove("x");
+    expect(reg.modelOf("x")).toBeUndefined();
+  });
+
+  it("carries the picked model across a /clear rotation", () => {
+    const reg = createManagedRegistry();
+    reg.add("A", 100, "sonnet");
+    reg.rename("A", "B");
+    expect(reg.modelOf("A")).toBeUndefined();
+    expect(reg.modelOf("B")).toBe("sonnet");
+  });
 });
