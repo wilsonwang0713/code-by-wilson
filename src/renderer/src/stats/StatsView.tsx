@@ -132,6 +132,7 @@ function RangeFilter({
         <button
           key={v}
           onClick={() => onChange(v)}
+          aria-pressed={v === value}
           className={`rounded px-2 py-0.5 transition-colors ${
             v === value
               ? "bg-ink-700 text-fg"
