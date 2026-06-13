@@ -3,6 +3,7 @@ import type { TranscriptRead, ReadSettled } from "./transcript";
 import type { TerminalApi } from "./terminal";
 import type { MetricsRead } from "./metrics";
 import type { ModelDefaults } from "./models";
+import type { StatsTotals } from "./stats";
 export const IPC = {
   overview: "overview:get",
   refresh: "sessions:refresh",
@@ -12,6 +13,7 @@ export const IPC = {
   readMetrics: "metrics:read",
   fullscreen: "window:fullscreen",
   modelDefaults: "model:defaults",
+  readStats: "stats:read",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -50,6 +52,9 @@ export interface IpcApi {
   /** Per-family model overrides, the configured default family, and the allowed-family allowlist —
    *  read from Claude Code's settings.json and the process env. */
   modelDefaults(): Promise<ModelDefaults>;
+  /** All-time usage totals for the Overall Stats view. Triggers a full transcript scan, then returns
+   *  one SQL aggregate (Sessions, turns, tokens by kind, Equivalent API value). */
+  readStats(): Promise<StatsTotals>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */

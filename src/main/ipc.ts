@@ -12,6 +12,8 @@ import {
   CAPTURE_STALE_MS,
 } from "@shared/statusline";
 import { getOverview } from "./db/store";
+import { readTotals, emptyTotals } from "./db/analytics";
+import { scanAllTranscripts } from "./analytics/scan";
 import { syncSessions } from "./sync";
 
 export interface IpcDeps {
@@ -29,6 +31,11 @@ export interface IpcDeps {
   /** Runs at the start of every sync, before discovery. Used to follow `/clear` rotations so the
    *  provider labels a rotated session correctly on the same tick. Its failure must not block the sync. */
   beforeSync?: () => void;
+  /** The durable analytics store. When absent, stats:read serves zeros. Separate from `db` (the live
+   *  index): a different file with its own lifecycle (#107). */
+  analyticsDb?: SqliteDb;
+  /** The Claude config dir, so stats:read can run a full transcript scan before aggregating. */
+  claudeDir?: string;
 }
 
 export function registerIpc({
@@ -39,6 +46,8 @@ export function registerIpc({
   apiConfig,
   modelDefaults,
   beforeSync,
+  analyticsDb,
+  claudeDir,
 }: IpcDeps): { sync: () => void } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
@@ -105,6 +114,19 @@ export function registerIpc({
   ipcMain.handle(IPC.readMetrics, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readMetrics(id, sinceMtimeMs),
   );
+
+  // Slice 1 lifecycle: the Stats view calls this on mount, so the scan runs on-open. A full synchronous
+  // walk is the documented slice-1 tradeoff (chunked, incremental passes come later). Never reject to the
+  // renderer: a scan failure serves last-known totals, like refresh serves last-known rows.
+  ipcMain.handle(IPC.readStats, () => {
+    if (!analyticsDb) return emptyTotals();
+    try {
+      if (claudeDir) scanAllTranscripts(analyticsDb, claudeDir);
+    } catch (err) {
+      console.error("stats scan failed; serving last-known totals", err);
+    }
+    return readTotals(analyticsDb);
+  });
 
   return { sync };
 }
