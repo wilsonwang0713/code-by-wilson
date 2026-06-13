@@ -31,30 +31,20 @@ export interface ManagedRegistry {
 }
 
 export function createManagedRegistry(): ManagedRegistry {
-  const pidById = new Map<string, number>();
-  const modelById = new Map<string, Family>();
+  // One entry per managed id: pid + the picked alias travel together, so add/remove/rename touch a
+  // single map and can't drift the two apart.
+  const byId = new Map<string, { pid: number; model?: Family }>();
   return {
-    add: (id, pid, model) => {
-      pidById.set(id, pid);
-      if (model !== undefined) modelById.set(id, model);
-    },
-    remove: (id) => {
-      pidById.delete(id);
-      modelById.delete(id);
-    },
-    has: (id) => pidById.has(id),
-    modelOf: (id) => modelById.get(id),
-    entries: () => [...pidById].map(([id, pid]) => ({ id, pid })),
+    add: (id, pid, model) => byId.set(id, { pid, model }),
+    remove: (id) => byId.delete(id),
+    has: (id) => byId.has(id),
+    modelOf: (id) => byId.get(id)?.model,
+    entries: () => [...byId].map(([id, { pid }]) => ({ id, pid })),
     rename: (from, to) => {
-      const pid = pidById.get(from);
-      if (pid === undefined || pidById.has(to)) return; // `from` isn't managed, or `to` is already a live pty
-      pidById.delete(from);
-      pidById.set(to, pid);
-      const model = modelById.get(from);
-      if (model !== undefined) {
-        modelById.delete(from);
-        modelById.set(to, model);
-      }
+      const entry = byId.get(from);
+      if (!entry || byId.has(to)) return; // `from` isn't managed, or `to` is already a live pty
+      byId.delete(from);
+      byId.set(to, entry);
     },
   };
 }
