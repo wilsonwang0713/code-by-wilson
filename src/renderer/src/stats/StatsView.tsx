@@ -196,24 +196,31 @@ function Totals({ totals }: { totals: StatsTotals }) {
   );
 }
 
-/** The per-model breakdown (#111): a donut sized by each model's token share beside a table of tokens and
- *  Equivalent API value per raw model id. An unrecognized id shows n/a cost while its tokens still count;
- *  a turn with no recorded model rows as "Unknown". Color is paired onto each row so the donut and the
- *  table legend read off one source — no zip-by-index that could drift if rows reorder. */
+/** The per-model breakdown (#111): a donut sized by each model's input+output share beside a table of total
+ *  tokens and Equivalent API value per raw model id. The donut excludes cache tokens on purpose —
+ *  cache-read volume dwarfs fresh tokens, so totalTokens would let a heavily-cached model swamp the chart.
+ *  An unrecognized id shows n/a cost while its tokens still count; a turn with no recorded model rows as
+ *  "Unknown". Color is paired onto each row so the donut and the table legend read off one source — no
+ *  zip-by-index that could drift if rows reorder. */
 function ByModel({ rows }: { rows: StatsByModel[] }) {
+  // Nothing worth charting: every model in the window recorded turns but no tokens (e.g. only synthetic or
+  // errored turns). Skip the whole panel rather than show a table of zeros beside a blank ring.
+  if (!rows.some((r) => r.totalTokens > 0)) return null;
   const colored = rows.map((r, i) => ({
     ...r,
     color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
   }));
+  // The donut sizes on input+output. When that's zero for every row (a pure cache-read window) it would be
+  // a featureless track, so drop it and let the table stand alone.
+  const segments = colored.map((r) => ({
+    value: r.inputTokens + r.outputTokens,
+    color: r.color,
+  }));
+  const hasDonut = segments.some((s) => s.value > 0);
   return (
     <StatsPanel title="By model">
       <div className="flex items-center gap-4">
-        <Donut
-          segments={colored.map((r) => ({
-            value: r.totalTokens,
-            color: r.color,
-          }))}
-        />
+        {hasDonut && <Donut segments={segments} />}
         <table className="min-w-0 flex-1 text-[12px]">
           <thead>
             <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
@@ -229,9 +236,11 @@ function ByModel({ rows }: { rows: StatsByModel[] }) {
             </tr>
           </thead>
           <tbody>
+            {/* Key on the raw id (unique per GROUP BY row); the null "Unknown" bucket gets a NUL sentinel a
+                real model id can never be, so it can't collide with a model whose raw string is "unknown". */}
             {colored.map((r) => (
               <tr
-                key={r.modelRaw ?? "unknown"}
+                key={r.modelRaw ?? "\u0000"}
                 className="border-t border-ink-850"
               >
                 <td className="py-1 pr-2">

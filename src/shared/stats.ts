@@ -33,13 +33,19 @@ export function emptyTotals(): StatsTotals {
 /**
  * One row of the per-model breakdown (#111), keyed on the raw model id exactly as the transcript recorded
  * it (e.g. "claude-opus-4-8"), so one model version is distinct from the next. `totalTokens` is the sum of
- * all four token kinds — what the donut sizes on and the table shows. `equivApiValueUsd` is null when the
- * raw id matches no known family: an honest n/a, never a guessed $0. A null `modelRaw` is a turn that
- * recorded no model; it renders as "Unknown" with n/a cost.
+ * all four token kinds — the figure the table's Tokens column shows. The donut sizes on `inputTokens +
+ * outputTokens` instead: cache-read volume dwarfs fresh tokens in agentic use, so sizing the chart on the
+ * total would let a heavily-cached model swamp it. `equivApiValueUsd` is null when the raw id matches no
+ * known family: an honest n/a, never a guessed $0. A null `modelRaw` is a turn that recorded no model; it
+ * renders as "Unknown" with n/a cost.
  */
 export interface StatsByModel {
   modelRaw: string | null;
   totalTokens: number;
+  /** Input and output tokens (cache excluded) — the donut's slice weight, kept apart from totalTokens so
+   *  cache-read volume can't inflate a model's share. */
+  inputTokens: number;
+  outputTokens: number;
   /** Equivalent API value for this model, or null (n/a) when the raw id matches no known family. */
   equivApiValueUsd: number | null;
 }

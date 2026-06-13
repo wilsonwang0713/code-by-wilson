@@ -413,6 +413,44 @@ describe("readByModel", () => {
       "claude-opus-4-8",
     ]);
     expect(rows.map((r) => r.totalTokens)).toEqual([1001, 310]);
+    // input/output ride along apart from totalTokens — the donut sizes on them, so cache tokens are
+    // excluded: opus is 300 (100+200), not 310; sonnet is 1000, not 1001.
+    const opus = rows.find((r) => r.modelRaw === "claude-opus-4-8")!;
+    expect([opus.inputTokens, opus.outputTokens]).toEqual([300, 0]);
+    const sonnet = rows.find((r) => r.modelRaw === "claude-sonnet-4-6")!;
+    expect([sonnet.inputTokens, sonnet.outputTokens]).toEqual([1000, 0]);
+  });
+
+  it("breaks total-token ties by raw id so order is stable, not SQLite's GROUP BY order", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "z",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "a",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    // Same totalTokens (100 each): the tiebreak sorts by raw id ascending, deterministically.
+    expect(readByModel(db).map((r) => r.modelRaw)).toEqual([
+      "claude-opus-4-8",
+      "claude-sonnet-4-6",
+    ]);
   });
 
   it("maps cost per model and gives an unrecognized id null (n/a), still counting its tokens", () => {
@@ -545,6 +583,12 @@ describe("readByModel", () => {
         },
       }),
     ]);
+    // Per-row, not just the sum: a regression that swaps which model gets which cost (opus's onto sonnet's
+    // row and back) preserves the total, so the sum check alone would miss it. Pin each row.
+    const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
+    expect(byRaw.get("claude-opus-4-8")!.equivApiValueUsd).toBeCloseTo(5); // 1M input @ $5/M
+    expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueUsd).toBeCloseTo(3); // 1M input @ $3/M
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeNull(); // unrecognized → n/a
     const summed = readByModel(db).reduce(
       (acc, r) => acc + (r.equivApiValueUsd ?? 0),
       0,
