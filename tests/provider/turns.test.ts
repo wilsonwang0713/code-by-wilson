@@ -127,4 +127,26 @@ describe("extractTurns", () => {
     expect(turns).toHaveLength(2);
     expect(new Set(turns.map((t) => t.messageId)).size).toBe(2);
   });
+
+  it("keys an id-less turn on its absolute line, stable across a full vs tail parse", () => {
+    // Two id-less assistant turns on lines 0 and 1. Parsing the whole file and parsing only the tail
+    // (line 1) with startLine=1 must yield the SAME surrogate for line 1 — that is what lets an
+    // incremental pass over an appended tail upsert in place instead of double-counting.
+    const idless = (input: number) =>
+      line({
+        type: "assistant",
+        cwd: "/w",
+        message: {
+          role: "assistant",
+          model: "claude-opus-4-8",
+          usage: { input_tokens: input },
+        },
+      });
+    const full = extractTurns([idless(1), idless(2)].join("\n"), "sess-1");
+    const tail = extractTurns(idless(2), "sess-1", "sess-1", 1);
+    expect(full).toHaveLength(2);
+    expect(tail).toHaveLength(1);
+    expect(tail[0].messageId).toBe(full[1].messageId); // line 1's surrogate is identical either way
+    expect(full[0].messageId).not.toBe(full[1].messageId); // lines 0 and 1 stay distinct
+  });
 });

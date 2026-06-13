@@ -1,44 +1,102 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { type StatsTotals, emptyTotals } from "@shared/stats";
+import {
+  type StatsSnapshot,
+  type ScanProgress,
+  type StatsTotals,
+  emptySnapshot,
+} from "@shared/stats";
 import { formatTokensShort, formatUsd } from "@shared/format";
 import { Icon } from "../ui/icons";
 
+/** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
+ *  in another Session still shows up without a manual refresh. */
+const BACKFILL_POLL_MS = 40;
+const WARM_POLL_MS = 1500;
+
 /**
- * The Overall Stats view (slice 1): the all-time Totals panel from one stats:read aggregate. Reads on
- * mount — that read triggers the on-open scan in the main process. The page-global range filter, the
- * contributions calendar, the daily time-series, and the per-model/project/branch/session breakdowns land
- * in later slices (the layout follows the prototype's chosen "Insights grid"; this is its top-left panel).
+ * The Overall Stats view: the all-time Totals panel, plus a "building history" progress banner on a first
+ * cold run. Polls stats:read while mounted — each poll runs one bounded scan step in the main process —
+ * fast until the backfill is done, then at the warm cadence so turns from other Sessions appear on their
+ * own. The effect's cleanup stops the poll on unmount, so selecting any Session ends all scan work; the
+ * main process does nothing unprompted. (The range filter, calendar, time-series, and breakdowns are
+ * later slices; this is still the prototype "Insights grid"'s top-left panel.)
  */
 export function StatsView() {
-  const [totals, setTotals] = useState<StatsTotals | null>(null);
+  const [snap, setSnap] = useState<StatsSnapshot | null>(null);
 
   useEffect(() => {
     let alive = true;
-    void window.api
-      .readStats()
-      .then((t) => {
-        if (alive) setTotals(t);
-      })
-      .catch(() => {
-        // The main handler is built never to reject; if the IPC bridge itself fails, fall back to zeros
-        // (which renders the empty state) rather than stranding the view on the blank loading state.
-        if (alive) setTotals(emptyTotals());
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = (): void => {
+      void window.api
+        .readStats()
+        .then((s) => {
+          if (!alive) return;
+          setSnap(s);
+          timer = setTimeout(
+            tick,
+            s.progress.done ? WARM_POLL_MS : BACKFILL_POLL_MS,
+          );
+        })
+        .catch(() => {
+          // The handler is built never to reject; reaching here means the IPC bridge itself failed.
+          // Keep the last good snapshot rather than blanking populated totals to zero (fall back to an
+          // empty, done snapshot only on the very first poll), and retry at the warm cadence so a
+          // transient bridge hiccup recovers on its own instead of freezing the view forever.
+          if (!alive) return;
+          setSnap((prev) => prev ?? emptySnapshot());
+          timer = setTimeout(tick, WARM_POLL_MS);
+        });
+    };
+    tick();
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
     };
   }, []);
 
+  const totals = snap?.totals;
+  const progress = snap?.progress;
   return (
     <div className="h-full min-w-0 flex-1 overflow-y-auto bg-ink-950 text-fg">
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 px-6 py-6">
-        {/* null = first read in flight: blank, no spinner (matches EmptyDetail's loading). */}
-        {totals && (
+        {/* null = first poll in flight: blank, no spinner (matches EmptyDetail's loading). */}
+        {snap && totals && progress && (
           <>
             <h1 className="font-display text-lg text-fg">Overall stats</h1>
-            {totals.turns === 0 ? <EmptyStats /> : <Totals totals={totals} />}
+            {!progress.done && <BuildingHistory progress={progress} />}
+            {totals.turns === 0 && progress.done ? (
+              <EmptyStats />
+            ) : (
+              <Totals totals={totals} />
+            )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The first-cold-run progress state (#107 user story 26): a thin determinate bar while the scan ingests
+ *  history. Gone once progress.done — the warm polls that follow refresh the totals silently. */
+function BuildingHistory({ progress }: { progress: ScanProgress }) {
+  const pct = progress.filesTotal
+    ? Math.round((progress.filesDone / progress.filesTotal) * 100)
+    : 0;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-ink-800 bg-ink-900/40 px-3 py-2.5">
+      <div className="flex items-center justify-between text-[11px] text-fg-muted">
+        <span>Building history…</span>
+        <span className="tabular-nums">
+          {progress.filesDone.toLocaleString("en-US")}/
+          {progress.filesTotal.toLocaleString("en-US")}
+        </span>
+      </div>
+      <div className="h-1 overflow-hidden rounded-full bg-ink-800">
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-300"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );

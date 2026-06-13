@@ -29,3 +29,30 @@ export function emptyTotals(): StatsTotals {
     equivApiValueUsd: 0,
   };
 }
+
+/**
+ * How far the incremental scan has gotten, returned alongside the totals so the Stats view can show a
+ * "building history" state on a first cold run and know when to drop from brisk polling to a gentle warm
+ * cadence. `filesTotal`/`filesDone` count Transcript and subagent files; `done` is true once every file's
+ * high-water mark is current (nothing left to ingest this pass).
+ */
+export interface ScanProgress {
+  filesTotal: number;
+  filesDone: number;
+  done: boolean;
+}
+
+/** One Stats poll: the all-time totals as they stand, plus how far the scan has gotten. */
+export interface StatsSnapshot {
+  totals: StatsTotals;
+  progress: ScanProgress;
+}
+
+/** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
+ *  the view shows its empty state rather than spinning on "building history" forever. */
+export function emptySnapshot(): StatsSnapshot {
+  return {
+    totals: emptyTotals(),
+    progress: { filesTotal: 0, filesDone: 0, done: true },
+  };
+}

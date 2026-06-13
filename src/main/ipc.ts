@@ -13,7 +13,9 @@ import {
 } from "@shared/statusline";
 import { getOverview } from "./db/store";
 import { readTotals, emptyTotals } from "./db/analytics";
-import { scanAllTranscripts } from "./analytics/scan";
+import { scanStep } from "./analytics/scan";
+import type { StatsTotals, StatsSnapshot, ScanProgress } from "@shared/stats";
+import { emptySnapshot } from "@shared/stats";
 import { syncSessions } from "./sync";
 
 export interface IpcDeps {
@@ -115,24 +117,37 @@ export function registerIpc({
     provider.readMetrics(id, sinceMtimeMs),
   );
 
-  // Slice 1 lifecycle: the Stats view calls this on mount, so the scan runs on-open. A full synchronous
-  // walk is the documented slice-1 tradeoff (chunked, incremental passes come later). Never reject to the
-  // renderer: a scan failure serves last-known totals, like refresh serves last-known rows.
-  ipcMain.handle(IPC.readStats, () => {
-    if (!analyticsDb) return emptyTotals();
+  // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan
+  // step (the event loop breathes between calls, so pty output and IPC stay responsive) and returns the
+  // totals plus scan progress. Never reject to the renderer: a scan or read failure serves the last-known
+  // totals with a `done` progress, so the view stops the "building history" poll instead of spinning.
+  const doneProgress = (): ScanProgress => ({
+    filesTotal: 0,
+    filesDone: 0,
+    done: true,
+  });
+  const safeTotals = (adb: SqliteDb): StatsTotals => {
     try {
-      if (claudeDir) scanAllTranscripts(analyticsDb, claudeDir);
+      return readTotals(adb);
     } catch (err) {
-      console.error("stats scan failed; serving last-known totals", err);
-    }
-    try {
-      return readTotals(analyticsDb);
-    } catch (err) {
-      // The aggregate read itself can fail (a corrupt or locked store). Honor the never-reject contract:
-      // serve zeros rather than letting the rejection strand the Stats view on its blank loading state.
       console.error("stats read failed; serving zeros", err);
       return emptyTotals();
     }
+  };
+  ipcMain.handle(IPC.readStats, (): StatsSnapshot => {
+    if (!analyticsDb || !claudeDir) {
+      // No store, or no dir to scan: a done snapshot (zeros if no store; last-known if a store but no dir).
+      return analyticsDb
+        ? { totals: safeTotals(analyticsDb), progress: doneProgress() }
+        : emptySnapshot();
+    }
+    let progress = doneProgress();
+    try {
+      progress = scanStep(analyticsDb, claudeDir);
+    } catch (err) {
+      console.error("stats scan step failed; serving last-known totals", err);
+    }
+    return { totals: safeTotals(analyticsDb), progress };
   });
 
   return { sync };
