@@ -30,6 +30,9 @@ export function StatsView() {
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Range changed: blank the cards back to the loading state rather than leave the prior range's totals
+    // showing under the newly-pressed button until this range's first poll lands.
+    setSnap(null);
     const tick = (): void => {
       void window.api
         .readStats(range)
@@ -71,7 +74,13 @@ export function StatsView() {
             {!snap.progress.done && (
               <BuildingHistory progress={snap.progress} />
             )}
-            {!snap.hasAnyTurns && snap.progress.done ? (
+            {/* "No usage yet" only when the store is empty AND the scoped totals are too. The second
+                clause is the safety: hasAnyTurns rides a separate query (safeHasAnyTurns → false on a read
+                error), so a non-zero scoped count must still win, never EmptyStats over real cards. In the
+                normal case totals.turns is 0 whenever hasAnyTurns is false, so this is a no-op. */}
+            {!snap.hasAnyTurns &&
+            snap.totals.turns === 0 &&
+            snap.progress.done ? (
               <EmptyStats />
             ) : (
               <Totals totals={snap.totals} />
@@ -110,14 +119,20 @@ function BuildingHistory({ progress }: { progress: ScanProgress }) {
 
 /** The page-global range filter (#110): five trailing windows, defaulting to 30d. It scopes every total
  *  on the page (not the calendar, which is range-independent — that's why it sits in the page header, not a
- *  panel). Presentational; the scoping happens main-side via the range passed through stats:read. */
-const RANGE_OPTS: [StatsRange, string][] = [
-  ["today", "Today"],
-  ["7d", "7d"],
-  ["30d", "30d"],
-  ["90d", "90d"],
-  ["all", "All"],
-];
+ *  panel). Presentational; the scoping happens main-side via the range passed through stats:read.
+ *  `satisfies Record<StatsRange, string>` keeps this list exhaustive: a new range can't ship a main-side
+ *  bound without also growing a button here, the way RANGE_DAYS enforces it for the bound. */
+const RANGE_LABELS = {
+  today: "Today",
+  "7d": "7d",
+  "30d": "30d",
+  "90d": "90d",
+  all: "All",
+} satisfies Record<StatsRange, string>;
+
+// Insertion order is the render order (none of the keys are array-index-like), and the cast restores the
+// StatsRange key type that Object.entries widens to string.
+const RANGE_OPTS = Object.entries(RANGE_LABELS) as [StatsRange, string][];
 
 function RangeFilter({
   value,
