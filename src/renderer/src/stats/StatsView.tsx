@@ -3,12 +3,16 @@ import {
   type StatsSnapshot,
   type ScanProgress,
   type StatsTotals,
+  type StatsByModel,
   type StatsRange,
   DEFAULT_RANGE,
   emptySnapshot,
 } from "@shared/stats";
 import { formatTokensShort, formatUsd } from "@shared/format";
 import { Icon } from "../ui/icons";
+import { Donut } from "../ui/charts";
+import { MODEL_SEGMENT_COLORS } from "../ui/meta";
+import { Swatch } from "../ui/atoms";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -83,7 +87,10 @@ export function StatsView() {
             snap.progress.done ? (
               <EmptyStats />
             ) : (
-              <Totals totals={snap.totals} />
+              <>
+                <Totals totals={snap.totals} />
+                {snap.byModel.length > 0 && <ByModel rows={snap.byModel} />}
+              </>
             )}
           </>
         )}
@@ -184,6 +191,69 @@ function Totals({ totals }: { totals: StatsTotals }) {
           value={formatUsd(totals.equivApiValueUsd)}
           title="Equivalent API value — a reference figure, not money owed"
         />
+      </div>
+    </StatsPanel>
+  );
+}
+
+/** The per-model breakdown (#111): a donut sized by each model's token share beside a table of tokens and
+ *  Equivalent API value per raw model id. An unrecognized id shows n/a cost while its tokens still count;
+ *  a turn with no recorded model rows as "Unknown". Color is paired onto each row so the donut and the
+ *  table legend read off one source — no zip-by-index that could drift if rows reorder. */
+function ByModel({ rows }: { rows: StatsByModel[] }) {
+  const colored = rows.map((r, i) => ({
+    ...r,
+    color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
+  }));
+  return (
+    <StatsPanel title="By model">
+      <div className="flex items-center gap-4">
+        <Donut
+          segments={colored.map((r) => ({
+            value: r.totalTokens,
+            color: r.color,
+          }))}
+        />
+        <table className="min-w-0 flex-1 text-[12px]">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
+              <th scope="col" className="pb-1.5 text-left font-normal">
+                Model
+              </th>
+              <th scope="col" className="pb-1.5 text-right font-normal">
+                Tokens
+              </th>
+              <th scope="col" className="pb-1.5 text-right font-normal">
+                Equiv API value
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {colored.map((r) => (
+              <tr
+                key={r.modelRaw ?? "unknown"}
+                className="border-t border-ink-850"
+              >
+                <td className="py-1 pr-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <Swatch color={r.color} />
+                    <span className="truncate text-fg">
+                      {r.modelRaw ?? "Unknown"}
+                    </span>
+                  </span>
+                </td>
+                <td className="py-1 text-right font-mono tabular-nums text-fg-muted">
+                  {formatTokensShort(r.totalTokens)}
+                </td>
+                <td className="py-1 text-right font-mono tabular-nums text-fg-muted">
+                  {r.equivApiValueUsd == null
+                    ? "n/a"
+                    : formatUsd(r.equivApiValueUsd)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </StatsPanel>
   );

@@ -100,6 +100,18 @@ export const TOKEN_SEGMENT_COLORS = [
   "var(--color-ok)", // Cached
 ] as const;
 
+/** The per-model breakdown's donut + legend palette (#111), cycled by row index. Distinct hues so adjacent
+ *  models read apart; CSS var strings so a retone stays in index.css. More models than colors wraps — fine
+ *  for a legend read top-down against its donut. */
+export const MODEL_SEGMENT_COLORS = [
+  "var(--color-primary)",
+  "var(--color-working)",
+  "var(--color-accent)",
+  "var(--color-ok)",
+  "var(--color-primary-bright)",
+  "var(--color-danger)",
+] as const;
+
 /** A session's model label: the family name, plus the real resolved id in parens when we have one.
  *  `raw` is the live statusLine modelId else the persisted transcript modelRaw. A raw that matches no
  *  known family shows the capture's display_name (or the raw) rather than a faked family. `compact`
