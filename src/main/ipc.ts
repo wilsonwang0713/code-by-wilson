@@ -125,7 +125,14 @@ export function registerIpc({
     } catch (err) {
       console.error("stats scan failed; serving last-known totals", err);
     }
-    return readTotals(analyticsDb);
+    try {
+      return readTotals(analyticsDb);
+    } catch (err) {
+      // The aggregate read itself can fail (a corrupt or locked store). Honor the never-reject contract:
+      // serve zeros rather than letting the rejection strand the Stats view on its blank loading state.
+      console.error("stats read failed; serving zeros", err);
+      return emptyTotals();
+    }
   });
 
   return { sync };

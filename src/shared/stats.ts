@@ -15,3 +15,17 @@ export interface StatsTotals {
   cacheCreationTokens: number;
   equivApiValueUsd: number;
 }
+
+/** All-zero totals. One definition for the three places that need it: the empty store, the
+ *  no-analytics-db fallback (main), and the renderer's error state, so the zero shape can't drift. */
+export function emptyTotals(): StatsTotals {
+  return {
+    sessions: 0,
+    turns: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    equivApiValueUsd: 0,
+  };
+}

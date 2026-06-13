@@ -118,18 +118,9 @@ interface ModelRow {
   cache_creation_tokens: number;
 }
 
-/** All-zero totals: the empty store, and the fallback when no analytics db is wired in. */
-export function emptyTotals(): StatsTotals {
-  return {
-    sessions: 0,
-    turns: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-    equivApiValueUsd: 0,
-  };
-}
+/** All-zero totals, re-exported from the shared single source so the no-db fallback here and the
+ *  renderer's error state share one definition (the zero shape can't drift). */
+export { emptyTotals } from "@shared/stats";
 
 /**
  * Grand totals from one SQL aggregate, plus the Equivalent API value. The value is summed per raw model id

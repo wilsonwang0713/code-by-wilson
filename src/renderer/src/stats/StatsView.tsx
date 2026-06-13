@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { StatsTotals } from "@shared/stats";
+import { type StatsTotals, emptyTotals } from "@shared/stats";
 import { formatTokensShort, formatUsd } from "@shared/format";
 import { Icon } from "../ui/icons";
 
@@ -14,9 +14,16 @@ export function StatsView() {
 
   useEffect(() => {
     let alive = true;
-    void window.api.readStats().then((t) => {
-      if (alive) setTotals(t);
-    });
+    void window.api
+      .readStats()
+      .then((t) => {
+        if (alive) setTotals(t);
+      })
+      .catch(() => {
+        // The main handler is built never to reject; if the IPC bridge itself fails, fall back to zeros
+        // (which renders the empty state) rather than stranding the view on the blank loading state.
+        if (alive) setTotals(emptyTotals());
+      });
     return () => {
       alive = false;
     };
