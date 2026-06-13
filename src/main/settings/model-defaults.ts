@@ -1,5 +1,11 @@
 import { join } from "node:path";
-import { FAMILIES, normalizeModelId, type ModelDefaults } from "@shared/models";
+import {
+  FAMILIES,
+  isKnownModelString,
+  normalizeModelId,
+  type Family,
+  type ModelDefaults,
+} from "@shared/models";
 import { readTextOrNull } from "../claude-config";
 
 /** A trimmed, non-empty string, else undefined. */
@@ -32,13 +38,11 @@ export function readModelDefaults(
       settingsAvailable = j.availableModels;
     }
 
-    // Per-family overrides: settings env wins over process env.
+    // Per-family overrides: settings env wins over process env. Trimmed and non-empty, same as the
+    // default, so a blank or whitespace-only override is dropped rather than shown as "Opus ( )".
     for (const family of FAMILIES) {
       const key = `ANTHROPIC_DEFAULT_${family.toUpperCase()}_MODEL`;
-      const fromSettings =
-        typeof settingsEnv[key] === "string" ? settingsEnv[key] : undefined;
-      const fromEnv = typeof env[key] === "string" ? env[key] : undefined;
-      const value = fromSettings ?? fromEnv;
+      const value = str(settingsEnv[key]) ?? str(env[key]);
       if (value) result.overrides[family] = value;
     }
 
@@ -54,12 +58,18 @@ export function readModelDefaults(
       str(settingsModel);
     if (rawDefault) result.default = normalizeModelId(rawDefault);
 
-    // Available models: intersect with known families, preserve order.
+    // Available models: normalize each entry to its family (so a full id like
+    // `global.anthropic.claude-sonnet-4-6` resolves to `sonnet`, matching how the default is read),
+    // drop anything that maps to no known family, and dedupe preserving first-seen order. Exact-alias
+    // matching here would fail open — a full-id allowlist would intersect to empty and the picker would
+    // silently offer every family.
     if (Array.isArray(settingsAvailable)) {
-      const allowed = settingsAvailable.filter(
-        (v): v is (typeof FAMILIES)[number] =>
-          typeof v === "string" && (FAMILIES as readonly string[]).includes(v),
-      );
+      const allowed: Family[] = [];
+      for (const v of settingsAvailable) {
+        if (typeof v !== "string" || !isKnownModelString(v)) continue;
+        const family = normalizeModelId(v);
+        if (!allowed.includes(family)) allowed.push(family);
+      }
       if (allowed.length > 0) result.allowed = allowed;
     }
 

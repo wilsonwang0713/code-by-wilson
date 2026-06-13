@@ -88,6 +88,41 @@ describe("readModelDefaults", () => {
       ).allowed,
     ).toEqual(["opus", "sonnet"]);
   });
+  it("normalizes full-id availableModels entries to their family", () => {
+    expect(
+      readModelDefaults(
+        writeSettings({
+          availableModels: [
+            "global.anthropic.claude-sonnet-4-6",
+            "claude-opus-4-8",
+          ],
+        }),
+        {},
+      ).allowed,
+    ).toEqual(["sonnet", "opus"]);
+  });
+  it("dedupes an availableModels list that maps to the same family twice", () => {
+    expect(
+      readModelDefaults(
+        writeSettings({
+          availableModels: ["sonnet", "global.anthropic.claude-sonnet-4-6"],
+        }),
+        {},
+      ).allowed,
+    ).toEqual(["sonnet"]);
+  });
+  it("leaves allowed unset when availableModels maps to no known family", () => {
+    expect(
+      readModelDefaults(writeSettings({ availableModels: ["gpt-4"] }), {})
+        .allowed,
+    ).toBeUndefined();
+  });
+  it("drops a whitespace-only per-family override", () => {
+    const dir = writeSettings({
+      env: { ANTHROPIC_DEFAULT_OPUS_MODEL: "   " },
+    });
+    expect(readModelDefaults(dir, {}).overrides.opus).toBeUndefined();
+  });
   it("returns empty overrides for a missing settings file and empty env", () => {
     expect(readModelDefaults(emptyDir(), {})).toEqual({ overrides: {} });
   });

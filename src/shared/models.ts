@@ -67,7 +67,7 @@ const SPECS: readonly FamilySpec[] = [
  *  that *did* run is shown by its raw id via the honest label, not by this fallback family, so the
  *  fallback only ever fronts a zero-cost session. Adding the new family to SPECS above is the real fix
  *  when one ships. */
-const DEFAULT_SPEC = SPECS.find((s) => s.alias === "opus")!;
+const DEFAULT_SPEC = SPECS.find((s) => s.alias === "opus") ?? SPECS[0];
 
 /** The spec for a family; DEFAULT_SPEC if somehow unmatched. */
 function specByFamily(model: Family): FamilySpec {
