@@ -7,6 +7,7 @@ import { formatRelativeTime } from "@shared/format";
 import { cx, Dot } from "./ui/atoms";
 import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
+import { OVERVIEW_ID } from "./stats/sentinel";
 
 /**
  * The master rail: every session grouped by state (Waiting → Working → Idle → Ended) with sticky group
@@ -77,6 +78,32 @@ export function SessionList({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
+        <button
+          type="button"
+          onClick={() => onSelect(OVERVIEW_ID)}
+          aria-pressed={selectedId === OVERVIEW_ID}
+          aria-label="Open overview"
+          className={cx(
+            "flex w-full items-center gap-2 border-b border-l-2 border-ink-850 px-3 py-2.5 text-left transition-colors",
+            selectedId === OVERVIEW_ID
+              ? "border-l-primary bg-ink-850"
+              : "border-l-transparent hover:bg-ink-900",
+          )}
+        >
+          <Icon
+            name="chart-column"
+            size={13}
+            className="shrink-0 text-fg-muted"
+          />
+          <span
+            className={cx(
+              "min-w-0 flex-1 truncate text-[13px] text-fg",
+              selectedId === OVERVIEW_ID ? "font-semibold" : "font-medium",
+            )}
+          >
+            Overview
+          </span>
+        </button>
         {groups.length === 0 ? (
           <p className="px-4 py-5 text-[12px] text-fg-faint">
             No sessions match "{query}".

@@ -1,0 +1,182 @@
+import type { Usage } from "@shared/types";
+import type { StatsTotals } from "@shared/stats";
+import {
+  equivApiValue,
+  isKnownModelString,
+  normalizeModelId,
+} from "@shared/models";
+import { transaction, type SqliteDb } from "./driver";
+
+/**
+ * Bump when the turn schema changes. Unlike the live index (which DROPs and rebuilds from the JSONL on a
+ * bump — ADR-0002), the analytics store is durable: a full disk scan is expensive to redo, so migrate only
+ * ever CREATEs, never DROPs. It lives in its own file with its own user_version, so a live-index bump can't
+ * touch it. Keyed on user_version so every launch past the first is a no-op.
+ */
+const ANALYTICS_SCHEMA_VERSION = 1;
+
+function userVersion(db: SqliteDb): number {
+  return (db.prepare("PRAGMA user_version").get() as { user_version: number })
+    .user_version;
+}
+
+export function migrateAnalytics(db: SqliteDb): void {
+  if (userVersion(db) < ANALYTICS_SCHEMA_VERSION) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS turns (
+        message_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        ts INTEGER NOT NULL DEFAULT 0,
+        model_raw TEXT,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+        cwd TEXT NOT NULL DEFAULT '',
+        project TEXT NOT NULL DEFAULT '',
+        branch TEXT
+      );
+      CREATE INDEX IF NOT EXISTS turns_ts ON turns(ts);
+      CREATE INDEX IF NOT EXISTS turns_session ON turns(session_id);
+      CREATE INDEX IF NOT EXISTS turns_project ON turns(project);
+      PRAGMA user_version = ${ANALYTICS_SCHEMA_VERSION};
+    `);
+  }
+}
+
+/**
+ * One assistant turn as the analytics store records it. `cwd` is the full working directory (not just the
+ * basename) so later per-project work can keep two same-named repos distinct (#107); `project` is the
+ * basename for display. `messageId` is the dedup key — the UNIQUE backstop that makes a re-scan idempotent.
+ */
+export interface AnalyticsTurn {
+  messageId: string;
+  sessionId: string;
+  ts: number;
+  modelRaw?: string;
+  usage: Usage;
+  cwd: string;
+  project: string;
+  branch?: string;
+}
+
+const UPSERT_TURN = `
+  INSERT INTO turns
+    (message_id, session_id, ts, model_raw, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cwd, project, branch)
+  VALUES
+    (@message_id, @session_id, @ts, @model_raw, @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cwd, @project, @branch)
+  ON CONFLICT(message_id) DO UPDATE SET
+    session_id = excluded.session_id,
+    ts = excluded.ts,
+    model_raw = excluded.model_raw,
+    input_tokens = excluded.input_tokens,
+    output_tokens = excluded.output_tokens,
+    cache_read_tokens = excluded.cache_read_tokens,
+    cache_creation_tokens = excluded.cache_creation_tokens,
+    cwd = excluded.cwd,
+    project = excluded.project,
+    branch = excluded.branch
+`;
+
+/** Upsert turns by message_id: a re-scan rewrites the same rows in place (last-write-wins), so totals
+ *  never double-count. One transaction, so a mid-batch failure leaves the store as it was. */
+export function upsertTurns(db: SqliteDb, turns: AnalyticsTurn[]): void {
+  const stmt = db.prepare(UPSERT_TURN);
+  transaction(db, () => {
+    for (const t of turns) {
+      stmt.run({
+        message_id: t.messageId,
+        session_id: t.sessionId,
+        ts: t.ts,
+        model_raw: t.modelRaw ?? null,
+        input_tokens: t.usage.inputTokens,
+        output_tokens: t.usage.outputTokens,
+        cache_read_tokens: t.usage.cacheReadTokens,
+        cache_creation_tokens: t.usage.cacheCreationTokens,
+        cwd: t.cwd,
+        project: t.project,
+        branch: t.branch ?? null,
+      });
+    }
+  });
+}
+
+interface TotalsRow {
+  sessions: number;
+  turns: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+}
+
+interface ModelRow {
+  model_raw: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+}
+
+/** All-zero totals, re-exported from the shared single source so the no-db fallback here and the
+ *  renderer's error state share one definition (the zero shape can't drift). */
+export { emptyTotals } from "@shared/stats";
+
+/**
+ * Grand totals from one SQL aggregate, plus the Equivalent API value. The value is summed per raw model id
+ * (so each family is priced at its own rates) over only the recognized models; an unrecognized id still
+ * contributes its tokens to the token totals above but n/a cost here. Pricing is single-sourced through
+ * equivApiValue (the same formula the per-session Cost panel uses), so the two can never drift.
+ */
+export function readTotals(db: SqliteDb): StatsTotals {
+  const t = db
+    .prepare(
+      `SELECT
+         COUNT(DISTINCT session_id) AS sessions,
+         COUNT(*) AS turns,
+         COALESCE(SUM(input_tokens), 0) AS input_tokens,
+         COALESCE(SUM(output_tokens), 0) AS output_tokens,
+         COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+       FROM turns`,
+    )
+    .get() as TotalsRow;
+
+  const byModel = db
+    .prepare(
+      `SELECT
+         model_raw,
+         COALESCE(SUM(input_tokens), 0) AS input_tokens,
+         COALESCE(SUM(output_tokens), 0) AS output_tokens,
+         COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+       FROM turns
+       GROUP BY model_raw`,
+    )
+    .all() as ModelRow[];
+
+  let equivApiValueUsd = 0;
+  for (const m of byModel) {
+    const raw = m.model_raw ?? undefined;
+    if (!isKnownModelString(raw)) continue; // n/a cost: tokens already counted in the grand totals
+    equivApiValueUsd += equivApiValue(
+      {
+        inputTokens: m.input_tokens,
+        outputTokens: m.output_tokens,
+        cacheReadTokens: m.cache_read_tokens,
+        cacheCreationTokens: m.cache_creation_tokens,
+      },
+      normalizeModelId(raw),
+    );
+  }
+
+  return {
+    sessions: t.sessions,
+    turns: t.turns,
+    inputTokens: t.input_tokens,
+    outputTokens: t.output_tokens,
+    cacheReadTokens: t.cache_read_tokens,
+    cacheCreationTokens: t.cache_creation_tokens,
+    equivApiValueUsd,
+  };
+}

@@ -1,7 +1,9 @@
 import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 import { openDb } from "./db/sqlite";
+import type { SqliteDb } from "./db/driver";
 import { migrate } from "./db/store";
+import { migrateAnalytics } from "./db/analytics";
 import { createClaudeProvider } from "./provider/claude";
 import { createManagedRegistry } from "./managed-registry";
 import type { ManagedRegistry } from "./managed-registry";
@@ -92,6 +94,19 @@ app
   .then(() => {
     const db = openDb(join(app.getPath("userData"), "index.db"));
     migrate(db); // bring the index schema up to date before the first sync
+    // The durable, non-pruned analytics store (#107). A separate file with its own user_version, so a
+    // live-index schema bump (which DROPs and rebuilds index.db) never touches all-time history. It's
+    // optional by contract — when it can't be opened (corrupt file, locked, bad permissions) stats:read
+    // serves zeros — so guard the open: a failure here must never cost the user a window (same principle
+    // as the statusLine install below).
+    let analyticsDb: SqliteDb | undefined;
+    try {
+      analyticsDb = openDb(join(app.getPath("userData"), "analytics.db"));
+      migrateAnalytics(analyticsDb);
+    } catch (err) {
+      console.error("analytics store unavailable; stats will show zeros", err);
+      analyticsDb = undefined;
+    }
     // The registry of app-spawned ids, shared by reference: the terminal IPC writes it on spawn, the
     // provider reads it to label discovered sessions Managed.
     const managed = createManagedRegistry();
@@ -158,6 +173,8 @@ app
       apiConfig,
       modelDefaults,
       beforeSync: reconcile,
+      analyticsDb,
+      claudeDir,
     });
 
     try {
