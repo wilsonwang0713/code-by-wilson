@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { IPC } from "@shared/ipc";
-import type { StatsTotals } from "@shared/stats";
+import type { StatsSnapshot } from "@shared/stats";
 import type { Provider } from "../src/main/provider/types";
 
 // Capture the handlers registerIpc registers, without a real Electron ipcMain (same shape as ipc.test.ts).
@@ -87,11 +87,17 @@ describe("registerIpc stats:read", () => {
     migrateAnalytics(analyticsDb);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    const totals = handlers.get(IPC.readStats)!() as StatsTotals;
-    expect(totals.sessions).toBe(1);
-    expect(totals.turns).toBe(1);
-    expect(totals.inputTokens).toBe(1_000_000);
-    expect(totals.equivApiValueUsd).toBeCloseTo(5); // opus $5/M input
+    const snap = handlers.get(IPC.readStats)!() as StatsSnapshot;
+    expect(snap.totals.sessions).toBe(1);
+    expect(snap.totals.turns).toBe(1);
+    expect(snap.totals.inputTokens).toBe(1_000_000);
+    expect(snap.totals.equivApiValueUsd).toBeCloseTo(5); // opus $5/M input
+    expect(snap.progress.done).toBe(true);
+
+    // A second call is a no-op: the file is unchanged, so totals hold and it's still done.
+    const again = handlers.get(IPC.readStats)!() as StatsSnapshot;
+    expect(again.totals).toEqual(snap.totals);
+    expect(again.progress.done).toBe(true);
   });
 
   it("swallows a scan failure and serves last-known totals", () => {
@@ -123,12 +129,13 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    let totals: StatsTotals | undefined;
+    let snap: StatsSnapshot | undefined;
     expect(() => {
-      totals = handlers.get(IPC.readStats)!() as StatsTotals;
+      snap = handlers.get(IPC.readStats)!() as StatsSnapshot;
     }).not.toThrow();
-    expect(totals?.turns).toBe(1); // last-known seeded total survives; scan failure swallowed
-    expect(totals?.inputTokens).toBe(1_000_000);
+    expect(snap?.totals.turns).toBe(1); // last-known seeded total survives; scan failure swallowed
+    expect(snap?.totals.inputTokens).toBe(1_000_000);
+    expect(snap?.progress.done).toBe(true); // a failed step reports done so the view stops polling
   });
 
   it("returns zeroed totals when no analytics db is wired in", () => {
@@ -136,13 +143,46 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider });
     expect(handlers.get(IPC.readStats)!()).toEqual({
-      sessions: 0,
-      turns: 0,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      cacheCreationTokens: 0,
-      equivApiValueUsd: 0,
+      totals: {
+        sessions: 0,
+        turns: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        equivApiValueUsd: 0,
+      },
+      progress: { filesTotal: 0, filesDone: 0, done: true },
     });
+  });
+
+  it("with a store but no claude dir, serves last-known totals and reports done", () => {
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    upsertTurns(analyticsDb, [
+      {
+        messageId: "seed",
+        sessionId: "s",
+        ts: 0,
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/w",
+        project: "w",
+      },
+    ]);
+
+    const db = openTestDb();
+    migrate(db);
+    registerIpc({ db, provider, analyticsDb }); // no claudeDir → no scan, just the last-known totals
+
+    const snap = handlers.get(IPC.readStats)!() as StatsSnapshot;
+    expect(snap.totals.turns).toBe(1);
+    expect(snap.totals.inputTokens).toBe(1_000_000);
+    expect(snap.progress.done).toBe(true);
   });
 });
