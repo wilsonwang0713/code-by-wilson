@@ -4,7 +4,7 @@ import {
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { FAMILIES, type Family } from "@shared/models";
+import { FAMILIES, type Family, type ModelDefaults } from "@shared/models";
 import { FAMILY_LABEL } from "../ui/meta";
 import { Icon } from "../ui/icons";
 
@@ -18,9 +18,11 @@ export function NewSessionDialog({
 }) {
   const [cwd, setCwd] = useState<string | null>(null);
   const [model, setModel] = useState<Family>("sonnet");
+  const [defaults, setDefaults] = useState<ModelDefaults | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const userPickedModel = useRef(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -36,6 +38,20 @@ export function NewSessionDialog({
     const prev = document.activeElement as HTMLElement | null;
     panelRef.current?.focus();
     return () => prev?.focus?.();
+  }, []);
+
+  // Fetch the configured model defaults once on mount: per-family overrides for the picker labels,
+  // and the default family to pre-select.
+  useEffect(() => {
+    void window.api
+      .modelDefaults()
+      .then((d) => {
+        setDefaults(d);
+        if (d.default && !userPickedModel.current) setModel(d.default);
+      })
+      .catch(() => {
+        /* keep defaults null; picker falls back to FAMILIES + bare labels */
+      });
   }, []);
 
   // Minimal focus trap: keep Tab cycling within the dialog instead of wandering to the hidden app behind it.
@@ -121,14 +137,21 @@ export function NewSessionDialog({
         <div className="relative mt-1.5">
           <select
             value={model}
-            onChange={(e) => setModel(e.target.value as Family)}
+            onChange={(e) => {
+              userPickedModel.current = true;
+              setModel(e.target.value as Family);
+            }}
             className="w-full appearance-none rounded-md border border-ink-700 bg-well py-2 pl-2.5 pr-8 text-[13px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
           >
-            {FAMILIES.map((id) => (
-              <option key={id} value={id}>
-                {FAMILY_LABEL[id]}
-              </option>
-            ))}
+            {(defaults?.allowed ?? FAMILIES).map((id) => {
+              const override = defaults?.overrides[id];
+              return (
+                <option key={id} value={id}>
+                  {FAMILY_LABEL[id]}
+                  {override ? ` (${override})` : ""}
+                </option>
+              );
+            })}
           </select>
           <Icon
             name="chevron-down"

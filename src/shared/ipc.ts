@@ -2,6 +2,7 @@ import type { Session, ProviderCapabilities, Account, Task } from "./types";
 import type { TranscriptRead, ReadSettled } from "./transcript";
 import type { TerminalApi } from "./terminal";
 import type { MetricsRead } from "./metrics";
+import type { ModelDefaults } from "./models";
 export const IPC = {
   overview: "overview:get",
   refresh: "sessions:refresh",
@@ -10,6 +11,7 @@ export const IPC = {
   readTasks: "tasks:read",
   readMetrics: "metrics:read",
   fullscreen: "window:fullscreen",
+  modelDefaults: "model:defaults",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -45,6 +47,9 @@ export interface IpcApi {
   /** Read one session's lazy metrics (token speed, git, voice, remote). `sinceMtimeMs` is the change
    *  token from the last read; an unchanged token skips the recompute. */
   readMetrics(id: string, sinceMtimeMs?: number): Promise<MetricsRead>;
+  /** Per-family model overrides, the configured default family, and the allowed-family allowlist —
+   *  read from Claude Code's settings.json and the process env. */
+  modelDefaults(): Promise<ModelDefaults>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */

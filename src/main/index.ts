@@ -14,6 +14,8 @@ import { registerTerminalIpc } from "./terminal/ipc";
 import { shellPath } from "./terminal/shell-path";
 import { readAccountEmail } from "./settings/account-email";
 import { readApiConfig, type ApiConfig } from "./settings/api-config";
+import { readModelDefaults } from "./settings/model-defaults";
+import type { ModelDefaults } from "@shared/models";
 import { resolveClaudeDir } from "./claude-config";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
@@ -122,6 +124,14 @@ app
         apiConfigCache = readApiConfig(claudeDir);
       return apiConfigCache;
     };
+    // Read once per app run — same populate-once tradeoff as apiConfig. Editing settings.json while
+    // the app is running won't change the model picker until restart.
+    let modelDefaultsCache: ModelDefaults | undefined;
+    const modelDefaults = (): ModelDefaults => {
+      if (modelDefaultsCache === undefined)
+        modelDefaultsCache = readModelDefaults(claudeDir, process.env);
+      return modelDefaultsCache;
+    };
     // The live window's terminal-rename hook, set when a window opens and revoked when it closes. The
     // reconcile (below) calls through it to follow a /clear, so it's a no-op before the first window.
     let renameInWindow: (from: string, to: string) => void = () => {};
@@ -146,6 +156,7 @@ app
       statusLine,
       accountEmail,
       apiConfig,
+      modelDefaults,
       beforeSync: reconcile,
     });
 

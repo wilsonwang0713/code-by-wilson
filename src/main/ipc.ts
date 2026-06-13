@@ -4,6 +4,7 @@ import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
 import type { ApiConfig } from "./settings/api-config";
+import type { ModelDefaults } from "@shared/models";
 import {
   deriveAccount,
   overlaySessions,
@@ -22,6 +23,9 @@ export interface IpcDeps {
   accountEmail?: () => string | null;
   /** Reads the configured API-billing config (cached by the caller). Defaults to no config. */
   apiConfig?: () => ApiConfig | null;
+  /** Reads the configured model defaults: per-family overrides, default family, allowed families
+   *  (cached by the caller). Defaults to empty overrides. */
+  modelDefaults?: () => ModelDefaults;
   /** Runs at the start of every sync, before discovery. Used to follow `/clear` rotations so the
    *  provider labels a rotated session correctly on the same tick. Its failure must not block the sync. */
   beforeSync?: () => void;
@@ -33,11 +37,13 @@ export function registerIpc({
   statusLine,
   accountEmail,
   apiConfig,
+  modelDefaults,
   beforeSync,
 }: IpcDeps): { sync: () => void } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
   const readApi = apiConfig ?? ((): ApiConfig | null => null);
+  const readDefaults = modelDefaults ?? ((): ModelDefaults => ({ overrides: {} }));
 
   const sync = (): void => {
     try {
@@ -88,6 +94,7 @@ export function registerIpc({
     return overviewNow();
   });
   ipcMain.handle(IPC.capabilities, () => provider.capabilities);
+  ipcMain.handle(IPC.modelDefaults, () => readDefaults());
   ipcMain.handle(IPC.readTranscript, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readTranscript(id, sinceMtimeMs),
   );
