@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@shared/types";
 import { cx } from "../ui/atoms";
 import { Icon, type IconName } from "../ui/icons";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { OpenInMenu } from "./OpenInMenu";
 
 /** The header's right-side action cluster. Adopt — the one wired action — leads when an observed session
@@ -17,6 +18,10 @@ export function HeaderActions({
   const canAdopt = s.management === "observed" && s.state === "ended";
   const [adoptBusy, setAdoptBusy] = useState(false);
   const [adoptError, setAdoptError] = useState<string | null>(null);
+  const [confirmAdopt, setConfirmAdopt] = useState(false);
+  // A session that never recorded a real model (only '<synthetic>' turns — usually one that errored at
+  // startup) has no valid model to resume, so `claude --resume` will 400. Don't block Adopt: warn first.
+  const modelUnknown = s.modelId == null && s.modelRaw == null;
 
   // Drop the transient adopt state the moment the button goes away. An observed session can resume and
   // then end again, re-arming Adopt; without this, a stale error (or a wedged busy flag) from the prior
@@ -25,6 +30,7 @@ export function HeaderActions({
     if (!canAdopt) {
       setAdoptBusy(false);
       setAdoptError(null);
+      setConfirmAdopt(false);
     }
   }, [canAdopt]);
 
@@ -42,6 +48,12 @@ export function HeaderActions({
     }
   }
 
+  // Gate the click: a modelless session gets the warning modal first; everything else adopts straight away.
+  function requestAdopt() {
+    if (modelUnknown) setConfirmAdopt(true);
+    else void handleAdopt();
+  }
+
   return (
     <div className="flex shrink-0 items-center gap-2">
       {canAdopt && (
@@ -51,13 +63,25 @@ export function HeaderActions({
           )}
           <button
             type="button"
-            onClick={() => void handleAdopt()}
+            onClick={requestAdopt}
             disabled={adoptBusy}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[12px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
           >
             <Icon name="git-pull-request-arrow" size={13} />
             {adoptBusy ? "Adopting…" : "Adopt"}
           </button>
+          {confirmAdopt && (
+            <ConfirmDialog
+              title="Resume a session with no recorded model?"
+              body="This session never recorded a model — it likely errored before its first turn — so resuming it may fail with a model error. Continue anyway?"
+              confirmLabel="Resume anyway"
+              onCancel={() => setConfirmAdopt(false)}
+              onConfirm={() => {
+                setConfirmAdopt(false);
+                void handleAdopt();
+              }}
+            />
+          )}
           <Divider />
         </>
       )}
