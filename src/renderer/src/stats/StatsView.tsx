@@ -39,9 +39,13 @@ export function StatsView() {
           );
         })
         .catch(() => {
-          // The handler is built never to reject; if the IPC bridge itself fails, fall back to an empty,
-          // done snapshot (renders the empty state) rather than spinning, and stop polling.
-          if (alive) setSnap(emptySnapshot());
+          // The handler is built never to reject; reaching here means the IPC bridge itself failed.
+          // Keep the last good snapshot rather than blanking populated totals to zero (fall back to an
+          // empty, done snapshot only on the very first poll), and retry at the warm cadence so a
+          // transient bridge hiccup recovers on its own instead of freezing the view forever.
+          if (!alive) return;
+          setSnap((prev) => prev ?? emptySnapshot());
+          timer = setTimeout(tick, WARM_POLL_MS);
         });
     };
     tick();

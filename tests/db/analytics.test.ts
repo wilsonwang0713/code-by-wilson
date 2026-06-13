@@ -90,6 +90,30 @@ describe("analytics store", () => {
     ).toBe(2);
   });
 
+  it("only clears turns on the v1 → v2 step, never on another upgrade (no future-bump re-wipe)", () => {
+    // The destructive DELETE is the v1-surrogate-scheme fix, scoped to `from === 1`. Any other upgrade
+    // into v2+ must preserve history — this guards the next bump (v2 → v3) from silently wiping turns.
+    // Simulate a store that enters the migration block from a version other than 1 (here 0) carrying data.
+    const db = openTestDb();
+    db.exec(`
+      CREATE TABLE turns (
+        message_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, ts INTEGER NOT NULL DEFAULT 0,
+        model_raw TEXT, input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_read_tokens INTEGER NOT NULL DEFAULT 0, cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+        cwd TEXT NOT NULL DEFAULT '', project TEXT NOT NULL DEFAULT '', branch TEXT
+      );
+      PRAGMA user_version = 0;
+    `);
+    upsertTurns(db, [turn()]);
+
+    migrateAnalytics(db); // enters the block (0 < 2) but `from !== 1`, so turns survive
+    expect(readTotals(db).turns).toBe(1);
+    expect(
+      (db.prepare("PRAGMA user_version").get() as { user_version: number })
+        .user_version,
+    ).toBe(2);
+  });
+
   it("returns zeroed totals for an empty store", () => {
     const db = openTestDb();
     migrateAnalytics(db);

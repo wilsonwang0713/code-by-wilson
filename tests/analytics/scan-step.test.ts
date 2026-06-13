@@ -188,6 +188,24 @@ describe("scanStep (chunked incremental engine)", () => {
     expect(p).toEqual({ filesTotal: 2, filesDone: 2, done: true });
   });
 
+  it("an unreadable target doesn't block done or stall the scan (it converges, readable files ingest)", () => {
+    const home = makeHome();
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 7 }], MT);
+    // A directory whose name ends in .jsonl: indexTranscripts enumerates it and statSync succeeds, but
+    // readFileSync throws EISDIR on every pass. It must not keep the scan from ever reaching done — a
+    // perpetually-pending target would pin the Stats poll at the brisk 40ms cadence forever.
+    mkdirSync(join(home, "projects", "-b", "s2.jsonl"), { recursive: true });
+
+    const db = openTestDb();
+    migrateAnalytics(db);
+
+    const p = scanStep(db, home, 1_000_000);
+    expect(p.done).toBe(true); // converges despite the unreadable target
+    expect(p.filesTotal).toBe(2);
+    expect(readTotals(db).turns).toBe(1); // the readable transcript is still ingested
+    expect(readTotals(db).inputTokens).toBe(7);
+  });
+
   it("collectScanTargets enumerates parent transcripts and their subagent files", () => {
     const home = makeHome();
     writeTurns(home, "-a", "s1", [{ id: "a1", input: 1 }], MT);

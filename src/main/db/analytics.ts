@@ -17,6 +17,10 @@ import { transaction, type SqliteDb } from "./driver";
  * parse keys it the same way a full parse does), and the only coherent way to switch schemes is to let
  * the next scan rebuild `turns` from disk. It's a deliberate, related migration — not the unrelated
  * churn the durability rule guards against — and the chunked backfill repopulates within seconds.
+ *
+ * Critically the delete is scoped to exactly the v1 -> v2 step (`from === 1`), NOT every upgrade: it
+ * must never re-run on a future bump, or a later schema change would silently re-wipe a v2+ user's
+ * durable history — the precise durability violation this file guards against.
  */
 const ANALYTICS_SCHEMA_VERSION = 2;
 
@@ -26,7 +30,8 @@ function userVersion(db: SqliteDb): number {
 }
 
 export function migrateAnalytics(db: SqliteDb): void {
-  if (userVersion(db) < ANALYTICS_SCHEMA_VERSION) {
+  const from = userVersion(db);
+  if (from < ANALYTICS_SCHEMA_VERSION) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS turns (
         message_id TEXT PRIMARY KEY,
@@ -49,7 +54,7 @@ export function migrateAnalytics(db: SqliteDb): void {
         mtime REAL NOT NULL,
         lines INTEGER NOT NULL
       );
-      DELETE FROM turns;
+      ${from === 1 ? "DELETE FROM turns;" : ""}
       PRAGMA user_version = ${ANALYTICS_SCHEMA_VERSION};
     `);
   }

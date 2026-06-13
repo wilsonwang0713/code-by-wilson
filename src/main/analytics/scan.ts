@@ -77,8 +77,9 @@ export function collectScanTargets(claudeDir: string): ScanTarget[] {
  * the win that leaves an unchanged ~400MB of ancient Transcripts untouched. For each new/changed file it
  * reads only the lines appended past the stored count (planFileScan), splitting a very large append across
  * steps by `maxLines`; a shrunk file is re-read from zero. Each file's turns and its high-water mark are
- * written in one transaction. A single unreadable file is skipped this pass, retried next. Returns
- * progress so the caller can show "building history" and know when the backfill is done.
+ * written in one transaction. A single unreadable file records its mtime (so it stops blocking `done`)
+ * and is retried only when its mtime next moves. Returns progress so the caller can show "building
+ * history" and know when the backfill is done.
  */
 export function scanStep(
   db: SqliteDb,
@@ -98,7 +99,18 @@ export function scanStep(
     try {
       content = readFileSync(t.path, "utf8");
     } catch {
-      continue; // unreadable this pass; retried next
+      // Unreadable: a chmod-000 file, a directory whose name ends in .jsonl, or a parent deleted since
+      // the walk stat'd it. Record its mtime so it stops being pending and `done` can settle — leaving
+      // it pending would block convergence forever and pin the poll at the brisk 40ms cadence. A file
+      // that's only momentarily locked bumps its mtime on the next write, so it's retried then; a
+      // permanently unreadable one stays skipped, which is correct since there's nothing to ingest.
+      upsertProcessedFile(
+        db,
+        t.path,
+        t.mtimeMs,
+        stored.get(t.path)?.lines ?? 0,
+      );
+      continue;
     }
     const prev = stored.get(t.path);
     const plan = planFileScan(content, prev);
