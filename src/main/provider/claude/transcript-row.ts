@@ -51,3 +51,28 @@ export function parseJsonlRows(jsonl: string): any[] {
   }
   return rows;
 }
+
+/**
+ * Parse JSONL into rows tagged with their absolute 0-based line number, skipping blank and unparseable
+ * lines (their line numbers are still consumed, so a blank line never shifts the numbers after it).
+ * `startLine` is added to every line index, so parsing only an appended tail yields the same line numbers
+ * a whole-file parse would — which keeps an id-less turn's position-stable surrogate key identical across
+ * full and incremental reads, so neither double-counts. Like parseJsonlRows, lives in the claude/ dir
+ * where no-unsafe-* is downgraded to warn: it consumes `any` transcript JSON by design.
+ */
+export function parseJsonlRowsAt(
+  jsonl: string,
+  startLine = 0,
+): { row: any; line: number }[] {
+  const out: { row: any; line: number }[] = [];
+  jsonl.split("\n").forEach((raw, i) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    try {
+      out.push({ row: JSON.parse(trimmed), line: startLine + i });
+    } catch {
+      // skip a malformed / half-written line
+    }
+  });
+  return out;
+}
