@@ -42,10 +42,16 @@ export interface ScanProgress {
   done: boolean;
 }
 
-/** One Stats poll: the all-time totals as they stand, plus how far the scan has gotten. */
+/** One Stats poll: the totals as they stand, how far the scan has gotten, and whether the store holds any
+ *  turn at all. */
 export interface StatsSnapshot {
+  /** Totals scoped to the requested range (all-time when no range bound is applied). */
   totals: StatsTotals;
   progress: ScanProgress;
+  /** Whether the store holds any turn at all (range-independent). The empty state keys off this, not the
+   *  scoped totals, so picking a range with no turns shows zeroed cards rather than "No usage yet" when
+   *  there is history outside the window. */
+  hasAnyTurns: boolean;
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -54,6 +60,7 @@ export function emptySnapshot(): StatsSnapshot {
   return {
     totals: emptyTotals(),
     progress: { filesTotal: 0, filesDone: 0, done: true },
+    hasAnyTurns: false,
   };
 }
 

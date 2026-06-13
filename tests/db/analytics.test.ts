@@ -7,6 +7,7 @@ import {
   emptyTotals,
   readProcessedFiles,
   upsertProcessedFile,
+  hasAnyTurns,
 } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
 
@@ -250,6 +251,14 @@ describe("analytics store", () => {
     expect(scoped.sessions).toBe(1); // only s-new is active in the window
     expect(scoped.inputTokens).toBe(1_000_000);
     expect(scoped.equivApiValueUsd).toBeCloseTo(3); // sonnet only; the out-of-window opus $5 is excluded
+  });
+
+  it("reports whether the store holds any turn (range-independent)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(hasAnyTurns(db)).toBe(false);
+    upsertTurns(db, [turn()]);
+    expect(hasAnyTurns(db)).toBe(true);
   });
 
   it("counts an unrecognized model's tokens but gives it n/a cost", () => {

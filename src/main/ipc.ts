@@ -12,7 +12,7 @@ import {
   CAPTURE_STALE_MS,
 } from "@shared/statusline";
 import { getOverview } from "./db/store";
-import { readTotals, emptyTotals } from "./db/analytics";
+import { readTotals, emptyTotals, hasAnyTurns } from "./db/analytics";
 import { scanStep } from "./analytics/scan";
 import type { StatsTotals, StatsSnapshot, ScanProgress } from "@shared/stats";
 import { emptySnapshot } from "@shared/stats";
@@ -134,11 +134,23 @@ export function registerIpc({
       return emptyTotals();
     }
   };
+  const safeHasAnyTurns = (adb: SqliteDb): boolean => {
+    try {
+      return hasAnyTurns(adb);
+    } catch (err) {
+      console.error("stats hasAnyTurns check failed; treating store as empty", err);
+      return false;
+    }
+  };
   ipcMain.handle(IPC.readStats, (): StatsSnapshot => {
     if (!analyticsDb || !claudeDir) {
       // No store, or no dir to scan: a done snapshot (zeros if no store; last-known if a store but no dir).
       return analyticsDb
-        ? { totals: safeTotals(analyticsDb), progress: doneProgress() }
+        ? {
+            totals: safeTotals(analyticsDb),
+            progress: doneProgress(),
+            hasAnyTurns: safeHasAnyTurns(analyticsDb),
+          }
         : emptySnapshot();
     }
     let progress = doneProgress();
@@ -147,7 +159,11 @@ export function registerIpc({
     } catch (err) {
       console.error("stats scan step failed; serving last-known totals", err);
     }
-    return { totals: safeTotals(analyticsDb), progress };
+    return {
+      totals: safeTotals(analyticsDb),
+      progress,
+      hasAnyTurns: safeHasAnyTurns(analyticsDb),
+    };
   });
 
   return { sync };

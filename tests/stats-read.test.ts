@@ -93,6 +93,7 @@ describe("registerIpc stats:read", () => {
     expect(snap.totals.inputTokens).toBe(1_000_000);
     expect(snap.totals.equivApiValueUsd).toBeCloseTo(5); // opus $5/M input
     expect(snap.progress.done).toBe(true);
+    expect(snap.hasAnyTurns).toBe(true); // a turn was ingested
 
     // A second call is a no-op: the file is unchanged, so totals hold and it's still done.
     const again = handlers.get(IPC.readStats)!() as StatsSnapshot;
@@ -136,6 +137,7 @@ describe("registerIpc stats:read", () => {
     expect(snap?.totals.turns).toBe(1); // last-known seeded total survives; scan failure swallowed
     expect(snap?.totals.inputTokens).toBe(1_000_000);
     expect(snap?.progress.done).toBe(true); // a failed step reports done so the view stops polling
+    expect(snap?.hasAnyTurns).toBe(true); // the seeded turn survives the swallowed scan failure
   });
 
   it("returns zeroed totals when no analytics db is wired in", () => {
@@ -153,6 +155,7 @@ describe("registerIpc stats:read", () => {
         equivApiValueUsd: 0,
       },
       progress: { filesTotal: 0, filesDone: 0, done: true },
+      hasAnyTurns: false,
     });
   });
 
@@ -184,5 +187,6 @@ describe("registerIpc stats:read", () => {
     expect(snap.totals.turns).toBe(1);
     expect(snap.totals.inputTokens).toBe(1_000_000);
     expect(snap.progress.done).toBe(true);
+    expect(snap.hasAnyTurns).toBe(true); // the seeded turn is present
   });
 });

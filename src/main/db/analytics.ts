@@ -238,3 +238,13 @@ export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
     equivApiValueUsd,
   };
 }
+
+/** Whether the store holds any turn at all, range-independent. Drives the Stats view's empty state so a
+ *  scoped range that happens to be empty (e.g. "today" before any activity) shows zeroed cards, not the
+ *  "No usage yet" empty state, when history exists outside the window. */
+export function hasAnyTurns(db: SqliteDb): boolean {
+  const row = db
+    .prepare("SELECT EXISTS(SELECT 1 FROM turns) AS present")
+    .get() as { present: number };
+  return row.present === 1;
+}
