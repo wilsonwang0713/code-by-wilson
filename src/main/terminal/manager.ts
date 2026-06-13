@@ -42,8 +42,10 @@ export interface TerminalManagerDeps {
   /** Tell the renderer a session's process exited. */
   notifyExit: (id: string, exitCode: number) => void;
   /** Record `id` as Managed (the registry's `add`), anchored to its pty's `pid`, so discovery labels it
-   *  and can follow it across a `/clear` that rotates the session id under the same pid. */
-  onSpawned: (id: string, pid: number) => void;
+   *  and can follow it across a `/clear` that rotates the session id under the same pid. `model` is the
+   *  picked alias for a fresh spawn (undefined on Adopt, which restores the model via the CLI), so the
+   *  provider can front it before the first assistant turn records a real model. */
+  onSpawned: (id: string, pid: number, model?: Family) => void;
   /** Drop `id`'s Managed label (the registry's `remove`) once its pty is gone — natural exit or a
    *  disposeAll on window close — so Managed-ness stays anchored to the pty's actual lifetime and a
    *  reopened window doesn't resurrect a dead session as Managed. */
@@ -96,6 +98,7 @@ export function createTerminalManager(
     cwd: string,
     cols: number,
     rows: number,
+    model?: Family,
   ): void {
     if (terms.has(id)) return; // idempotent — a double start of one id is a no-op
     // Resolve the child env here, not at construction: the PATH probe behind `deps.env` is a synchronous
@@ -138,7 +141,7 @@ export function createTerminalManager(
       deps.notifyExit(term.id, exitCode);
     });
 
-    deps.onSpawned(id, pty.pid);
+    deps.onSpawned(id, pty.pid, model);
   }
 
   function spawn(req: SpawnRequest): void {
@@ -148,6 +151,7 @@ export function createTerminalManager(
       req.cwd,
       req.cols,
       req.rows,
+      req.model,
     );
   }
 

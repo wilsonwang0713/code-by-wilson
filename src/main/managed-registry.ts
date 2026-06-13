@@ -1,3 +1,4 @@
+import type { Family } from "@shared/models";
 import type { ManagedPty } from "./provider/claude/rotation";
 
 /**
@@ -12,33 +13,48 @@ import type { ManagedPty } from "./provider/claude/rotation";
  * of losing it to Observed.
  */
 export interface ManagedRegistry {
-  add(id: string, pid: number): void;
+  /** Record a spawned id with its pty pid and, for a fresh spawn, the alias we picked for it. Adopt has
+   *  no picked alias (the CLI restores the session's model), so `model` is omitted there. */
+  add(id: string, pid: number, model?: Family): void;
   remove(id: string): void;
   has(id: string): boolean;
+  /** The alias this run spawned `id` on, or undefined for an unmanaged or model-less (adopted) id. Lets
+   *  the provider front the picked model before the first assistant turn records a real one. */
+  modelOf(id: string): Family | undefined;
   /** Every managed id paired with its pty pid — the input to rotation detection. */
   entries(): ManagedPty[];
   /** Re-key a still-living managed pty from its old session id to the new one (a `/clear` rotation),
-   *  keeping the same pid. A no-op if `from` isn't managed or `to` is already a live managed id (so a
-   *  rotation never clobbers another pty's entry) — matching the same guard the manager/store renames use. */
+   *  keeping the same pid and picked model. A no-op if `from` isn't managed or `to` is already a live
+   *  managed id (so a rotation never clobbers another pty's entry) — matching the same guard the
+   *  manager/store renames use. */
   rename(from: string, to: string): void;
 }
 
 export function createManagedRegistry(): ManagedRegistry {
   const pidById = new Map<string, number>();
+  const modelById = new Map<string, Family>();
   return {
-    add: (id, pid) => {
+    add: (id, pid, model) => {
       pidById.set(id, pid);
+      if (model !== undefined) modelById.set(id, model);
     },
     remove: (id) => {
       pidById.delete(id);
+      modelById.delete(id);
     },
     has: (id) => pidById.has(id),
+    modelOf: (id) => modelById.get(id),
     entries: () => [...pidById].map(([id, pid]) => ({ id, pid })),
     rename: (from, to) => {
       const pid = pidById.get(from);
       if (pid === undefined || pidById.has(to)) return; // `from` isn't managed, or `to` is already a live pty
       pidById.delete(from);
       pidById.set(to, pid);
+      const model = modelById.get(from);
+      if (model !== undefined) {
+        modelById.delete(from);
+        modelById.set(to, model);
+      }
     },
   };
 }

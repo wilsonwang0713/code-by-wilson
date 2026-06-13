@@ -119,6 +119,64 @@ describe("ClaudeProvider managed labelling", () => {
   });
 });
 
+describe("ClaudeProvider managed model", () => {
+  const makeHome = tempHomes("cbw-prov-model-");
+
+  // Stand up a managed session whose transcript holds only a user turn — no assistant turn has landed,
+  // so no real model string is recorded yet. This is the window right after the first prompt is sent.
+  function homeWithModellessSession(id: string): string {
+    const home = makeHome();
+    mkdirSync(join(home, "sessions"), { recursive: true });
+    writeFileSync(
+      join(home, "sessions", `${id}.json`),
+      JSON.stringify({
+        pid: 100,
+        sessionId: id,
+        cwd: "/w/proj",
+        status: "busy",
+        updatedAt: 1,
+      }),
+    );
+    const proj = join(home, "projects", "-w-proj");
+    mkdirSync(proj, { recursive: true });
+    writeFileSync(
+      join(proj, `${id}.jsonl`),
+      JSON.stringify({
+        type: "user",
+        cwd: "/w/proj",
+        timestamp: "2026-06-09T00:00:00.000Z",
+        message: { role: "user", content: "hello" },
+      }) + "\n",
+    );
+    return home;
+  }
+
+  it("fronts the registry's picked model while the transcript has recorded no real model yet", () => {
+    const id = "ffff5555-5555-5555-5555-555555555555";
+    const provider = createClaudeProvider({
+      claudeDir: homeWithModellessSession(id),
+      isPidAlive: () => true,
+      managed: { has: () => true, modelOf: () => "sonnet" },
+    });
+    const live = provider.listCandidates().find((c) => c.id === id)!;
+    const s = provider.summarize(live);
+    // Without the picked model, normalizeModelId(undefined) would surface the Opus fallback — the flicker.
+    expect(s.model).toBe("sonnet");
+    expect(s.modelRaw).toBeUndefined();
+  });
+
+  it("leaves an Observed model-less session on the normalize fallback (no picked model to vouch)", () => {
+    const id = "ffff5555-5555-5555-5555-555555555555";
+    const provider = createClaudeProvider({
+      claudeDir: homeWithModellessSession(id),
+      isPidAlive: () => true,
+      managed: { has: () => false },
+    });
+    const live = provider.listCandidates().find((c) => c.id === id)!;
+    expect(provider.summarize(live).model).toBe("opus");
+  });
+});
+
 describe("ClaudeProvider.resolveAdoptTarget", () => {
   const makeHome = tempHomes("cbw-prov-adopt-");
 
