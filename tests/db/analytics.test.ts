@@ -210,6 +210,48 @@ describe("analytics store", () => {
     expect(readTotals(db).equivApiValueUsd).toBeCloseTo(5);
   });
 
+  it("scopes totals to turns at or after the since bound (inclusive at the edge)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({ messageId: "old", ts: 1000, usage: { inputTokens: 1, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+      turn({ messageId: "edge", ts: 2000, usage: { inputTokens: 10, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+      turn({ messageId: "new", ts: 3000, usage: { inputTokens: 100, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+    ]);
+    // since == the edge turn's ts: the edge is included (>=), the older one excluded.
+    const scoped = readTotals(db, 2000);
+    expect(scoped.turns).toBe(2);
+    expect(scoped.inputTokens).toBe(110);
+    // one ms past the edge: the edge falls out, only the newest remains.
+    expect(readTotals(db, 2001).turns).toBe(1);
+    expect(readTotals(db, 2001).inputTokens).toBe(100);
+  });
+
+  it("counts all-time with no bound (a null bound matches the no-arg call)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [turn({ messageId: "a", ts: 1000 }), turn({ messageId: "b", ts: 9_999_999 })]);
+    expect(readTotals(db).turns).toBe(2);
+    expect(readTotals(db, null).turns).toBe(2);
+  });
+
+  it("scopes sessions and Equivalent API value to the window", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // out of window: a different session, 1M opus input ($5) — must not leak into the scoped value.
+      turn({ messageId: "old", sessionId: "s-old", ts: 1000, modelRaw: "claude-opus-4-8",
+        usage: { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+      // in window: a sonnet turn, 1M input ($3).
+      turn({ messageId: "new", sessionId: "s-new", ts: 5000, modelRaw: "claude-sonnet-4-6",
+        usage: { inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 } }),
+    ]);
+    const scoped = readTotals(db, 5000);
+    expect(scoped.sessions).toBe(1); // only s-new is active in the window
+    expect(scoped.inputTokens).toBe(1_000_000);
+    expect(scoped.equivApiValueUsd).toBeCloseTo(3); // sonnet only; the out-of-window opus $5 is excluded
+  });
+
   it("counts an unrecognized model's tokens but gives it n/a cost", () => {
     const db = openTestDb();
     migrateAnalytics(db);

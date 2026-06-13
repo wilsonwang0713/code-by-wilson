@@ -180,7 +180,13 @@ export { emptyTotals } from "@shared/stats";
  * contributes its tokens to the token totals above but n/a cost here. Pricing is single-sourced through
  * equivApiValue (the same formula the per-session Cost panel uses), so the two can never drift.
  */
-export function readTotals(db: SqliteDb): StatsTotals {
+export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
+  // null/undefined → all-time (no bound). A number → an inclusive lower bound on ts (the window's start,
+  // computed local-day-aware by the caller via rangeSinceMs). `bind` is spread into get/all: an empty
+  // array calls them with no params, a single object binds @since.
+  const where = sinceMs != null ? "WHERE ts >= @since" : "";
+  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+
   const t = db
     .prepare(
       `SELECT
@@ -190,9 +196,9 @@ export function readTotals(db: SqliteDb): StatsTotals {
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
          COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
-       FROM turns`,
+       FROM turns ${where}`,
     )
-    .get() as TotalsRow;
+    .get(...bind) as TotalsRow;
 
   const byModel = db
     .prepare(
@@ -202,10 +208,10 @@ export function readTotals(db: SqliteDb): StatsTotals {
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
          COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
-       FROM turns
+       FROM turns ${where}
        GROUP BY model_raw`,
     )
-    .all() as ModelRow[];
+    .all(...bind) as ModelRow[];
 
   let equivApiValueUsd = 0;
   for (const m of byModel) {
