@@ -242,3 +242,84 @@ export function rangeSinceMs(range: StatsRange, nowMs: number): number | null {
   d.setDate(d.getDate() - (days - 1));
   return d.getTime();
 }
+
+/**
+ * One local calendar day of the daily usage time-series (#114). `day` is the local-day key
+ * 'YYYY-MM-DD' — the same string SQLite's date(ts/1000,'unixepoch','localtime') produces — so the
+ * renderer's contiguous axis lines up with the store's sparse buckets. The four token-kind sums drive
+ * the default by-kind stacking; `byModel` (raw id → total tokens that day, ordered by tokens desc) drives
+ * the by-model stacking. Both partition the same tokens, so a day's grand total is identical either way.
+ */
+export interface DailyBucket {
+  /** Local calendar day, 'YYYY-MM-DD'. */
+  day: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  /** Total tokens (all four kinds) per raw model id active this day, ordered by tokens descending then
+   *  raw id. A turn that recorded no model uses modelRaw null. Empty on a zero-fill day. */
+  byModel: { modelRaw: string | null; totalTokens: number }[];
+}
+
+/** A zero-usage day bucket: the gap-fill the renderer inserts for a calendar day with no turns, and the
+ *  shared empty shape so the zero bucket can't drift from DailyBucket's field set. */
+export function emptyDay(day: string): DailyBucket {
+  return {
+    day,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    byModel: [],
+  };
+}
+
+/**
+ * The local calendar day key ('YYYY-MM-DD') for an epoch-ms instant in the machine's local time — the
+ * same day SQLite's date(ts/1000,'unixepoch','localtime') assigns that turn (#107 local-day bucketing),
+ * so the renderer's contiguous day axis aligns with the store's sparse buckets.
+ */
+export function localDayKey(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * The local day `n` days after `day` (negative walks back), as a 'YYYY-MM-DD' key. Builds a local-midnight
+ * Date from the key's parts and steps with setDate, so it crosses month ends, year ends, and DST cleanly —
+ * the same local-Date arithmetic rangeSinceMs uses for its bound.
+ */
+export function addDays(day: string, n: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + n);
+  return localDayKey(dt.getTime());
+}
+
+/**
+ * Fill a sparse, ascending list of daily buckets into a contiguous run from `startDay` to `endDay`
+ * inclusive, inserting a zero bucket for every calendar day with no turns — so the chart draws one bar per
+ * day across the range and a gap reads as a gap, not a compressed axis. Buckets outside [startDay, endDay]
+ * are dropped; an empty range (start after end) yields []. The loop is bounded defensively so a malformed
+ * key can't spin forever.
+ */
+export function densifyDays(
+  sparse: DailyBucket[],
+  startDay: string,
+  endDay: string,
+): DailyBucket[] {
+  if (startDay > endDay) return [];
+  const bySparse = new Map(sparse.map((b) => [b.day, b]));
+  const out: DailyBucket[] = [];
+  let day = startDay;
+  // ~27 years of days: far above any real range, a backstop against a bad key, never reached in practice.
+  for (let i = 0; i < 10_000 && day <= endDay; i++) {
+    out.push(bySparse.get(day) ?? emptyDay(day));
+    day = addDays(day, 1);
+  }
+  return out;
+}
