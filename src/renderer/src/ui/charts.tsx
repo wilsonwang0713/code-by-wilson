@@ -247,8 +247,9 @@ export function BarSeries({
               />
             ))}
           </svg>
-          {/* Tooltip for the hovered column, centered over it, clamped to stay on-screen by the caller's
-              content width; translateX(-50%) centers it on the column. */}
+          {/* Tooltip for the hovered column: centered on it via translateX(-50%), pointer-events-none so it
+              never steals the hover. At the extreme edge columns it can overhang the plot slightly —
+              acceptable for v1. */}
           {hovered != null && (
             <div
               className="pointer-events-none absolute bottom-full z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-ink-800 bg-ink-900 px-2 py-1.5 text-[11px] shadow-lg"

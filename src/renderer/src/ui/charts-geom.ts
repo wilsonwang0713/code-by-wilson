@@ -70,14 +70,18 @@ export function niceAxisMax(dataMax: number): number {
 }
 
 /**
- * `count` evenly spaced tick values from 0 to `axisMax` inclusive (count + 1 values), ascending. With a
- * nice axisMax (see niceAxisMax) the steps land on round numbers — the Y-axis gridline labels. Values are
- * rounded to integers (tokens are whole). A zero or negative axis yields [0].
+ * Up to `count` + 1 evenly spaced tick values from 0 to `axisMax` inclusive, ascending. With a nice axisMax
+ * (see niceAxisMax) the steps land on round numbers — the Y-axis gridline labels. Values are rounded to
+ * integers (tokens are whole); consecutive duplicates that rounding introduces on a small axis are
+ * collapsed, so an all-zero range (axisMax 1) yields [0, 1] rather than [0, 0, 1, 1, 1] — keeping the tick
+ * values (and the chart's per-tick React keys) unique. A zero or negative axis yields [0].
  */
 export function axisTicks(axisMax: number, count = 4): number[] {
   if (!Number.isFinite(axisMax) || axisMax <= 0) return [0];
   const step = axisMax / count;
-  return Array.from({ length: count + 1 }, (_, i) => Math.round(i * step));
+  const all = Array.from({ length: count + 1 }, (_, i) => Math.round(i * step));
+  // The rounded sequence is monotonic non-decreasing, so dropping consecutive equals yields the unique set.
+  return all.filter((v, i) => i === 0 || v !== all[i - 1]);
 }
 
 /** One segment of a stacked bar: its color and its bottom (`y0`) and top (`y1`) edges as fractions of the

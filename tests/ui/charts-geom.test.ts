@@ -143,13 +143,19 @@ describe("niceAxisMax", () => {
 
 describe("axisTicks", () => {
   it("splits the axis into count+1 evenly spaced, ascending tick values", () => {
-    expect(axisTicks(2_000_000)).toEqual([0, 500_000, 1_000_000, 1_500_000, 2_000_000]);
+    expect(axisTicks(2_000_000)).toEqual([
+      0, 500_000, 1_000_000, 1_500_000, 2_000_000,
+    ]);
     expect(axisTicks(2_000_000, 2)).toEqual([0, 1_000_000, 2_000_000]);
   });
 
   it("returns [0] for a zero or negative axis", () => {
     expect(axisTicks(0)).toEqual([0]);
     expect(axisTicks(-1)).toEqual([0]);
+  });
+
+  it("collapses duplicate ticks integer rounding produces on a small axis", () => {
+    expect(axisTicks(1)).toEqual([0, 1]);
   });
 });
 
