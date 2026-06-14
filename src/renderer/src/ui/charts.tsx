@@ -312,6 +312,7 @@ export function CalendarHeatmap({
   selectedDay,
   onSelectDay,
   renderTooltip,
+  ariaLabelOf,
   monthLabels,
 }: {
   weeks: CalendarCell[][];
@@ -320,6 +321,7 @@ export function CalendarHeatmap({
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
   renderTooltip: (day: string) => ReactNode;
+  ariaLabelOf: (day: string) => string;
   monthLabels: { col: number; label: string }[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -344,6 +346,22 @@ export function CalendarHeatmap({
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth; // clamps to the max automatically
   }, [firstDay, lastDay]);
+
+  // Position the tooltip over a cell — shared by pointer hover and keyboard focus. The x is the cell's center
+  // in the OUTER wrapper's coordinates, with the current scroll offset baked in at call time (see `hovered`).
+  const showAt = (day: string, ci: number, ri: number): void =>
+    setHovered({
+      day,
+      x:
+        CAL_GUTTER_W +
+        CAL_GAP_X +
+        ci * CAL_STEP +
+        CAL_CELL / 2 -
+        (scrollRef.current?.scrollLeft ?? 0),
+      y: ri * CAL_STEP,
+    });
+  const hideIf = (day: string): void =>
+    setHovered((h) => (h?.day === day ? null : h));
 
   return (
     // Relative, non-clipping wrapper: the tooltip renders here, free to overhang the grid's top, while only
@@ -395,22 +413,22 @@ export function CalendarHeatmap({
                     stroke="var(--color-fg)"
                     strokeWidth={cell.day === selectedDay ? 1.5 : 0}
                     className="cursor-pointer"
-                    onMouseEnter={() =>
-                      setHovered({
-                        day: cell.day,
-                        x:
-                          CAL_GUTTER_W +
-                          CAL_GAP_X +
-                          ci * CAL_STEP +
-                          CAL_CELL / 2 -
-                          (scrollRef.current?.scrollLeft ?? 0),
-                        y: ri * CAL_STEP,
-                      })
-                    }
-                    onMouseLeave={() =>
-                      setHovered((h) => (h?.day === cell.day ? null : h))
-                    }
+                    // A focusable, labeled button so the click-to-filter is reachable by keyboard and announced
+                    // to screen readers; Enter/Space drill in, focus mirrors hover to surface the tooltip.
+                    tabIndex={0}
+                    role="button"
+                    aria-label={ariaLabelOf(cell.day)}
+                    onMouseEnter={() => showAt(cell.day, ci, ri)}
+                    onMouseLeave={() => hideIf(cell.day)}
+                    onFocus={() => showAt(cell.day, ci, ri)}
+                    onBlur={() => hideIf(cell.day)}
                     onClick={() => onSelectDay(cell.day)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectDay(cell.day);
+                      }
+                    }}
                   />
                 ) : null,
               ),

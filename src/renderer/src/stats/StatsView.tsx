@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   type StatsSnapshot,
   type ScanProgress,
@@ -84,8 +90,11 @@ export function StatsView() {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     // Range changed: blank the cards back to the loading state rather than leave the prior range's totals
-    // showing under the newly-pressed button until this range's first poll lands.
-    setSnap(null);
+    // showing under the newly-pressed button until this range's first poll lands. But NOT when drilling
+    // into a day from the calendar — the calendar is range-independent, so blanking would unmount it and
+    // its scroll-to-newest effect would re-fire on remount, flashing and scrolling away from the cell the
+    // user just clicked. The day's totals load under the prior view for one tick instead.
+    if (!isDayRange(range)) setSnap(null);
     const tick = (): void => {
       void window.api
         .readStats(range, calendarYear ?? undefined)
@@ -327,51 +336,74 @@ function Contributions({
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
 }) {
-  const byDay = new Map(days.map((d) => [d.day, d]));
+  // Derived grid/metrics, memoized so the calendar isn't rebuilt wholesale on every poll re-render. weeks and
+  // monthLabels key on the day-string bounds (stable by value across polls, so the ~370-cell grid build and
+  // the column scan skip when the window is unchanged); the value buckets additionally track the active metric
+  // and cache pill, so a toggle only re-buckets rather than re-laying-out.
+  const byDay = useMemo(() => new Map(days.map((d) => [d.day, d])), [days]);
   // The value a day contributes under the active metric. The Tokens metric follows the page's "Include cache"
   // pill via the shared tokensOf (all four kinds on, fresh input+output off), like the other breakdowns. A
   // null equiv (no recognized model that day) reads as 0 intensity — honest n/a in the tooltip, no guessed cost.
-  const valueOf = (day: string): number => {
-    const d = byDay.get(day);
-    if (!d) return 0;
-    if (metric === "turns") return d.turns;
-    if (metric === "tokens") return tokensOf(d, includeCache);
-    return d.equivApiValueUsd ?? 0;
-  };
+  const valueOf = useCallback(
+    (day: string): number => {
+      const d = byDay.get(day);
+      if (!d) return 0;
+      if (metric === "turns") return d.turns;
+      if (metric === "tokens") return tokensOf(d, includeCache);
+      return d.equivApiValueUsd ?? 0;
+    },
+    [byDay, metric, includeCache],
+  );
 
-  const weeks = calendarGrid(startDay, endDay);
+  const weeks = useMemo(
+    () => calendarGrid(startDay, endDay),
+    [startDay, endDay],
+  );
   // Adaptive buckets over only the in-range days' values (padding cells are out of window).
-  const values = weeks
-    .flat()
-    .filter((c) => c.inRange)
-    .map((c) => valueOf(c.day));
-  const thresholds = intensityThresholds(values, CALENDAR_RAMP.length);
-  const levelOf = (day: string): number =>
-    intensityLevel(valueOf(day), thresholds);
-  const monthLabels = monthLabelCols(weeks).map((m) => ({
-    col: m.col,
-    label: formatMonthShort(m.firstDay),
-  }));
+  const thresholds = useMemo(
+    () =>
+      intensityThresholds(
+        weeks
+          .flat()
+          .filter((c) => c.inRange)
+          .map((c) => valueOf(c.day)),
+        CALENDAR_RAMP.length,
+      ),
+    [weeks, valueOf],
+  );
+  const levelOf = useCallback(
+    (day: string): number => intensityLevel(valueOf(day), thresholds),
+    [valueOf, thresholds],
+  );
+  const monthLabels = useMemo(
+    () =>
+      monthLabelCols(weeks).map((m) => ({
+        col: m.col,
+        label: formatMonthShort(m.firstDay),
+      })),
+    [weeks],
+  );
 
-  const renderTooltip = (day: string): ReactNode => {
+  // The active-metric value as a display string — shared by the hover tooltip and the cell's aria-label.
+  const valueLabel = (day: string): string => {
     const d = byDay.get(day);
-    const value =
-      metric === "turns"
-        ? `${(d?.turns ?? 0).toLocaleString("en-US")} ${
-            (d?.turns ?? 0) === 1 ? "turn" : "turns"
-          }`
-        : metric === "tokens"
-          ? `${formatTokensShort(d ? tokensOf(d, includeCache) : 0)} tokens`
-          : d?.equivApiValueUsd == null
-            ? "n/a"
-            : formatUsd(d.equivApiValueUsd);
-    return (
-      <div className="flex flex-col gap-0.5">
-        <div className="font-medium text-fg">{formatDayLong(day)}</div>
-        <div className="text-fg-muted">{value}</div>
-      </div>
-    );
+    if (metric === "turns") {
+      const n = d?.turns ?? 0;
+      return `${n.toLocaleString("en-US")} ${n === 1 ? "turn" : "turns"}`;
+    }
+    if (metric === "tokens")
+      return `${formatTokensShort(d ? tokensOf(d, includeCache) : 0)} tokens`;
+    return d?.equivApiValueUsd == null ? "n/a" : formatUsd(d.equivApiValueUsd);
   };
+  const renderTooltip = (day: string): ReactNode => (
+    <div className="flex flex-col gap-0.5">
+      <div className="font-medium text-fg">{formatDayLong(day)}</div>
+      <div className="text-fg-muted">{valueLabel(day)}</div>
+    </div>
+  );
+  // The screen-reader label for a day cell: the date plus its value under the active metric.
+  const describeDay = (day: string): string =>
+    `${formatDayLong(day)}: ${valueLabel(day)}`;
 
   return (
     <StatsPanel
@@ -390,6 +422,7 @@ function Contributions({
         selectedDay={selectedDay}
         onSelectDay={onSelectDay}
         renderTooltip={renderTooltip}
+        ariaLabelOf={describeDay}
         monthLabels={monthLabels}
       />
       {/* Less -> More ramp legend. */}
