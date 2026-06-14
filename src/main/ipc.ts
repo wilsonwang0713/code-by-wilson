@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { IPC, type OverviewData } from "@shared/ipc";
+import { IPC, type OverviewData, type StatsRead } from "@shared/ipc";
 import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
@@ -22,10 +22,15 @@ import {
   emptyTotals,
   hasAnyTurns,
 } from "./db/analytics";
-import { scanStep } from "./analytics/scan";
+import {
+  scanStep,
+  collectScanTargets,
+  freshTargets,
+  type ScanTarget,
+  type WalkCache,
+} from "./analytics/scan";
 import type {
   StatsTotals,
-  StatsSnapshot,
   StatsBreakdowns,
   ScanProgress,
   StatsRange,
@@ -38,6 +43,7 @@ import {
   emptyBreakdowns,
   rangeWindow,
   calendarWindow,
+  localDayKey,
 } from "@shared/stats";
 import { syncSessions } from "./sync";
 
@@ -227,47 +233,88 @@ export function registerIpc({
       return [];
     }
   };
+  // Cache the target walk briefly so a 40ms backfill burst doesn't re-walk projects/ ~25×/sec. The TTL sits
+  // below WARM_POLL_MS (1500ms), so a warm poll always re-walks fresh and catches other sessions promptly;
+  // only a rapid burst reuses the list. Lives here, not in scanStep, so scanStep stays a pure function.
+  const WALK_TTL_MS = 500;
+  let walkCache: WalkCache | null = null;
+  const scanTargets = (now: number): ScanTarget[] => {
+    if (!claudeDir) return [];
+    walkCache = freshTargets(walkCache, now, WALK_TTL_MS, () =>
+      collectScanTargets(claudeDir),
+    );
+    return walkCache.targets;
+  };
+  // The poll's change token: the post-scan max turns rowid (a new turn always lands as a new row — transcripts
+  // are append-only) plus the local day (the only other input that moves the windowed output). On a read
+  // error return "" so the poll reads `changed` and serves a safe (zeroed) snapshot instead of sticking.
+  const tokenFor = (adb: SqliteDb, now: number): string => {
+    try {
+      return `${turnsMaxRowid(adb)}:${localDayKey(now)}`;
+    } catch (err) {
+      console.error("stats token read failed; forcing a full snapshot", err);
+      return "";
+    }
+  };
   ipcMain.handle(
     IPC.readStats,
-    (_e, range?: StatsRange, calendarYear?: number): StatsSnapshot => {
+    (
+      _e,
+      range?: StatsRange,
+      calendarYear?: number,
+      since?: string,
+    ): StatsRead => {
       const now = Date.now();
-      // The page window scopes totals/breakdowns/daily. A missing/unrecognized range falls back to all-time
-      // (#110); a single-day range ({day}) bounds it both ends. The calendar window is resolved separately
-      // (#115): trailing twelve months by default, or the selected local year — independent of `range`.
+      // The page window scopes totals/breakdowns/daily; a missing range falls back to all-time (#110). The
+      // calendar window is resolved separately (#115), independent of `range`.
       const { sinceMs, untilMs } = rangeWindow(range ?? "all", now);
       const cal = calendarWindow(calendarYear ?? null, now);
-      if (!analyticsDb || !claudeDir) {
-        // No store, or no dir to scan: a done snapshot (zeros if no store; last-known if a store but no dir).
-        return analyticsDb
-          ? {
-              totals: safeTotals(analyticsDb, sinceMs, untilMs),
-              progress: doneProgress(),
-              hasAnyTurns: safeHasAnyTurns(analyticsDb),
-              daily: safeDaily(analyticsDb, sinceMs, untilMs),
-              ...safeBreakdowns(analyticsDb, sinceMs, untilMs),
-              calendar: safeCalendar(analyticsDb, cal),
-              calendarStart: cal.startDay,
-              calendarEnd: cal.endDay,
-              calendarYears: safeCalendarYears(analyticsDb),
-            }
-          : emptySnapshot();
+
+      // No durable store wired in: a constant per-day token, so repeated polls read unchanged after the first.
+      if (!analyticsDb) {
+        const token = `empty:${localDayKey(now)}`;
+        return since === token
+          ? { status: "unchanged", token }
+          : { status: "changed", token, snapshot: emptySnapshot() };
       }
+
+      // One bounded scan step when there's a dir to scan; otherwise serve last-known with a done progress.
       let progress = doneProgress();
-      try {
-        progress = scanStep(analyticsDb, claudeDir);
-      } catch (err) {
-        console.error("stats scan step failed; serving last-known totals", err);
+      if (claudeDir) {
+        try {
+          progress = scanStep(
+            analyticsDb,
+            claudeDir,
+            undefined,
+            scanTargets(now),
+          );
+        } catch (err) {
+          console.error(
+            "stats scan step failed; serving last-known totals",
+            err,
+          );
+        }
       }
+
+      // Token off the POST-scan rowid: a step that ingested moved it. Unchanged -> skip every aggregate.
+      const token = tokenFor(analyticsDb, now);
+      if (since === token && token !== "")
+        return { status: "unchanged", token };
+
       return {
-        totals: safeTotals(analyticsDb, sinceMs, untilMs),
-        progress,
-        hasAnyTurns: safeHasAnyTurns(analyticsDb),
-        daily: safeDaily(analyticsDb, sinceMs, untilMs),
-        ...safeBreakdowns(analyticsDb, sinceMs, untilMs),
-        calendar: safeCalendar(analyticsDb, cal),
-        calendarStart: cal.startDay,
-        calendarEnd: cal.endDay,
-        calendarYears: safeCalendarYears(analyticsDb),
+        status: "changed",
+        token,
+        snapshot: {
+          totals: safeTotals(analyticsDb, sinceMs, untilMs),
+          progress,
+          hasAnyTurns: safeHasAnyTurns(analyticsDb),
+          daily: safeDaily(analyticsDb, sinceMs, untilMs),
+          ...safeBreakdowns(analyticsDb, sinceMs, untilMs),
+          calendar: safeCalendar(analyticsDb, cal),
+          calendarStart: cal.startDay,
+          calendarEnd: cal.endDay,
+          calendarYears: safeCalendarYears(analyticsDb),
+        },
       };
     },
   );

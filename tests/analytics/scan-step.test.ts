@@ -7,7 +7,6 @@ import {
   collectScanTargets,
   freshTargets,
   type ScanTarget,
-  type WalkCache,
 } from "../../src/main/analytics/scan";
 import * as analytics from "../../src/main/db/analytics";
 import {

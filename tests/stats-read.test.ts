@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mkdirSync, writeFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { IPC } from "@shared/ipc";
+import type { StatsRead } from "@shared/ipc";
 import type { StatsSnapshot, StatsRange, StatsByModel } from "@shared/stats";
 import type { Provider } from "../src/main/provider/types";
 
@@ -58,6 +59,66 @@ const provider: Provider = {
 };
 
 describe("registerIpc stats:read", () => {
+  // Unwrap a `changed` poll to its snapshot for the assertions below; the unchanged path has its own test.
+  const readChanged = (
+    range?: StatsRange,
+    calendarYear?: number,
+  ): StatsSnapshot => {
+    const r = handlers.get(IPC.readStats)!(
+      null,
+      range,
+      calendarYear,
+    ) as StatsRead;
+    if (r.status !== "changed")
+      throw new Error(`expected changed, got ${r.status}`);
+    return r.snapshot;
+  };
+
+  it("an unchanged poll returns {status:'unchanged'} and skips building a snapshot", () => {
+    const home = makeHome();
+    const dir = join(home, "projects", "-work-proj");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "sess-1.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        cwd: "/work/proj",
+        message: {
+          role: "assistant",
+          id: "m1",
+          model: "claude-opus-4-8",
+          usage: {
+            input_tokens: 1_000_000,
+            output_tokens: 0,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+        },
+      }) + "\n",
+    );
+
+    const db = openTestDb();
+    migrate(db);
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    registerIpc({ db, provider, analyticsDb, claudeDir: home });
+
+    const first = handlers.get(IPC.readStats)!() as StatsRead;
+    expect(first.status).toBe("changed");
+    if (first.status !== "changed") throw new Error("expected changed");
+    expect(first.snapshot.totals.turns).toBe(1);
+
+    const second = handlers.get(IPC.readStats)!(
+      null,
+      undefined,
+      undefined,
+      first.token,
+    ) as StatsRead;
+    expect(second.status).toBe("unchanged");
+    expect(second.token).toBe(first.token);
+    expect("snapshot" in second).toBe(false);
+  });
+
   it("scans the claude dir and returns the aggregated totals", () => {
     const home = makeHome();
     const dir = join(home, "projects", "-work-proj");
@@ -87,7 +148,7 @@ describe("registerIpc stats:read", () => {
     migrateAnalytics(analyticsDb);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    const snap = handlers.get(IPC.readStats)!() as StatsSnapshot;
+    const snap = readChanged();
     expect(snap.totals.sessions).toBe(1);
     expect(snap.totals.turns).toBe(1);
     expect(snap.totals.inputTokens).toBe(1_000_000);
@@ -96,7 +157,7 @@ describe("registerIpc stats:read", () => {
     expect(snap.hasAnyTurns).toBe(true); // a turn was ingested
 
     // A second call is a no-op: the file is unchanged, so totals hold and it's still done.
-    const again = handlers.get(IPC.readStats)!() as StatsSnapshot;
+    const again = readChanged();
     expect(again.totals).toEqual(snap.totals);
     expect(again.progress.done).toBe(true);
   });
@@ -132,7 +193,7 @@ describe("registerIpc stats:read", () => {
 
     let snap: StatsSnapshot | undefined;
     expect(() => {
-      snap = handlers.get(IPC.readStats)!() as StatsSnapshot;
+      snap = readChanged();
     }).not.toThrow();
     expect(snap?.totals.turns).toBe(1); // last-known seeded total survives; scan failure swallowed
     expect(snap?.totals.inputTokens).toBe(1_000_000);
@@ -144,7 +205,11 @@ describe("registerIpc stats:read", () => {
     const db = openTestDb();
     migrate(db);
     registerIpc({ db, provider });
-    expect(handlers.get(IPC.readStats)!()).toEqual({
+    const r = handlers.get(IPC.readStats)!() as StatsRead;
+    expect(r.status).toBe("changed");
+    if (r.status !== "changed") throw new Error("expected changed");
+    expect(typeof r.token).toBe("string");
+    expect(r.snapshot).toEqual({
       totals: {
         sessions: 0,
         turns: 0,
@@ -201,7 +266,7 @@ describe("registerIpc stats:read", () => {
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
     const turnsFor = (range?: StatsRange): number =>
-      (handlers.get(IPC.readStats)!(null, range) as StatsSnapshot).totals.turns;
+      readChanged(range).totals.turns;
 
     expect(turnsFor("all")).toBe(3);
     expect(turnsFor("90d")).toBe(2);
@@ -255,7 +320,7 @@ describe("registerIpc stats:read", () => {
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
     const byModelFor = (range?: StatsRange): StatsByModel[] =>
-      (handlers.get(IPC.readStats)!(null, range) as StatsSnapshot).byModel;
+      readChanged(range).byModel;
 
     const all = byModelFor("all");
     expect(all.map((r) => r.modelRaw).sort()).toEqual([
@@ -316,8 +381,7 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    const snapFor = (range?: StatsRange): StatsSnapshot =>
-      handlers.get(IPC.readStats)!(null, range) as StatsSnapshot;
+    const snapFor = (range?: StatsRange): StatsSnapshot => readChanged(range);
 
     const all = snapFor("all");
     expect(all.byProject.map((r) => r.project).sort()).toEqual([
@@ -379,8 +443,7 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    const snapFor = (range?: StatsRange): StatsSnapshot =>
-      handlers.get(IPC.readStats)!(null, range) as StatsSnapshot;
+    const snapFor = (range?: StatsRange): StatsSnapshot => readChanged(range);
 
     const all = snapFor("all");
     expect(all.bySession.map((r) => r.sessionId).sort()).toEqual([
@@ -437,8 +500,7 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    const all = (handlers.get(IPC.readStats)!(null, "all") as StatsSnapshot)
-      .daily;
+    const all = readChanged("all").daily;
     expect(all.map((d) => d.day)).toEqual(["2026-01-01", "2026-06-14"]);
     expect(all[1].inputTokens).toBe(1_000_000);
     expect(all[1].byModel).toEqual([
@@ -490,11 +552,7 @@ describe("registerIpc stats:read", () => {
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
     // calendarYear = 2024 → only the 2024 turn lands in the calendar window.
-    const snap = handlers.get(IPC.readStats)!(
-      null,
-      undefined,
-      2024,
-    ) as StatsSnapshot;
+    const snap = readChanged(undefined, 2024);
     expect(snap.calendarStart).toBe("2024-01-01");
     expect(snap.calendarEnd).toBe("2024-12-31");
     expect(snap.calendar.map((d) => d.day)).toEqual(["2024-03-02"]);
@@ -533,9 +591,7 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider, analyticsDb, claudeDir: home });
 
-    const snap = handlers.get(IPC.readStats)!(null, {
-      day: "2026-06-14",
-    }) as StatsSnapshot;
+    const snap = readChanged({ day: "2026-06-14" });
     expect(snap.totals.turns).toBe(1);
     expect(snap.totals.inputTokens).toBe(5);
   });
@@ -564,7 +620,7 @@ describe("registerIpc stats:read", () => {
     migrate(db);
     registerIpc({ db, provider, analyticsDb }); // no claudeDir → no scan, just the last-known totals
 
-    const snap = handlers.get(IPC.readStats)!() as StatsSnapshot;
+    const snap = readChanged();
     expect(snap.totals.turns).toBe(1);
     expect(snap.totals.inputTokens).toBe(1_000_000);
     expect(snap.progress.done).toBe(true);
