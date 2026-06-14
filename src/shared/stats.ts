@@ -65,6 +65,10 @@ export interface StatsByProject {
   /** The basename of `cwd` — the display label. */
   project: string;
   totalTokens: number;
+  /** Input and output tokens (cache excluded), mirroring StatsByModel, so the renderer can show the fresh
+   *  metric (input + output) when the page cache toggle is off. */
+  inputTokens: number;
+  outputTokens: number;
   /** Equivalent API value summed over the project's recognized models, or null (n/a) when it has none. */
   equivApiValueUsd: number | null;
 }
@@ -81,6 +85,10 @@ export interface StatsByBranch {
   /** The git branch, or null when the turn recorded none. */
   branch: string | null;
   totalTokens: number;
+  /** Input and output tokens (cache excluded), mirroring StatsByModel, so the renderer can show the fresh
+   *  metric (input + output) when the page cache toggle is off. */
+  inputTokens: number;
+  outputTokens: number;
   equivApiValueUsd: number | null;
 }
 

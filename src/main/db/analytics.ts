@@ -391,6 +391,8 @@ interface DimAgg {
   project: string;
   branch: string | null;
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   knownCost: number;
   hasKnownCost: boolean;
 }
@@ -416,6 +418,8 @@ function foldByDim(
         project: r.project,
         branch: r.branch ?? null,
         totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
         knownCost: 0,
         hasKnownCost: false,
       };
@@ -426,6 +430,8 @@ function foldByDim(
       r.output_tokens +
       r.cache_read_tokens +
       r.cache_creation_tokens;
+    a.inputTokens += r.input_tokens;
+    a.outputTokens += r.output_tokens;
     const cost = modelRowCost(r);
     if (cost != null) {
       a.knownCost += cost;
@@ -460,6 +466,8 @@ function foldProjects(rows: DimModelRow[]): StatsByProject[] {
         cwd: a.cwd,
         project: a.project,
         totalTokens: a.totalTokens,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
         equivApiValueUsd: dimCost(a),
       }),
     )
@@ -483,6 +491,8 @@ function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
         project: a.project,
         branch: a.branch,
         totalTokens: a.totalTokens,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
         equivApiValueUsd: dimCost(a),
       }),
     )
