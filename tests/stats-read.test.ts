@@ -159,6 +159,7 @@ describe("registerIpc stats:read", () => {
       byModel: [],
       byProject: [],
       byBranch: [],
+      bySession: [],
     });
   });
 
