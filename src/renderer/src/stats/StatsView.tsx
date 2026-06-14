@@ -1290,7 +1290,7 @@ function StatsPanel({
   return (
     <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
       <header className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-xs uppercase tracking-wide text-fg-muted">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
           {title}
         </h2>
         {right}
