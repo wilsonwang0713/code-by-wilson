@@ -1,4 +1,4 @@
-import type { StatsBySession } from "@shared/stats";
+import { tokensOf, type StatsBySession } from "@shared/stats";
 
 /** The per-Session table's sortable columns. `tokens` follows the page's cache toggle; `cost` is the
  *  Equivalent API value column (n/a rows sort below every real figure). */
@@ -43,8 +43,6 @@ export function sortSessions(
   sort: SessionSort,
   includeCache: boolean,
 ): StatsBySession[] {
-  const tokensOf = (r: StatsBySession): number =>
-    includeCache ? r.totalTokens : r.inputTokens + r.outputTokens;
   const cmp = (a: StatsBySession, b: StatsBySession): number => {
     // Exhaustive over SessionSortKey with no default branch on purpose: adding a column without a case
     // here is a compile error (noImplicitReturns), not a silent fall-through to 0.
@@ -60,7 +58,7 @@ export function sortSessions(
       case "turns":
         return a.turns - b.turns;
       case "tokens":
-        return tokensOf(a) - tokensOf(b);
+        return tokensOf(a, includeCache) - tokensOf(b, includeCache);
       case "cost":
         // -1 sentinel keeps n/a (null) below every real figure, including a real $0.
         return (a.equivApiValueUsd ?? -1) - (b.equivApiValueUsd ?? -1);

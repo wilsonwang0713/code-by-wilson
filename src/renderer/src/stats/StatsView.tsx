@@ -11,6 +11,7 @@ import {
   DEFAULT_RANGE,
   emptySnapshot,
   branchRowKey,
+  tokensOf,
 } from "@shared/stats";
 import {
   formatTokensShort,
@@ -259,17 +260,6 @@ function CacheToggle({
       Include cache
     </button>
   );
-}
-
-/** The token figure the page shows for one breakdown row, governed by the header's cache pill: the full
- *  total (all four kinds) when cache is included, or fresh tokens (input + output) when it's off. Shared by
- *  By model, By project, and By branch so the three can't drift on what "Tokens" means. It reads the
- *  { totalTokens, inputTokens, outputTokens } shape common to all three row types. */
-function tokensOf(
-  row: { totalTokens: number; inputTokens: number; outputTokens: number },
-  includeCache: boolean,
-): number {
-  return includeCache ? row.totalTokens : row.inputTokens + row.outputTokens;
 }
 
 /** The per-model breakdown (#111): a donut sized by each model's token share beside a table of tokens and
@@ -654,7 +644,11 @@ function BySession({
                 </span>
               </td>
               <td className="py-1 pl-2 text-right tabular-nums text-fg-muted">
-                {formatRelativeTime(r.lastActivityMs, now)}
+                {/* lastActivityMs is 0 only when no turn had a known time; show a dash, not a
+                    formatRelativeTime epoch render ("20000d ago") that fakes exact data. */}
+                {r.lastActivityMs === 0
+                  ? "—"
+                  : formatRelativeTime(r.lastActivityMs, now)}
               </td>
               <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
                 {formatDuration(r.durationMs)}

@@ -126,6 +126,20 @@ export interface StatsBySession {
 }
 
 /**
+ * The token figure shown for one breakdown row, governed by the page's "Include cache" pill: the full total
+ * (all four kinds) when cache is included, or fresh tokens (input + output) when it's off. Read off the
+ * { totalTokens, inputTokens, outputTokens } shape every breakdown row carries, so By model / By project /
+ * By branch / By session — and the session table's SORT — share one definition and can't drift on what
+ * "Tokens" means versus the number on screen.
+ */
+export function tokensOf(
+  row: { totalTokens: number; inputTokens: number; outputTokens: number },
+  includeCache: boolean,
+): number {
+  return includeCache ? row.totalTokens : row.inputTokens + row.outputTokens;
+}
+
+/**
  * The stable, collision-free key for a per-branch row: the full `cwd` joined to the branch with a NUL.
  * Neither a path nor a git ref can contain one, so the null-branch sentinel (a turn that recorded no
  * ref) can never collide with a real branch. The store folds branch turns on this key and the renderer
