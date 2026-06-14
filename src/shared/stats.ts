@@ -51,6 +51,40 @@ export interface StatsByModel {
 }
 
 /**
+ * One row of the per-project breakdown (#112). The grouping key is the FULL `cwd`, so two repos that share a
+ * folder name stay separate rows; `project` is that cwd's basename, the display label. `totalTokens` sums all
+ * four token kinds — the bar's length and the table's Tokens column. `equivApiValueUsd` is the project's
+ * Equivalent API value summed across its recognized models, or null (n/a) when none of its turns ran a known
+ * model — an honest n/a, never a guessed $0. A mixed project shows the sum over only its recognized models,
+ * which is exactly its contribution to the grand total.
+ */
+export interface StatsByProject {
+  /** The full working directory the turns ran in: the grouping key, kept distinct per repo. The row labels
+   *  by `project`; the cwd disambiguates two same-basename projects (the view surfaces it on hover). */
+  cwd: string;
+  /** The basename of `cwd` — the display label. */
+  project: string;
+  totalTokens: number;
+  /** Equivalent API value summed over the project's recognized models, or null (n/a) when it has none. */
+  equivApiValueUsd: number | null;
+}
+
+/**
+ * One row of the per-branch breakdown (#112): a (project, git branch) pair. Keyed on the full `cwd` plus the
+ * `branch`, so the same branch name in two projects stays distinct and same-basename projects never merge.
+ * `branch` is null when the turn recorded none (it renders as a dash). `totalTokens` and `equivApiValueUsd`
+ * mean the same as in StatsByProject.
+ */
+export interface StatsByBranch {
+  cwd: string;
+  project: string;
+  /** The git branch, or null when the turn recorded none. */
+  branch: string | null;
+  totalTokens: number;
+  equivApiValueUsd: number | null;
+}
+
+/**
  * How far the incremental scan has gotten, returned alongside the totals so the Stats view can show a
  * "building history" state on a first cold run and know when to drop from brisk polling to a gentle warm
  * cadence. `filesTotal`/`filesDone` count Transcript and subagent files; `done` is true once every file's
