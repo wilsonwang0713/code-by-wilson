@@ -274,7 +274,8 @@ const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
  * The store's daily buckets are sparse (only days with turns); we densify the contiguous range so a quiet
  * day reads as a gap. The range's start day is the local day of rangeSinceMs (the same bound main scopes
  * to); all-time starts at the earliest bucket. The model series order and colors come from the snapshot's
- * byModel, so the chart and the By-model panel agree.
+ * byModel (its store order, tokens desc), so the chart matches the By-model panel in the default cache-on
+ * view; with "Include cache" off that panel re-ranks and can recolor, which the chart doesn't follow.
  */
 function DailyUsage({
   daily,
