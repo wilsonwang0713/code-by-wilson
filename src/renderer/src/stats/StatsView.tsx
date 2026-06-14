@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -40,6 +41,7 @@ import {
   Donut,
   BarSeries,
   CalendarHeatmap,
+  StackedBar,
   type DayColumn,
 } from "../ui/charts";
 import {
@@ -54,6 +56,7 @@ import {
   monthLabelCols,
 } from "../ui/contributions-geom";
 import { Swatch, Bar } from "../ui/atoms";
+import { InfoButton } from "../ui/InfoButton";
 import {
   sortSessions,
   defaultDirFor,
@@ -61,6 +64,7 @@ import {
   type SessionSort,
   type SessionSortKey,
 } from "./session-sort";
+import { groupProjectBranches, TOP_PROJECTS } from "./project-branches";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -68,12 +72,12 @@ const BACKFILL_POLL_MS = 40;
 const WARM_POLL_MS = 1500;
 
 /**
- * The Overall Stats view: the all-time Totals panel, plus a "building history" progress banner on a first
- * cold run. Polls stats:read while mounted — each poll runs one bounded scan step in the main process —
- * fast until the backfill is done, then at the warm cadence so turns from other Sessions appear on their
- * own. The effect's cleanup stops the poll on unmount, so selecting any Session ends all scan work; the
- * main process does nothing unprompted. (The range filter, calendar, time-series, and breakdowns are
- * later slices; this is still the prototype "Insights grid"'s top-left panel.)
+ * The Overall Stats view: a headline KPI strip, then the contributions calendar, the daily time-series,
+ * and the per-model / per-project / per-Session breakdowns, with a "building history" progress banner on a
+ * first cold run. Polls stats:read while mounted — each poll runs one bounded scan step in the main
+ * process — fast until the backfill is done, then at the warm cadence so turns from other Sessions appear
+ * on their own. The effect's cleanup stops the poll on unmount, so selecting any Session ends all scan
+ * work; the main process does nothing unprompted.
  */
 export function StatsView() {
   const [snap, setSnap] = useState<StatsSnapshot | null>(null);
@@ -162,29 +166,22 @@ export function StatsView() {
               <EmptyStats />
             ) : (
               <>
-                {/* Hero: a fixed-width Totals card beside a flexible calendar that takes the rest of the row
-                    on wide screens, stacking on narrow ones. The calendar column is minmax(0,1fr) — NOT a bare
-                    1fr, whose auto minimum would refuse to shrink below the grid's content and break the inner
-                    scroll — so the panel adjusts to the width and the calendar scrolls horizontally inside it
-                    whenever the column is too narrow for the full year, the same as the stacked narrow view. */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-                  <Totals totals={snap.totals} />
-                  {snap.calendarStart && (
-                    <Contributions
-                      days={snap.calendar}
-                      startDay={snap.calendarStart}
-                      endDay={snap.calendarEnd}
-                      years={snap.calendarYears}
-                      year={calendarYear}
-                      onYear={setCalendarYear}
-                      metric={calMetric}
-                      onMetric={setCalMetric}
-                      includeCache={includeCache}
-                      selectedDay={isDayRange(range) ? range.day : null}
-                      onSelectDay={(day) => setRange({ day })}
-                    />
-                  )}
-                </div>
+                <KpiStrip totals={snap.totals} includeCache={includeCache} />
+                {snap.calendarStart && (
+                  <Contributions
+                    days={snap.calendar}
+                    startDay={snap.calendarStart}
+                    endDay={snap.calendarEnd}
+                    years={snap.calendarYears}
+                    year={calendarYear}
+                    onYear={setCalendarYear}
+                    metric={calMetric}
+                    onMetric={setCalMetric}
+                    includeCache={includeCache}
+                    selectedDay={isDayRange(range) ? range.day : null}
+                    onSelectDay={(day) => setRange({ day })}
+                  />
+                )}
                 {snap.daily.length > 0 && (
                   <DailyUsage
                     daily={snap.daily}
@@ -192,17 +189,28 @@ export function StatsView() {
                     range={range}
                   />
                 )}
-                {snap.byModel.length > 0 && (
-                  <ByModel rows={snap.byModel} includeCache={includeCache} />
-                )}
-                {snap.byProject.length > 0 && (
-                  <ByProject
-                    rows={snap.byProject}
-                    includeCache={includeCache}
-                  />
-                )}
-                {snap.byBranch.length > 0 && (
-                  <ByBranch rows={snap.byBranch} includeCache={includeCache} />
+                {(snap.byModel.length > 0 || snap.byProject.length > 0) && (
+                  <div
+                    className={`grid grid-cols-1 gap-4 ${
+                      snap.byModel.length > 0 && snap.byProject.length > 0
+                        ? "lg:grid-cols-2"
+                        : ""
+                    }`}
+                  >
+                    {snap.byModel.length > 0 && (
+                      <ByModel
+                        rows={snap.byModel}
+                        includeCache={includeCache}
+                      />
+                    )}
+                    {snap.byProject.length > 0 && (
+                      <ByProject
+                        rows={snap.byProject}
+                        branches={snap.byBranch}
+                        includeCache={includeCache}
+                      />
+                    )}
+                  </div>
                 )}
                 {snap.bySession.length > 0 && (
                   <BySession
@@ -304,7 +312,7 @@ const CAL_METRIC_OPTS = Object.entries(CAL_METRIC_LABELS) as [
 ][];
 
 /**
- * The contributions calendar (#115): the hero of the page. A trailing-twelve-month (or selected-year) grid of
+ * The contributions calendar (#115): a full-width activity grid below the KPI strip. A trailing-twelve-month (or selected-year) grid of
  * one cell per local day, intensity-bucketed adaptively over the visible window by the active metric (turns
  * default, tokens, or Equivalent API value). Its window is queried independently of the page range filter, so
  * its year switcher and metric toggle live in this panel's header, not the page toolbar. Hovering a day shows
@@ -499,31 +507,95 @@ function YearSwitcher({
   );
 }
 
-function Totals({ totals }: { totals: StatsTotals }) {
+/** The headline KPI strip: Sessions, Turns, Tokens (with a mini kind-split bar), and Equivalent API value
+ *  (with the reference-figure explainer). Replaces the old Totals card. The Tokens number and its split
+ *  both follow the page's Include-cache toggle, so the bar and the figure above it always agree. */
+function KpiStrip({
+  totals,
+  includeCache,
+}: {
+  totals: StatsTotals;
+  includeCache: boolean;
+}) {
+  // Segments under the Tokens number, in the shared cost-palette order. Cache off counts fresh tokens
+  // only, so drop the two cache segments — then the bar composition matches the number above it.
+  const kindSegments = includeCache
+    ? [
+        { value: totals.inputTokens, color: COST_SEGMENT_COLORS[0] },
+        { value: totals.outputTokens, color: COST_SEGMENT_COLORS[1] },
+        { value: totals.cacheReadTokens, color: COST_SEGMENT_COLORS[2] },
+        { value: totals.cacheCreationTokens, color: COST_SEGMENT_COLORS[3] },
+      ]
+    : [
+        { value: totals.inputTokens, color: COST_SEGMENT_COLORS[0] },
+        { value: totals.outputTokens, color: COST_SEGMENT_COLORS[1] },
+      ];
+  const tokenTotal = includeCache
+    ? totals.inputTokens +
+      totals.outputTokens +
+      totals.cacheReadTokens +
+      totals.cacheCreationTokens
+    : totals.inputTokens + totals.outputTokens;
   return (
-    <StatsPanel title="Totals">
-      <div className="grid grid-cols-2 gap-2.5">
-        <StatCard
-          label="Sessions"
-          value={totals.sessions.toLocaleString("en-US")}
-        />
-        <StatCard label="Turns" value={totals.turns.toLocaleString("en-US")} />
-        <StatCard label="Input" value={formatTokensShort(totals.inputTokens)} />
-        <StatCard
-          label="Output"
-          value={formatTokensShort(totals.outputTokens)}
-        />
-        <StatCard
-          label="Cache read"
-          value={formatTokensShort(totals.cacheReadTokens)}
-        />
-        <StatCard
-          label="Equiv API value"
-          value={formatUsd(totals.equivApiValueUsd)}
-          title="Equivalent API value — a reference figure, not money owed"
-        />
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <KpiCard
+        label="Sessions"
+        value={totals.sessions.toLocaleString("en-US")}
+      />
+      <KpiCard label="Turns" value={totals.turns.toLocaleString("en-US")} />
+      <KpiCard label="Tokens" value={formatTokensShort(tokenTotal)}>
+        <StackedBar segments={kindSegments} height={6} className="mt-3" />
+        <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] text-fg-faint">
+          {KIND_LABELS.slice(0, kindSegments.length).map((label, i) => (
+            <span key={label} className="flex items-center gap-1">
+              <Swatch color={COST_SEGMENT_COLORS[i]} />
+              {label}
+            </span>
+          ))}
+        </div>
+      </KpiCard>
+      <KpiCard
+        label="Equiv API value"
+        value={formatUsd(totals.equivApiValueUsd)}
+      >
+        <div className="mt-2 flex items-center gap-1 text-[10px] text-fg-faint">
+          <span>reference, not money owed</span>
+          <span className="relative">
+            <InfoButton
+              label="About Equivalent API value"
+              popoverClassName="left-0 top-full mt-1.5 w-56 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg"
+            >
+              What these tokens would cost at API rates. A reference figure for
+              a subscription account, never money owed.
+            </InfoButton>
+          </span>
+        </div>
+      </KpiCard>
+    </div>
+  );
+}
+
+/** One headline KPI: an uppercase eyebrow over a large display figure, with an optional detail slot below
+ *  (the Tokens card's mini split bar, or the Equiv card's subline + info popover). */
+function KpiCard({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col rounded-xl border border-ink-800 bg-ink-925 px-4 py-3.5">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-faint">
+        {label}
       </div>
-    </StatsPanel>
+      <div className="mt-1.5 font-display text-[28px] leading-none tracking-tight text-fg">
+        {value}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -756,10 +828,10 @@ function StackByToggle({
   );
 }
 
-/** The page-level "Include cache" pill in the Stats header, governing the Tokens metric across all three
- *  breakdowns at once. On (default) counts all four token kinds; off counts fresh tokens (input + output)
- *  only. Cost is never affected; it always prices every kind, as the tooltip says. Styled like
- *  RangeFilter's pressed state. */
+/** The page-level "Include cache" control in the Stats header, governing the Tokens metric across every
+ *  breakdown. A checkbox: a filled, sky-ticked box when on (count all four token kinds), an empty box when
+ *  off (fresh input + output only). Cost always prices every kind, as the tooltip notes. The checkbox reads
+ *  its binary state at a glance and stays visually distinct from the range pill group beside it. */
 function CacheToggle({
   on,
   onChange,
@@ -773,12 +845,17 @@ function CacheToggle({
       onClick={() => onChange(!on)}
       aria-pressed={on}
       title="Count cache-read and cache-creation tokens in the token figures (cost always includes them)"
-      className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
-        on
-          ? "border-ink-700 bg-ink-700 text-fg"
-          : "border-ink-800 bg-ink-900 text-fg-faint hover:text-fg-muted"
-      }`}
+      className="flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-[11px] text-fg-muted transition-colors hover:border-ink-700"
     >
+      <span
+        className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border transition-colors ${
+          on
+            ? "border-primary bg-primary text-ink-950"
+            : "border-ink-700 text-transparent"
+        }`}
+      >
+        <Icon name="check" size={10} />
+      </span>
       Include cache
     </button>
   );
@@ -870,33 +947,41 @@ function ByModel({
   );
 }
 
-/** The per-project breakdown (#112): the top projects as horizontal bars with their tokens and Equivalent
- *  API value. Rows key and rank on the full cwd, so two repos that share a basename are separate rows — both
- *  labelled by basename, told apart by the cwd surfaced on hover (the row's title). Bars size on each
- *  project's share of the top project's tokens. Cost is the project's summed Equivalent API value, n/a when
- *  none of its turns ran a recognized model. Capped to the top N with a "+N more" note, so a long project
- *  list stays bounded without silently hiding the tail. */
-const TOP_PROJECTS = 8;
+/** The per-project breakdown (#112), now with its branches folded in. Top projects as horizontal bars with
+ *  tokens and Equivalent API value; a project with real branch detail carries a disclosure caret that
+ *  reveals its branches (label, tokens, Equiv) as indented sub-rows. Keyed on the full cwd so two repos that
+ *  share a basename stay separate and a branch never lands under the wrong one; projects and branches both
+ *  rank by the displayed Tokens metric, so order and caps follow the page's Include-cache toggle. Capped to
+ *  the top N projects with a "+N more" note that flags when those hidden projects still carry branch detail
+ *  (folded under the top-N, it's otherwise unreachable); each expanded project caps its branches the same way. */
 function ByProject({
   rows,
+  branches,
   includeCache,
 }: {
   rows: StatsByProject[];
+  branches: StatsByBranch[];
   includeCache: boolean;
 }) {
-  // Guard on the full set so the panel never vanishes on a pure-zero window; rows are sorted desc, so the
-  // first is the largest and (past this guard) > 0 — a safe bar denominator.
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const top = rows.slice(0, TOP_PROJECTS);
-  // Rows stay in the store's order (by total tokens); only the displayed figure and bar length follow the
-  // toggle. Unlike By model, this panel doesn't re-rank. It's capped to the top N, so re-ranking would
-  // change which projects show.
-  // Bars size on the displayed metric. The denominator is the largest shown value: with cache included that
-  // equals top[0]'s total (rows arrive sorted by total); with cache excluded it's the largest fresh figure,
-  // which need not be top[0]. A zero denominator (a pure cache window in exclude mode) yields empty bars
-  // rather than a divide-by-zero.
+  const groups = groupProjectBranches(rows, branches, includeCache);
+  const top = groups.slice(0, TOP_PROJECTS);
+  // Bars size on the displayed metric; the denominator is the largest shown value. A zero denominator (a
+  // pure cache window in exclude mode) yields empty bars rather than a divide-by-zero.
   const max = Math.max(...top.map((r) => tokensOf(r, includeCache)));
-  const rest = rows.length - top.length;
+  // Projects past the cap roll into the "+N more" note. Flag when any of them still carries branch detail:
+  // folding branches under the top-N projects means those branches are otherwise unreachable on the page.
+  const hidden = groups.slice(TOP_PROJECTS);
+  const rest = hidden.length;
+  const hiddenHaveBranches = hidden.some((g) => g.expandable);
+  const toggle = (cwd: string): void =>
+    setOpen((s) => {
+      const next = new Set(s);
+      if (next.has(cwd)) next.delete(cwd);
+      else next.add(cwd);
+      return next;
+    });
   return (
     <StatsPanel title="By project">
       <table className="w-full text-[12px]">
@@ -914,108 +999,101 @@ function ByProject({
           </tr>
         </thead>
         <tbody>
-          {/* Key on the full cwd (the unique grouping key), so two same-basename projects never collide. */}
-          {top.map((r) => (
-            <tr key={r.cwd} className="border-t border-ink-850">
-              <td className="py-1.5 pr-3 align-middle">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate text-fg" title={r.cwd}>
-                    {r.project}
-                  </span>
-                  <Bar
-                    pct={max > 0 ? (tokensOf(r, includeCache) / max) * 100 : 0}
-                    fill="bg-primary/70"
-                    className="w-full"
-                  />
-                </div>
-              </td>
-              <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
-                {formatTokensShort(tokensOf(r, includeCache))}
-              </td>
-              <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
-                {r.equivApiValueUsd == null
-                  ? "n/a"
-                  : formatUsd(r.equivApiValueUsd)}
-              </td>
-            </tr>
-          ))}
+          {top.map((r) => {
+            // Gate on expandable too: a project can lose its last real branch on a later poll (a trailing
+            // window ages it out), dropping the chevron while its cwd lingers in `open`. Without this the
+            // sub-rows would render stuck open with nothing to collapse them; folding it in also makes any
+            // stranded `open` entry inert.
+            const isOpen = r.expandable && open.has(r.cwd);
+            return (
+              <Fragment key={r.cwd}>
+                <tr className="border-t border-ink-850">
+                  <td className="py-1.5 pr-3 align-middle">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      {r.expandable ? (
+                        <button
+                          type="button"
+                          onClick={() => toggle(r.cwd)}
+                          aria-expanded={isOpen}
+                          title={r.cwd}
+                          className="flex min-w-0 items-center gap-1 text-left text-fg"
+                        >
+                          <Icon
+                            name="chevron-right"
+                            size={11}
+                            className={`shrink-0 text-fg-faint transition-transform ${
+                              isOpen ? "rotate-90" : ""
+                            }`}
+                          />
+                          <span className="truncate">{r.project}</span>
+                        </button>
+                      ) : (
+                        <span
+                          className="truncate pl-[15px] text-fg"
+                          title={r.cwd}
+                        >
+                          {r.project}
+                        </span>
+                      )}
+                      <Bar
+                        pct={
+                          max > 0 ? (tokensOf(r, includeCache) / max) * 100 : 0
+                        }
+                        fill="bg-primary/70"
+                        className="w-full"
+                      />
+                    </div>
+                  </td>
+                  <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
+                    {formatTokensShort(tokensOf(r, includeCache))}
+                  </td>
+                  <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
+                    {r.equivApiValueUsd == null
+                      ? "n/a"
+                      : formatUsd(r.equivApiValueUsd)}
+                  </td>
+                </tr>
+                {isOpen &&
+                  r.branches.map((b) => (
+                    <tr
+                      key={branchRowKey(b.cwd, b.branch)}
+                      className="bg-ink-900/30"
+                    >
+                      <td className="py-1 pr-3 pl-[22px]">
+                        <span className="block truncate font-mono text-[11px] text-fg-muted">
+                          {b.branch ?? "—"}
+                        </span>
+                      </td>
+                      <td className="py-1 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+                        {formatTokensShort(tokensOf(b, includeCache))}
+                      </td>
+                      <td className="py-1 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+                        {b.equivApiValueUsd == null
+                          ? "n/a"
+                          : formatUsd(b.equivApiValueUsd)}
+                      </td>
+                    </tr>
+                  ))}
+                {isOpen && r.branchOverflow > 0 && (
+                  <tr className="bg-ink-900/30">
+                    <td
+                      colSpan={3}
+                      className="py-1 pl-[22px] text-[10px] text-fg-faint"
+                    >
+                      +{r.branchOverflow}{" "}
+                      {r.branchOverflow === 1 ? "more branch" : "more branches"}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
       {rest > 0 && (
         <p className="mt-2 text-[11px] text-fg-faint">
           +{rest} more {rest === 1 ? "project" : "projects"}
-        </p>
-      )}
-    </StatsPanel>
-  );
-}
-
-/** The per-branch breakdown (#112): a table of (project, git branch) pairs with tokens and Equivalent API
- *  value. Keyed on the full cwd plus the branch, so the same branch name in two projects stays distinct and
- *  same-basename projects don't merge; a turn that recorded no branch shows a dash. Capped to the top N with
- *  a "+N more" note. */
-const TOP_BRANCHES = 12;
-function ByBranch({
-  rows,
-  includeCache,
-}: {
-  rows: StatsByBranch[];
-  includeCache: boolean;
-}) {
-  if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const top = rows.slice(0, TOP_BRANCHES);
-  const rest = rows.length - top.length;
-  return (
-    <StatsPanel title="By branch">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
-            <th scope="col" className="pb-1.5 text-left font-normal">
-              Project
-            </th>
-            <th scope="col" className="pb-1.5 text-left font-normal">
-              Branch
-            </th>
-            <th scope="col" className="pb-1.5 text-right font-normal">
-              Tokens
-            </th>
-            <th scope="col" className="pb-1.5 text-right font-normal">
-              Equiv API value
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {/* The same NUL-joined (cwd, branch) key the store folds on, stable and collision-free. */}
-          {top.map((r) => (
-            <tr
-              key={branchRowKey(r.cwd, r.branch)}
-              className="border-t border-ink-850"
-            >
-              <td className="py-1 pr-3">
-                <span className="block truncate text-fg" title={r.cwd}>
-                  {r.project}
-                </span>
-              </td>
-              <td className="py-1 pr-3">
-                <span className="block truncate font-mono text-fg-muted">
-                  {r.branch ?? "—"}
-                </span>
-              </td>
-              <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {formatTokensShort(tokensOf(r, includeCache))}
-              </td>
-              <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {r.equivApiValueUsd == null
-                  ? "n/a"
-                  : formatUsd(r.equivApiValueUsd)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rest > 0 && (
-        <p className="mt-2 text-[11px] text-fg-faint">
-          +{rest} more {rest === 1 ? "branch" : "branches"}
+          {hiddenHaveBranches && " (branches hidden)"}
         </p>
       )}
     </StatsPanel>
@@ -1223,37 +1301,12 @@ function StatsPanel({
   return (
     <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
       <header className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-xs uppercase tracking-wide text-fg-muted">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
           {title}
         </h2>
         {right}
       </header>
       {children}
     </section>
-  );
-}
-
-/** One stat: an uppercase eyebrow label over a display-type figure. */
-function StatCard({
-  label,
-  value,
-  title,
-}: {
-  label: string;
-  value: string;
-  title?: string;
-}) {
-  return (
-    <div className="flex flex-col justify-center rounded-md border border-ink-800 bg-ink-900/40 px-3 py-2">
-      <div className="truncate text-[10px] uppercase tracking-wide text-fg-faint">
-        {label}
-      </div>
-      <div
-        className="mt-0.5 truncate font-display text-base text-fg"
-        title={title}
-      >
-        {value}
-      </div>
-    </div>
   );
 }
