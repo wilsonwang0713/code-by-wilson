@@ -153,7 +153,10 @@ export function StatsView() {
               <EmptyStats />
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,340px)_1fr]">
+                {/* Hero: Totals and the calendar share the row at a fluid 1:2 ratio on wide screens, stacking
+                    on narrow ones. The calendar keeps its own horizontal scroll when its column is too narrow
+                    for the full year (CalendarHeatmap), so the ratio holds at every width. */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_2fr]">
                   <Totals totals={snap.totals} />
                   {snap.calendarStart && (
                     <Contributions
