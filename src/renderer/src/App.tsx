@@ -33,7 +33,10 @@ export function App() {
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Land on Overview: the app opens to the all-time stats, not a session. The auto-select effect below
+  // guards on `!isOverview`, so it never yanks this to a session on first load; the user clicks into a
+  // session to leave it.
+  const [selectedId, setSelectedId] = useState<string | null>(OVERVIEW_ID);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
 
