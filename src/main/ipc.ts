@@ -15,6 +15,8 @@ import { getOverview } from "./db/store";
 import {
   readTotals,
   readByModel,
+  readByProject,
+  readByBranch,
   emptyTotals,
   hasAnyTurns,
 } from "./db/analytics";
@@ -23,6 +25,8 @@ import type {
   StatsTotals,
   StatsSnapshot,
   StatsByModel,
+  StatsByProject,
+  StatsByBranch,
   ScanProgress,
   StatsRange,
 } from "@shared/stats";
@@ -167,6 +171,28 @@ export function registerIpc({
       return [];
     }
   };
+  const safeByProject = (
+    adb: SqliteDb,
+    sinceMs: number | null,
+  ): StatsByProject[] => {
+    try {
+      return readByProject(adb, sinceMs);
+    } catch (err) {
+      console.error("stats by-project read failed; serving none", err);
+      return [];
+    }
+  };
+  const safeByBranch = (
+    adb: SqliteDb,
+    sinceMs: number | null,
+  ): StatsByBranch[] => {
+    try {
+      return readByBranch(adb, sinceMs);
+    } catch (err) {
+      console.error("stats by-branch read failed; serving none", err);
+      return [];
+    }
+  };
   ipcMain.handle(IPC.readStats, (_e, range?: StatsRange): StatsSnapshot => {
     // The window's inclusive lower bound, computed in the MAIN process's local time (the user's calendar
     // day — #110). A missing or unrecognized range falls back to all-time (null), so a malformed arg shows
@@ -180,6 +206,8 @@ export function registerIpc({
             progress: doneProgress(),
             hasAnyTurns: safeHasAnyTurns(analyticsDb),
             byModel: safeByModel(analyticsDb, sinceMs),
+            byProject: safeByProject(analyticsDb, sinceMs),
+            byBranch: safeByBranch(analyticsDb, sinceMs),
           }
         : emptySnapshot();
     }
@@ -194,6 +222,8 @@ export function registerIpc({
       progress,
       hasAnyTurns: safeHasAnyTurns(analyticsDb),
       byModel: safeByModel(analyticsDb, sinceMs),
+      byProject: safeByProject(analyticsDb, sinceMs),
+      byBranch: safeByBranch(analyticsDb, sinceMs),
     };
   });
 

@@ -109,6 +109,11 @@ export interface StatsSnapshot {
   /** The per-model breakdown (#111), scoped to the same range as `totals`, ordered by tokens descending.
    *  Empty when there is no store, the scan errors, or the window holds no turns. */
   byModel: StatsByModel[];
+  /** The per-project breakdown (#112), scoped to the same range as `totals`, ordered by tokens descending.
+   *  Empty under the same conditions as byModel. */
+  byProject: StatsByProject[];
+  /** The per-branch breakdown (#112), same scoping and ordering. */
+  byBranch: StatsByBranch[];
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -119,6 +124,8 @@ export function emptySnapshot(): StatsSnapshot {
     progress: { filesTotal: 0, filesDone: 0, done: true },
     hasAnyTurns: false,
     byModel: [],
+    byProject: [],
+    byBranch: [],
   };
 }
 
