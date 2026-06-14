@@ -6,6 +6,7 @@ import {
   emptyDay,
   type DailyBucket,
 } from "@shared/stats";
+import { formatDayShort, formatDayLong } from "@shared/format";
 
 // Build instants from LOCAL components at noon, so the local calendar day is unambiguous in any
 // timezone (DST transitions never happen at noon). Month is 0-indexed: 5 = June.
@@ -67,5 +68,17 @@ describe("densifyDays", () => {
     expect(densifyDays([], "2026-06-14", "2026-06-14").map((b) => b.day)).toEqual([
       "2026-06-14",
     ]);
+  });
+});
+
+describe("formatDayShort / formatDayLong", () => {
+  it("renders a day key as a short axis label", () => {
+    expect(formatDayShort("2026-06-14")).toBe("Jun 14");
+    expect(formatDayShort("2026-01-05")).toBe("Jan 5");
+  });
+
+  it("renders a day key with the year for the tooltip", () => {
+    expect(formatDayLong("2026-06-14")).toBe("Jun 14, 2026");
+    expect(formatDayLong("2026-12-01")).toBe("Dec 1, 2026");
   });
 });
