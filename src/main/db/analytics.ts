@@ -806,6 +806,9 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
  * Range-scoped like the other reads; unknown-time turns are excluded (see groupByDayAndModel). Sparse —
  * only days with turns — the renderer densifies the contiguous calendar range.
  */
-export function readDaily(db: SqliteDb, sinceMs?: number | null): DailyBucket[] {
+export function readDaily(
+  db: SqliteDb,
+  sinceMs?: number | null,
+): DailyBucket[] {
   return foldDays(groupByDayAndModel(db, sinceMs));
 }

@@ -298,12 +298,20 @@ function DailyUsage({
     since != null ? localDayKey(since) : (daily[0]?.day ?? endDay);
   const days = densifyDays(daily, startDay, endDay);
 
-  // Model series: the snapshot's byModel order (tokens desc), each paired to a cycled color. Used for the
-  // by-model stacking and its legend, so they match the By-model panel's hue assignment intent.
-  const series = byModel.map((r, i) => ({
-    modelRaw: r.modelRaw,
-    color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
-  }));
+  // Model series: the snapshot's byModel order (tokens desc), each paired by store index to a cycled color,
+  // so the hue matches the By-model panel's cache-on assignment. Drop any model that never lands on a
+  // rendered day: in the all-time view byModel can carry a model whose turns are all unknown-time (ts=0),
+  // which daily excludes — without this it would sit in the legend with no bar. Pairing the color before the
+  // filter keeps the survivors' hues aligned with the By-model panel (it indexes by the same store order).
+  const presentModels = new Set<string>();
+  for (const d of days)
+    for (const e of d.byModel) presentModels.add(modelKey(e.modelRaw));
+  const series = byModel
+    .map((r, i) => ({
+      modelRaw: r.modelRaw,
+      color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
+    }))
+    .filter((s) => presentModels.has(modelKey(s.modelRaw)));
 
   // Per-day model lookup so a column can pull each series' total in O(1) (0 when the model was idle).
   const perDayModel = days.map((d) => {
@@ -332,11 +340,14 @@ function DailyUsage({
         },
   );
 
-  // Thin the x labels to ~8 across the range so they never crowd: show the first of every stride.
+  // Thin the x labels to ~8 across the range so they never crowd. Anchor the stride to the LAST day so
+  // today (the rightmost, most-read bar) always carries a date; labels then march back evenly from there,
+  // rather than from index 0 where the final day usually falls between strides and goes unlabeled.
   const stride = Math.max(1, Math.ceil(days.length / 8));
+  const lastPhase = (days.length - 1) % stride;
   const xLabels = days
     .map((d, i) => ({ index: i, label: formatDayShort(d.day) }))
-    .filter(({ index }) => index % stride === 0);
+    .filter(({ index }) => index % stride === lastPhase);
 
   const legend =
     stackBy === "kind"

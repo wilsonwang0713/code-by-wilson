@@ -46,7 +46,11 @@ describe("densifyDays", () => {
   });
 
   it("keeps the sparse buckets and zero-fills the gaps, ascending", () => {
-    const out = densifyDays([bucket("2026-06-13", 7)], "2026-06-12", "2026-06-14");
+    const out = densifyDays(
+      [bucket("2026-06-13", 7)],
+      "2026-06-12",
+      "2026-06-14",
+    );
     expect(out.map((b) => [b.day, b.inputTokens])).toEqual([
       ["2026-06-12", 0],
       ["2026-06-13", 7],
@@ -65,9 +69,9 @@ describe("densifyDays", () => {
   });
 
   it("returns a single day when start equals end", () => {
-    expect(densifyDays([], "2026-06-14", "2026-06-14").map((b) => b.day)).toEqual([
-      "2026-06-14",
-    ]);
+    expect(
+      densifyDays([], "2026-06-14", "2026-06-14").map((b) => b.day),
+    ).toEqual(["2026-06-14"]);
   });
 });
 
