@@ -15,6 +15,7 @@ import { getOverview } from "./db/store";
 import {
   readTotals,
   readBreakdowns,
+  readDaily,
   emptyTotals,
   hasAnyTurns,
 } from "./db/analytics";
@@ -25,6 +26,7 @@ import type {
   StatsBreakdowns,
   ScanProgress,
   StatsRange,
+  DailyBucket,
 } from "@shared/stats";
 import { emptySnapshot, emptyBreakdowns, rangeSinceMs } from "@shared/stats";
 import { syncSessions } from "./sync";
@@ -169,6 +171,16 @@ export function registerIpc({
       return emptyBreakdowns();
     }
   };
+  // The daily time-series, range-scoped; on a read error serve an empty series so a bad row never sinks
+  // the snapshot (matching safeTotals/safeBreakdowns' "serve a safe default" posture).
+  const safeDaily = (adb: SqliteDb, sinceMs: number | null): DailyBucket[] => {
+    try {
+      return readDaily(adb, sinceMs);
+    } catch (err) {
+      console.error("stats daily read failed; serving none", err);
+      return [];
+    }
+  };
   ipcMain.handle(IPC.readStats, (_e, range?: StatsRange): StatsSnapshot => {
     // The window's inclusive lower bound, computed in the MAIN process's local time (the user's calendar
     // day — #110). A missing or unrecognized range falls back to all-time (null), so a malformed arg shows
@@ -181,6 +193,7 @@ export function registerIpc({
             totals: safeTotals(analyticsDb, sinceMs),
             progress: doneProgress(),
             hasAnyTurns: safeHasAnyTurns(analyticsDb),
+            daily: safeDaily(analyticsDb, sinceMs),
             ...safeBreakdowns(analyticsDb, sinceMs),
           }
         : emptySnapshot();
@@ -195,6 +208,7 @@ export function registerIpc({
       totals: safeTotals(analyticsDb, sinceMs),
       progress,
       hasAnyTurns: safeHasAnyTurns(analyticsDb),
+      daily: safeDaily(analyticsDb, sinceMs),
       ...safeBreakdowns(analyticsDb, sinceMs),
     };
   });

@@ -97,3 +97,32 @@ export function costDisplay(opts: {
   const equivalent = !(live && opts.billingMode === "api");
   return { text: (equivalent ? "~" : "") + formatUsd(value), equivalent };
 }
+
+/** Three-letter month names, indexed 0–11. A fixed table (not toLocaleDateString) so the day-label
+ *  formatters are deterministic across ICU builds and unit-testable. */
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** A 'YYYY-MM-DD' local day key as a short axis label: "Jun 14". Day-of-month is un-padded. */
+export function formatDayShort(day: string): string {
+  const [, m, d] = day.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${d}`;
+}
+
+/** A 'YYYY-MM-DD' local day key as a full tooltip label: "Jun 14, 2026". */
+export function formatDayLong(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}

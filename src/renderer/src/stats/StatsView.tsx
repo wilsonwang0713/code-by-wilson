@@ -8,20 +8,26 @@ import {
   type StatsByBranch,
   type StatsBySession,
   type StatsRange,
+  type DailyBucket,
   DEFAULT_RANGE,
   emptySnapshot,
   branchRowKey,
   tokensOf,
+  rangeSinceMs,
+  localDayKey,
+  densifyDays,
 } from "@shared/stats";
 import {
   formatTokensShort,
   formatUsd,
   formatDuration,
   formatRelativeTime,
+  formatDayShort,
+  formatDayLong,
 } from "@shared/format";
 import { Icon } from "../ui/icons";
-import { Donut } from "../ui/charts";
-import { MODEL_SEGMENT_COLORS } from "../ui/meta";
+import { Donut, BarSeries, type DayColumn } from "../ui/charts";
+import { MODEL_SEGMENT_COLORS, COST_SEGMENT_COLORS } from "../ui/meta";
 import { Swatch, Bar } from "../ui/atoms";
 import {
   sortSessions,
@@ -110,6 +116,13 @@ export function StatsView() {
             ) : (
               <>
                 <Totals totals={snap.totals} />
+                {snap.daily.length > 0 && (
+                  <DailyUsage
+                    daily={snap.daily}
+                    byModel={snap.byModel}
+                    range={range}
+                  />
+                )}
                 {snap.byModel.length > 0 && (
                   <ByModel rows={snap.byModel} includeCache={includeCache} />
                 )}
@@ -231,6 +244,235 @@ function Totals({ totals }: { totals: StatsTotals }) {
         />
       </div>
     </StatsPanel>
+  );
+}
+
+/** Whether the daily bars stack by token kind (the default — input/output/cache-read/cache-write) or by
+ *  model. A page-local toggle; the daily payload carries both stackings so switching needs no re-fetch. */
+type StackBy = "kind" | "model";
+
+const STACK_LABELS: Record<StackBy, string> = { kind: "Kind", model: "Model" };
+const STACK_OPTS = Object.entries(STACK_LABELS) as [StackBy, string][];
+
+/** The by-kind segment labels, paired by index with COST_SEGMENT_COLORS (input/output/cache-read/
+ *  cache-write). One source for the legend, the tooltip, and the stack order. */
+const KIND_LABELS = ["Input", "Output", "Cache read", "Cache write"] as const;
+
+/** An in-module sentinel for the null ("Unknown") model, so the per-day lookup map keys it distinctly from
+ *  any real raw id (a single space can't be a real model id). Used only as a Map key here, never as a React
+ *  key, so it needn't be the NUL the ByModel table uses for its null-model React key. */
+const NULL_MODEL_KEY = " ";
+const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
+
+/**
+ * The daily usage time-series (#114): one stacked SVG bar per local calendar day across the active range,
+ * with a readable Y axis and a hover tooltip giving that day's exact numbers. The stack-by toggle (in this
+ * panel's header, top-right) switches between token kind (default) and model; both stackings ride the same
+ * payload, so it never re-fetches. The chart shows the full token composition regardless of the page's
+ * "Include cache" pill — cache is its own segment here, not a hidden total.
+ *
+ * The store's daily buckets are sparse (only days with turns); we densify the contiguous range so a quiet
+ * day reads as a gap. The range's start day is the local day of rangeSinceMs (the same bound main scopes
+ * to); all-time starts at the earliest bucket. The model series order and colors come from the snapshot's
+ * byModel (its store order, tokens desc), so the chart matches the By-model panel in the default cache-on
+ * view; with "Include cache" off that panel re-ranks and can recolor, which the chart doesn't follow.
+ */
+function DailyUsage({
+  daily,
+  byModel,
+  range,
+}: {
+  daily: DailyBucket[];
+  byModel: StatsByModel[];
+  range: StatsRange;
+}) {
+  const [stackBy, setStackBy] = useState<StackBy>("kind");
+
+  // Contiguous calendar axis for the range. endDay is local today; startDay is the window's first local
+  // day (all-time: the earliest bucket, or today when empty). Recomputed each render off Date.now(); a
+  // midnight tick self-corrects on the next poll.
+  const now = Date.now();
+  const endDay = localDayKey(now);
+  const since = rangeSinceMs(range, now);
+  const startDay =
+    since != null ? localDayKey(since) : (daily[0]?.day ?? endDay);
+  const days = densifyDays(daily, startDay, endDay);
+
+  // Model series: the snapshot's byModel order (tokens desc), each paired by store index to a cycled color,
+  // so the hue matches the By-model panel's cache-on assignment. Drop any model that never lands on a
+  // rendered day: in the all-time view byModel can carry a model whose turns are all unknown-time (ts=0),
+  // which daily excludes — without this it would sit in the legend with no bar. Pairing the color before the
+  // filter keeps the survivors' hues aligned with the By-model panel (it indexes by the same store order).
+  const presentModels = new Set<string>();
+  for (const d of days)
+    for (const e of d.byModel) presentModels.add(modelKey(e.modelRaw));
+  const series = byModel
+    .map((r, i) => ({
+      modelRaw: r.modelRaw,
+      color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
+    }))
+    .filter((s) => presentModels.has(modelKey(s.modelRaw)));
+
+  // Per-day model lookup so a column can pull each series' total in O(1) (0 when the model was idle).
+  const perDayModel = days.map((d) => {
+    const m = new Map<string, number>();
+    for (const e of d.byModel) m.set(modelKey(e.modelRaw), e.totalTokens);
+    return m;
+  });
+
+  const columns: DayColumn[] = days.map((d, i) =>
+    stackBy === "kind"
+      ? {
+          key: d.day,
+          segments: [
+            { value: d.inputTokens, color: COST_SEGMENT_COLORS[0] },
+            { value: d.outputTokens, color: COST_SEGMENT_COLORS[1] },
+            { value: d.cacheReadTokens, color: COST_SEGMENT_COLORS[2] },
+            { value: d.cacheCreationTokens, color: COST_SEGMENT_COLORS[3] },
+          ],
+        }
+      : {
+          key: d.day,
+          segments: series.map((s) => ({
+            value: perDayModel[i].get(modelKey(s.modelRaw)) ?? 0,
+            color: s.color,
+          })),
+        },
+  );
+
+  // Thin the x labels to ~8 across the range so they never crowd. Anchor the stride to the LAST day so
+  // today (the rightmost, most-read bar) always carries a date; labels then march back evenly from there,
+  // rather than from index 0 where the final day usually falls between strides and goes unlabeled.
+  const stride = Math.max(1, Math.ceil(days.length / 8));
+  const lastPhase = (days.length - 1) % stride;
+  const xLabels = days
+    .map((d, i) => ({ index: i, label: formatDayShort(d.day) }))
+    .filter(({ index }) => index % stride === lastPhase);
+
+  const legend =
+    stackBy === "kind"
+      ? KIND_LABELS.map((label, i) => ({
+          label,
+          color: COST_SEGMENT_COLORS[i],
+        }))
+      : series.map((s) => ({
+          label: s.modelRaw ?? "Unknown",
+          color: s.color,
+        }));
+
+  const renderTooltip = (i: number): ReactNode => {
+    const d = days[i];
+    const total =
+      d.inputTokens +
+      d.outputTokens +
+      d.cacheReadTokens +
+      d.cacheCreationTokens;
+    const rows =
+      stackBy === "kind"
+        ? [
+            {
+              label: "Input",
+              value: d.inputTokens,
+              color: COST_SEGMENT_COLORS[0],
+            },
+            {
+              label: "Output",
+              value: d.outputTokens,
+              color: COST_SEGMENT_COLORS[1],
+            },
+            {
+              label: "Cache read",
+              value: d.cacheReadTokens,
+              color: COST_SEGMENT_COLORS[2],
+            },
+            {
+              label: "Cache write",
+              value: d.cacheCreationTokens,
+              color: COST_SEGMENT_COLORS[3],
+            },
+          ].filter((r) => r.value > 0)
+        : series
+            .map((s) => ({
+              label: s.modelRaw ?? "Unknown",
+              value: perDayModel[i].get(modelKey(s.modelRaw)) ?? 0,
+              color: s.color,
+            }))
+            .filter((r) => r.value > 0);
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
+        {rows.length === 0 ? (
+          <div className="text-fg-faint">No usage</div>
+        ) : (
+          rows.map((r) => (
+            <div key={r.label} className="flex items-center gap-1.5">
+              <Swatch color={r.color} />
+              <span className="text-fg-muted">{r.label}</span>
+              <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
+                {formatTokensShort(r.value)}
+              </span>
+            </div>
+          ))
+        )}
+        <div className="mt-0.5 flex items-center gap-1.5 border-t border-ink-800 pt-1">
+          <span className="text-fg-muted">Total</span>
+          <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
+            {formatTokensShort(total)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <StatsPanel
+      title="Daily usage"
+      right={<StackByToggle value={stackBy} onChange={setStackBy} />}
+    >
+      <BarSeries
+        columns={columns}
+        formatTick={formatTokensShort}
+        xLabels={xLabels}
+        renderTooltip={renderTooltip}
+      />
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+        {legend.map((l) => (
+          <span key={l.label} className="flex items-center gap-1.5">
+            <Swatch color={l.color} />
+            <span className="truncate text-fg-muted">{l.label}</span>
+          </span>
+        ))}
+      </div>
+    </StatsPanel>
+  );
+}
+
+/** The daily chart's stack-by toggle (Kind / Model), styled like RangeFilter's pill group. Lives in the
+ *  Daily usage panel's header, top-right (#114). */
+function StackByToggle({
+  value,
+  onChange,
+}: {
+  value: StackBy;
+  onChange: (v: StackBy) => void;
+}) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-md border border-ink-800 bg-ink-900 p-0.5 text-[11px]">
+      {STACK_OPTS.map(([v, label]) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          aria-pressed={v === value}
+          className={`rounded px-2 py-0.5 transition-colors ${
+            v === value
+              ? "bg-ink-700 text-fg"
+              : "text-fg-faint hover:text-fg-muted"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -686,21 +928,25 @@ function EmptyStats() {
   );
 }
 
-/** A bordered, titled section box for the stats page: the shell later slices hang the calendar,
- *  time-series, and breakdown panels off it. */
+/** A bordered, titled section box for the stats page. `right` is an optional controls slot pinned to the
+ *  header's top-right (e.g. the daily chart's stack-by toggle), so a panel can carry its own control
+ *  without a shared page toolbar. */
 function StatsPanel({
   title,
+  right,
   children,
 }: {
   title: string;
+  right?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
-      <header className="mb-3 flex items-center">
+      <header className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-xs uppercase tracking-wide text-fg-muted">
           {title}
         </h2>
+        {right}
       </header>
       {children}
     </section>
