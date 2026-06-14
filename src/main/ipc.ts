@@ -14,9 +14,7 @@ import {
 import { getOverview } from "./db/store";
 import {
   readTotals,
-  readByModel,
-  readByProject,
-  readByBranch,
+  readBreakdowns,
   emptyTotals,
   hasAnyTurns,
 } from "./db/analytics";
@@ -24,13 +22,11 @@ import { scanStep } from "./analytics/scan";
 import type {
   StatsTotals,
   StatsSnapshot,
-  StatsByModel,
-  StatsByProject,
-  StatsByBranch,
+  StatsBreakdowns,
   ScanProgress,
   StatsRange,
 } from "@shared/stats";
-import { emptySnapshot, rangeSinceMs } from "@shared/stats";
+import { emptySnapshot, emptyBreakdowns, rangeSinceMs } from "@shared/stats";
 import { syncSessions } from "./sync";
 
 export interface IpcDeps {
@@ -160,37 +156,17 @@ export function registerIpc({
       return false;
     }
   };
-  const safeByModel = (
+  // All three breakdowns from one finest-grain scan; on any read error serve empty breakdowns so a bad row
+  // never sinks the whole snapshot (matching safeTotals' "serve zeros" posture).
+  const safeBreakdowns = (
     adb: SqliteDb,
     sinceMs: number | null,
-  ): StatsByModel[] => {
+  ): StatsBreakdowns => {
     try {
-      return readByModel(adb, sinceMs);
+      return readBreakdowns(adb, sinceMs);
     } catch (err) {
-      console.error("stats by-model read failed; serving none", err);
-      return [];
-    }
-  };
-  const safeByProject = (
-    adb: SqliteDb,
-    sinceMs: number | null,
-  ): StatsByProject[] => {
-    try {
-      return readByProject(adb, sinceMs);
-    } catch (err) {
-      console.error("stats by-project read failed; serving none", err);
-      return [];
-    }
-  };
-  const safeByBranch = (
-    adb: SqliteDb,
-    sinceMs: number | null,
-  ): StatsByBranch[] => {
-    try {
-      return readByBranch(adb, sinceMs);
-    } catch (err) {
-      console.error("stats by-branch read failed; serving none", err);
-      return [];
+      console.error("stats breakdown read failed; serving none", err);
+      return emptyBreakdowns();
     }
   };
   ipcMain.handle(IPC.readStats, (_e, range?: StatsRange): StatsSnapshot => {
@@ -205,9 +181,7 @@ export function registerIpc({
             totals: safeTotals(analyticsDb, sinceMs),
             progress: doneProgress(),
             hasAnyTurns: safeHasAnyTurns(analyticsDb),
-            byModel: safeByModel(analyticsDb, sinceMs),
-            byProject: safeByProject(analyticsDb, sinceMs),
-            byBranch: safeByBranch(analyticsDb, sinceMs),
+            ...safeBreakdowns(analyticsDb, sinceMs),
           }
         : emptySnapshot();
     }
@@ -221,9 +195,7 @@ export function registerIpc({
       totals: safeTotals(analyticsDb, sinceMs),
       progress,
       hasAnyTurns: safeHasAnyTurns(analyticsDb),
-      byModel: safeByModel(analyticsDb, sinceMs),
-      byProject: safeByProject(analyticsDb, sinceMs),
-      byBranch: safeByBranch(analyticsDb, sinceMs),
+      ...safeBreakdowns(analyticsDb, sinceMs),
     };
   });
 

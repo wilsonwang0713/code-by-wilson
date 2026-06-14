@@ -4,7 +4,9 @@ import type {
   StatsByModel,
   StatsByProject,
   StatsByBranch,
+  StatsBreakdowns,
 } from "@shared/stats";
+import { branchRowKey } from "@shared/stats";
 import {
   equivApiValue,
   isKnownModelString,
@@ -291,7 +293,37 @@ export function readByModel(
   db: SqliteDb,
   sinceMs?: number | null,
 ): StatsByModel[] {
-  return groupByModel(db, sinceMs)
+  return foldModels(groupByModel(db, sinceMs));
+}
+
+/**
+ * Fold per-model rows into the per-model breakdown. The input may already be one row per model (groupByModel)
+ * or a finer dimension×model scan (readBreakdowns) — either way we re-group by raw id, summing the four token
+ * kinds, so the result is identical. The map keys on `model_raw` directly (so a null "Unknown" model and an
+ * empty-string id stay distinct buckets, matching SQLite's GROUP BY); cost prices each summed row through
+ * modelRowCost (n/a for an unrecognized id). Rows order by total tokens descending, then by raw id so ties
+ * stay stable across polls.
+ */
+function foldModels(rows: ModelRow[]): StatsByModel[] {
+  const map = new Map<string | null, ModelRow>();
+  for (const r of rows) {
+    let m = map.get(r.model_raw);
+    if (!m) {
+      m = {
+        model_raw: r.model_raw,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_creation_tokens: 0,
+      };
+      map.set(r.model_raw, m);
+    }
+    m.input_tokens += r.input_tokens;
+    m.output_tokens += r.output_tokens;
+    m.cache_read_tokens += r.cache_read_tokens;
+    m.cache_creation_tokens += r.cache_creation_tokens;
+  }
+  return [...map.values()]
     .map(
       (m): StatsByModel => ({
         modelRaw: m.model_raw,
@@ -409,20 +441,20 @@ function dimCost(a: DimAgg): number | null {
   return a.hasKnownCost ? a.knownCost : null;
 }
 
+/** The finest dimension grain: one row per (cwd × project × branch × model). readBreakdowns scans at this
+ *  grain once and folds it down to each breakdown, so a poll runs a single GROUP BY instead of one per cut. */
+const FINEST_DIMS = "cwd, project, branch";
+
 /**
- * The per-project breakdown (#112): one row per project, keyed on the FULL cwd so two repos that share a
- * basename stay distinct (`project` is the basename, for display only). Tokens sum across the project's
- * models; cost folds each model slice through modelRowCost and reconciles with the grand total. Rows order by
- * total tokens descending, then by cwd so ties (and same-basename projects) stay stable across polls.
+ * Fold (dimension × model) rows into the per-project breakdown (#112): one row per project, keyed on the FULL
+ * cwd so two repos that share a basename stay distinct (`project` is the basename, for display only). The fold
+ * works at any grain finer than cwd — readByProject scans "cwd, project", readBreakdowns hands it the finest
+ * scan — because folding by cwd collapses the extra columns. Tokens sum across the project's models; cost
+ * folds each model slice through modelRowCost and reconciles with the grand total. Rows order by total tokens
+ * descending, then by cwd so ties (and same-basename projects) stay stable across polls.
  */
-export function readByProject(
-  db: SqliteDb,
-  sinceMs?: number | null,
-): StatsByProject[] {
-  return foldByDim(
-    groupByDimsAndModel(db, "cwd, project", sinceMs),
-    (r) => r.cwd,
-  )
+function foldProjects(rows: DimModelRow[]): StatsByProject[] {
+  return foldByDim(rows, (r) => r.cwd)
     .map(
       (a): StatsByProject => ({
         cwd: a.cwd,
@@ -437,20 +469,14 @@ export function readByProject(
 }
 
 /**
- * The per-branch breakdown (#112): one row per (project, git branch), keyed on the full cwd plus the branch
- * so the same branch name in two projects stays distinct and same-basename projects don't merge. The key
- * joins cwd and branch with a NUL — neither a path nor a git ref can contain one — so a null branch (no ref
- * recorded) gets its own key, never colliding with a real branch. Tokens and cost fold exactly as the
- * per-project read. Rows order by total tokens descending, then by cwd then branch for a stable tie order.
+ * Fold (dimension × model) rows into the per-branch breakdown (#112): one row per (project, git branch),
+ * keyed via branchRowKey on the full cwd plus the branch so the same branch name in two projects stays
+ * distinct, same-basename projects don't merge, and a null branch (no ref recorded) gets its own key. Tokens
+ * and cost fold exactly as the per-project read. Rows order by total tokens descending, then by cwd then
+ * branch for a stable tie order.
  */
-export function readByBranch(
-  db: SqliteDb,
-  sinceMs?: number | null,
-): StatsByBranch[] {
-  return foldByDim(
-    groupByDimsAndModel(db, "cwd, project, branch", sinceMs),
-    (r) => `${r.cwd}\u0000${r.branch ?? "\u0000"}`,
-  )
+function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
+  return foldByDim(rows, (r) => branchRowKey(r.cwd, r.branch ?? null))
     .map(
       (a): StatsByBranch => ({
         cwd: a.cwd,
@@ -466,4 +492,37 @@ export function readByBranch(
         a.cwd.localeCompare(b.cwd) ||
         (a.branch ?? "").localeCompare(b.branch ?? ""),
     );
+}
+
+export function readByProject(
+  db: SqliteDb,
+  sinceMs?: number | null,
+): StatsByProject[] {
+  return foldProjects(groupByDimsAndModel(db, "cwd, project", sinceMs));
+}
+
+export function readByBranch(
+  db: SqliteDb,
+  sinceMs?: number | null,
+): StatsByBranch[] {
+  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, sinceMs));
+}
+
+/**
+ * All three per-dimension breakdowns from ONE finest-grain scan, folded three ways. The poll path
+ * (stats:read) calls this once instead of running a separate GROUP BY per breakdown: byModel folds the scan
+ * by raw id, byProject by cwd, byBranch by cwd+branch. Every fold is lossless — token sums are additive and
+ * equivApiValue is linear in tokens — so each breakdown is identical to its standalone readByX and still
+ * reconciles with the grand total.
+ */
+export function readBreakdowns(
+  db: SqliteDb,
+  sinceMs?: number | null,
+): StatsBreakdowns {
+  const rows = groupByDimsAndModel(db, FINEST_DIMS, sinceMs);
+  return {
+    byModel: foldModels(rows),
+    byProject: foldProjects(rows),
+    byBranch: foldBranches(rows),
+  };
 }

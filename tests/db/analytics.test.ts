@@ -7,6 +7,7 @@ import {
   readByModel,
   readByProject,
   readByBranch,
+  readBreakdowns,
   emptyTotals,
   readProcessedFiles,
   upsertProcessedFile,
@@ -997,5 +998,113 @@ describe("readByBranch", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     expect(readByBranch(db)).toEqual([]);
+  });
+});
+
+describe("readBreakdowns", () => {
+  // The refactor's load-bearing invariant (#112): folding ONE finest-grain scan three ways must produce
+  // exactly what three independent reads do. A seed that spans every axis the folds differ on — two repos
+  // sharing a basename, two branches per repo, a recognized + an unrecognized model, and a null branch — so
+  // any divergence between a fold and its standalone reader surfaces here.
+  const seed = (): AnalyticsTurn[] => [
+    turn({
+      messageId: "a1",
+      cwd: "/work/app",
+      project: "app",
+      branch: "main",
+      modelRaw: "claude-opus-4-8",
+      usage: {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+    }),
+    turn({
+      messageId: "a2",
+      cwd: "/work/app",
+      project: "app",
+      branch: "feature",
+      modelRaw: "gpt-9-ultra", // unrecognized: tokens count, cost n/a
+      usage: {
+        inputTokens: 500,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+    }),
+    turn({
+      messageId: "b1",
+      cwd: "/play/app", // same basename, different repo — must stay distinct
+      project: "app",
+      branch: undefined, // null branch bucket
+      modelRaw: "claude-sonnet-4-6",
+      usage: {
+        inputTokens: 2_000_000,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+    }),
+  ];
+
+  it("folds one scan into the same rows the three standalone readers return", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, seed());
+    const b = readBreakdowns(db);
+    expect(b.byModel).toEqual(readByModel(db));
+    expect(b.byProject).toEqual(readByProject(db));
+    expect(b.byBranch).toEqual(readByBranch(db));
+  });
+
+  it("matches the standalone readers under a range bound too", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      ...seed().map((t, i) => ({ ...t, ts: 5000 + i })), // in-window
+      turn({
+        messageId: "old",
+        ts: 1000,
+        cwd: "/work/app",
+        project: "app",
+        branch: "main",
+        usage: {
+          inputTokens: 9_999,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const b = readBreakdowns(db, 5000);
+    expect(b.byModel).toEqual(readByModel(db, 5000));
+    expect(b.byProject).toEqual(readByProject(db, 5000));
+    expect(b.byBranch).toEqual(readByBranch(db, 5000));
+  });
+
+  it("reconciles every breakdown's summed cost with the grand total", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, seed());
+    // $5 opus (1M input) + $6 sonnet (2M input); the unrecognized model contributes tokens but no cost.
+    const total = readTotals(db).equivApiValueUsd;
+    const sum = (rows: { equivApiValueUsd: number | null }[]): number =>
+      rows.reduce((acc, r) => acc + (r.equivApiValueUsd ?? 0), 0);
+    const b = readBreakdowns(db);
+    expect(sum(b.byModel)).toBeCloseTo(total);
+    expect(sum(b.byProject)).toBeCloseTo(total);
+    expect(sum(b.byBranch)).toBeCloseTo(total);
+    expect(total).toBeCloseTo(11);
+  });
+
+  it("returns three empty breakdowns for an empty store", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(readBreakdowns(db)).toEqual({
+      byModel: [],
+      byProject: [],
+      byBranch: [],
+    });
   });
 });

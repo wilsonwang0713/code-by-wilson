@@ -9,6 +9,7 @@ import {
   type StatsRange,
   DEFAULT_RANGE,
   emptySnapshot,
+  branchRowKey,
 } from "@shared/stats";
 import { formatTokensShort, formatUsd } from "@shared/format";
 import { Icon } from "../ui/icons";
@@ -413,7 +414,7 @@ function ByBranch({ rows }: { rows: StatsByBranch[] }) {
           {/* The same NUL-joined (cwd, branch) key the store folds on, stable and collision-free. */}
           {top.map((r) => (
             <tr
-              key={`${r.cwd}\u0000${r.branch ?? "\u0000"}`}
+              key={branchRowKey(r.cwd, r.branch)}
               className="border-t border-ink-850"
             >
               <td className="py-1 pr-3">
