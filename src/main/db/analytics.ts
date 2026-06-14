@@ -7,6 +7,7 @@ import type {
   StatsBySession,
   StatsBreakdowns,
   DailyBucket,
+  CalendarDay,
 } from "@shared/stats";
 import { branchRowKey } from "@shared/stats";
 import {
@@ -183,12 +184,45 @@ interface ModelRow {
  *  renderer's error state share one definition (the zero shape can't drift). */
 export { emptyTotals } from "@shared/stats";
 
+/**
+ * The windowed WHERE clause + bind params shared by every turn aggregation. `sinceMs` is an inclusive lower
+ * bound (`ts >= @since`); `untilMs` an exclusive upper bound (`ts < @until`); each clause is added only when
+ * its bound is set. `requireTs` adds a bare `ts > 0` when NO lower bound is set — the daily/calendar cuts
+ * need it so an unknown-time (ts=0) turn never buckets into a 1970 day; the scalar cuts leave it false so
+ * all-time still counts those turns (they survive only in all-time — see readTotals).
+ */
+function tsWindow(
+  sinceMs: number | null | undefined,
+  untilMs: number | null | undefined,
+  requireTs = false,
+): { where: string; bind: Record<string, number>[] } {
+  const clauses: string[] = [];
+  const params: Record<string, number> = {};
+  if (sinceMs != null) {
+    clauses.push("ts >= @since");
+    params.since = sinceMs;
+  } else if (requireTs) {
+    clauses.push("ts > 0");
+  }
+  if (untilMs != null) {
+    clauses.push("ts < @until");
+    params.until = untilMs;
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const bind = Object.keys(params).length ? [params] : [];
+  return { where, bind };
+}
+
 /** The windowed per-model GROUP BY that both the grand totals' cost and the per-model breakdown read from.
  *  Single-sourced so the two can never group differently or fall out of sync. `sinceMs` null/undefined →
- *  all-time (no bound); a number is an inclusive lower bound on ts. */
-function groupByModel(db: SqliteDb, sinceMs?: number | null): ModelRow[] {
-  const where = sinceMs != null ? "WHERE ts >= @since" : "";
-  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+ *  all-time (no lower bound); a number is an inclusive lower bound on ts. `untilMs` null/undefined → no
+ *  upper bound; a number is an exclusive upper bound on ts. */
+function groupByModel(
+  db: SqliteDb,
+  sinceMs?: number | null,
+  untilMs?: number | null,
+): ModelRow[] {
+  const { where, bind } = tsWindow(sinceMs, untilMs);
   return db
     .prepare(
       `SELECT
@@ -228,7 +262,11 @@ function modelRowCost(m: ModelRow): number | null {
  * contributes its tokens to the token totals above but n/a cost here. Pricing is single-sourced through
  * equivApiValue (the same formula the per-session Cost panel uses).
  */
-export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
+export function readTotals(
+  db: SqliteDb,
+  sinceMs?: number | null,
+  untilMs?: number | null,
+): StatsTotals {
   // null/undefined → all-time (no bound). A number → an inclusive lower bound on ts (the window's start,
   // computed local-day-aware by the caller via rangeSinceMs). `bind` is spread into get/all: an empty
   // array calls them with no params, a single object binds @since.
@@ -237,8 +275,7 @@ export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
   // windowed bound is a positive epoch, so those turns fall out of dated ranges and survive only in
   // all-time. That's deliberate: a turn with no known time can't honestly be placed in a calendar window
   // (exact data only). The consequence is that all-time can exceed the sum of the windows — by design.
-  const where = sinceMs != null ? "WHERE ts >= @since" : "";
-  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+  const { where, bind } = tsWindow(sinceMs, untilMs);
 
   const t = db
     .prepare(
@@ -256,7 +293,7 @@ export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
   // Cost is summed per raw model id over the recognized models, single-sourced through the same
   // groupByModel/modelRowCost the per-model breakdown uses — so the headline total and the breakdown rows
   // reconcile by construction. An unrecognized id contributes nothing here; its tokens still count above.
-  const equivApiValueUsd = groupByModel(db, sinceMs).reduce(
+  const equivApiValueUsd = groupByModel(db, sinceMs, untilMs).reduce(
     (acc, m) => acc + (modelRowCost(m) ?? 0),
     0,
   );
@@ -294,8 +331,9 @@ export function hasAnyTurns(db: SqliteDb): boolean {
 export function readByModel(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): StatsByModel[] {
-  return foldModels(groupByModel(db, sinceMs));
+  return foldModels(groupByModel(db, sinceMs, untilMs));
 }
 
 /**
@@ -369,9 +407,9 @@ function groupByDimsAndModel(
   db: SqliteDb,
   cols: string,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): DimModelRow[] {
-  const where = sinceMs != null ? "WHERE ts >= @since" : "";
-  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+  const { where, bind } = tsWindow(sinceMs, untilMs);
   return db
     .prepare(
       `SELECT ${cols},
@@ -509,15 +547,19 @@ function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
 export function readByProject(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): StatsByProject[] {
-  return foldProjects(groupByDimsAndModel(db, "cwd, project", sinceMs));
+  return foldProjects(
+    groupByDimsAndModel(db, "cwd, project", sinceMs, untilMs),
+  );
 }
 
 export function readByBranch(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): StatsByBranch[] {
-  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, sinceMs));
+  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, sinceMs, untilMs));
 }
 
 /**
@@ -545,9 +587,9 @@ interface SessionModelRow extends ModelRow {
 function groupBySession(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): SessionModelRow[] {
-  const where = sinceMs != null ? "WHERE ts >= @since" : "";
-  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+  const { where, bind } = tsWindow(sinceMs, untilMs);
   return db
     .prepare(
       `SELECT
@@ -675,8 +717,9 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
 export function readBySession(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): StatsBySession[] {
-  return foldSessions(groupBySession(db, sinceMs));
+  return foldSessions(groupBySession(db, sinceMs, untilMs));
 }
 
 /**
@@ -689,15 +732,16 @@ export function readBySession(
 export function readBreakdowns(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): StatsBreakdowns {
-  const rows = groupByDimsAndModel(db, FINEST_DIMS, sinceMs);
+  const rows = groupByDimsAndModel(db, FINEST_DIMS, sinceMs, untilMs);
   return {
     byModel: foldModels(rows),
     byProject: foldProjects(rows),
     byBranch: foldBranches(rows),
     // The session cut needs the session grain plus per-session span/count aggregates the dims scan above
     // can't express, so it runs its own GROUP BY rather than folding `rows`.
-    bySession: readBySession(db, sinceMs),
+    bySession: readBySession(db, sinceMs, untilMs),
   };
 }
 
@@ -708,6 +752,9 @@ export function readBreakdowns(
  */
 interface DayModelRow extends ModelRow {
   day: string;
+  /** Assistant turns in this (day × model) group — summed per day by the calendar fold (#115); the daily
+   *  by-kind fold (#114) ignores it. */
+  turns: number;
 }
 
 /**
@@ -719,14 +766,15 @@ interface DayModelRow extends ModelRow {
 function groupByDayAndModel(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): DayModelRow[] {
-  const where = sinceMs != null ? "WHERE ts >= @since" : "WHERE ts > 0";
-  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+  const { where, bind } = tsWindow(sinceMs, untilMs, true);
   return db
     .prepare(
       `SELECT
          date(ts / 1000, 'unixepoch', 'localtime') AS day,
          model_raw,
+         COUNT(*) AS turns,
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
@@ -809,6 +857,117 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
 export function readDaily(
   db: SqliteDb,
   sinceMs?: number | null,
+  untilMs?: number | null,
 ): DailyBucket[] {
-  return foldDays(groupByDayAndModel(db, sinceMs));
+  return foldDays(groupByDayAndModel(db, sinceMs, untilMs));
+}
+
+/** A calendar day mid-fold: turns and tokens summed across the day's models (total plus the fresh input/
+ *  output subset, so the renderer can honor the page's "Include cache" pill via tokensOf); cost accumulated
+ *  over only its recognized models (tracking hasKnownCost so an all-unrecognized day renders n/a, not $0). */
+interface CalAgg {
+  day: string;
+  turns: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  knownCost: number;
+  hasKnownCost: boolean;
+}
+
+/**
+ * Fold (day × model) rows into one CalendarDay per local day (#115): the day's turn count and total tokens
+ * sum across its models; its Equivalent API value sums modelRowCost over only the recognized ones (an
+ * unrecognized model adds its tokens but no cost, and a day with no recognized model is honest n/a). The
+ * same per-model cost mapping readTotals/readByModel use, so the calendar reconciles with them. Days emit
+ * ascending (string compare on 'YYYY-MM-DD').
+ */
+function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
+  const map = new Map<string, CalAgg>();
+  for (const r of rows) {
+    let a = map.get(r.day);
+    if (!a) {
+      a = {
+        day: r.day,
+        turns: 0,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        knownCost: 0,
+        hasKnownCost: false,
+      };
+      map.set(r.day, a);
+    }
+    a.turns += r.turns;
+    a.totalTokens +=
+      r.input_tokens +
+      r.output_tokens +
+      r.cache_read_tokens +
+      r.cache_creation_tokens;
+    a.inputTokens += r.input_tokens;
+    a.outputTokens += r.output_tokens;
+    const cost = modelRowCost(r);
+    if (cost != null) {
+      a.knownCost += cost;
+      a.hasKnownCost = true;
+    }
+  }
+  return [...map.values()]
+    .map(
+      (a): CalendarDay => ({
+        day: a.day,
+        turns: a.turns,
+        totalTokens: a.totalTokens,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
+        equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+      }),
+    )
+    .sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/**
+ * The contributions calendar's per-day metrics (#115) over a bounded window [sinceMs, untilMs): one row per
+ * local calendar day with activity, each carrying turns, total tokens, and Equivalent API value — the three
+ * the cell-intensity toggle switches between. Sparse (only days with turns); the renderer densifies the grid.
+ * Reuses the daily (day × model) scan, folded for the calendar's three metrics rather than the by-kind split.
+ */
+export function readCalendar(
+  db: SqliteDb,
+  sinceMs: number | null,
+  untilMs: number | null,
+): CalendarDay[] {
+  return foldCalendar(groupByDayAndModel(db, sinceMs, untilMs));
+}
+
+/**
+ * The distinct local years that hold any turn (#115), descending — the calendar year switcher's options.
+ * Excludes unknown-time (ts=0) turns, which can't honestly be placed in a year (exact data only), so a year
+ * is offered only when real activity falls in it. strftime buckets by the main process's local calendar year,
+ * the same 'localtime' the daily/calendar cuts use.
+ */
+export function readCalendarYears(db: SqliteDb): number[] {
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT
+         CAST(strftime('%Y', ts / 1000, 'unixepoch', 'localtime') AS INTEGER) AS y
+       FROM turns
+       WHERE ts > 0
+       ORDER BY y DESC`,
+    )
+    .all() as { y: number }[];
+  return rows.map((r) => r.y);
+}
+
+/** The largest turns rowid (0 when empty) — an O(1) "has a new turn landed" signal. Turns are insert/upsert
+ *  only, so a stable max rowid means the set of turns is unchanged; the IPC layer memoizes the all-time year
+ *  scan (a full-table strftime, polled every tick) against it so the gentle poll doesn't rescan for a list
+ *  that's all but static. */
+export function turnsMaxRowid(db: SqliteDb): number {
+  const r = db
+    .prepare(`SELECT COALESCE(MAX(rowid), 0) AS r FROM turns`)
+    .get() as {
+    r: number;
+  };
+  return r.r;
 }

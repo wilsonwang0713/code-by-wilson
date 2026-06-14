@@ -9,6 +9,7 @@ import {
   formatTokensShort,
   formatTps,
   formatClock,
+  formatMonthShort,
 } from "@shared/format";
 
 describe("formatUsd", () => {
@@ -168,5 +169,13 @@ describe("formatClock", () => {
     expect(formatClock(6_120_000)).toBe("1h 42m");
     expect(formatClock(42_000)).toBe("42s");
     expect(formatClock(0)).toBe("0s");
+  });
+});
+
+describe("formatMonthShort", () => {
+  it("is the three-letter month of a 'YYYY-MM-DD' key", () => {
+    expect(formatMonthShort("2026-06-14")).toBe("Jun");
+    expect(formatMonthShort("2024-01-01")).toBe("Jan");
+    expect(formatMonthShort("2024-12-31")).toBe("Dec");
   });
 });

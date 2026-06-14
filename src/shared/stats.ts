@@ -197,6 +197,17 @@ export interface StatsSnapshot extends StatsBreakdowns {
   /** The daily usage time-series (#114), range-scoped: one sparse bucket per local day with turns,
    *  ascending. The renderer densifies the contiguous calendar range for the chart. */
   daily: DailyBucket[];
+  /** The contributions calendar (#115), scoped to its OWN window (trailing twelve months or a selected
+   *  year), INDEPENDENT of `range`: the sparse days with activity in that window. */
+  calendar: CalendarDay[];
+  /** The calendar window's inclusive start day ('YYYY-MM-DD', the day `calendarWindow` resolved), so the
+   *  renderer densifies and lays out exactly the queried range. Empty string in the no-store fallback. */
+  calendarStart: string;
+  /** The calendar window's inclusive end day ('YYYY-MM-DD'); today for the trailing window, Dec 31 for a
+   *  selected year. Empty string in the no-store fallback. */
+  calendarEnd: string;
+  /** The distinct local years that hold any turn, descending — the year switcher's options. */
+  calendarYears: number[];
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -208,21 +219,33 @@ export function emptySnapshot(): StatsSnapshot {
     hasAnyTurns: false,
     daily: [],
     ...emptyBreakdowns(),
+    calendar: [],
+    calendarStart: "",
+    calendarEnd: "",
+    calendarYears: [],
   };
 }
 
-/** The range the Stats view scopes every total to. `today` is the current local calendar day; `7d`/`30d`/
- *  `90d` are the trailing N local days ending today (inclusive); `all` is all-time, no lower bound. */
-export type StatsRange = "today" | "7d" | "30d" | "90d" | "all";
+/** The five trailing-window presets the range filter offers. `today` is the current local calendar day;
+ *  `7d`/`30d`/`90d` are the trailing N local days ending today (inclusive); `all` is all-time, no bound. */
+export type RangePreset = "today" | "7d" | "30d" | "90d" | "all";
 
-/** The range the page lands on (#107 user story 15): a useful window with no configuration. The IPC
- *  handler's own fallback for a MISSING arg is all-time — show everything rather than silently hide
- *  history — so this 30d default is the product landing the renderer sends on mount, not the handler's
- *  default. */
+/** The range the Stats view scopes every total to: one of the trailing presets, or a single calendar day
+ *  the user drilled into by clicking a contributions-calendar cell (#115). The single-day variant scopes the
+ *  page to exactly that local day — the same range mechanism, bounded both ends. */
+export type StatsRange = RangePreset | { day: string };
+
+/** The page lands on 30d (#107 user story 15): a useful window with no configuration. The IPC handler's own
+ *  fallback for a MISSING arg is all-time; this is the renderer's mount default. */
 export const DEFAULT_RANGE: StatsRange = "30d";
 
-/** Trailing-day span per range; a null span (all-time) means no lower bound. */
-const RANGE_DAYS: Record<StatsRange, number | null> = {
+/** Whether a range is the single-day drill-down variant (a type guard so callers can read `range.day`). */
+export function isDayRange(range: StatsRange): range is { day: string } {
+  return typeof range === "object";
+}
+
+/** Trailing-day span per preset; a null span (all-time) means no lower bound. */
+const RANGE_DAYS: Record<RangePreset, number | null> = {
   today: 1,
   "7d": 7,
   "30d": 30,
@@ -231,20 +254,82 @@ const RANGE_DAYS: Record<StatsRange, number | null> = {
 };
 
 /**
- * The inclusive lower bound (epoch ms) a range scopes to, or null for all-time. Computed against the
- * machine's LOCAL calendar day (the user's today, not UTC — #107): `today` is local midnight today, `7d`
- * local midnight six days earlier, and so on, so each window spans exactly N local days ending today.
- * Date arithmetic via setDate keeps the bound at local midnight across month ends and DST, which pure ms
- * subtraction would drift off. `nowMs` is injected so the boundary is deterministic in tests. An
- * unrecognized range falls back to all-time (null), so a malformed IPC arg never yields a NaN bound.
+ * The inclusive lower bound (epoch ms) a PRESET range scopes to, or null for all-time. Computed against the
+ * machine's LOCAL calendar day (the user's today, not UTC — #107). Date arithmetic via setDate keeps the
+ * bound at local midnight across month ends and DST. `nowMs` is injected so the boundary is deterministic in
+ * tests. (The single-day variant is resolved by `rangeWindow`, not here.)
  */
-export function rangeSinceMs(range: StatsRange, nowMs: number): number | null {
+export function rangeSinceMs(range: RangePreset, nowMs: number): number | null {
   const days = RANGE_DAYS[range];
   if (days == null) return null;
   const d = new Date(nowMs);
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - (days - 1));
   return d.getTime();
+}
+
+/** A resolved query window: an inclusive `sinceMs` lower bound and an exclusive `untilMs` upper bound. A null
+ *  bound is open (no lower bound = all-time start; no upper bound = open to now). The store's aggregations
+ *  filter `ts >= sinceMs AND ts < untilMs`, each clause applied only when its bound is set. */
+export interface StatsWindow {
+  sinceMs: number | null;
+  untilMs: number | null;
+}
+
+/** Local midnight (epoch ms) for a 'YYYY-MM-DD' key — the day's inclusive lower bound. Built from the key's
+ *  parts as a local Date, the same local-day arithmetic rangeSinceMs and addDays use. */
+export function dayStartMs(day: string): number {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d).getTime();
+}
+
+/**
+ * Resolve a `StatsRange` to a query window. A preset becomes an open-topped window (its `rangeSinceMs` lower
+ * bound, no upper bound). A single day becomes a bounded window: [local midnight that day, local midnight the
+ * next day) — so the whole page scopes to exactly that calendar day. `nowMs` is injected for determinism;
+ * it is used only for a preset (the single-day bounds come from the key, not the clock).
+ */
+export function rangeWindow(range: StatsRange, nowMs: number): StatsWindow {
+  if (isDayRange(range)) {
+    return {
+      sinceMs: dayStartMs(range.day),
+      untilMs: dayStartMs(addDays(range.day, 1)),
+    };
+  }
+  return { sinceMs: rangeSinceMs(range, nowMs), untilMs: null };
+}
+
+/** The contributions calendar's resolved window (#115): the inclusive local-day span [startDay, endDay] it
+ *  renders, plus the epoch bounds the store queries ([sinceMs, untilMs)). Independent of the page range. */
+export interface CalendarWindow {
+  startDay: string;
+  endDay: string;
+  sinceMs: number;
+  untilMs: number;
+}
+
+/**
+ * Resolve the calendar's window. A null year is the default trailing twelve months: the 365 inclusive local
+ * days ending today. A specific year runs Jan 1 through Dec 31 of that local year, but never past today — the
+ * current year ends at today rather than padding the grid with empty future months (which would scroll the
+ * view to a blank December). A past year is unaffected; a future year can't reach the switcher (years come
+ * from real data). Either way the epoch bounds are local-midnight aligned (since = startDay's midnight,
+ * until = the day after endDay's midnight). `nowMs` is injected so the bounds are deterministic in tests.
+ */
+export function calendarWindow(
+  year: number | null,
+  nowMs: number,
+): CalendarWindow {
+  const today = localDayKey(nowMs);
+  const yearEnd = year == null ? today : `${year}-12-31`;
+  const endDay = yearEnd < today ? yearEnd : today;
+  const startDay = year == null ? addDays(endDay, -364) : `${year}-01-01`;
+  return {
+    startDay,
+    endDay,
+    sinceMs: dayStartMs(startDay),
+    untilMs: dayStartMs(addDays(endDay, 1)),
+  };
 }
 
 /**
@@ -264,6 +349,24 @@ export interface DailyBucket {
   /** Total tokens (all four kinds) per raw model id active this day, ordered by tokens descending then
    *  raw id. A turn that recorded no model uses modelRaw null. Empty on a zero-fill day. */
   byModel: { modelRaw: string | null; totalTokens: number }[];
+}
+
+/**
+ * One local calendar day of the contributions calendar (#115), carrying all three toggle metrics so the cell
+ * intensity can switch between them with no re-fetch. `turns` is the day's assistant-turn count.
+ * `totalTokens` sums all four token kinds; `inputTokens`/`outputTokens` ride along so the page's "Include
+ * cache" pill can pick the Tokens metric via the shared `tokensOf` (all four kinds on, fresh input+output
+ * off), exactly like the per-model/-project/-branch/-session rows. `equivApiValueUsd` is the day's
+ * Equivalent API value summed over its recognized models, or null (n/a) when none of that day's turns ran a
+ * known model — never a guessed $0 (cost always prices every kind, unaffected by the cache pill).
+ */
+export interface CalendarDay {
+  day: string;
+  turns: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  equivApiValueUsd: number | null;
 }
 
 /** A zero-usage day bucket: the gap-fill the renderer inserts for a calendar day with no turns, and the
