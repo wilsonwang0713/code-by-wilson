@@ -1,5 +1,5 @@
 import type { Usage } from "@shared/types";
-import type { StatsTotals } from "@shared/stats";
+import type { StatsTotals, StatsByModel } from "@shared/stats";
 import {
   equivApiValue,
   isKnownModelString,
@@ -174,11 +174,50 @@ interface ModelRow {
  *  renderer's error state share one definition (the zero shape can't drift). */
 export { emptyTotals } from "@shared/stats";
 
+/** The windowed per-model GROUP BY that both the grand totals' cost and the per-model breakdown read from.
+ *  Single-sourced so the two can never group differently or fall out of sync. `sinceMs` null/undefined →
+ *  all-time (no bound); a number is an inclusive lower bound on ts. */
+function groupByModel(db: SqliteDb, sinceMs?: number | null): ModelRow[] {
+  const where = sinceMs != null ? "WHERE ts >= @since" : "";
+  const bind = sinceMs != null ? [{ since: sinceMs }] : [];
+  return db
+    .prepare(
+      `SELECT
+         model_raw,
+         COALESCE(SUM(input_tokens), 0) AS input_tokens,
+         COALESCE(SUM(output_tokens), 0) AS output_tokens,
+         COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+       FROM turns ${where}
+       GROUP BY model_raw`,
+    )
+    .all(...bind) as ModelRow[];
+}
+
+/** A grouped row's Equivalent API value, or null (n/a) when its raw id matches no known family. The single
+ *  cost mapping the totals and the breakdown share, so a breakdown row's cost is exactly its contribution
+ *  to the grand total. Pricing flows through equivApiValue (the per-session Cost panel's formula too), so
+ *  the three can't drift. */
+function modelRowCost(m: ModelRow): number | null {
+  const raw = m.model_raw ?? undefined;
+  if (!isKnownModelString(raw)) return null; // n/a cost: the tokens still count toward the token totals
+  return equivApiValue(
+    {
+      inputTokens: m.input_tokens,
+      outputTokens: m.output_tokens,
+      cacheReadTokens: m.cache_read_tokens,
+      cacheCreationTokens: m.cache_creation_tokens,
+    },
+    normalizeModelId(raw),
+  );
+}
+
 /**
- * Grand totals from one SQL aggregate, plus the Equivalent API value. The value is summed per raw model id
- * (so each family is priced at its own rates) over only the recognized models; an unrecognized id still
+ * Grand totals from a SQL aggregate, plus the Equivalent API value. The value is summed per raw model id
+ * (so each family is priced at its own rates) over only the recognized models, sharing the groupByModel /
+ * modelRowCost mapping the per-model breakdown uses so the two can't drift; an unrecognized id still
  * contributes its tokens to the token totals above but n/a cost here. Pricing is single-sourced through
- * equivApiValue (the same formula the per-session Cost panel uses), so the two can never drift.
+ * equivApiValue (the same formula the per-session Cost panel uses).
  */
 export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
   // null/undefined → all-time (no bound). A number → an inclusive lower bound on ts (the window's start,
@@ -205,33 +244,13 @@ export function readTotals(db: SqliteDb, sinceMs?: number | null): StatsTotals {
     )
     .get(...bind) as TotalsRow;
 
-  const byModel = db
-    .prepare(
-      `SELECT
-         model_raw,
-         COALESCE(SUM(input_tokens), 0) AS input_tokens,
-         COALESCE(SUM(output_tokens), 0) AS output_tokens,
-         COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
-       FROM turns ${where}
-       GROUP BY model_raw`,
-    )
-    .all(...bind) as ModelRow[];
-
-  let equivApiValueUsd = 0;
-  for (const m of byModel) {
-    const raw = m.model_raw ?? undefined;
-    if (!isKnownModelString(raw)) continue; // n/a cost: tokens already counted in the grand totals
-    equivApiValueUsd += equivApiValue(
-      {
-        inputTokens: m.input_tokens,
-        outputTokens: m.output_tokens,
-        cacheReadTokens: m.cache_read_tokens,
-        cacheCreationTokens: m.cache_creation_tokens,
-      },
-      normalizeModelId(raw),
-    );
-  }
+  // Cost is summed per raw model id over the recognized models, single-sourced through the same
+  // groupByModel/modelRowCost the per-model breakdown uses — so the headline total and the breakdown rows
+  // reconcile by construction. An unrecognized id contributes nothing here; its tokens still count above.
+  const equivApiValueUsd = groupByModel(db, sinceMs).reduce(
+    (acc, m) => acc + (modelRowCost(m) ?? 0),
+    0,
+  );
 
   return {
     sessions: t.sessions,
@@ -252,4 +271,38 @@ export function hasAnyTurns(db: SqliteDb): boolean {
     .prepare("SELECT EXISTS(SELECT 1 FROM turns) AS present")
     .get() as { present: number };
   return row.present === 1;
+}
+
+/**
+ * The per-model breakdown (#111): one row per raw model id, scoped to the same range bound the totals use.
+ * `totalTokens` sums all four kinds (the table's Tokens column); `inputTokens`/`outputTokens` ride along so
+ * the donut can size on fresh tokens alone, since cache-read volume would otherwise swamp it. Cost flows
+ * through modelRowCost — the same mapping readTotals sums — so an unrecognized id gets null cost (n/a) while
+ * its tokens still count, and the rows reconcile with the grand total. Rows order by total tokens
+ * descending, then by raw id so ties stay stable across polls (SQLite's GROUP BY order is otherwise
+ * unspecified, which would flicker the donut colors).
+ */
+export function readByModel(
+  db: SqliteDb,
+  sinceMs?: number | null,
+): StatsByModel[] {
+  return groupByModel(db, sinceMs)
+    .map(
+      (m): StatsByModel => ({
+        modelRaw: m.model_raw,
+        totalTokens:
+          m.input_tokens +
+          m.output_tokens +
+          m.cache_read_tokens +
+          m.cache_creation_tokens,
+        inputTokens: m.input_tokens,
+        outputTokens: m.output_tokens,
+        equivApiValueUsd: modelRowCost(m),
+      }),
+    )
+    .sort(
+      (a, b) =>
+        b.totalTokens - a.totalTokens ||
+        (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
+    );
 }

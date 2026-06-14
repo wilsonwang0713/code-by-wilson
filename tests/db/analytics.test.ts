@@ -4,6 +4,7 @@ import {
   migrateAnalytics,
   upsertTurns,
   readTotals,
+  readByModel,
   emptyTotals,
   readProcessedFiles,
   upsertProcessedFile,
@@ -365,5 +366,233 @@ describe("analytics store", () => {
     expect(t.turns).toBe(2);
     expect(t.inputTokens).toBe(2_000_000); // unknown model's tokens still counted
     expect(t.equivApiValueUsd).toBeCloseTo(3); // only sonnet ($3/M); the unknown adds nothing
+  });
+});
+
+describe("readByModel", () => {
+  it("returns one row per raw model id, tokens summed, ordered by tokens desc", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // opus: two turns, same model id → one row. 100 + 200 input + 10 cache-read = 310 tokens.
+      turn({
+        messageId: "o1",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 5,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "o2",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 200,
+          outputTokens: 0,
+          cacheReadTokens: 5,
+          cacheCreationTokens: 0,
+        },
+      }),
+      // sonnet: one turn, 1000 input + 1 cache-write = 1001 tokens → the bigger row, sorts first.
+      turn({
+        messageId: "s1",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 1,
+        },
+      }),
+    ]);
+    const rows = readByModel(db);
+    expect(rows.map((r) => r.modelRaw)).toEqual([
+      "claude-sonnet-4-6",
+      "claude-opus-4-8",
+    ]);
+    expect(rows.map((r) => r.totalTokens)).toEqual([1001, 310]);
+    // input/output ride along apart from totalTokens — the donut sizes on them, so cache tokens are
+    // excluded: opus is 300 (100+200), not 310; sonnet is 1000, not 1001.
+    const opus = rows.find((r) => r.modelRaw === "claude-opus-4-8")!;
+    expect([opus.inputTokens, opus.outputTokens]).toEqual([300, 0]);
+    const sonnet = rows.find((r) => r.modelRaw === "claude-sonnet-4-6")!;
+    expect([sonnet.inputTokens, sonnet.outputTokens]).toEqual([1000, 0]);
+  });
+
+  it("breaks total-token ties by raw id so order is stable, not SQLite's GROUP BY order", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "z",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "a",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    // Same totalTokens (100 each): the tiebreak sorts by raw id ascending, deterministically.
+    expect(readByModel(db).map((r) => r.modelRaw)).toEqual([
+      "claude-opus-4-8",
+      "claude-sonnet-4-6",
+    ]);
+  });
+
+  it("maps cost per model and gives an unrecognized id null (n/a), still counting its tokens", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // sonnet: 1M input at $3/M = $3.00.
+      turn({
+        messageId: "known",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      // unrecognized id: matches no family → cost null, but its 2M tokens still appear.
+      turn({
+        messageId: "unknown",
+        modelRaw: "gpt-9-ultra",
+        usage: {
+          inputTokens: 2_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
+    expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueUsd).toBeCloseTo(3);
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeNull();
+    expect(byRaw.get("gpt-9-ultra")!.totalTokens).toBe(2_000_000);
+  });
+
+  it("buckets a turn that recorded no model under modelRaw null with n/a cost", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "nomodel",
+        modelRaw: undefined,
+        usage: {
+          inputTokens: 50,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const rows = readByModel(db);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].modelRaw).toBeNull();
+    expect(rows[0].totalTokens).toBe(50);
+    expect(rows[0].equivApiValueUsd).toBeNull();
+  });
+
+  it("respects the range bound, excluding out-of-window turns", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "old",
+        ts: 1000,
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 999,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "new",
+        ts: 5000,
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const rows = readByModel(db, 5000); // since == the new turn's ts: only it survives
+    expect(rows).toHaveLength(1);
+    expect(rows[0].modelRaw).toBe("claude-sonnet-4-6");
+    expect(rows[0].totalTokens).toBe(100);
+  });
+
+  it("returns an empty array for an empty store", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(readByModel(db)).toEqual([]);
+  });
+
+  it("sums the same Equivalent API value readTotals reports (the breakdown reconciles)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "a",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "b",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      // an unrecognized id contributes null to the breakdown and nothing to readTotals' cost.
+      turn({
+        messageId: "c",
+        modelRaw: "gpt-9-ultra",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    // Per-row, not just the sum: a regression that swaps which model gets which cost (opus's onto sonnet's
+    // row and back) preserves the total, so the sum check alone would miss it. Pin each row.
+    const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
+    expect(byRaw.get("claude-opus-4-8")!.equivApiValueUsd).toBeCloseTo(5); // 1M input @ $5/M
+    expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueUsd).toBeCloseTo(3); // 1M input @ $3/M
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeNull(); // unrecognized → n/a
+    const summed = readByModel(db).reduce(
+      (acc, r) => acc + (r.equivApiValueUsd ?? 0),
+      0,
+    );
+    expect(summed).toBeCloseTo(readTotals(db).equivApiValueUsd); // $5 opus + $3 sonnet = $8
   });
 });

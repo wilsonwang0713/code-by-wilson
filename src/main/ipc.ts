@@ -12,11 +12,17 @@ import {
   CAPTURE_STALE_MS,
 } from "@shared/statusline";
 import { getOverview } from "./db/store";
-import { readTotals, emptyTotals, hasAnyTurns } from "./db/analytics";
+import {
+  readTotals,
+  readByModel,
+  emptyTotals,
+  hasAnyTurns,
+} from "./db/analytics";
 import { scanStep } from "./analytics/scan";
 import type {
   StatsTotals,
   StatsSnapshot,
+  StatsByModel,
   ScanProgress,
   StatsRange,
 } from "@shared/stats";
@@ -150,6 +156,17 @@ export function registerIpc({
       return false;
     }
   };
+  const safeByModel = (
+    adb: SqliteDb,
+    sinceMs: number | null,
+  ): StatsByModel[] => {
+    try {
+      return readByModel(adb, sinceMs);
+    } catch (err) {
+      console.error("stats by-model read failed; serving none", err);
+      return [];
+    }
+  };
   ipcMain.handle(IPC.readStats, (_e, range?: StatsRange): StatsSnapshot => {
     // The window's inclusive lower bound, computed in the MAIN process's local time (the user's calendar
     // day — #110). A missing or unrecognized range falls back to all-time (null), so a malformed arg shows
@@ -162,6 +179,7 @@ export function registerIpc({
             totals: safeTotals(analyticsDb, sinceMs),
             progress: doneProgress(),
             hasAnyTurns: safeHasAnyTurns(analyticsDb),
+            byModel: safeByModel(analyticsDb, sinceMs),
           }
         : emptySnapshot();
     }
@@ -175,6 +193,7 @@ export function registerIpc({
       totals: safeTotals(analyticsDb, sinceMs),
       progress,
       hasAnyTurns: safeHasAnyTurns(analyticsDb),
+      byModel: safeByModel(analyticsDb, sinceMs),
     };
   });
 

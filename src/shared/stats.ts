@@ -31,6 +31,26 @@ export function emptyTotals(): StatsTotals {
 }
 
 /**
+ * One row of the per-model breakdown (#111), keyed on the raw model id exactly as the transcript recorded
+ * it (e.g. "claude-opus-4-8"), so one model version is distinct from the next. `totalTokens` is the sum of
+ * all four token kinds — the figure the table's Tokens column shows. The donut sizes on `inputTokens +
+ * outputTokens` instead: cache-read volume dwarfs fresh tokens in agentic use, so sizing the chart on the
+ * total would let a heavily-cached model swamp it. `equivApiValueUsd` is null when the raw id matches no
+ * known family: an honest n/a, never a guessed $0. A null `modelRaw` is a turn that recorded no model; it
+ * renders as "Unknown" with n/a cost.
+ */
+export interface StatsByModel {
+  modelRaw: string | null;
+  totalTokens: number;
+  /** Input and output tokens (cache excluded) — the donut's slice weight, kept apart from totalTokens so
+   *  cache-read volume can't inflate a model's share. */
+  inputTokens: number;
+  outputTokens: number;
+  /** Equivalent API value for this model, or null (n/a) when the raw id matches no known family. */
+  equivApiValueUsd: number | null;
+}
+
+/**
  * How far the incremental scan has gotten, returned alongside the totals so the Stats view can show a
  * "building history" state on a first cold run and know when to drop from brisk polling to a gentle warm
  * cadence. `filesTotal`/`filesDone` count Transcript and subagent files; `done` is true once every file's
@@ -52,6 +72,9 @@ export interface StatsSnapshot {
    *  scoped totals, so picking a range with no turns shows zeroed cards rather than "No usage yet" when
    *  there is history outside the window. */
   hasAnyTurns: boolean;
+  /** The per-model breakdown (#111), scoped to the same range as `totals`, ordered by tokens descending.
+   *  Empty when there is no store, the scan errors, or the window holds no turns. */
+  byModel: StatsByModel[];
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -61,6 +84,7 @@ export function emptySnapshot(): StatsSnapshot {
     totals: emptyTotals(),
     progress: { filesTotal: 0, filesDone: 0, done: true },
     hasAnyTurns: false,
+    byModel: [],
   };
 }
 
