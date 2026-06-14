@@ -1,11 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import {
   scanStep,
   scanAllTranscripts,
   collectScanTargets,
+  freshTargets,
+  type ScanTarget,
+  type WalkCache,
 } from "../../src/main/analytics/scan";
+import * as analytics from "../../src/main/db/analytics";
 import {
   migrateAnalytics,
   readTotals,
@@ -221,5 +225,48 @@ describe("scanStep (chunked incremental engine)", () => {
     const sub = targets.find((t) => t.path.endsWith("agent-x.jsonl"))!;
     expect(sub.sessionId).toBe("s1");
     expect(sub.keyPrefix).toBe("s1/agent-x.jsonl");
+  });
+
+  it("reads processed_files once per step", () => {
+    const home = makeHome();
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 1 }], MT);
+    writeTurns(home, "-b", "s2", [{ id: "b1", input: 1 }], MT);
+    const db = openTestDb();
+    migrateAnalytics(db);
+
+    const spy = vi.spyOn(analytics, "readProcessedFiles");
+    scanStep(db, home, 1_000_000);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+});
+
+describe("freshTargets (walk cache)", () => {
+  const target = (path: string): ScanTarget => ({
+    path,
+    mtimeMs: 1,
+    sessionId: "s",
+    keyPrefix: "s",
+  });
+
+  it("walks when there is no cache, reuses within the TTL, re-walks past it", () => {
+    let walks = 0;
+    const walk = (): ScanTarget[] => {
+      walks++;
+      return [target(`/p/${walks}.jsonl`)];
+    };
+    const TTL = 500;
+
+    const a = freshTargets(null, 1000, TTL, walk);
+    expect(walks).toBe(1);
+
+    const b = freshTargets(a, 1000 + 499, TTL, walk);
+    expect(walks).toBe(1);
+    expect(b).toBe(a);
+
+    const c = freshTargets(b, 1000 + 500, TTL, walk);
+    expect(walks).toBe(2);
+    expect(c.atMs).toBe(1500);
+    expect(c.targets).not.toBe(a.targets);
   });
 });
