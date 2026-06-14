@@ -56,6 +56,33 @@ export function SessionList({
   return (
     <aside className="flex w-[332px] shrink-0 flex-col border-r border-ink-800 bg-ink-925">
       <RailAccount account={account ?? null} now={accountClock} />
+      {/* Pinned Overview: an app-level destination, kept out of the scrolling session list so it's always
+          one click away and never scrolls off. Styled as navigation, not a session — a filled highlight and
+          a sky chart icon when active, not the rows' left-border accent. */}
+      <div className="shrink-0 border-b border-ink-800 p-3">
+        <button
+          type="button"
+          onClick={() => onSelect(OVERVIEW_ID)}
+          aria-pressed={selectedId === OVERVIEW_ID}
+          aria-label="Open overview"
+          className={cx(
+            "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-[13px] transition-colors",
+            selectedId === OVERVIEW_ID
+              ? "bg-ink-800 font-semibold text-fg"
+              : "font-medium text-fg-muted hover:bg-ink-850 hover:text-fg",
+          )}
+        >
+          <Icon
+            name="chart-column"
+            size={14}
+            className={cx(
+              "shrink-0",
+              selectedId === OVERVIEW_ID ? "text-primary" : "text-fg-faint",
+            )}
+          />
+          <span className="min-w-0 flex-1 truncate">Overview</span>
+        </button>
+      </div>
       <div className="shrink-0 border-b border-ink-800 p-3">
         <button
           type="button"
@@ -78,32 +105,6 @@ export function SessionList({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <button
-          type="button"
-          onClick={() => onSelect(OVERVIEW_ID)}
-          aria-pressed={selectedId === OVERVIEW_ID}
-          aria-label="Open overview"
-          className={cx(
-            "flex w-full items-center gap-2 border-b border-l-2 border-ink-850 px-3 py-2.5 text-left transition-colors",
-            selectedId === OVERVIEW_ID
-              ? "border-l-primary bg-ink-850"
-              : "border-l-transparent hover:bg-ink-900",
-          )}
-        >
-          <Icon
-            name="chart-column"
-            size={13}
-            className="shrink-0 text-fg-muted"
-          />
-          <span
-            className={cx(
-              "min-w-0 flex-1 truncate text-[13px] text-fg",
-              selectedId === OVERVIEW_ID ? "font-semibold" : "font-medium",
-            )}
-          >
-            Overview
-          </span>
-        </button>
         {groups.length === 0 ? (
           <p className="px-4 py-5 text-[12px] text-fg-faint">
             No sessions match "{query}".
