@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -90,40 +91,67 @@ export function StatsView() {
   // pure re-bucket with no re-fetch.
   const [calMetric, setCalMetric] = useState<CalMetric>("turns");
 
+  // The last change token from stats:read, echoed back as `since`. Reset on a range/year change so a filter
+  // switch always forces a full snapshot.
+  const tokenRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    // Range changed: blank the cards back to the loading state rather than leave the prior range's totals
-    // showing under the newly-pressed button until this range's first poll lands. But NOT when drilling
-    // into a day from the calendar — the calendar is range-independent, so blanking would unmount it and
-    // its scroll-to-newest effect would re-fire on remount, flashing and scrolling away from the cell the
-    // user just clicked. The day's totals load under the prior view for one tick instead.
+    let inFlight = false;
+    tokenRef.current = undefined; // new range/year: force a full snapshot on the next poll
+    // Range changed: blank the cards back to loading rather than show the prior range's totals under the
+    // newly-pressed button. But NOT when drilling into a day from the calendar — blanking would unmount the
+    // calendar and re-fire its scroll-to-newest effect, flashing away from the clicked cell.
     if (!isDayRange(range)) setSnap(null);
-    const tick = (): void => {
+
+    const schedule = (ms: number): void => {
+      timer = setTimeout(tick, ms);
+    };
+    function tick(): void {
+      if (inFlight) return; // a slow read is outstanding; its handler will reschedule
+      if (document.hidden) {
+        // Backgrounded: don't fetch (and don't drive the main-thread walk). Re-check at the warm cadence;
+        // returning to the foreground fires an immediate tick via the listener below.
+        schedule(WARM_POLL_MS);
+        return;
+      }
+      inFlight = true;
       void window.api
-        .readStats(range, calendarYear ?? undefined)
-        .then((s) => {
+        .readStats(range, calendarYear ?? undefined, tokenRef.current)
+        .then((r) => {
           if (!alive) return;
-          setSnap(s);
-          timer = setTimeout(
-            tick,
-            s.progress.done ? WARM_POLL_MS : BACKFILL_POLL_MS,
-          );
+          inFlight = false;
+          tokenRef.current = r.token;
+          // unchanged: hold the current snapshot (no setSnap -> no re-render). It implies the backfill is
+          // done, so reschedule at the warm cadence; a changed snapshot carries its own progress.
+          const done =
+            r.status === "unchanged" ? true : r.snapshot.progress.done;
+          if (r.status === "changed") setSnap(r.snapshot);
+          schedule(done ? WARM_POLL_MS : BACKFILL_POLL_MS);
         })
         .catch(() => {
-          // The handler is built never to reject; reaching here means the IPC bridge itself failed.
-          // Keep the last good snapshot rather than blanking populated totals to zero (fall back to an
-          // empty, done snapshot only on the very first poll), and retry at the warm cadence so a
-          // transient bridge hiccup recovers on its own instead of freezing the view forever.
+          // The handler is built never to reject; reaching here means the IPC bridge itself failed. Keep the
+          // last good snapshot (fall back to an empty done snapshot only on the very first poll) and retry warm.
           if (!alive) return;
+          inFlight = false;
           setSnap((prev) => prev ?? emptySnapshot());
-          timer = setTimeout(tick, WARM_POLL_MS);
+          schedule(WARM_POLL_MS);
         });
+    }
+
+    const onVisible = (): void => {
+      if (!document.hidden) {
+        if (timer) clearTimeout(timer);
+        tick();
+      }
     };
+    document.addEventListener("visibilitychange", onVisible);
     tick();
     return () => {
       alive = false;
       if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [range, calendarYear]);
 

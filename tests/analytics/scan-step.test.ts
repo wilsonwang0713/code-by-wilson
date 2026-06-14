@@ -1,11 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import {
   scanStep,
   scanAllTranscripts,
   collectScanTargets,
+  freshTargets,
+  type ScanTarget,
 } from "../../src/main/analytics/scan";
+import * as analytics from "../../src/main/db/analytics";
 import {
   migrateAnalytics,
   readTotals,
@@ -185,7 +188,7 @@ describe("scanStep (chunked incremental engine)", () => {
     migrateAnalytics(db);
 
     const p = scanStep(db, home, 1_000_000);
-    expect(p).toEqual({ filesTotal: 2, filesDone: 2, done: true });
+    expect(p).toEqual({ filesTotal: 2, filesDone: 2, done: true, wrote: true });
   });
 
   it("an unreadable target doesn't block done or stall the scan (it converges, readable files ingest)", () => {
@@ -221,5 +224,82 @@ describe("scanStep (chunked incremental engine)", () => {
     const sub = targets.find((t) => t.path.endsWith("agent-x.jsonl"))!;
     expect(sub.sessionId).toBe("s1");
     expect(sub.keyPrefix).toBe("s1/agent-x.jsonl");
+  });
+
+  it("reads processed_files once per step", () => {
+    const home = makeHome();
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 1 }], MT);
+    writeTurns(home, "-b", "s2", [{ id: "b1", input: 1 }], MT);
+    const db = openTestDb();
+    migrateAnalytics(db);
+
+    const spy = vi.spyOn(analytics, "readProcessedFiles");
+    scanStep(db, home, 1_000_000);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("reports `wrote` only on a step that ingests turns", () => {
+    const home = makeHome();
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 1 }], MT);
+    const db = openTestDb();
+    migrateAnalytics(db);
+
+    expect(scanStep(db, home, 1_000_000).wrote).toBe(true); // first pass ingests the turn
+    expect(scanStep(db, home, 1_000_000).wrote).toBe(false); // nothing changed: a no-op
+  });
+
+  it("re-reads a shrunk file in place and reports the re-ingest via `wrote`", () => {
+    // A shrink (fewer complete lines than stored) re-reads from zero, re-upserting existing message_ids
+    // WITHOUT moving the max rowid — so `wrote` is the only signal a poll's change token can lean on.
+    const home = makeHome();
+    writeTurns(
+      home,
+      "-a",
+      "s1",
+      [
+        { id: "a1", input: 1 },
+        { id: "a2", input: 2 },
+      ],
+      MT,
+    );
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(scanStep(db, home, 1_000_000).wrote).toBe(true);
+
+    // Rewrite shorter (one line) with a bumped mtime: re-read from zero re-upserts a1 in place.
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 9 }], MT + 1000);
+    const after = scanStep(db, home, 1_000_000);
+    expect(after.wrote).toBe(true); // re-ingest detected even though no new rowid lands
+  });
+});
+
+describe("freshTargets (walk cache)", () => {
+  const target = (path: string): ScanTarget => ({
+    path,
+    mtimeMs: 1,
+    sessionId: "s",
+    keyPrefix: "s",
+  });
+
+  it("walks when there is no cache, reuses within the TTL, re-walks past it", () => {
+    let walks = 0;
+    const walk = (): ScanTarget[] => {
+      walks++;
+      return [target(`/p/${walks}.jsonl`)];
+    };
+    const TTL = 500;
+
+    const a = freshTargets(null, 1000, TTL, walk);
+    expect(walks).toBe(1);
+
+    const b = freshTargets(a, 1000 + 499, TTL, walk);
+    expect(walks).toBe(1);
+    expect(b).toBe(a);
+
+    const c = freshTargets(b, 1000 + 500, TTL, walk);
+    expect(walks).toBe(2);
+    expect(c.atMs).toBe(1500);
+    expect(c.targets).not.toBe(a.targets);
   });
 });

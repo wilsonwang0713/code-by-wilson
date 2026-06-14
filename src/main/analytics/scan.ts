@@ -33,6 +33,26 @@ export interface ScanTarget {
   keyPrefix: string;
 }
 
+/** A briefly-cached target walk: the list and the wall-clock ms it was taken. The handler reuses it across
+ *  a rapid backfill burst so `projects/` isn't re-walked ~25×/sec; a warm poll (1500ms apart) always
+ *  exceeds the TTL and re-walks fresh, so other sessions' appends still appear promptly. */
+export interface WalkCache {
+  targets: ScanTarget[];
+  atMs: number;
+}
+
+/** Return the cached targets when they're younger than `ttlMs`, else re-walk via `walk` and restamp. Pure:
+ *  the clock and the walk are injected, so the cache policy is testable without disk or a real timer. */
+export function freshTargets(
+  cache: WalkCache | null,
+  nowMs: number,
+  ttlMs: number,
+  walk: () => ScanTarget[],
+): WalkCache {
+  if (cache && nowMs - cache.atMs < ttlMs) return cache;
+  return { targets: walk(), atMs: nowMs };
+}
+
 /**
  * Every file the analytics scan ingests, with its current mtime — the cheap walk (readdir + stat, no
  * parse). Parent Transcripts come from indexTranscripts (the full, unpruned projects/ sweep, unlike the
@@ -79,18 +99,27 @@ export function collectScanTargets(claudeDir: string): ScanTarget[] {
  * steps by `maxLines`; a shrunk file is re-read from zero. Each file's turns and its high-water mark are
  * written in one transaction. A single unreadable file records its mtime (so it stops blocking `done`)
  * and is retried only when its mtime next moves. Returns progress so the caller can show "building
- * history" and know when the backfill is done.
+ * history" and know when the backfill is done, plus `wrote`: whether this step upserted any turns. A
+ * caller keying a change token off the max turns rowid needs `wrote` because an in-place re-ingest (a
+ * shrunk/rewritten file re-read from zero) updates existing rows without moving the rowid.
  */
 export function scanStep(
   db: SqliteDb,
   claudeDir: string,
   maxLines: number = DEFAULT_MAX_LINES,
-): ScanProgress {
-  const targets = collectScanTargets(claudeDir);
+  targets: ScanTarget[] = collectScanTargets(claudeDir),
+): ScanProgress & { wrote: boolean } {
   const stored = readProcessedFiles(db);
   const pending = targets
     .filter((t) => stored.get(t.path)?.mtime !== t.mtimeMs)
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+  // Every target already caught up at the start; each pending file we bring current this step adds to it,
+  // so we never re-read processed_files or re-filter all targets to learn `filesDone`.
+  let filesDone = targets.length - pending.length;
+  // Whether this step ingested any turns. A no-turn step (recorded an unreadable/half-written file, or a
+  // slice that extracts to nothing) leaves the max rowid put, so the caller's token must lean on this too.
+  let wrote = false;
 
   let budget = maxLines;
   for (const t of pending) {
@@ -110,6 +139,7 @@ export function scanStep(
         t.mtimeMs,
         stored.get(t.path)?.lines ?? 0,
       );
+      filesDone++;
       continue;
     }
     const prev = stored.get(t.path);
@@ -118,12 +148,14 @@ export function scanStep(
       // No new complete line, but the mtime moved (e.g. only a half-written trailing line grew). Record
       // the current mtime so we don't keep re-reading this file until it grows a complete line.
       upsertProcessedFile(db, t.path, t.mtimeMs, prev?.lines ?? 0);
+      filesDone++;
       continue;
     }
     const lines = plan.jsonl.length ? plan.jsonl.split("\n") : [];
     const take = Math.min(lines.length, budget);
     const slice = lines.slice(0, take).join("\n");
     const turns = extractTurns(slice, t.sessionId, t.keyPrefix, plan.startLine);
+    if (turns.length) wrote = true;
     const full = take === lines.length;
     transaction(db, () => {
       upsertTurns(db, turns);
@@ -136,17 +168,16 @@ export function scanStep(
         full ? plan.lines : plan.startLine + take,
       );
     });
+    // Fully consumed -> caught up; a mid-split partial keeps the sentinel mtime and stays pending.
+    if (full) filesDone++;
     budget -= take;
   }
 
-  const after = readProcessedFiles(db);
-  const filesDone = targets.filter(
-    (t) => after.get(t.path)?.mtime === t.mtimeMs,
-  ).length;
   return {
     filesTotal: targets.length,
     filesDone,
     done: filesDone === targets.length,
+    wrote,
   };
 }
 

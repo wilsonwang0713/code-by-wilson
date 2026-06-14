@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { IPC, type OverviewData } from "@shared/ipc";
+import { IPC, type OverviewData, type StatsRead } from "@shared/ipc";
 import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
@@ -22,10 +22,15 @@ import {
   emptyTotals,
   hasAnyTurns,
 } from "./db/analytics";
-import { scanStep } from "./analytics/scan";
+import {
+  scanStep,
+  collectScanTargets,
+  freshTargets,
+  type ScanTarget,
+  type WalkCache,
+} from "./analytics/scan";
 import type {
   StatsTotals,
-  StatsSnapshot,
   StatsBreakdowns,
   ScanProgress,
   StatsRange,
@@ -38,6 +43,7 @@ import {
   emptyBreakdowns,
   rangeWindow,
   calendarWindow,
+  localDayKey,
 } from "@shared/stats";
 import { syncSessions } from "./sync";
 
@@ -227,47 +233,113 @@ export function registerIpc({
       return [];
     }
   };
+  // Cache the target walk briefly so a 40ms backfill burst doesn't re-walk projects/ ~25×/sec. The TTL sits
+  // below WARM_POLL_MS (1500ms), so a warm poll always re-walks fresh and catches other sessions promptly;
+  // only a rapid burst reuses the list. Lives here, not in scanStep, so scanStep stays a pure function.
+  const WALK_TTL_MS = 500;
+  let walkCache: WalkCache | null = null;
+  // Returns the (briefly-cached) target walk plus whether this call did a real disk walk. `fresh` lets the
+  // handler avoid settling `done` off a stale cache hit: a session that appeared during a backfill burst is
+  // absent from a cached list, so the cached set would drain to done=true while real work remains.
+  const scanTargets = (
+    now: number,
+  ): { targets: ScanTarget[]; fresh: boolean } => {
+    if (!claudeDir) return { targets: [], fresh: true };
+    const fresh = !walkCache || now - walkCache.atMs >= WALK_TTL_MS;
+    walkCache = freshTargets(walkCache, now, WALK_TTL_MS, () =>
+      collectScanTargets(claudeDir),
+    );
+    return { targets: walkCache.targets, fresh };
+  };
+  // The poll's change token: the post-scan max turns rowid (a new turn always lands as a new row —
+  // transcripts are append-only), the local day (the other input that moves the windowed output), and the
+  // scan progress. Progress is in the token because a step can advance files WITHOUT moving the rowid (it
+  // recorded an unreadable/half-written file, or the final file after a partial), and that progress change
+  // must still re-render. On a read error return "" so the poll reads `changed` and serves a safe (zeroed)
+  // snapshot instead of sticking.
+  const tokenFor = (
+    adb: SqliteDb,
+    now: number,
+    progress: ScanProgress,
+  ): string => {
+    try {
+      return `${turnsMaxRowid(adb)}:${localDayKey(now)}:${progress.filesDone}/${progress.filesTotal}`;
+    } catch (err) {
+      console.error("stats token read failed; forcing a full snapshot", err);
+      return "";
+    }
+  };
   ipcMain.handle(
     IPC.readStats,
-    (_e, range?: StatsRange, calendarYear?: number): StatsSnapshot => {
+    (
+      _e,
+      range?: StatsRange,
+      calendarYear?: number,
+      since?: string,
+    ): StatsRead => {
       const now = Date.now();
-      // The page window scopes totals/breakdowns/daily. A missing/unrecognized range falls back to all-time
-      // (#110); a single-day range ({day}) bounds it both ends. The calendar window is resolved separately
-      // (#115): trailing twelve months by default, or the selected local year — independent of `range`.
+      // The page window scopes totals/breakdowns/daily; a missing range falls back to all-time (#110). The
+      // calendar window is resolved separately (#115), independent of `range`.
       const { sinceMs, untilMs } = rangeWindow(range ?? "all", now);
       const cal = calendarWindow(calendarYear ?? null, now);
-      if (!analyticsDb || !claudeDir) {
-        // No store, or no dir to scan: a done snapshot (zeros if no store; last-known if a store but no dir).
-        return analyticsDb
-          ? {
-              totals: safeTotals(analyticsDb, sinceMs, untilMs),
-              progress: doneProgress(),
-              hasAnyTurns: safeHasAnyTurns(analyticsDb),
-              daily: safeDaily(analyticsDb, sinceMs, untilMs),
-              ...safeBreakdowns(analyticsDb, sinceMs, untilMs),
-              calendar: safeCalendar(analyticsDb, cal),
-              calendarStart: cal.startDay,
-              calendarEnd: cal.endDay,
-              calendarYears: safeCalendarYears(analyticsDb),
-            }
-          : emptySnapshot();
+
+      // No durable store wired in: a constant per-day token, so repeated polls read unchanged after the first.
+      if (!analyticsDb) {
+        const token = `empty:${localDayKey(now)}`;
+        return since === token
+          ? { status: "unchanged", token }
+          : { status: "changed", token, snapshot: emptySnapshot() };
       }
+
+      // One bounded scan step when there's a dir to scan; otherwise serve last-known with a done progress.
       let progress = doneProgress();
-      try {
-        progress = scanStep(analyticsDb, claudeDir);
-      } catch (err) {
-        console.error("stats scan step failed; serving last-known totals", err);
+      let wrote = false;
+      if (claudeDir) {
+        try {
+          const walk = scanTargets(now);
+          let step = scanStep(analyticsDb, claudeDir, undefined, walk.targets);
+          // Don't settle `done` off a cached (possibly stale) walk: re-walk fresh once and re-step, so a
+          // file created during a backfill burst is ingested before we drop to the warm cadence.
+          if (step.done && !walk.fresh) {
+            walkCache = null;
+            const restep = scanStep(
+              analyticsDb,
+              claudeDir,
+              undefined,
+              scanTargets(now).targets,
+            );
+            step = { ...restep, wrote: step.wrote || restep.wrote };
+          }
+          ({ wrote, ...progress } = step);
+        } catch (err) {
+          console.error(
+            "stats scan step failed; serving last-known totals",
+            err,
+          );
+        }
       }
+
+      // Skip every aggregate only when the token matches AND the backfill is caught up AND this step wrote
+      // nothing: an in-progress backfill must keep re-rendering (its progress moves), and an in-place turn
+      // update keeps the rowid but still changes the totals, so `wrote` forces a fresh snapshot.
+      const token = tokenFor(analyticsDb, now, progress);
+      if (since === token && token !== "" && progress.done && !wrote)
+        return { status: "unchanged", token };
+
       return {
-        totals: safeTotals(analyticsDb, sinceMs, untilMs),
-        progress,
-        hasAnyTurns: safeHasAnyTurns(analyticsDb),
-        daily: safeDaily(analyticsDb, sinceMs, untilMs),
-        ...safeBreakdowns(analyticsDb, sinceMs, untilMs),
-        calendar: safeCalendar(analyticsDb, cal),
-        calendarStart: cal.startDay,
-        calendarEnd: cal.endDay,
-        calendarYears: safeCalendarYears(analyticsDb),
+        status: "changed",
+        token,
+        snapshot: {
+          totals: safeTotals(analyticsDb, sinceMs, untilMs),
+          progress,
+          hasAnyTurns: safeHasAnyTurns(analyticsDb),
+          daily: safeDaily(analyticsDb, sinceMs, untilMs),
+          ...safeBreakdowns(analyticsDb, sinceMs, untilMs),
+          calendar: safeCalendar(analyticsDb, cal),
+          calendarStart: cal.startDay,
+          calendarEnd: cal.endDay,
+          calendarYears: safeCalendarYears(analyticsDb),
+        },
       };
     },
   );

@@ -36,6 +36,14 @@ export type TaskRead =
   | { status: "changed"; mtimeMs: number; tasks: Task[] }
   | ReadSettled;
 
+/** The result of a Stats poll: a fresh snapshot with a change token the renderer echoes back as `since`,
+ *  or `unchanged` when nothing the snapshot depends on has moved (no new turn, same local day, scan caught
+ *  up, no in-place rewrite) — so the handler skips every aggregate and the renderer skips the re-render.
+ *  Mirrors the transcript/tasks reads. */
+export type StatsRead =
+  | { status: "changed"; token: string; snapshot: StatsSnapshot }
+  | { status: "unchanged"; token: string };
+
 export interface IpcApi {
   /** Read-only: the indexed sessions as they stand, no sync — fast initial paint. */
   overview(): Promise<OverviewData>;
@@ -52,11 +60,15 @@ export interface IpcApi {
   /** Per-family model overrides, the configured default family, and the allowed-family allowlist —
    *  read from Claude Code's settings.json and the process env. */
   modelDefaults(): Promise<ModelDefaults>;
-  /** Run one bounded, incremental scan step and return totals scoped to `range` (default all-time when
-   *  omitted), the per-dimension breakdowns, the daily series, and the contributions calendar for
-   *  `calendarYear` (a specific local year, or the trailing twelve months when omitted) — the calendar window
-   *  is independent of `range`. Polled while the Stats view is open; never rejects. */
-  readStats(range?: StatsRange, calendarYear?: number): Promise<StatsSnapshot>;
+  /** Run one bounded, incremental scan step, then return a snapshot scoped to `range` (all-time when
+   *  omitted) and `calendarYear` (trailing twelve months when omitted), tagged with a change token. Pass the
+   *  last token as `since`; when nothing the snapshot depends on has moved, the result is `unchanged` and no
+   *  snapshot is built. Polled while the Stats view is open; never rejects. */
+  readStats(
+    range?: StatsRange,
+    calendarYear?: number,
+    since?: string,
+  ): Promise<StatsRead>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
