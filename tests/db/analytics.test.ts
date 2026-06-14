@@ -14,6 +14,8 @@ import {
   readProcessedFiles,
   upsertProcessedFile,
   hasAnyTurns,
+  readCalendar,
+  readCalendarYears,
 } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
 
@@ -1581,6 +1583,15 @@ function u(input: number) {
   };
 }
 
+function oneIn() {
+  return {
+    inputTokens: 1,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  };
+}
+
 describe("upper-bound (untilMs) scoping", () => {
   const noon = (y: number, m: number, d: number): number =>
     new Date(y, m - 1, d, 12, 0, 0).getTime();
@@ -1614,5 +1625,150 @@ describe("upper-bound (untilMs) scoping", () => {
     expect(readDaily(db, since, until).map((d) => d.day)).toEqual([
       "2026-06-14",
     ]);
+  });
+});
+
+describe("readCalendar", () => {
+  const noon = (y: number, m: number, d: number): number =>
+    new Date(y, m - 1, d, 12, 0, 0).getTime();
+  const since = new Date(2026, 0, 1).getTime();
+  const until = new Date(2027, 0, 1).getTime();
+
+  it("returns turns, tokens, and equiv value per local day", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // Two opus turns on the 14th: 1M input + 1M output → equiv = $5 + $25 = $30; tokens = 2,000,000.
+      turn({
+        messageId: "a",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "b",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const cal = readCalendar(db, since, until);
+    expect(cal).toHaveLength(1);
+    expect(cal[0].day).toBe("2026-06-14");
+    expect(cal[0].turns).toBe(2);
+    expect(cal[0].tokens).toBe(2_000_000);
+    expect(cal[0].equivApiValueUsd).toBeCloseTo(30);
+  });
+
+  it("reports n/a (null) equiv on a day whose only model is unrecognized, while still counting tokens", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "x",
+        ts: noon(2026, 6, 14),
+        modelRaw: "some-unknown-model",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const cal = readCalendar(db, since, until);
+    expect(cal[0].tokens).toBe(100);
+    expect(cal[0].turns).toBe(1);
+    expect(cal[0].equivApiValueUsd).toBeNull();
+  });
+
+  it("prices only the recognized models on a mixed day, counting every model's tokens", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // Recognized opus: 1M input → $5. Its single presence unlocks a real (non-null) equiv.
+      turn({
+        messageId: "known",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      // Unrecognized model: its tokens still count, but it contributes no cost (not a guessed $0).
+      turn({
+        messageId: "unknown",
+        ts: noon(2026, 6, 14),
+        modelRaw: "some-unknown-model",
+        usage: {
+          inputTokens: 500,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const cal = readCalendar(db, since, until);
+    expect(cal).toHaveLength(1);
+    expect(cal[0].turns).toBe(2);
+    expect(cal[0].tokens).toBe(1_000_500);
+    expect(cal[0].equivApiValueUsd).toBeCloseTo(5); // opus only; the unknown model adds tokens, no cost
+  });
+
+  it("buckets by local day, ascending, and honors the window's bounds", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({ messageId: "before", ts: noon(2025, 12, 31), usage: oneIn() }),
+      turn({ messageId: "d1", ts: noon(2026, 6, 14), usage: oneIn() }),
+      turn({ messageId: "d2", ts: noon(2026, 6, 15), usage: oneIn() }),
+      turn({ messageId: "after", ts: noon(2027, 1, 1), usage: oneIn() }),
+    ]);
+    expect(readCalendar(db, since, until).map((d) => d.day)).toEqual([
+      "2026-06-14",
+      "2026-06-15",
+    ]);
+  });
+
+  it("returns an empty array for an empty store", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(readCalendar(db, since, until)).toEqual([]);
+  });
+});
+
+describe("readCalendarYears", () => {
+  const noon = (y: number, m: number, d: number): number =>
+    new Date(y, m - 1, d, 12, 0, 0).getTime();
+
+  it("lists distinct local years with any turn, descending, excluding ts=0", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({ messageId: "y24", ts: noon(2024, 3, 2), usage: oneIn() }),
+      turn({ messageId: "y26a", ts: noon(2026, 1, 9), usage: oneIn() }),
+      turn({ messageId: "y26b", ts: noon(2026, 6, 14), usage: oneIn() }),
+      turn({ messageId: "notime", ts: 0, usage: oneIn() }),
+    ]);
+    expect(readCalendarYears(db)).toEqual([2026, 2024]);
+  });
+
+  it("is empty for an empty store", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(readCalendarYears(db)).toEqual([]);
   });
 });

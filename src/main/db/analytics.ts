@@ -7,6 +7,7 @@ import type {
   StatsBySession,
   StatsBreakdowns,
   DailyBucket,
+  CalendarDay,
 } from "@shared/stats";
 import { branchRowKey } from "@shared/stats";
 import {
@@ -859,4 +860,92 @@ export function readDaily(
   untilMs?: number | null,
 ): DailyBucket[] {
   return foldDays(groupByDayAndModel(db, sinceMs, untilMs));
+}
+
+/** A calendar day mid-fold: turns and tokens summed across the day's models; cost accumulated over only its
+ *  recognized models (tracking hasKnownCost so an all-unrecognized day renders n/a, not a misleading $0). */
+interface CalAgg {
+  day: string;
+  turns: number;
+  tokens: number;
+  knownCost: number;
+  hasKnownCost: boolean;
+}
+
+/**
+ * Fold (day × model) rows into one CalendarDay per local day (#115): the day's turn count and total tokens
+ * sum across its models; its Equivalent API value sums modelRowCost over only the recognized ones (an
+ * unrecognized model adds its tokens but no cost, and a day with no recognized model is honest n/a). The
+ * same per-model cost mapping readTotals/readByModel use, so the calendar reconciles with them. Days emit
+ * ascending (string compare on 'YYYY-MM-DD').
+ */
+function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
+  const map = new Map<string, CalAgg>();
+  for (const r of rows) {
+    let a = map.get(r.day);
+    if (!a) {
+      a = {
+        day: r.day,
+        turns: 0,
+        tokens: 0,
+        knownCost: 0,
+        hasKnownCost: false,
+      };
+      map.set(r.day, a);
+    }
+    a.turns += r.turns;
+    a.tokens +=
+      r.input_tokens +
+      r.output_tokens +
+      r.cache_read_tokens +
+      r.cache_creation_tokens;
+    const cost = modelRowCost(r);
+    if (cost != null) {
+      a.knownCost += cost;
+      a.hasKnownCost = true;
+    }
+  }
+  return [...map.values()]
+    .map(
+      (a): CalendarDay => ({
+        day: a.day,
+        turns: a.turns,
+        tokens: a.tokens,
+        equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+      }),
+    )
+    .sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/**
+ * The contributions calendar's per-day metrics (#115) over a bounded window [sinceMs, untilMs): one row per
+ * local calendar day with activity, each carrying turns, total tokens, and Equivalent API value — the three
+ * the cell-intensity toggle switches between. Sparse (only days with turns); the renderer densifies the grid.
+ * Reuses the daily (day × model) scan, folded for the calendar's three metrics rather than the by-kind split.
+ */
+export function readCalendar(
+  db: SqliteDb,
+  sinceMs: number | null,
+  untilMs: number | null,
+): CalendarDay[] {
+  return foldCalendar(groupByDayAndModel(db, sinceMs, untilMs));
+}
+
+/**
+ * The distinct local years that hold any turn (#115), descending — the calendar year switcher's options.
+ * Excludes unknown-time (ts=0) turns, which can't honestly be placed in a year (exact data only), so a year
+ * is offered only when real activity falls in it. strftime buckets by the main process's local calendar year,
+ * the same 'localtime' the daily/calendar cuts use.
+ */
+export function readCalendarYears(db: SqliteDb): number[] {
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT
+         CAST(strftime('%Y', ts / 1000, 'unixepoch', 'localtime') AS INTEGER) AS y
+       FROM turns
+       WHERE ts > 0
+       ORDER BY y DESC`,
+    )
+    .all() as { y: number }[];
+  return rows.map((r) => r.y);
 }
