@@ -32,18 +32,19 @@ export function emptyTotals(): StatsTotals {
 
 /**
  * One row of the per-model breakdown (#111), keyed on the raw model id exactly as the transcript recorded
- * it (e.g. "claude-opus-4-8"), so one model version is distinct from the next. `totalTokens` is the sum of
- * all four token kinds — the figure the table's Tokens column shows. The donut sizes on `inputTokens +
- * outputTokens` instead: cache-read volume dwarfs fresh tokens in agentic use, so sizing the chart on the
- * total would let a heavily-cached model swamp it. `equivApiValueUsd` is null when the raw id matches no
- * known family: an honest n/a, never a guessed $0. A null `modelRaw` is a turn that recorded no model; it
- * renders as "Unknown" with n/a cost.
+ * it (e.g. "claude-opus-4-8"), so one model version is distinct from the next. `totalTokens` sums all four
+ * token kinds; `inputTokens + outputTokens` is the fresh subset. The donut and the table's Tokens column
+ * both follow the page-level "Include cache" toggle (StatsView's `tokensOf`): on by default they read
+ * `totalTokens`, so a cache-heavy model can dominate the donut; off they read the fresh subset, which keeps
+ * cache-read volume from swamping the chart. `equivApiValueUsd` is null when the raw id matches no known
+ * family: an honest n/a, never a guessed $0. A null `modelRaw` is a turn that recorded no model; it renders
+ * as "Unknown" with n/a cost.
  */
 export interface StatsByModel {
   modelRaw: string | null;
   totalTokens: number;
-  /** Input and output tokens (cache excluded) — the donut's slice weight, kept apart from totalTokens so
-   *  cache-read volume can't inflate a model's share. */
+  /** Input and output tokens (cache excluded): the fresh metric the donut and Tokens column show when the
+   *  page's "Include cache" toggle is off, kept apart from totalTokens. Mirrors StatsByProject/StatsByBranch. */
   inputTokens: number;
   outputTokens: number;
   /** Equivalent API value for this model, or null (n/a) when the raw id matches no known family. */

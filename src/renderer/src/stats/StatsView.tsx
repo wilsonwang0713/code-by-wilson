@@ -500,25 +500,21 @@ function EmptyStats() {
   );
 }
 
-/** A bordered, titled section box for the stats page — the shell later slices hang the calendar,
- *  time-series, and breakdown panels off. `right` is an optional header slot for a secondary control,
- *  currently unused since the cache toggle moved to the page header. */
+/** A bordered, titled section box for the stats page: the shell later slices hang the calendar,
+ *  time-series, and breakdown panels off it. */
 function StatsPanel({
   title,
-  right,
   children,
 }: {
   title: string;
-  right?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
-      <header className="mb-3 flex items-center justify-between">
+      <header className="mb-3 flex items-center">
         <h2 className="text-xs uppercase tracking-wide text-fg-muted">
           {title}
         </h2>
-        {right}
       </header>
       {children}
     </section>
