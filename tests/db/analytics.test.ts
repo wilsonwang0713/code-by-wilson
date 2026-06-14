@@ -824,6 +824,45 @@ describe("readByProject", () => {
     migrateAnalytics(db);
     expect(readByProject(db)).toEqual([]);
   });
+
+  it("sums input and output tokens per project apart from the total (fresh-vs-total split)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // One project, two turns carrying cache tokens. Fresh (input + output) is deliberately far below the
+      // total so the split is pinned, not coincidentally equal.
+      turn({
+        messageId: "p1",
+        cwd: "/w/proj",
+        project: "proj",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 1000,
+          cacheCreationTokens: 5,
+        },
+      }),
+      turn({
+        messageId: "p2",
+        cwd: "/w/proj",
+        project: "proj",
+        usage: {
+          inputTokens: 200,
+          outputTokens: 30,
+          cacheReadTokens: 2000,
+          cacheCreationTokens: 10,
+        },
+      }),
+    ]);
+    const rows = readByProject(db);
+    expect(rows).toHaveLength(1);
+    // total sums all four kinds: (100+20+1000+5) + (200+30+2000+10) = 3365.
+    expect(rows[0].totalTokens).toBe(3365);
+    // input/output ride along apart from the total so the renderer can show fresh (input+output) when the
+    // cache toggle is off: 300 input + 50 output = 350 fresh, far below the 3365 total.
+    expect(rows[0].inputTokens).toBe(300);
+    expect(rows[0].outputTokens).toBe(50);
+  });
 });
 
 describe("readByBranch", () => {
@@ -998,6 +1037,43 @@ describe("readByBranch", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     expect(readByBranch(db)).toEqual([]);
+  });
+
+  it("sums input and output tokens per branch apart from the total (fresh-vs-total split)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // One (project, branch) pair, two turns with cache tokens — same pinned split as the project test.
+      turn({
+        messageId: "b1",
+        cwd: "/w/proj",
+        project: "proj",
+        branch: "main",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 1000,
+          cacheCreationTokens: 5,
+        },
+      }),
+      turn({
+        messageId: "b2",
+        cwd: "/w/proj",
+        project: "proj",
+        branch: "main",
+        usage: {
+          inputTokens: 200,
+          outputTokens: 30,
+          cacheReadTokens: 2000,
+          cacheCreationTokens: 10,
+        },
+      }),
+    ]);
+    const rows = readByBranch(db);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].totalTokens).toBe(3365);
+    expect(rows[0].inputTokens).toBe(300);
+    expect(rows[0].outputTokens).toBe(50);
   });
 });
 
