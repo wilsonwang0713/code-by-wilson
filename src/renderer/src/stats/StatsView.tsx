@@ -949,9 +949,11 @@ function ByModel({
 
 /** The per-project breakdown (#112), now with its branches folded in. Top projects as horizontal bars with
  *  tokens and Equivalent API value; a project with real branch detail carries a disclosure caret that
- *  reveals its branches (label, tokens, Equiv) as indented sub-rows. Rows key and rank on the full cwd, so
- *  two repos that share a basename are separate and a branch never lands under the wrong one. Capped to the
- *  top N projects with a "+N more" note; each expanded project caps its branches the same way. */
+ *  reveals its branches (label, tokens, Equiv) as indented sub-rows. Keyed on the full cwd so two repos that
+ *  share a basename stay separate and a branch never lands under the wrong one; projects and branches both
+ *  rank by the displayed Tokens metric, so order and caps follow the page's Include-cache toggle. Capped to
+ *  the top N projects with a "+N more" note that flags when those hidden projects still carry branch detail
+ *  (folded under the top-N, it's otherwise unreachable); each expanded project caps its branches the same way. */
 function ByProject({
   rows,
   branches,
@@ -963,12 +965,16 @@ function ByProject({
 }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const groups = groupProjectBranches(rows, branches);
+  const groups = groupProjectBranches(rows, branches, includeCache);
   const top = groups.slice(0, TOP_PROJECTS);
   // Bars size on the displayed metric; the denominator is the largest shown value. A zero denominator (a
   // pure cache window in exclude mode) yields empty bars rather than a divide-by-zero.
   const max = Math.max(...top.map((r) => tokensOf(r, includeCache)));
-  const rest = groups.length - top.length;
+  // Projects past the cap roll into the "+N more" note. Flag when any of them still carries branch detail:
+  // folding branches under the top-N projects means those branches are otherwise unreachable on the page.
+  const hidden = groups.slice(TOP_PROJECTS);
+  const rest = hidden.length;
+  const hiddenHaveBranches = hidden.some((g) => g.expandable);
   const toggle = (cwd: string): void =>
     setOpen((s) => {
       const next = new Set(s);
@@ -994,7 +1000,11 @@ function ByProject({
         </thead>
         <tbody>
           {top.map((r) => {
-            const isOpen = open.has(r.cwd);
+            // Gate on expandable too: a project can lose its last real branch on a later poll (a trailing
+            // window ages it out), dropping the chevron while its cwd lingers in `open`. Without this the
+            // sub-rows would render stuck open with nothing to collapse them; folding it in also makes any
+            // stranded `open` entry inert.
+            const isOpen = r.expandable && open.has(r.cwd);
             return (
               <Fragment key={r.cwd}>
                 <tr className="border-t border-ink-850">
@@ -1083,6 +1093,7 @@ function ByProject({
       {rest > 0 && (
         <p className="mt-2 text-[11px] text-fg-faint">
           +{rest} more {rest === 1 ? "project" : "projects"}
+          {hiddenHaveBranches && " (branches hidden)"}
         </p>
       )}
     </StatsPanel>
