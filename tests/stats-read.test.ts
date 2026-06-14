@@ -119,6 +119,102 @@ describe("registerIpc stats:read", () => {
     expect("snapshot" in second).toBe(false);
   });
 
+  it("a non-matching `since` token returns a fresh snapshot", () => {
+    const home = makeHome();
+    const dir = join(home, "projects", "-work-proj");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "sess-1.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        cwd: "/work/proj",
+        message: {
+          role: "assistant",
+          id: "m1",
+          model: "claude-opus-4-8",
+          usage: {
+            input_tokens: 5,
+            output_tokens: 0,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+        },
+      }) + "\n",
+    );
+    const db = openTestDb();
+    migrate(db);
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    registerIpc({ db, provider, analyticsDb, claudeDir: home });
+
+    const r = handlers.get(IPC.readStats)!(
+      null,
+      undefined,
+      undefined,
+      "stale:token:0/0",
+    ) as StatsRead;
+    expect(r.status).toBe("changed");
+  });
+
+  it("ingests a transcript that appears after a cached walk, and re-renders on a turn-less progress move", () => {
+    // Regression: the change token must fold in scan progress, and `done` must not settle off a stale
+    // cached walk. A new turn-LESS transcript appears within the walk-cache TTL after the first poll: the
+    // cached walk can't see it, only the fresh re-walk on `done` does. Its arrival moves progress
+    // (filesTotal 1->2) without ingesting a turn — so the token must move and the poll must report changed.
+    const home = makeHome();
+    const dir = join(home, "projects", "-work-proj");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "sess-1.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        cwd: "/work/proj",
+        message: {
+          role: "assistant",
+          id: "m1",
+          model: "claude-opus-4-8",
+          usage: {
+            input_tokens: 5,
+            output_tokens: 0,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+          },
+        },
+      }) + "\n",
+    );
+    const db = openTestDb();
+    migrate(db);
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    registerIpc({ db, provider, analyticsDb, claudeDir: home });
+
+    const first = handlers.get(IPC.readStats)!() as StatsRead;
+    if (first.status !== "changed") throw new Error("expected changed");
+    expect(first.snapshot.totals.turns).toBe(1);
+    expect(first.snapshot.progress.filesTotal).toBe(1);
+
+    // A turn-less transcript (a user line, no assistant usage) lands after the walk was cached.
+    writeFileSync(
+      join(dir, "sess-2.jsonl"),
+      JSON.stringify({
+        type: "user",
+        cwd: "/work/proj",
+        message: { role: "user", content: "hi" },
+      }) + "\n",
+    );
+
+    const second = handlers.get(IPC.readStats)!(
+      null,
+      undefined,
+      undefined,
+      first.token,
+    ) as StatsRead;
+    expect(second.status).toBe("changed");
+    if (second.status !== "changed") throw new Error("expected changed");
+    expect(second.snapshot.totals.turns).toBe(1); // the new file carried no turn
+    expect(second.snapshot.progress.filesTotal).toBe(2); // but it was discovered and counted
+  });
+
   it("scans the claude dir and returns the aggregated totals", () => {
     const home = makeHome();
     const dir = join(home, "projects", "-work-proj");

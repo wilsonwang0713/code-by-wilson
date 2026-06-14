@@ -188,7 +188,7 @@ describe("scanStep (chunked incremental engine)", () => {
     migrateAnalytics(db);
 
     const p = scanStep(db, home, 1_000_000);
-    expect(p).toEqual({ filesTotal: 2, filesDone: 2, done: true });
+    expect(p).toEqual({ filesTotal: 2, filesDone: 2, done: true, wrote: true });
   });
 
   it("an unreadable target doesn't block done or stall the scan (it converges, readable files ingest)", () => {
@@ -237,6 +237,40 @@ describe("scanStep (chunked incremental engine)", () => {
     scanStep(db, home, 1_000_000);
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
+  });
+
+  it("reports `wrote` only on a step that ingests turns", () => {
+    const home = makeHome();
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 1 }], MT);
+    const db = openTestDb();
+    migrateAnalytics(db);
+
+    expect(scanStep(db, home, 1_000_000).wrote).toBe(true); // first pass ingests the turn
+    expect(scanStep(db, home, 1_000_000).wrote).toBe(false); // nothing changed: a no-op
+  });
+
+  it("re-reads a shrunk file in place and reports the re-ingest via `wrote`", () => {
+    // A shrink (fewer complete lines than stored) re-reads from zero, re-upserting existing message_ids
+    // WITHOUT moving the max rowid — so `wrote` is the only signal a poll's change token can lean on.
+    const home = makeHome();
+    writeTurns(
+      home,
+      "-a",
+      "s1",
+      [
+        { id: "a1", input: 1 },
+        { id: "a2", input: 2 },
+      ],
+      MT,
+    );
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(scanStep(db, home, 1_000_000).wrote).toBe(true);
+
+    // Rewrite shorter (one line) with a bumped mtime: re-read from zero re-upserts a1 in place.
+    writeTurns(home, "-a", "s1", [{ id: "a1", input: 9 }], MT + 1000);
+    const after = scanStep(db, home, 1_000_000);
+    expect(after.wrote).toBe(true); // re-ingest detected even though no new rowid lands
   });
 });
 

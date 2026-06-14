@@ -99,14 +99,16 @@ export function collectScanTargets(claudeDir: string): ScanTarget[] {
  * steps by `maxLines`; a shrunk file is re-read from zero. Each file's turns and its high-water mark are
  * written in one transaction. A single unreadable file records its mtime (so it stops blocking `done`)
  * and is retried only when its mtime next moves. Returns progress so the caller can show "building
- * history" and know when the backfill is done.
+ * history" and know when the backfill is done, plus `wrote`: whether this step upserted any turns. A
+ * caller keying a change token off the max turns rowid needs `wrote` because an in-place re-ingest (a
+ * shrunk/rewritten file re-read from zero) updates existing rows without moving the rowid.
  */
 export function scanStep(
   db: SqliteDb,
   claudeDir: string,
   maxLines: number = DEFAULT_MAX_LINES,
   targets: ScanTarget[] = collectScanTargets(claudeDir),
-): ScanProgress {
+): ScanProgress & { wrote: boolean } {
   const stored = readProcessedFiles(db);
   const pending = targets
     .filter((t) => stored.get(t.path)?.mtime !== t.mtimeMs)
@@ -115,6 +117,9 @@ export function scanStep(
   // Every target already caught up at the start; each pending file we bring current this step adds to it,
   // so we never re-read processed_files or re-filter all targets to learn `filesDone`.
   let filesDone = targets.length - pending.length;
+  // Whether this step ingested any turns. A no-turn step (recorded an unreadable/half-written file, or a
+  // slice that extracts to nothing) leaves the max rowid put, so the caller's token must lean on this too.
+  let wrote = false;
 
   let budget = maxLines;
   for (const t of pending) {
@@ -150,6 +155,7 @@ export function scanStep(
     const take = Math.min(lines.length, budget);
     const slice = lines.slice(0, take).join("\n");
     const turns = extractTurns(slice, t.sessionId, t.keyPrefix, plan.startLine);
+    if (turns.length) wrote = true;
     const full = take === lines.length;
     transaction(db, () => {
       upsertTurns(db, turns);
@@ -171,6 +177,7 @@ export function scanStep(
     filesTotal: targets.length,
     filesDone,
     done: filesDone === targets.length,
+    wrote,
   };
 }
 

@@ -238,19 +238,32 @@ export function registerIpc({
   // only a rapid burst reuses the list. Lives here, not in scanStep, so scanStep stays a pure function.
   const WALK_TTL_MS = 500;
   let walkCache: WalkCache | null = null;
-  const scanTargets = (now: number): ScanTarget[] => {
-    if (!claudeDir) return [];
+  // Returns the (briefly-cached) target walk plus whether this call did a real disk walk. `fresh` lets the
+  // handler avoid settling `done` off a stale cache hit: a session that appeared during a backfill burst is
+  // absent from a cached list, so the cached set would drain to done=true while real work remains.
+  const scanTargets = (
+    now: number,
+  ): { targets: ScanTarget[]; fresh: boolean } => {
+    if (!claudeDir) return { targets: [], fresh: true };
+    const fresh = !walkCache || now - walkCache.atMs >= WALK_TTL_MS;
     walkCache = freshTargets(walkCache, now, WALK_TTL_MS, () =>
       collectScanTargets(claudeDir),
     );
-    return walkCache.targets;
+    return { targets: walkCache.targets, fresh };
   };
-  // The poll's change token: the post-scan max turns rowid (a new turn always lands as a new row — transcripts
-  // are append-only) plus the local day (the only other input that moves the windowed output). On a read
-  // error return "" so the poll reads `changed` and serves a safe (zeroed) snapshot instead of sticking.
-  const tokenFor = (adb: SqliteDb, now: number): string => {
+  // The poll's change token: the post-scan max turns rowid (a new turn always lands as a new row —
+  // transcripts are append-only), the local day (the other input that moves the windowed output), and the
+  // scan progress. Progress is in the token because a step can advance files WITHOUT moving the rowid (it
+  // recorded an unreadable/half-written file, or the final file after a partial), and that progress change
+  // must still re-render. On a read error return "" so the poll reads `changed` and serves a safe (zeroed)
+  // snapshot instead of sticking.
+  const tokenFor = (
+    adb: SqliteDb,
+    now: number,
+    progress: ScanProgress,
+  ): string => {
     try {
-      return `${turnsMaxRowid(adb)}:${localDayKey(now)}`;
+      return `${turnsMaxRowid(adb)}:${localDayKey(now)}:${progress.filesDone}/${progress.filesTotal}`;
     } catch (err) {
       console.error("stats token read failed; forcing a full snapshot", err);
       return "";
@@ -280,14 +293,24 @@ export function registerIpc({
 
       // One bounded scan step when there's a dir to scan; otherwise serve last-known with a done progress.
       let progress = doneProgress();
+      let wrote = false;
       if (claudeDir) {
         try {
-          progress = scanStep(
-            analyticsDb,
-            claudeDir,
-            undefined,
-            scanTargets(now),
-          );
+          const walk = scanTargets(now);
+          let step = scanStep(analyticsDb, claudeDir, undefined, walk.targets);
+          // Don't settle `done` off a cached (possibly stale) walk: re-walk fresh once and re-step, so a
+          // file created during a backfill burst is ingested before we drop to the warm cadence.
+          if (step.done && !walk.fresh) {
+            walkCache = null;
+            const restep = scanStep(
+              analyticsDb,
+              claudeDir,
+              undefined,
+              scanTargets(now).targets,
+            );
+            step = { ...restep, wrote: step.wrote || restep.wrote };
+          }
+          ({ wrote, ...progress } = step);
         } catch (err) {
           console.error(
             "stats scan step failed; serving last-known totals",
@@ -296,9 +319,11 @@ export function registerIpc({
         }
       }
 
-      // Token off the POST-scan rowid: a step that ingested moved it. Unchanged -> skip every aggregate.
-      const token = tokenFor(analyticsDb, now);
-      if (since === token && token !== "")
+      // Skip every aggregate only when the token matches AND the backfill is caught up AND this step wrote
+      // nothing: an in-progress backfill must keep re-rendering (its progress moves), and an in-place turn
+      // update keeps the rowid but still changes the totals, so `wrote` forces a fresh snapshot.
+      const token = tokenFor(analyticsDb, now, progress);
+      if (since === token && token !== "" && progress.done && !wrote)
         return { status: "unchanged", token };
 
       return {

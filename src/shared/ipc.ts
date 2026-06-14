@@ -37,8 +37,9 @@ export type TaskRead =
   | ReadSettled;
 
 /** The result of a Stats poll: a fresh snapshot with a change token the renderer echoes back as `since`,
- *  or `unchanged` when nothing the snapshot depends on has moved (no new turn, same local day) — so the
- *  handler skips every aggregate and the renderer skips the re-render. Mirrors the transcript/tasks reads. */
+ *  or `unchanged` when nothing the snapshot depends on has moved (no new turn, same local day, scan caught
+ *  up, no in-place rewrite) — so the handler skips every aggregate and the renderer skips the re-render.
+ *  Mirrors the transcript/tasks reads. */
 export type StatsRead =
   | { status: "changed"; token: string; snapshot: StatsSnapshot }
   | { status: "unchanged"; token: string };
