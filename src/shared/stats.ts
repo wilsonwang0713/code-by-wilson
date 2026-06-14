@@ -194,6 +194,9 @@ export interface StatsSnapshot extends StatsBreakdowns {
    *  scoped totals, so picking a range with no turns shows zeroed cards rather than "No usage yet" when
    *  there is history outside the window. */
   hasAnyTurns: boolean;
+  /** The daily usage time-series (#114), range-scoped: one sparse bucket per local day with turns,
+   *  ascending. The renderer densifies the contiguous calendar range for the chart. */
+  daily: DailyBucket[];
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -203,6 +206,7 @@ export function emptySnapshot(): StatsSnapshot {
     totals: emptyTotals(),
     progress: { filesTotal: 0, filesDone: 0, done: true },
     hasAnyTurns: false,
+    daily: [],
     ...emptyBreakdowns(),
   };
 }

@@ -160,6 +160,7 @@ describe("registerIpc stats:read", () => {
       byProject: [],
       byBranch: [],
       bySession: [],
+      daily: [],
     });
   });
 
@@ -387,6 +388,58 @@ describe("registerIpc stats:read", () => {
     expect(week.bySession).toHaveLength(1); // the 100-day-old session is out of the window
     expect(week.bySession[0].sessionId).toBe("recent");
     expect(week.bySession[0].equivApiValueUsd).toBeCloseTo(5);
+  });
+
+  it("returns a daily time-series in the snapshot, ascending by day", () => {
+    const home = makeHome();
+    mkdirSync(join(home, "projects"), { recursive: true });
+
+    const noon = (y: number, m: number, d: number): number =>
+      new Date(y, m - 1, d, 12, 0, 0).getTime();
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    upsertTurns(analyticsDb, [
+      {
+        messageId: "recent",
+        sessionId: "s1",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/w",
+        project: "w",
+      },
+      {
+        messageId: "old",
+        sessionId: "s2",
+        ts: noon(2026, 1, 1),
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 500_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/w",
+        project: "w",
+      },
+    ]);
+
+    const db = openTestDb();
+    migrate(db);
+    registerIpc({ db, provider, analyticsDb, claudeDir: home });
+
+    const all = (handlers.get(IPC.readStats)!(null, "all") as StatsSnapshot)
+      .daily;
+    expect(all.map((d) => d.day)).toEqual(["2026-01-01", "2026-06-14"]);
+    expect(all[1].inputTokens).toBe(1_000_000);
+    expect(all[1].byModel).toEqual([
+      { modelRaw: "claude-opus-4-8", totalTokens: 1_000_000 },
+    ]);
   });
 
   it("with a store but no claude dir, serves last-known totals and reports done", () => {
