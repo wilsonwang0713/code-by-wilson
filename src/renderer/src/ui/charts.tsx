@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "./atoms";
 import {
   donutGradient,
@@ -333,6 +333,17 @@ export function CalendarHeatmap({
   } | null>(null);
   const width = weeks.length * CAL_STEP;
   const height = 7 * CAL_STEP;
+
+  // Open scrolled to the newest week (the grid runs oldest -> newest left to right), so the latest activity is
+  // visible without scrolling. Keyed on the window's first/last day, so it snaps right only when the window
+  // changes (page open, year switch) — NOT on the data-only polls that refresh cell colors, which would
+  // otherwise fight a user who scrolled back to look at an earlier month.
+  const firstDay = weeks[0]?.[0]?.day;
+  const lastDay = weeks[weeks.length - 1]?.[6]?.day;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth; // clamps to the max automatically
+  }, [firstDay, lastDay]);
 
   return (
     // Relative, non-clipping wrapper: the tooltip renders here, free to overhang the grid's top, while only
