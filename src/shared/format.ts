@@ -126,3 +126,9 @@ export function formatDayLong(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
+
+/** A 'YYYY-MM-DD' local day key as its three-letter month, for the calendar's top axis: "Jun". */
+export function formatMonthShort(day: string): string {
+  const [, m] = day.split("-").map(Number);
+  return MONTHS[m - 1];
+}
