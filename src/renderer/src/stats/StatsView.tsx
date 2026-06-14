@@ -815,10 +815,10 @@ function StackByToggle({
   );
 }
 
-/** The page-level "Include cache" pill in the Stats header, governing the Tokens metric across all three
- *  breakdowns at once. On (default) counts all four token kinds; off counts fresh tokens (input + output)
- *  only. Cost is never affected; it always prices every kind, as the tooltip says. Styled like
- *  RangeFilter's pressed state. */
+/** The page-level "Include cache" control in the Stats header, governing the Tokens metric across every
+ *  breakdown. A checkbox: a filled, sky-ticked box when on (count all four token kinds), an empty box when
+ *  off (fresh input + output only). Cost always prices every kind, as the tooltip notes. The checkbox reads
+ *  its binary state at a glance and stays visually distinct from the range pill group beside it. */
 function CacheToggle({
   on,
   onChange,
@@ -832,12 +832,17 @@ function CacheToggle({
       onClick={() => onChange(!on)}
       aria-pressed={on}
       title="Count cache-read and cache-creation tokens in the token figures (cost always includes them)"
-      className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ${
-        on
-          ? "border-ink-700 bg-ink-700 text-fg"
-          : "border-ink-800 bg-ink-900 text-fg-faint hover:text-fg-muted"
-      }`}
+      className="flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-[11px] text-fg-muted transition-colors hover:border-ink-700"
     >
+      <span
+        className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border transition-colors ${
+          on
+            ? "border-primary bg-primary text-ink-950"
+            : "border-ink-700 text-transparent"
+        }`}
+      >
+        <Icon name="check" size={10} />
+      </span>
       Include cache
     </button>
   );
