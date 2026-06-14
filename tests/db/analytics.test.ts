@@ -1666,8 +1666,32 @@ describe("readCalendar", () => {
     expect(cal).toHaveLength(1);
     expect(cal[0].day).toBe("2026-06-14");
     expect(cal[0].turns).toBe(2);
-    expect(cal[0].tokens).toBe(2_000_000);
+    expect(cal[0].totalTokens).toBe(2_000_000);
+    expect(cal[0].inputTokens).toBe(1_000_000);
+    expect(cal[0].outputTokens).toBe(1_000_000);
     expect(cal[0].equivApiValueUsd).toBeCloseTo(30);
+  });
+
+  it("carries the fresh input/output subset apart from the total, so the cache toggle can pick either", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "cache-heavy",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadTokens: 1000,
+          cacheCreationTokens: 500,
+        },
+      }),
+    ]);
+    const cal = readCalendar(db, since, until);
+    expect(cal[0].totalTokens).toBe(1515); // all four kinds (cache included)
+    expect(cal[0].inputTokens).toBe(10);
+    expect(cal[0].outputTokens).toBe(5); // fresh subset = 15, far below the total
   });
 
   it("reports n/a (null) equiv on a day whose only model is unrecognized, while still counting tokens", () => {
@@ -1687,7 +1711,7 @@ describe("readCalendar", () => {
       }),
     ]);
     const cal = readCalendar(db, since, until);
-    expect(cal[0].tokens).toBe(100);
+    expect(cal[0].totalTokens).toBe(100);
     expect(cal[0].turns).toBe(1);
     expect(cal[0].equivApiValueUsd).toBeNull();
   });
@@ -1724,7 +1748,7 @@ describe("readCalendar", () => {
     const cal = readCalendar(db, since, until);
     expect(cal).toHaveLength(1);
     expect(cal[0].turns).toBe(2);
-    expect(cal[0].tokens).toBe(1_000_500);
+    expect(cal[0].totalTokens).toBe(1_000_500);
     expect(cal[0].equivApiValueUsd).toBeCloseTo(5); // opus only; the unknown model adds tokens, no cost
   });
 

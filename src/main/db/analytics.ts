@@ -862,12 +862,15 @@ export function readDaily(
   return foldDays(groupByDayAndModel(db, sinceMs, untilMs));
 }
 
-/** A calendar day mid-fold: turns and tokens summed across the day's models; cost accumulated over only its
- *  recognized models (tracking hasKnownCost so an all-unrecognized day renders n/a, not a misleading $0). */
+/** A calendar day mid-fold: turns and tokens summed across the day's models (total plus the fresh input/
+ *  output subset, so the renderer can honor the page's "Include cache" pill via tokensOf); cost accumulated
+ *  over only its recognized models (tracking hasKnownCost so an all-unrecognized day renders n/a, not $0). */
 interface CalAgg {
   day: string;
   turns: number;
-  tokens: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   knownCost: number;
   hasKnownCost: boolean;
 }
@@ -887,18 +890,22 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
       a = {
         day: r.day,
         turns: 0,
-        tokens: 0,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
         knownCost: 0,
         hasKnownCost: false,
       };
       map.set(r.day, a);
     }
     a.turns += r.turns;
-    a.tokens +=
+    a.totalTokens +=
       r.input_tokens +
       r.output_tokens +
       r.cache_read_tokens +
       r.cache_creation_tokens;
+    a.inputTokens += r.input_tokens;
+    a.outputTokens += r.output_tokens;
     const cost = modelRowCost(r);
     if (cost != null) {
       a.knownCost += cost;
@@ -910,7 +917,9 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
       (a): CalendarDay => ({
         day: a.day,
         turns: a.turns,
-        tokens: a.tokens,
+        totalTokens: a.totalTokens,
+        inputTokens: a.inputTokens,
+        outputTokens: a.outputTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
       }),
     )

@@ -349,14 +349,19 @@ export interface DailyBucket {
 
 /**
  * One local calendar day of the contributions calendar (#115), carrying all three toggle metrics so the cell
- * intensity can switch between them with no re-fetch. `turns` is the day's assistant-turn count; `tokens` is
- * the sum of all four token kinds; `equivApiValueUsd` is the day's Equivalent API value summed over its
- * recognized models, or null (n/a) when none of that day's turns ran a known model — never a guessed $0.
+ * intensity can switch between them with no re-fetch. `turns` is the day's assistant-turn count.
+ * `totalTokens` sums all four token kinds; `inputTokens`/`outputTokens` ride along so the page's "Include
+ * cache" pill can pick the Tokens metric via the shared `tokensOf` (all four kinds on, fresh input+output
+ * off), exactly like the per-model/-project/-branch/-session rows. `equivApiValueUsd` is the day's
+ * Equivalent API value summed over its recognized models, or null (n/a) when none of that day's turns ran a
+ * known model — never a guessed $0 (cost always prices every kind, unaffected by the cache pill).
  */
 export interface CalendarDay {
   day: string;
   turns: number;
-  tokens: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   equivApiValueUsd: number | null;
 }
 

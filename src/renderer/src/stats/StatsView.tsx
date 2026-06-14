@@ -165,6 +165,7 @@ export function StatsView() {
                       onYear={setCalendarYear}
                       metric={calMetric}
                       onMetric={setCalMetric}
+                      includeCache={includeCache}
                       selectedDay={isDayRange(range) ? range.day : null}
                       onSelectDay={(day) => setRange({ day })}
                     />
@@ -305,6 +306,7 @@ function Contributions({
   onYear,
   metric,
   onMetric,
+  includeCache,
   selectedDay,
   onSelectDay,
 }: {
@@ -316,17 +318,19 @@ function Contributions({
   onYear: (y: number | null) => void;
   metric: CalMetric;
   onMetric: (m: CalMetric) => void;
+  includeCache: boolean;
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
 }) {
   const byDay = new Map(days.map((d) => [d.day, d]));
-  // The value a day contributes under the active metric. A null equiv (no recognized model that day) reads as
-  // 0 intensity — honest n/a in the tooltip, no guessed cost.
+  // The value a day contributes under the active metric. The Tokens metric follows the page's "Include cache"
+  // pill via the shared tokensOf (all four kinds on, fresh input+output off), like the other breakdowns. A
+  // null equiv (no recognized model that day) reads as 0 intensity — honest n/a in the tooltip, no guessed cost.
   const valueOf = (day: string): number => {
     const d = byDay.get(day);
     if (!d) return 0;
     if (metric === "turns") return d.turns;
-    if (metric === "tokens") return d.tokens;
+    if (metric === "tokens") return tokensOf(d, includeCache);
     return d.equivApiValueUsd ?? 0;
   };
 
@@ -352,7 +356,7 @@ function Contributions({
             (d?.turns ?? 0) === 1 ? "turn" : "turns"
           }`
         : metric === "tokens"
-          ? `${formatTokensShort(d?.tokens ?? 0)} tokens`
+          ? `${formatTokensShort(d ? tokensOf(d, includeCache) : 0)} tokens`
           : d?.equivApiValueUsd == null
             ? "n/a"
             : formatUsd(d.equivApiValueUsd);
