@@ -118,12 +118,21 @@ describe("calendarWindow", () => {
     });
   });
 
-  it("a specific year spans Jan 1 through Dec 31 of that year", () => {
+  it("a specific (past) year spans Jan 1 through Dec 31 of that year", () => {
     expect(calendarWindow(2024, NOON)).toEqual({
       startDay: "2024-01-01",
       endDay: "2024-12-31",
       sinceMs: new Date(2024, 0, 1, 0, 0, 0, 0).getTime(),
       untilMs: new Date(2025, 0, 1, 0, 0, 0, 0).getTime(),
+    });
+  });
+
+  it("clamps the current year to today, never padding empty future months", () => {
+    expect(calendarWindow(2026, NOON)).toEqual({
+      startDay: "2026-01-01",
+      endDay: "2026-06-14",
+      sinceMs: new Date(2026, 0, 1, 0, 0, 0, 0).getTime(),
+      untilMs: new Date(2026, 5, 15, 0, 0, 0, 0).getTime(),
     });
   });
 });

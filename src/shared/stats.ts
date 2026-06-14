@@ -310,15 +310,19 @@ export interface CalendarWindow {
 
 /**
  * Resolve the calendar's window. A null year is the default trailing twelve months: the 365 inclusive local
- * days ending today. A specific year is Jan 1 through Dec 31 of that local year. Either way the epoch bounds
- * are local-midnight aligned (since = startDay's midnight, until = the day after endDay's midnight). `nowMs`
- * is injected so the trailing window is deterministic in tests.
+ * days ending today. A specific year runs Jan 1 through Dec 31 of that local year, but never past today — the
+ * current year ends at today rather than padding the grid with empty future months (which would scroll the
+ * view to a blank December). A past year is unaffected; a future year can't reach the switcher (years come
+ * from real data). Either way the epoch bounds are local-midnight aligned (since = startDay's midnight,
+ * until = the day after endDay's midnight). `nowMs` is injected so the bounds are deterministic in tests.
  */
 export function calendarWindow(
   year: number | null,
   nowMs: number,
 ): CalendarWindow {
-  const endDay = year == null ? localDayKey(nowMs) : `${year}-12-31`;
+  const today = localDayKey(nowMs);
+  const yearEnd = year == null ? today : `${year}-12-31`;
+  const endDay = yearEnd < today ? yearEnd : today;
   const startDay = year == null ? addDays(endDay, -364) : `${year}-01-01`;
   return {
     startDay,
