@@ -2,7 +2,7 @@ import type { Subagent } from "@shared/types";
 import { formatDuration, formatTokens } from "@shared/format";
 import { cx } from "../../ui/atoms";
 import { FAMILY_LABEL } from "../../ui/meta";
-import { PanelSection, PanelHeading } from "./chrome";
+import { EmptyState } from "./chrome";
 
 const GLYPH: Record<Subagent["status"], string> = {
   working: "◐",
@@ -14,14 +14,6 @@ const GLYPH_TONE: Record<Subagent["status"], string> = {
   done: "text-fg-muted",
   failed: "text-danger",
 };
-
-/** Count a forest's nodes, children included — the panel's header tally. */
-function countAgents(nodes: Subagent[]): number {
-  return nodes.reduce(
-    (n, a) => n + 1 + (a.children ? countAgents(a.children) : 0),
-    0,
-  );
-}
 
 /** One subagent row plus its nested children, indented by depth. */
 function AgentNode({ agent, depth }: { agent: Subagent; depth: number }) {
@@ -66,26 +58,18 @@ function AgentNode({ agent, depth }: { agent: Subagent; depth: number }) {
   );
 }
 
-/** The subagent tree: who spawned whom, each node with type, status, tokens, and duration. Hidden when
- *  the session spawned no subagents. */
-export function SubagentTree({ subagents }: { subagents: Subagent[] }) {
-  if (subagents.length === 0) return null;
+/**
+ * The Structure dock's Subagents tab: the session's subagent forest — who spawned whom, each node with
+ * type, status, model, tokens, and duration. Display-only for this slice (no lanes, sorting, or
+ * drill-in). Shows an empty state until the session spawns a subagent.
+ */
+export function SubagentsTab({ subagents }: { subagents: Subagent[] }) {
+  if (subagents.length === 0) return <EmptyState>No subagents yet.</EmptyState>;
   return (
-    <PanelSection>
-      <PanelHeading
-        right={
-          <span className="font-mono text-[10px] tabular-nums text-fg-faint">
-            {countAgents(subagents)}
-          </span>
-        }
-      >
-        Subagents
-      </PanelHeading>
-      <ul className="space-y-1">
-        {subagents.map((a) => (
-          <AgentNode key={a.id} agent={a} depth={0} />
-        ))}
-      </ul>
-    </PanelSection>
+    <ul className="space-y-1 px-4 py-3">
+      {subagents.map((a) => (
+        <AgentNode key={a.id} agent={a} depth={0} />
+      ))}
+    </ul>
   );
 }
