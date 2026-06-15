@@ -14,6 +14,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   timeline, grouped into collapsible per-batch bands ordered by start time, with
   the task description and tool count on each lane and a status tally.
 
+### Fixed
+
+- Keep the terminal scrollback pinned to the bottom after switching sessions.
+
 ## [0.1.3] - 2026-06-15
 
 ### Added
@@ -32,6 +36,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   override, offers model aliases (including Fable), shows each session's resolved
   id, and labels a session with no recorded model "Unknown".
 - Capitalized the app display name to "Code-by-wire".
+
+### Fixed
+
+- Hold a new session's picked model in the rail until its first turn lands,
+  instead of briefly flickering to a default.
 
 ## [0.1.2] - 2026-06-12
 
