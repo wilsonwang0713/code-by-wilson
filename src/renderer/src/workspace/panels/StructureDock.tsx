@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Task } from "@shared/types";
+import type { Subagent, Task } from "@shared/types";
 import { Icon } from "../../ui/icons";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
 import type { DocState } from "../use-transcript";
@@ -23,10 +23,14 @@ export function StructureDock({
   tasks,
   doc,
   now,
+  activeAgentId,
+  onDrill,
 }: {
   tasks: Task[];
   doc: DocState;
   now: number;
+  activeAgentId?: string;
+  onDrill: (agent: Subagent) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const subagents = doc?.subagents ?? [];
@@ -71,7 +75,13 @@ export function StructureDock({
           {tab === "turns" ? (
             <TurnsTab turns={turns} now={now} />
           ) : (
-            <SubagentsTab subagents={subagents} stats={stats} now={now} />
+            <SubagentsTab
+              subagents={subagents}
+              stats={stats}
+              now={now}
+              activeAgentId={activeAgentId}
+              onDrill={onDrill}
+            />
           )}
         </div>
       </div>

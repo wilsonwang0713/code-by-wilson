@@ -85,10 +85,14 @@ function SubagentLane({
   agent,
   win,
   now,
+  active,
+  onDrill,
 }: {
   agent: Subagent;
   win: LaneWindow;
   now: number;
+  active: boolean;
+  onDrill: (agent: Subagent) => void;
 }) {
   const meta = LANE_META[agent.status];
   const { start, end } = laneInterval(agent, win.start, now);
@@ -98,7 +102,12 @@ function SubagentLane({
       ? now - agent.startMs
       : agent.durationMs;
   return (
-    <li className="relative flex min-h-[26px] flex-col justify-center overflow-hidden rounded-sm bg-ink-900">
+    <li
+      className={cx(
+        "relative flex min-h-[26px] flex-col justify-center overflow-hidden rounded-sm bg-ink-900",
+        active && "ring-1 ring-inset ring-accent",
+      )}
+    >
       <div
         className={cx(
           "absolute inset-y-0 border-l-2 transition-[left,width] duration-700 ease-out",
@@ -108,7 +117,12 @@ function SubagentLane({
         )}
         style={{ left: `${band.left}%`, width: `${band.width}%` }}
       />
-      <div className="relative px-2 py-1">
+      <button
+        type="button"
+        onClick={() => onDrill(agent)}
+        aria-label={`Drill into ${agent.type} subagent`}
+        className="relative block w-full px-2 py-1 text-left"
+      >
         <div className="flex items-center gap-2">
           <span
             className={cx(
@@ -145,7 +159,7 @@ function SubagentLane({
             {agent.description}
           </div>
         )}
-      </div>
+      </button>
     </li>
   );
 }
@@ -281,9 +295,13 @@ function GroupHeader({
 function SubagentGroupLanes({
   group,
   now,
+  activeAgentId,
+  onDrill,
 }: {
   group: SubagentGroup;
   now: number;
+  activeAgentId?: string;
+  onDrill: (agent: Subagent) => void;
 }) {
   const win = laneWindow(group.agents, now);
   const live = groupIsLive(group);
@@ -298,7 +316,14 @@ function SubagentGroupLanes({
       )}
       <ul className="space-y-1">
         {group.agents.map((a) => (
-          <SubagentLane key={a.id} agent={a} win={win} now={now} />
+          <SubagentLane
+            key={a.id}
+            agent={a}
+            win={win}
+            now={now}
+            active={a.id === activeAgentId}
+            onDrill={onDrill}
+          />
         ))}
       </ul>
     </div>
@@ -313,12 +338,16 @@ function SubagentGroupBand({
   collapsed,
   autoCollapsed,
   onToggle,
+  activeAgentId,
+  onDrill,
 }: {
   group: SubagentGroup;
   now: number;
   collapsed: boolean;
   autoCollapsed: boolean;
   onToggle: () => void;
+  activeAgentId?: string;
+  onDrill: (agent: Subagent) => void;
 }) {
   return (
     <div>
@@ -329,7 +358,14 @@ function SubagentGroupBand({
         autoCollapsed={autoCollapsed}
         onToggle={onToggle}
       />
-      {!collapsed && <SubagentGroupLanes group={group} now={now} />}
+      {!collapsed && (
+        <SubagentGroupLanes
+          group={group}
+          now={now}
+          activeAgentId={activeAgentId}
+          onDrill={onDrill}
+        />
+      )}
     </div>
   );
 }
@@ -346,10 +382,14 @@ export function SubagentsTab({
   subagents,
   stats,
   now,
+  activeAgentId,
+  onDrill,
 }: {
   subagents: Subagent[];
   stats: SubagentStats;
   now: number;
+  activeAgentId?: string;
+  onDrill: (agent: Subagent) => void;
 }) {
   // `lanes` and `groups` memoize on the subagents identity (stable between polls): the flatten and the
   // partition only re-run when the forest changes. Each band's window tracks `now` (fresh every render),
@@ -387,6 +427,8 @@ export function SubagentsTab({
               collapsed={collapsed}
               autoCollapsed={collapsed && isDefault}
               onToggle={() => toggle(group)}
+              activeAgentId={activeAgentId}
+              onDrill={onDrill}
             />
           );
         })}
