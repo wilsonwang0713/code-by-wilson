@@ -25,6 +25,7 @@ import {
   groupStartMs,
   groupSubagents,
   groupUniformType,
+  resolveCollapse,
   resolveCollapsed,
 } from "./subagent-group";
 
@@ -207,7 +208,7 @@ function groupCounts(agents: Subagent[]): {
   for (const a of agents) {
     if (a.status === "working") working++;
     else if (a.status === "failed") failed++;
-    else done++;
+    else if (a.status === "done") done++;
   }
   return { working, done, failed };
 }
@@ -275,6 +276,35 @@ function GroupHeader({
   );
 }
 
+/** The expanded band body: the group's lanes on its own time window, behind a per-band "now" playhead
+ *  while the group is live. Rendered only when the band is open, so a collapsed band runs no lane math. */
+function SubagentGroupLanes({
+  group,
+  now,
+}: {
+  group: SubagentGroup;
+  now: number;
+}) {
+  const win = laneWindow(group.agents, now);
+  const live = groupIsLive(group);
+  const nowPct = spanPct(now - win.start, win.end - win.start);
+  return (
+    <div className="relative mt-1.5">
+      {live && (
+        <div
+          className="pointer-events-none absolute inset-y-0 z-10 w-px bg-working-bright/50 transition-[left] duration-700 ease-out"
+          style={{ left: `${nowPct}%` }}
+        />
+      )}
+      <ul className="space-y-1">
+        {group.agents.map((a) => (
+          <SubagentLane key={a.id} agent={a} win={win} now={now} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** One group as a band: its header plus, when expanded, its lanes on the group's own time window with a
  *  per-band "now" playhead while the group is live. */
 function SubagentGroupBand({
@@ -290,9 +320,6 @@ function SubagentGroupBand({
   autoCollapsed: boolean;
   onToggle: () => void;
 }) {
-  const win = laneWindow(group.agents, now);
-  const live = groupIsLive(group);
-  const nowPct = spanPct(now - win.start, win.end - win.start);
   return (
     <div>
       <GroupHeader
@@ -302,21 +329,7 @@ function SubagentGroupBand({
         autoCollapsed={autoCollapsed}
         onToggle={onToggle}
       />
-      {!collapsed && (
-        <div className="relative mt-1.5">
-          {live && (
-            <div
-              className="pointer-events-none absolute inset-y-0 z-10 w-px bg-working-bright/50 transition-[left] duration-700 ease-out"
-              style={{ left: `${nowPct}%` }}
-            />
-          )}
-          <ul className="space-y-1">
-            {group.agents.map((a) => (
-              <SubagentLane key={a.id} agent={a} win={win} now={now} />
-            ))}
-          </ul>
-        </div>
-      )}
+      {!collapsed && <SubagentGroupLanes group={group} now={now} />}
     </div>
   );
 }
@@ -362,17 +375,17 @@ export function SubagentsTab({
       />
       <div className="space-y-3 px-4 py-3">
         {groups.map((group) => {
-          const override = overrides.get(group.id);
-          const collapsed = resolveCollapsed(group, override);
-          const overridden =
-            override !== undefined && override.live === groupIsLive(group);
+          const { collapsed, isDefault } = resolveCollapse(
+            group,
+            overrides.get(group.id),
+          );
           return (
             <SubagentGroupBand
               key={group.id}
               group={group}
               now={now}
               collapsed={collapsed}
-              autoCollapsed={collapsed && !overridden}
+              autoCollapsed={collapsed && isDefault}
               onToggle={() => toggle(group)}
             />
           );

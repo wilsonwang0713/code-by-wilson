@@ -10,6 +10,7 @@ import {
   groupSpanMs,
   groupUniformType,
   groupSubagents,
+  resolveCollapse,
   resolveCollapsed,
 } from "../../src/renderer/src/workspace/panels/subagent-group";
 
@@ -137,6 +138,26 @@ describe("group predicates and collapse", () => {
     expect(resolveCollapsed(doneClean, setWhileLive)).toBe(true);
     // no override -> default
     expect(resolveCollapsed(doneClean, undefined)).toBe(true);
+  });
+
+  it("reports whether the collapsed state came from the default or an in-phase override", () => {
+    // in-phase override drives the state, so it is not the default
+    const inPhase: CollapseOverride = { collapsed: false, live: false };
+    expect(resolveCollapse(doneClean, inPhase)).toEqual({
+      collapsed: false,
+      isDefault: false,
+    });
+    // override set while live has lapsed; the default (collapse) applies and is flagged as default
+    const stale: CollapseOverride = { collapsed: false, live: true };
+    expect(resolveCollapse(doneClean, stale)).toEqual({
+      collapsed: true,
+      isDefault: true,
+    });
+    // no override -> default
+    expect(resolveCollapse(doneClean, undefined)).toEqual({
+      collapsed: true,
+      isDefault: true,
+    });
   });
 
   it("reports a uniform agent type, undefined when mixed", () => {

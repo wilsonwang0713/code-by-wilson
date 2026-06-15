@@ -95,16 +95,26 @@ export function groupCollapseDefault(group: SubagentGroup): boolean {
   return !groupIsLive(group) && !groupHasFailure(group);
 }
 
-/** The effective collapsed state: a manual override wins while the group's live phase is unchanged,
- *  otherwise the default applies. So a freshly finished clean batch auto-collapses even if expanded
- *  while live, and a done batch the user expands by hand stays expanded. */
+/** The effective collapsed state plus whether it came from the default rule (`isDefault`) rather than a
+ *  still-in-phase manual override. A manual override wins while the group's live phase is unchanged,
+ *  otherwise the default applies — so a freshly finished clean batch auto-collapses even if expanded
+ *  while live, and a done batch the user expands by hand stays expanded. `isDefault` drives the header's
+ *  "auto" hint, decided here so the hint can't drift from the collapse decision. */
+export function resolveCollapse(
+  group: SubagentGroup,
+  override: CollapseOverride | undefined,
+): { collapsed: boolean; isDefault: boolean } {
+  if (override !== undefined && override.live === groupIsLive(group))
+    return { collapsed: override.collapsed, isDefault: false };
+  return { collapsed: groupCollapseDefault(group), isDefault: true };
+}
+
+/** The effective collapsed state alone (see resolveCollapse). */
 export function resolveCollapsed(
   group: SubagentGroup,
   override: CollapseOverride | undefined,
 ): boolean {
-  if (override !== undefined && override.live === groupIsLive(group))
-    return override.collapsed;
-  return groupCollapseDefault(group);
+  return resolveCollapse(group, override).collapsed;
 }
 
 /** The agent type shared by every member, or undefined when mixed (the header omits it then). */
