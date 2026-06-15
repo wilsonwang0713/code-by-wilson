@@ -155,6 +155,7 @@ export function buildSubagentForest(
       children: [],
     };
     if (model) node.model = model;
+    if (Number.isFinite(s.firstTs)) node.startMs = s.firstTs;
     nodeById.set(a.agentId, node);
   }
 

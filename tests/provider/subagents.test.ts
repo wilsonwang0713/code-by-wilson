@@ -109,6 +109,7 @@ describe("buildSubagentForest", () => {
         model: "sonnet",
         tokens: 157,
         durationMs: 10000,
+        startMs: Date.parse("2026-06-04T03:00:00.000Z"),
       },
       {
         id: "a2",
@@ -117,6 +118,7 @@ describe("buildSubagentForest", () => {
         model: "haiku",
         tokens: 10,
         durationMs: 0,
+        startMs: Date.parse("2026-06-04T03:00:01.000Z"),
       },
     ]);
   });
@@ -163,6 +165,7 @@ describe("buildSubagentForest", () => {
         model: "sonnet",
         tokens: 11,
         durationMs: 5000,
+        startMs: Date.parse("2026-06-04T03:00:00.000Z"),
         children: [
           {
             id: "kid",
@@ -171,10 +174,36 @@ describe("buildSubagentForest", () => {
             model: "haiku",
             tokens: 5,
             durationMs: 0,
+            startMs: Date.parse("2026-06-04T03:00:01.000Z"),
           },
         ],
       },
     ]);
+  });
+
+  it("exposes startMs from the agent's first parseable timestamp", () => {
+    const forest = buildSubagentForest(main("tu-1", { is_error: false }), [
+      agent("a1", "tu-1", "Explore", [
+        {
+          type: "assistant",
+          timestamp: "2026-06-04T03:00:00.000Z",
+          message: { model: SONNET, usage: { input_tokens: 1, output_tokens: 1 }, content: [] },
+        },
+        {
+          type: "assistant",
+          timestamp: "2026-06-04T03:00:10.000Z",
+          message: { model: SONNET, usage: { input_tokens: 1, output_tokens: 1 }, content: [] },
+        },
+      ]),
+    ]);
+    expect(forest[0].startMs).toBe(Date.parse("2026-06-04T03:00:00.000Z"));
+  });
+
+  it("leaves startMs unset for a timestamp-less agent", () => {
+    const forest = buildSubagentForest(main("tu-1"), [
+      agent("a1", "tu-1", "Explore", [{ type: "user", message: { content: [] } }]),
+    ]);
+    expect(forest[0].startMs).toBeUndefined();
   });
 
   it("marks a subagent working when its dispatch has no result yet", () => {

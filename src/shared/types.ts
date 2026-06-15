@@ -26,6 +26,9 @@ export interface Subagent {
   status: "working" | "done" | "failed";
   /** Absent until an assistant turn reports a model (a just-spawned agent has none yet). */
   model?: Family;
+  /** Wall-clock start (epoch ms): the agent's first parseable transcript timestamp. Absent when no row
+   *  carried a timestamp, so the lane can't be positioned and falls back to the timeline's left edge. */
+  startMs?: number;
   tokens: number;
   durationMs: number;
   children?: Subagent[];
