@@ -725,6 +725,41 @@ describe("parseTranscriptEvents — timeline", () => {
   });
 });
 
+describe("parseTranscriptEvents — include-sidechain option", () => {
+  const sidechainRows = () =>
+    jsonl(
+      {
+        type: "user",
+        isSidechain: true,
+        isMeta: false,
+        message: { role: "user", content: "Subagent task" },
+      },
+      {
+        type: "assistant",
+        isSidechain: true,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Working on it." }],
+        },
+      },
+    );
+
+  it("renders sidechain rows when includeSidechain is on", () => {
+    const { events } = parseTranscriptEvents(sidechainRows(), {
+      includeSidechain: true,
+    });
+    expect(events).toEqual([
+      { kind: "user", text: "Subagent task" },
+      { kind: "assistant", text: "Working on it." },
+    ]);
+  });
+
+  it("drops sidechain rows by default (option off)", () => {
+    const { events } = parseTranscriptEvents(sidechainRows());
+    expect(events).toEqual([]);
+  });
+});
+
 describe("parseTranscriptEvents — current context", () => {
   it("reports the latest assistant turn's cache-state split", () => {
     const { context } = parseTranscriptEvents(

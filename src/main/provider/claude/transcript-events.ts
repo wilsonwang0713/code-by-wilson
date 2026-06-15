@@ -62,13 +62,16 @@ function diffHunk(tool: string, input: Record<string, unknown>): DiffHunk {
 /**
  * Project parsed transcript rows into render-ready events, a waiting reason, a turn-by-turn timeline, and
  * the current context's cache-state split — all in one pass. Pure: same input, same output. Subagent-
- * internal turns (isSidechain) are dropped — the dispatch is surfaced from the parent's Task tool_use,
- * and a subagent's own tools/time don't count toward the parent turn. The read parses the JSONL once
+ * internal turns (isSidechain) are dropped by default (set includeSidechain to render a subagent's own
+ * file) — the dispatch is surfaced from the parent's Task tool_use, and a subagent's own tools/time
+ * don't count toward the parent turn. The read parses the JSONL once
  * (see parseTranscriptEvents) and feeds the same rows here and to the subagent reconstruction.
  */
 export function parseTranscriptEventsFromRows(
   rows: any[],
+  opts: { includeSidechain?: boolean } = {},
 ): Omit<TranscriptDoc, "subagents"> {
+  const { includeSidechain = false } = opts;
   const events: TranscriptEvent[] = [];
   const tail = createTailTracker();
 
@@ -101,7 +104,8 @@ export function parseTranscriptEventsFromRows(
 
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
-    if (row.isSidechain) continue; // subagent-internal turn; not part of the conversation or its timeline
+    // A subagent-internal turn: dropped for the Session view, kept when rendering a subagent's own file.
+    if (!includeSidechain && row.isSidechain) continue;
 
     const tsParsed =
       typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
@@ -220,6 +224,7 @@ export function parseTranscriptEventsFromRows(
  *  unparseable lines, so a half-written trailing line during an append is fine. */
 export function parseTranscriptEvents(
   jsonl: string,
+  opts?: { includeSidechain?: boolean },
 ): Omit<TranscriptDoc, "subagents"> {
-  return parseTranscriptEventsFromRows(parseJsonlRows(jsonl));
+  return parseTranscriptEventsFromRows(parseJsonlRows(jsonl), opts);
 }
