@@ -72,6 +72,7 @@ function harness(isMac = true) {
         term: f.term,
         fit: { fit: () => {}, proposeDimensions: () => undefined },
         wrapper: {} as HTMLElement,
+        syncScroll: () => {},
       };
     },
   });
