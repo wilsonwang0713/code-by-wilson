@@ -69,7 +69,7 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" --draft --title "code-by-wire $tag" --generate-notes
+            gh release create "$tag" --draft --title "Code-by-wire $tag" --generate-notes
           fi
           gh release upload "$tag" --clobber \
             release/*.dmg release/*.dmg.blockmap release/latest-mac.yml

@@ -7,7 +7,7 @@ English | [简体中文](README.zh-CN.md)
 [![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire?style=flat-square)](https://github.com/luojiahai/code-by-wire/releases)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=github&logoColor=white)](https://github.com/sponsors/luojiahai)
 
-**The cockpit for Claude Code.**
+**The cockpit for local Claude Code.**
 
 Claude Code runs in your terminal and writes a rich trail to `~/.claude` as it
 works: every turn, every token, every tool call, the running cost, the context
@@ -138,7 +138,7 @@ Download the prebuilt app, or build it yourself.
 ### Download
 
 1. [Download the latest `.dmg`](https://github.com/luojiahai/code-by-wire/releases/latest).
-2. Open it and drag code-by-wire to Applications.
+2. Open it and drag Code-by-wire to Applications.
 3. Launch it. The app is signed and notarized by Apple, so it opens straight
    away, no Gatekeeper warning and no quarantine workaround.
 
@@ -152,12 +152,12 @@ pnpm rebuild:native   # rebuild better-sqlite3 + node-pty for Electron's ABI
 pnpm dist             # writes the .dmg to release/
 ```
 
-Open the `.dmg` from `release/` and drag code-by-wire to Applications. Because
+Open the `.dmg` from `release/` and drag Code-by-wire to Applications. Because
 it's unsigned, the first launch may need a right-click → **Open**, or clearing
 the quarantine flag:
 
 ```
-xattr -dr com.apple.quarantine /Applications/code-by-wire.app
+xattr -dr com.apple.quarantine /Applications/Code-by-wire.app
 ```
 
 ## Requirements
