@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type ComponentPropsWithoutRef, useMemo } from "react";
 import type { Subagent } from "@shared/types";
 import { formatDuration, formatTokens } from "@shared/format";
 import { spanPct } from "../../ui/charts-geom";
@@ -40,9 +40,32 @@ const LANE_META: Record<
   },
 };
 
+/** A fixed-width, right-aligned mono metric in the lane's metadata row (model, tokens, tool count,
+ *  duration). `tone` picks the tint; extra props (e.g. aria-label) pass through to the span. */
+function LaneCell({
+  tone = "text-fg-faint",
+  className,
+  children,
+  ...rest
+}: ComponentPropsWithoutRef<"span"> & { tone?: string }) {
+  return (
+    <span
+      className={cx(
+        "w-12 shrink-0 text-right font-mono text-[10px] tabular-nums",
+        tone,
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </span>
+  );
+}
+
 /** One Subagent as a Gantt lane: a fill positioned by the agent's start and span within the shared time
- *  window, behind a metadata row (type, model, tokens, duration). A working lane's bar runs to `now` and
- *  its duration ticks live; a finished lane is frozen at its measured span. */
+ *  window, behind a metadata row (type, model, tokens, tool count, duration) with the task description on
+ *  a second line when present. A working lane's bar runs to `now` and its duration ticks live; a finished
+ *  lane is frozen at its measured span. */
 function SubagentLane({
   agent,
   win,
@@ -60,7 +83,7 @@ function SubagentLane({
       ? now - agent.startMs
       : agent.durationMs;
   return (
-    <li className="relative overflow-hidden rounded-sm bg-ink-900">
+    <li className="relative flex min-h-[26px] flex-col justify-center overflow-hidden rounded-sm bg-ink-900">
       <div
         className={cx(
           "absolute inset-y-0 border-l-2 transition-[left,width] duration-700 ease-out",
@@ -72,7 +95,12 @@ function SubagentLane({
       />
       <div className="relative px-2 py-1">
         <div className="flex items-center gap-2">
-          <span className={cx("shrink-0 font-mono text-[11px]", meta.tone)}>
+          <span
+            className={cx(
+              "w-4 shrink-0 text-center font-mono text-[11px]",
+              meta.tone,
+            )}
+          >
             {meta.char}
           </span>
           <span
@@ -81,23 +109,22 @@ function SubagentLane({
           >
             {agent.type}
           </span>
-          <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-faint">
-            {agent.model ? FAMILY_LABEL[agent.model] : "—"}
-          </span>
-          <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-muted">
-            {formatTokens(agent.tokens)}
-          </span>
-          <span className="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-faint">
+          <LaneCell>{agent.model ? FAMILY_LABEL[agent.model] : "—"}</LaneCell>
+          <LaneCell tone="text-fg-muted">{formatTokens(agent.tokens)}</LaneCell>
+          <LaneCell
+            aria-label={`${agent.toolCount} tool ${agent.toolCount === 1 ? "call" : "calls"}`}
+          >
             {agent.toolCount}
-            <span aria-hidden>⚒</span>
-          </span>
-          <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-faint">
-            {formatDuration(elapsed)}
-          </span>
+            <span aria-hidden className="ml-0.5">
+              ⚒
+            </span>
+          </LaneCell>
+          <LaneCell>{formatDuration(elapsed)}</LaneCell>
         </div>
+        {/* pl-6 lines the description up under the type label: glyph w-4 (16px) + the row's gap-2 (8px). */}
         {agent.description && (
           <div
-            className="truncate pl-5 pt-0.5 text-[11px] text-fg-faint"
+            className="truncate pl-6 pt-0.5 text-[11px] text-fg-faint"
             title={agent.description}
           >
             {agent.description}

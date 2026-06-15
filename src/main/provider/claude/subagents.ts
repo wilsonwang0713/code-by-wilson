@@ -159,7 +159,8 @@ export function buildSubagentForest(
     };
     if (model) node.model = model;
     if (Number.isFinite(s.firstTs)) node.startMs = s.firstTs;
-    if (a.meta.description) node.description = a.meta.description;
+    const description = a.meta.description.trim();
+    if (description) node.description = description;
     nodeById.set(a.agentId, node);
   }
 
