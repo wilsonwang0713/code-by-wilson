@@ -1,4 +1,5 @@
 import type { Subagent } from "@shared/types";
+import { laneInterval } from "./dock-tabs";
 
 // JSX-free dock logic so the tests can import it under tsconfig.node.json (mirrors dock-tabs.ts).
 
@@ -74,4 +75,58 @@ export function groupSubagents(lanes: Subagent[]): SubagentGroup[] {
       agents: orderPool(pool),
     });
   return batches;
+}
+
+/** A manual collapse choice plus the live phase it was made under, so it can lapse on a phase flip
+ *  (mirrors the dock tab auto-follow `pick` in StructureDock). */
+export interface CollapseOverride {
+  collapsed: boolean;
+  live: boolean;
+}
+
+/** A group is live while any member is still working. */
+export function groupIsLive(group: SubagentGroup): boolean {
+  return group.agents.some((a) => a.status === "working");
+}
+
+/** A group carries a failure when any member failed. */
+export function groupHasFailure(group: SubagentGroup): boolean {
+  return group.agents.some((a) => a.status === "failed");
+}
+
+/** The default: a finished, failure-free group collapses; a live group or one with a failure stays
+ *  open (failures pop, matching the lane colour language). */
+export function groupCollapseDefault(group: SubagentGroup): boolean {
+  return !groupIsLive(group) && !groupHasFailure(group);
+}
+
+/** The effective collapsed state: a manual override wins while the group's live phase is unchanged,
+ *  otherwise the default applies. So a freshly finished clean batch auto-collapses even if expanded
+ *  while live, and a done batch the user expands by hand stays expanded. */
+export function resolveCollapsed(
+  group: SubagentGroup,
+  override: CollapseOverride | undefined,
+): boolean {
+  if (override !== undefined && override.live === groupIsLive(group))
+    return override.collapsed;
+  return groupCollapseDefault(group);
+}
+
+/** The agent type shared by every member, or undefined when mixed (the header omits it then). */
+export function groupUniformType(group: SubagentGroup): string | undefined {
+  const first = group.agents[0]?.type;
+  return group.agents.every((a) => a.type === first) ? first : undefined;
+}
+
+/** The group's wall-clock span: latest member end minus earliest start, reusing laneInterval so a
+ *  working member runs to `now`. Zero when no member is positioned. */
+export function groupSpanMs(group: SubagentGroup, now: number): number {
+  const start = groupStartMs(group);
+  if (!Number.isFinite(start)) return 0;
+  let end = start;
+  for (const a of group.agents) {
+    const iv = laneInterval(a, start, now);
+    if (iv.end > end) end = iv.end;
+  }
+  return end - start;
 }

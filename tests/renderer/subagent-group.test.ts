@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { Subagent } from "@shared/types";
 import {
   INDIVIDUAL_GROUP_ID,
+  type CollapseOverride,
+  type SubagentGroup,
+  groupCollapseDefault,
+  groupHasFailure,
+  groupIsLive,
+  groupSpanMs,
+  groupUniformType,
   groupSubagents,
+  resolveCollapsed,
 } from "../../src/renderer/src/workspace/panels/subagent-group";
 
 /** A lane carrying only the fields the grouping reads. */
@@ -92,5 +100,82 @@ describe("groupSubagents", () => {
     const before = input.map((a) => a.id);
     groupSubagents(input);
     expect(input.map((a) => a.id)).toEqual(before);
+  });
+});
+
+function grp(id: string, agents: Subagent[]): SubagentGroup {
+  return { kind: "batch", id, agents };
+}
+
+describe("group predicates and collapse", () => {
+  const live = grp("g", [lane("a", "g", { status: "working" })]);
+  const doneClean = grp("g", [lane("a", "g", { status: "done" })]);
+  const doneFail = grp("g", [
+    lane("a", "g", { status: "done" }),
+    lane("b", "g", { status: "failed" }),
+  ]);
+
+  it("detects live and failed groups", () => {
+    expect(groupIsLive(live)).toBe(true);
+    expect(groupIsLive(doneClean)).toBe(false);
+    expect(groupHasFailure(doneFail)).toBe(true);
+    expect(groupHasFailure(doneClean)).toBe(false);
+  });
+
+  it("collapses only a done, failure-free group by default", () => {
+    expect(groupCollapseDefault(live)).toBe(false);
+    expect(groupCollapseDefault(doneFail)).toBe(false);
+    expect(groupCollapseDefault(doneClean)).toBe(true);
+  });
+
+  it("honours an override whose phase still matches, else the default", () => {
+    // user expanded a done group: phase (live=false) matches, so it stays expanded
+    const expanded: CollapseOverride = { collapsed: false, live: false };
+    expect(resolveCollapsed(doneClean, expanded)).toBe(false);
+    // override was set while live; group is now done, so the phase differs and the default (collapse) wins
+    const setWhileLive: CollapseOverride = { collapsed: false, live: true };
+    expect(resolveCollapsed(doneClean, setWhileLive)).toBe(true);
+    // no override -> default
+    expect(resolveCollapsed(doneClean, undefined)).toBe(true);
+  });
+
+  it("reports a uniform agent type, undefined when mixed", () => {
+    expect(
+      groupUniformType(
+        grp("g", [
+          lane("a", "g", { type: "Explore" }),
+          lane("b", "g", { type: "Explore" }),
+        ]),
+      ),
+    ).toBe("Explore");
+    expect(
+      groupUniformType(
+        grp("g", [
+          lane("a", "g", { type: "Explore" }),
+          lane("b", "g", { type: "general-purpose" }),
+        ]),
+      ),
+    ).toBeUndefined();
+    // a single member is trivially uniform; an empty group has no type
+    expect(
+      groupUniformType(grp("g", [lane("a", "g", { type: "Explore" })])),
+    ).toBe("Explore");
+    expect(groupUniformType(grp("g", []))).toBeUndefined();
+  });
+
+  it("measures the group span: latest end minus earliest start", () => {
+    const doneSpan = grp("g", [
+      lane("a", "g", { startMs: 0, durationMs: 30000, status: "done" }),
+      lane("b", "g", { startMs: 0, durationMs: 50000, status: "done" }),
+    ]);
+    expect(groupSpanMs(doneSpan, 999999)).toBe(50000);
+    const liveSpan = grp("g", [
+      lane("a", "g", { startMs: 0, status: "working" }),
+    ]);
+    expect(groupSpanMs(liveSpan, 22000)).toBe(22000);
+    const unpositioned = grp("g", [
+      lane("a", "g", { status: "done", durationMs: 5 }),
+    ]);
+    expect(groupSpanMs(unpositioned, 1000)).toBe(0);
   });
 });
