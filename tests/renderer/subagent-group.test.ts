@@ -58,11 +58,11 @@ describe("groupSubagents", () => {
     expect(pool.agents.map((a) => a.id)).toEqual(["d", "c"]);
   });
 
-  it("orders batch members by duration descending", () => {
+  it("orders batch members by start ascending", () => {
     const g = groupSubagents([
-      lane("a", "b1", { durationMs: 10 }),
-      lane("b", "b1", { durationMs: 50 }),
-      lane("c", "b1", { durationMs: 30 }),
+      lane("a", "b1", { startMs: 30 }),
+      lane("b", "b1", { startMs: 10 }),
+      lane("c", "b1", { startMs: 20 }),
     ])[0];
     expect(g.agents.map((a) => a.id)).toEqual(["b", "c", "a"]);
   });

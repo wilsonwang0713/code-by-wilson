@@ -24,16 +24,11 @@ export function groupStartMs(group: SubagentGroup): number {
   return min;
 }
 
-/** Batch order: longest pole first. durationMs is re-measured each poll, so no render clock is needed. */
-function orderBatch(agents: Subagent[]): Subagent[] {
-  return [...agents].sort(
-    (a, b) => b.durationMs - a.durationMs || a.id.localeCompare(b.id),
-  );
-}
-
-/** Pool order: start ascending, an unpositioned lane first (matching the timeline's left edge). Two
+/** Lane order within any group: start ascending, an unpositioned lane first (matching the timeline's
+ *  left edge). The same rule for a batch and the pool — the bars already encode start (x) and duration
+ *  (width), so the row order just follows the timeline rather than re-ranking by a second dimension. Two
  *  unpositioned lanes yield NaN from -Infinity - -Infinity, which is falsy, so the id tiebreak fires. */
-function orderPool(agents: Subagent[]): Subagent[] {
+function orderByStart(agents: Subagent[]): Subagent[] {
   return [...agents].sort(
     (a, b) =>
       (a.startMs ?? -Infinity) - (b.startMs ?? -Infinity) ||
@@ -44,8 +39,8 @@ function orderPool(agents: Subagent[]): Subagent[] {
 /**
  * Partition the flat lane list into batch groups plus one pooled group. A batchId shared by two or more
  * lanes is a batch (its own axis); a singleton batch or a lane with no batchId joins the pool (shared
- * axis), which always sorts last. Batch groups sort by earliest start. Pure: never mutates the input,
- * same input yields the same output.
+ * axis), which always sorts last. Batch groups sort by earliest start, and lanes within every group sort
+ * by start too. Pure: never mutates the input, same input yields the same output.
  */
 export function groupSubagents(lanes: Subagent[]): SubagentGroup[] {
   const buckets = new Map<string, Subagent[]>();
@@ -62,7 +57,7 @@ export function groupSubagents(lanes: Subagent[]): SubagentGroup[] {
   const batches: SubagentGroup[] = [];
   for (const [id, agents] of buckets) {
     if (agents.length >= 2)
-      batches.push({ kind: "batch", id, agents: orderBatch(agents) });
+      batches.push({ kind: "batch", id, agents: orderByStart(agents) });
     else pool.push(...agents);
   }
   batches.sort(
@@ -72,7 +67,7 @@ export function groupSubagents(lanes: Subagent[]): SubagentGroup[] {
     batches.push({
       kind: "individual",
       id: INDIVIDUAL_GROUP_ID,
-      agents: orderPool(pool),
+      agents: orderByStart(pool),
     });
   return batches;
 }
