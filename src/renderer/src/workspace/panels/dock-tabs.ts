@@ -1,4 +1,5 @@
 import type { Subagent } from "@shared/types";
+import { clampPct, niceAxisMax, ratePct, round2 } from "../../ui/charts-geom";
 
 // JSX-free dock logic, so the tests can import it under tsconfig.node.json (mirrors open-in-items.ts).
 
@@ -15,8 +16,14 @@ export interface SubagentStats {
   failed: number;
 }
 
-/** A zeroed tally: the reduce seed and the no-children base, so the two can't drift. */
-const ZERO_STATS: SubagentStats = { total: 0, working: 0, done: 0, failed: 0 };
+/** A zeroed tally, frozen: the shared reduce seed and no-children base, so the two can't drift and the
+ *  read-only return for an empty forest can't be mutated by a caller. */
+const ZERO_STATS: SubagentStats = Object.freeze({
+  total: 0,
+  working: 0,
+  done: 0,
+  failed: 0,
+});
 
 /** Fold the subagent forest once — children included — into its total and per-status node counts. One
  *  walk feeds the count badge, the tab tally, the live signal, and the default-tab choice, so they can't
@@ -49,4 +56,70 @@ export function flattenSubagents(subagents: Subagent[]): Subagent[] {
     if (a.children) lanes.push(...flattenSubagents(a.children));
   }
   return lanes;
+}
+
+/** A near-instant or just-spawned lane still shows this sliver (a percent of the window span), so it
+ *  never vanishes at the floor. */
+const MIN_BAR_PCT = 3;
+
+/** A lane's bar width as a percent of the longest lane's duration, floored to MIN_BAR_PCT so a sliver
+ *  always shows. An empty/zero max (a fresh fan-out, every duration still 0) falls to the floor. Reuses
+ *  ratePct so the share-of-max math matches the app's other bars. */
+export function laneWidthPct(
+  durationMs: number,
+  maxDurationMs: number,
+): number {
+  return Math.max(MIN_BAR_PCT, ratePct(durationMs, maxDurationMs));
+}
+
+/** A lane's position on the timeline window: a left offset and width, both in percent. */
+export interface LaneBand {
+  left: number;
+  width: number;
+}
+
+/** The time window the lane timeline is drawn against, in epoch ms. */
+export interface LaneWindow {
+  start: number;
+  end: number;
+}
+
+/** The window the lanes span. `start` is the earliest lane start. While any lane works, the window
+ *  extends to a "nice" rung at or past `now` (niceAxisMax) so it rescales in discrete steps with headroom
+ *  ahead of the playhead; once all lanes are done it snaps to the exact latest end so the finished
+ *  timeline fills the width. A forest with no positioned lane falls back to `now`. */
+export function laneWindow(lanes: Subagent[], now: number): LaneWindow {
+  let start = Infinity;
+  for (const l of lanes)
+    if (l.startMs !== undefined && l.startMs < start) start = l.startMs;
+  if (!Number.isFinite(start)) start = now;
+  let latest = start;
+  let anyWorking = false;
+  for (const l of lanes) {
+    if (l.status === "working") anyWorking = true;
+    const end =
+      l.status === "working" ? now : (l.startMs ?? start) + l.durationMs;
+    if (end > latest) latest = end;
+  }
+  const end = anyWorking ? start + niceAxisMax(latest - start) : latest;
+  return { start, end };
+}
+
+/** Position one lane on the window as left/width percents. Width is floored to MIN_BAR_PCT so a
+ *  near-instant lane stays visible, and left is clamped so a floored sliver never overflows the right
+ *  edge. A zero/negative span yields a floored bar at the left. */
+export function laneBand(
+  startMs: number,
+  endMs: number,
+  windowStart: number,
+  windowEnd: number,
+): LaneBand {
+  const span = windowEnd - windowStart;
+  if (!(span > 0)) return { left: 0, width: MIN_BAR_PCT };
+  const left = clampPct(((startMs - windowStart) / span) * 100);
+  const width = Math.max(
+    MIN_BAR_PCT,
+    clampPct(((endMs - startMs) / span) * 100),
+  );
+  return { left: round2(Math.min(left, 100 - width)), width: round2(width) };
 }
