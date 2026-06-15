@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-15
+
+### Added
+
+- Subagent lanes in the dock: each session's subagents render as a live gantt
+  timeline, grouped into collapsible per-batch bands ordered by start time, with
+  the task description and tool count on each lane and a status tally.
+
 ## [0.1.2] - 2026-06-12
 
 ### Changed
@@ -52,7 +60,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/luojiahai/code-by-wire/compare/v0.1.2...v0.1.4
 [0.1.2]: https://github.com/luojiahai/code-by-wire/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/luojiahai/code-by-wire/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.0
