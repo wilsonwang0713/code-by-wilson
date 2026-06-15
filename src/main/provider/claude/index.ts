@@ -14,6 +14,7 @@ import { parseJsonlRows } from "./transcript-row";
 import {
   buildSubagentForest,
   readSubagentSources,
+  subagentFileFor,
   subagentsDirFor,
   subagentsNewestMtime,
 } from "./subagents";
@@ -267,6 +268,44 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         // A non-ENOENT read failure (EACCES, EIO, …) is transient, not absence. Degrade like
         // summarize does: report an error so the view keeps its last doc, rather than rejecting the
         // IPC or masquerading as "no transcript".
+        return { status: "error" };
+      }
+    },
+    readSubagentTranscript: (id, agentId, sinceMtimeMs) => {
+      try {
+        const resolved = resolveTranscript(id);
+        if (!resolved) return { status: "absent" };
+        const file = subagentFileFor(resolved.path, agentId);
+        let mtimeMs: number;
+        try {
+          mtimeMs = statSync(file).mtimeMs;
+        } catch (err) {
+          // No such subagent file (or no subagents dir) — genuinely absent. A non-ENOENT stat failure
+          // (EACCES, EIO) is transient: rethrow to the outer catch so it degrades to `error`.
+          if ((err as NodeJS.ErrnoException)?.code === "ENOENT")
+            return { status: "absent" };
+          throw err;
+        }
+        // Keyed on the subagent file alone — the tightest token: a live subagent appending re-triggers
+        // the read, nothing else does.
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        const jsonl = readTextOrNull(file);
+        // Vanished between stat and read. Unlike readTranscript, no forgetSession here: a gone subagent
+        // file doesn't mean the session moved, so its cached path stays valid.
+        if (jsonl === null) return { status: "absent" };
+        // A subagent's file is all-sidechain, so render it with the option on. Nested drilling is a
+        // later issue, so the doc carries no forest of its own.
+        return {
+          status: "changed",
+          mtimeMs,
+          doc: {
+            ...parseTranscriptEventsFromRows(parseJsonlRows(jsonl), {
+              includeSidechain: true,
+            }),
+            subagents: [],
+          },
+        };
+      } catch {
         return { status: "error" };
       }
     },

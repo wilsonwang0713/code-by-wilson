@@ -53,6 +53,7 @@ const provider: Provider = {
   }),
   restate: (_c, prev) => prev,
   readTranscript: () => ({ status: "absent" }),
+  readSubagentTranscript: () => ({ status: "absent" }),
   readTasks: () => ({ status: "absent" }),
   readMetrics: () => ({ status: "absent" }),
   resolveAdoptTarget: () => null,

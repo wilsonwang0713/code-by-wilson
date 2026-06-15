@@ -23,6 +23,15 @@ export interface Provider {
    *  workspace view. `sinceMtimeMs` is the change token from the caller's last read; when it still
    *  matches, the result is `unchanged` and no file is read or parsed. */
   readTranscript(id: string, sinceMtimeMs?: number): TranscriptRead;
+  /** Read one subagent's own transcript (its sidechain file) into render-ready events — the on-demand
+   *  read behind drilling into a Subagent lane. `sinceMtimeMs` is the change token (the subagent file's
+   *  mtime) from the caller's last read; an unchanged token skips the read. Mirrors readTranscript's
+   *  changed / unchanged / absent / error contract. */
+  readSubagentTranscript(
+    id: string,
+    agentId: string,
+    sinceMtimeMs?: number,
+  ): TranscriptRead;
   /** Read one session's task list (status + blockedBy deps) — the on-demand read behind the Tasks
    *  panel. `sinceMtimeMs` is the change token from the caller's last read; an unchanged store skips
    *  the read. */
