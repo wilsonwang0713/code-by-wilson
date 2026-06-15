@@ -6,6 +6,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-15
+
+### Added
+
+- Subagent lanes in the dock: each session's subagents render as a live gantt
+  timeline, grouped into collapsible per-batch bands ordered by start time, with
+  the task description and tool count on each lane and a status tally.
+
+### Fixed
+
+- Keep the terminal scrollback pinned to the bottom after switching sessions.
+
+## [0.1.3] - 2026-06-15
+
+### Added
+
+- Overall Stats view, pinned as an Overview entry at the top of the rail and
+  served from the SQLite analytics index: a headline KPI strip, a GitHub-style
+  contributions calendar with a metric toggle and year switcher, a daily usage
+  chart, per-model, per-project, and per-branch breakdowns, a sortable session
+  table, a date-range filter, and a single cache-token toggle.
+- App version next to the header wordmark.
+
+### Changed
+
+- Moved Tasks, Turns, and Subagents into a collapsible Structure dock.
+- Reworked the model picker: it resolves its default from the configured
+  override, offers model aliases (including Fable), shows each session's resolved
+  id, and labels a session with no recorded model "Unknown".
+- Capitalized the app display name to "Code-by-wire".
+
+### Fixed
+
+- Hold a new session's picked model in the rail until its first turn lands,
+  instead of briefly flickering to a default.
+
 ## [0.1.2] - 2026-06-12
 
 ### Changed
@@ -52,7 +88,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/luojiahai/code-by-wire/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/luojiahai/code-by-wire/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/luojiahai/code-by-wire/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/luojiahai/code-by-wire/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.0
