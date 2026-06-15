@@ -28,6 +28,9 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
       window.api.terminal.resize(sessionId, handle.term.cols, handle.term.rows);
     };
     sync();
+    // The wrapper was just re-attached; the DOM viewport's scrollTop reset to 0 while xterm kept its
+    // scroll position, so realign them before any wheel input reads the stale 0 and jumps to the top.
+    handle.syncScroll();
     handle.term.focus();
 
     const ro = new ResizeObserver(sync);

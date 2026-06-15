@@ -35,13 +35,22 @@ export interface TerminalHandle {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
+  /** Realign the DOM viewport's scrollTop with xterm's internal scroll position. The view calls this
+   *  after re-attaching the wrapper, where detaching reset scrollTop to 0 and the first wheel tick would
+   *  otherwise jump to the top. Built in the factory (it needs the real buffer API). */
+  syncScroll: () => void;
   opened: boolean;
 }
 
 export interface TerminalStoreDeps {
   api: TerminalApi;
   /** Build a fresh xterm + fit + wrapper. Injected so the store is testable without a real DOM. */
-  createTerminal: () => { term: XtermLike; fit: FitLike; wrapper: HTMLElement };
+  createTerminal: () => {
+    term: XtermLike;
+    fit: FitLike;
+    wrapper: HTMLElement;
+    syncScroll: () => void;
+  };
   /** True on macOS. Gates the cmd/option editing keys so we never hijack Super+arrow elsewhere. */
   isMac: boolean;
 }
@@ -114,8 +123,15 @@ export function createTerminalStore({
     create(id) {
       const existing = handles.get(id);
       if (existing) return existing;
-      const { term, fit, wrapper } = createTerminal();
-      const handle: TerminalHandle = { id, term, fit, wrapper, opened: false };
+      const { term, fit, wrapper, syncScroll } = createTerminal();
+      const handle: TerminalHandle = {
+        id,
+        term,
+        fit,
+        wrapper,
+        syncScroll,
+        opened: false,
+      };
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.
       term.onData((data) => api.write(handle.id, data));
       // macOS text-editing keys the Claude Code prompt understands but xterm won't emit on its own:

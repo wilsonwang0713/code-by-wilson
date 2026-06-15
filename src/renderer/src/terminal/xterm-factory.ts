@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import type { FitLike, XtermLike } from "./terminal-store";
+import { viewportScrollTop } from "./viewport-scroll";
 
 /** xterm options tuned for the Claude TUI: generous scrollback, a dark theme matching the app's ink
  *  palette, a monospace stack, and a steady cursor. convertEol stays off — the TUI emits its own.
@@ -66,6 +67,7 @@ export function createXterm(): {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
+  syncScroll: () => void;
 } {
   const term = new Terminal(OPTIONS);
   const fit = new FitAddon();
@@ -90,5 +92,20 @@ export function createXterm(): {
   const wrapper = document.createElement("div");
   wrapper.style.height = "100%";
   wrapper.style.width = "100%";
-  return { term: term, fit, wrapper };
+  // Re-attaching the wrapper on a tab switch resets the DOM viewport's scrollTop to 0 while xterm keeps
+  // its scroll position, so the first wheel tick would otherwise read the stale 0 and jump to the top
+  // (round(0/rowHeight) - viewportY lines up). Re-derive scrollTop from the live buffer's viewportY to
+  // close that gap. No-ops before open() (no viewport yet) and on the DOM-renderer fallback if the
+  // element is missing; harmless on a fresh terminal (viewportY 0 → scrollTop 0).
+  const syncScroll = () => {
+    const viewport = wrapper.querySelector(".xterm-viewport");
+    if (!(viewport instanceof HTMLElement)) return;
+    const buf = term.buffer.active;
+    viewport.scrollTop = viewportScrollTop(
+      buf.viewportY,
+      buf.length,
+      viewport.scrollHeight,
+    );
+  };
+  return { term: term, fit, wrapper, syncScroll };
 }
