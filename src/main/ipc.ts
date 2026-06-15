@@ -140,6 +140,11 @@ export function registerIpc({
   ipcMain.handle(IPC.readTranscript, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readTranscript(id, sinceMtimeMs),
   );
+  ipcMain.handle(
+    IPC.readSubagentTranscript,
+    (_e, id: string, agentId: string, sinceMtimeMs?: number) =>
+      provider.readSubagentTranscript(id, agentId, sinceMtimeMs),
+  );
   ipcMain.handle(IPC.readTasks, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readTasks(id, sinceMtimeMs),
   );

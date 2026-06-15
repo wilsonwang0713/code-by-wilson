@@ -16,6 +16,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.readStats, range, calendarYear, since),
   readTranscript: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readTranscript, id, sinceMtimeMs),
+  readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
+    ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readTasks, id, sinceMtimeMs),
   readMetrics: (id, sinceMtimeMs) =>
