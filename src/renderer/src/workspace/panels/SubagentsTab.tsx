@@ -80,7 +80,7 @@ function SubagentLane({
         >
           {agent.type}
         </span>
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
+        <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-faint">
           {agent.model ? FAMILY_LABEL[agent.model] : "—"}
         </span>
         <span className="w-12 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-muted">
@@ -155,7 +155,7 @@ export function SubagentsTab({
         <div className="relative">
           {live && (
             <div
-              className="pointer-events-none absolute inset-y-0 z-10 w-px bg-working-bright/50"
+              className="pointer-events-none absolute inset-y-0 z-10 w-px bg-working-bright/50 transition-[left] duration-700 ease-out"
               style={{ left: `${nowPct}%` }}
             />
           )}
