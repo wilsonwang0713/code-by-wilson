@@ -63,7 +63,7 @@ two `latest-mac.yml` manifests into one.
 GH_HOST=github.com gh release view vX.Y.Z -R luojiahai/code-by-wire
 ```
 
-Expect `code-by-wire-X.Y.Z-arm64.dmg` (+ `.blockmap`) and `latest-mac.yml`. An
+Expect `Code-by-wire-X.Y.Z-arm64.dmg` (+ `.blockmap`) and `latest-mac.yml`. An
 empty asset list means the upload step didn't run or failed. Read the release
 job log.
 

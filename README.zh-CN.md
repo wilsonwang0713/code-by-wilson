@@ -7,7 +7,7 @@
 [![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire?style=flat-square)](https://github.com/luojiahai/code-by-wire/releases)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=github&logoColor=white)](https://github.com/sponsors/luojiahai)
 
-**Claude Code 的驾驶舱。**
+**本地 Claude Code 的驾驶舱。**
 
 Claude Code 跑在你的终端里，一边工作一边把丰富的轨迹写进 `~/.claude`：每一个回合、每一个
 token、每一次工具调用、实时花费、上下文窗口。可 CLI 几乎什么都不给你看。状态栏（statusline）
@@ -113,7 +113,7 @@ Code 会话，而不只是你正在看的那一个。选一个区间：Today、7
 ### 下载
 
 1. [下载最新的 `.dmg`](https://github.com/luojiahai/code-by-wire/releases/latest)。
-2. 打开后把 code-by-wire 拖进「应用程序」。
+2. 打开后把 Code-by-wire 拖进「应用程序」。
 3. 启动它。应用已由 Apple 签名并公证，可以直接打开，没有 Gatekeeper 警告，也不需要绕过
    隔离标记。
 
@@ -127,11 +127,11 @@ pnpm rebuild:native   # 为 Electron 的 ABI 重新编译 better-sqlite3 + node-
 pnpm dist             # 把 .dmg 输出到 release/
 ```
 
-从 `release/` 打开 `.dmg`，把 code-by-wire 拖进「应用程序」。由于它未签名，首次启动可能需要
+从 `release/` 打开 `.dmg`，把 Code-by-wire 拖进「应用程序」。由于它未签名，首次启动可能需要
 右键 → **打开**，或清除隔离标记：
 
 ```
-xattr -dr com.apple.quarantine /Applications/code-by-wire.app
+xattr -dr com.apple.quarantine /Applications/Code-by-wire.app
 ```
 
 ## 环境要求
