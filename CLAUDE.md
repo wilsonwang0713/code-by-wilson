@@ -28,6 +28,7 @@ The maintainer drives releases in two phases; full mechanics are in `docs/RELEAS
    - Bump + changelog go in one `build(release): vX.Y.Z` commit; keep unrelated changelog backfills as separate `docs(changelog):` commits.
    - Run `pnpm format` and `pnpm lint`, push, and open the PR. Don't push a tag.
 2. **"Release it" (after the PR merges).** Follow `docs/RELEASING.md`: tag the merged commit on `main` as `vX.Y.Z`, push the tag (CI builds the draft), then remind the maintainer to publish the draft.
+   - **Tag push is the maintainer's job from a local clone.** Claude Code on the web runs behind a git proxy scoped to the session's feature branch; pushing any other ref — tags included — returns HTTP 403, and the GitHub tools here can't create a tag/ref either. So in a web session, prepare and verify everything, then hand the maintainer the exact commands (`git switch main && git pull`, `git tag vX.Y.Z`, `git push origin vX.Y.Z`) to run themselves.
 
 ## Agent skills
 
