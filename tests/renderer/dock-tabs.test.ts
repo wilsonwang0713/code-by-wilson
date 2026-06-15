@@ -13,7 +13,14 @@ function sub(
   status: Subagent["status"],
   children?: Subagent[],
 ): Subagent {
-  return { id, type: "general-purpose", status, tokens: 0, durationMs: 0, children };
+  return {
+    id,
+    type: "general-purpose",
+    status,
+    tokens: 0,
+    durationMs: 0,
+    children,
+  };
 }
 
 describe("hasWorkingSubagent", () => {
@@ -21,13 +28,19 @@ describe("hasWorkingSubagent", () => {
     expect(hasWorkingSubagent([])).toBe(false);
   });
   it("is false when every agent is done or failed", () => {
-    expect(hasWorkingSubagent([sub("a", "done"), sub("b", "failed")])).toBe(false);
+    expect(hasWorkingSubagent([sub("a", "done"), sub("b", "failed")])).toBe(
+      false,
+    );
   });
   it("is true when a root agent is working", () => {
-    expect(hasWorkingSubagent([sub("a", "done"), sub("b", "working")])).toBe(true);
+    expect(hasWorkingSubagent([sub("a", "done"), sub("b", "working")])).toBe(
+      true,
+    );
   });
   it("is true when only a nested child is working", () => {
-    expect(hasWorkingSubagent([sub("a", "done", [sub("a1", "working")])])).toBe(true);
+    expect(hasWorkingSubagent([sub("a", "done", [sub("a1", "working")])])).toBe(
+      true,
+    );
   });
 });
 

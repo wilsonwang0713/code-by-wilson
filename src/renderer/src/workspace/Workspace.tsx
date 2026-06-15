@@ -7,9 +7,7 @@ import { TerminalView } from "../terminal/TerminalView";
 import { useTranscript, type DocState } from "./use-transcript";
 import { ContextPanel } from "./panels/ContextPanel";
 import { CostPanel } from "./panels/CostPanel";
-import { Timeline } from "./panels/Timeline";
-import { TasksPanel } from "./panels/TasksPanel";
-import { SubagentTree } from "./panels/SubagentTree";
+import { StructureDock } from "./panels/StructureDock";
 import { TokensPanel } from "./panels/TokensPanel";
 import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
 import { GitPanel } from "./panels/GitPanel";
@@ -105,9 +103,9 @@ function SessionIdChip({ id }: { id: string }) {
 }
 
 /**
- * The workspace body: a center column (the live view with the turn timeline below it) and a right rail
+ * The workspace body: a center column (the live view with the Structure dock below it) and a right rail
  * of telemetry panels. One transcript poll (useTranscript) feeds the center, the context panel, and the
- * timeline; the cost panel reads the Session directly. The rail hides below `lg`.
+ * dock; the cost panel reads the Session directly. The rail and the dock both hide below `lg`.
  */
 function WorkspaceBody({
   session: s,
@@ -128,7 +126,7 @@ function WorkspaceBody({
         <div className="min-h-0 flex-1">
           <CenterView session={s} doc={doc} />
         </div>
-        <Timeline turns={doc?.turns ?? []} now={now} />
+        <StructureDock tasks={tasks ?? []} doc={doc} now={now} />
       </div>
       <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-ink-800 bg-ink-925 p-4 lg:flex">
         <SessionPanel session={s} />
@@ -147,8 +145,6 @@ function WorkspaceBody({
         <TokensPanel usage={s.usage} />
         <TokenSpeedPanel speed={metrics ? metrics.tokenSpeed : null} />
         <GitPanel git={metrics ? metrics.git : null} />
-        <TasksPanel tasks={tasks ?? []} />
-        <SubagentTree subagents={doc?.subagents ?? []} />
       </aside>
     </div>
   );
