@@ -301,15 +301,25 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         // Vanished between stat and read. Unlike readTranscript, no forgetSession here: a gone subagent
         // file doesn't mean the session moved, so its cached path stays valid.
         if (jsonl === null) return { status: "absent" };
-        // A subagent's file is all-sidechain, so render it with the option on. Nested drilling is a
-        // later issue, so the doc carries no forest of its own.
+        // A subagent's file is all-sidechain, so render it with the option on. The drill surface shows
+        // only the event feed, so take just `events` and leave the session-shaped fields honestly empty:
+        // waitingReason/turns/context computed over a subagent's internal turns are meaningless here (a
+        // subagent's pending tool is not the Session waiting on you) and a trap for any future reader.
+        // Nested drilling is a later issue, so the doc carries no forest of its own.
+        const { events } = parseTranscriptEventsFromRows(
+          parseJsonlRows(jsonl),
+          {
+            includeSidechain: true,
+          },
+        );
         return {
           status: "changed",
           mtimeMs,
           doc: {
-            ...parseTranscriptEventsFromRows(parseJsonlRows(jsonl), {
-              includeSidechain: true,
-            }),
+            events,
+            waitingReason: null,
+            turns: [],
+            context: null,
             subagents: [],
           },
         };

@@ -75,6 +75,11 @@ describe("readSubagentTranscript", () => {
       { kind: "assistant", text: "Found it." },
     ]);
     expect(r.doc.subagents).toEqual([]);
+    // The drill surface renders only the feed, so the session-shaped fields are honestly empty rather
+    // than computed over the subagent's internal turns (which would yield a meaningless waitingReason).
+    expect(r.doc.waitingReason).toBeNull();
+    expect(r.doc.turns).toEqual([]);
+    expect(r.doc.context).toBeNull();
     // Echoing the token back yields unchanged.
     expect(provider.readSubagentTranscript(id, "a1", r.mtimeMs).status).toBe(
       "unchanged",
