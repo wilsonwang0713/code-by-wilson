@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   binNotFoundMessage,
+  pathFromEnv,
   resolveExecutable,
   spawnFailedMessage,
 } from "../../src/main/terminal/resolve-bin";
@@ -56,6 +57,20 @@ describe("resolveExecutable", () => {
       isExecutable: (p) => p === "C:\\bin\\claude.CMD",
     });
     expect(hit).toBe("C:\\bin\\claude.CMD");
+  });
+});
+
+describe("pathFromEnv", () => {
+  it("returns PATH when present", () => {
+    expect(pathFromEnv({ PATH: "/usr/bin" })).toBe("/usr/bin");
+  });
+
+  it("falls back to a differently-cased key (Windows `Path`)", () => {
+    expect(pathFromEnv({ Path: "C:\\bin" })).toBe("C:\\bin");
+  });
+
+  it("returns empty string when no PATH-like key exists", () => {
+    expect(pathFromEnv({ HOME: "/home/u" })).toBe("");
   });
 });
 

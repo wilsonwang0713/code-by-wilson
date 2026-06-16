@@ -60,6 +60,20 @@ export function resolveExecutable(d: ResolveExecutableDeps): string | null {
   return null;
 }
 
+/**
+ * Read PATH from an env object case-insensitively. A plain object spread from `process.env` (as the
+ * manager builds for the child) loses Node's case-insensitive env access, so on Windows the key is
+ * often `Path`, not `PATH` — and a naive `env.PATH` would read undefined and make every spawn look
+ * like a missing binary. Returns "" when no PATH-like key is present.
+ */
+export function pathFromEnv(env: NodeJS.ProcessEnv): string {
+  if (env.PATH != null) return env.PATH;
+  for (const key of Object.keys(env)) {
+    if (key.toLowerCase() === "path") return env[key] ?? "";
+  }
+  return "";
+}
+
 /** Real fs probe: an existing regular file with the execute bit (X_OK is a no-op gate on Windows). */
 function isExecutableFile(p: string): boolean {
   try {

@@ -64,6 +64,8 @@ interface HarnessOpts {
   createPty?: (o: SpawnOptions) => PtyProcess;
   /** Override the clock that drives the fast-exit hint. */
   now?: () => number;
+  /** Override the child env thunk. */
+  env?: () => NodeJS.ProcessEnv;
 }
 
 function harness(opts: HarnessOpts = {}) {
@@ -91,7 +93,7 @@ function harness(opts: HarnessOpts = {}) {
         return f.proc;
       }),
     createBufferer: passthroughBufferer,
-    env: () => ({ PATH: "/usr/bin" }),
+    env: opts.env ?? (() => ({ PATH: "/usr/bin" })),
     resolveBin: opts.resolveBin,
     now: opts.now,
   });
@@ -151,6 +153,20 @@ describe("createTerminalManager", () => {
     expect(h.sent[0][0]).toBe("sess-1");
     expect(h.sent[0][1]).toContain("Could not start Claude Code");
     expect(h.exited).toEqual([["sess-1", 127]]);
+  });
+
+  it("reads PATH case-insensitively for the resolver (Windows exposes it as `Path`)", () => {
+    const seen: string[] = [];
+    const h = harness({
+      env: () => ({ Path: "C:\\bin", COLORTERM: "x" }),
+      resolveBin: (_file, path) => {
+        seen.push(path);
+        return "ok";
+      },
+    });
+    h.manager.spawn(REQ);
+    expect(seen).toEqual(["C:\\bin"]); // not "" — so the spawn isn't wrongly blocked on Windows
+    expect(h.ptys).toHaveLength(1);
   });
 
   it("passes the resolver the command file and the child PATH", () => {

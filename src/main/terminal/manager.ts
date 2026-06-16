@@ -9,6 +9,7 @@ import { createDataBufferer, type DataBufferer } from "./data-bufferer";
 import {
   binNotFoundMessage,
   fastExitMessage,
+  pathFromEnv,
   spawnFailedMessage,
 } from "./resolve-bin";
 
@@ -134,8 +135,9 @@ export function createTerminalManager(
     // the terminal instead of node-pty's bare exit 1 — its exec failure surfaces only as a non-zero exit,
     // indistinguishable from claude starting and erroring. Skipped (assume resolvable) when no resolver is
     // injected, so unit tests and the happy path are untouched.
-    if (deps.resolveBin && !deps.resolveBin(command.file, env.PATH ?? "")) {
-      deps.send(id, binNotFoundMessage(command.file, env.PATH ?? ""));
+    const childPath = pathFromEnv(env);
+    if (deps.resolveBin && !deps.resolveBin(command.file, childPath)) {
+      deps.send(id, binNotFoundMessage(command.file, childPath));
       deps.notifyExit(id, 127); // 127 is the shell's conventional "command not found" code
       return;
     }
