@@ -22,6 +22,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readTasks, id, sinceMtimeMs),
+  readShells: (id, sinceMtimeMs) =>
+    ipcRenderer.invoke(IPC.readShells, id, sinceMtimeMs),
   readMetrics: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readMetrics, id, sinceMtimeMs),
   platform: process.platform,

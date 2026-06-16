@@ -52,6 +52,7 @@ const provider = (listCandidates: Provider["listCandidates"]): Provider => ({
   readTranscript: () => ({ status: "absent" }),
   readSubagentTranscript: () => ({ status: "absent" }),
   readTasks: () => ({ status: "absent" }),
+  readShells: () => ({ status: "absent" }),
   readMetrics: () => ({ status: "absent" }),
   resolveAdoptTarget: () => null,
 });

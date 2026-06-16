@@ -19,6 +19,7 @@ import {
   subagentsNewestMtime,
 } from "./subagents";
 import { readTasksForSession, tasksNewestMtime } from "./tasks";
+import { reconstructShells } from "./shells";
 import { resolveAdoptTarget } from "./adopt-target";
 import { computeTokenSpeed, SPEED_WINDOW_MS } from "./transcript-speed";
 import { firstTranscriptCwd } from "./transcript";
@@ -31,6 +32,7 @@ import type {
   SessionMetrics,
   TokenSpeed,
 } from "@shared/metrics";
+import type { ShellsRead } from "@shared/ipc";
 
 export interface ClaudeProviderDeps {
   claudeDir?: string;
@@ -339,6 +341,26 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         };
       } catch {
         return { status: "error" }; // transient read failure — caller keeps its last list
+      }
+    },
+    readShells: (id, sinceMtimeMs): ShellsRead => {
+      try {
+        const resolved = resolveTranscript(id);
+        if (!resolved) return { status: "absent" };
+        const { path, mtimeMs } = resolved;
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        const jsonl = readTextOrNull(path);
+        if (jsonl === null) {
+          forgetSession(id);
+          return { status: "absent" };
+        }
+        // Strip outputFile: the list is renderer-facing; the log path stays server-side (readShellOutput).
+        const shells = reconstructShells(parseJsonlRows(jsonl)).map(
+          ({ outputFile: _omit, ...s }) => s,
+        );
+        return { status: "changed", mtimeMs, shells };
+      } catch {
+        return { status: "error" };
       }
     },
     readMetrics: (id, sinceMtimeMs): MetricsRead => {

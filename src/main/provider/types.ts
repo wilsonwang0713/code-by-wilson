@@ -4,7 +4,7 @@ import type {
   SessionCandidate,
 } from "@shared/types";
 import type { TranscriptRead } from "@shared/transcript";
-import type { TaskRead } from "@shared/ipc";
+import type { TaskRead, ShellsRead } from "@shared/ipc";
 import type { MetricsRead } from "@shared/metrics";
 
 export interface Provider {
@@ -36,6 +36,9 @@ export interface Provider {
    *  panel. `sinceMtimeMs` is the change token from the caller's last read; an unchanged store skips
    *  the read. */
   readTasks(id: string, sinceMtimeMs?: number): TaskRead;
+  /** List one session's background bash shells — the on-demand read behind the Shells tab. `sinceMtimeMs`
+   *  is the change token (the transcript mtime); an unchanged transcript skips the read. */
+  readShells(id: string, sinceMtimeMs?: number): ShellsRead;
   /** Read one session's lazy metrics (token speed, git, voice, remote). Mirrors readTranscript's path
    *  resolution + change token; skips the recompute when `sinceMtimeMs` still matches. */
   readMetrics(id: string, sinceMtimeMs?: number): MetricsRead;
