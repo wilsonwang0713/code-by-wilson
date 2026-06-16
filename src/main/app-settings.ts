@@ -29,9 +29,7 @@ export function createAppSettingsStore(
     if (raw === null) return {};
     try {
       const v: unknown = JSON.parse(raw);
-      return v && typeof v === "object" && !Array.isArray(v)
-        ? (v as AppSettings)
-        : {};
+      return v && typeof v === "object" && !Array.isArray(v) ? v : {};
     } catch {
       return {}; // a corrupt file reads as "no settings" rather than crashing the app
     }
