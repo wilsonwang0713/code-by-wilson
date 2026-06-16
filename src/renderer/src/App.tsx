@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session, Family, Account } from "@shared/types";
+import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
 import {
   mergeManaged,
@@ -14,6 +15,8 @@ import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
 import { SessionList } from "./SessionList";
+import { CliTroubleshootModal } from "./ui/CliTroubleshootModal";
+import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
 import { OVERVIEW_ID } from "./stats/sentinel";
@@ -32,6 +35,11 @@ export function App() {
   // adopted row reads Managed/Working immediately, until the next sync confirms it (or its pty exits).
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
+  const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
+  // Whether the CLI-status troubleshooting modal is open (opened from the rail footer's Troubleshoot button).
+  const [troubleshootOpen, setTroubleshootOpen] = useState(false);
+  // True while a CLI status check (Re-check, or saving a binary-path override) is in flight — drives the spinner.
+  const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(true);
   // Land on Overview: the app opens to the all-time stats, not a session. The auto-select effect below
   // guards on `!isOverview`, so it never yanks this to a session on first load; the user clicks into a
@@ -45,6 +53,25 @@ export function App() {
   function applyOverview(o: OverviewData): void {
     setSessions(o.sessions);
     setAccount(o.account);
+    setCliStatus(o.cliStatus);
+  }
+
+  async function recheckCli(): Promise<void> {
+    setChecking(true);
+    try {
+      setCliStatus(await window.api.recheckCli());
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function setClaudeBinPath(path: string | null): Promise<void> {
+    setChecking(true);
+    try {
+      setCliStatus(await window.api.setClaudeBinPath(path));
+    } finally {
+      setChecking(false);
+    }
   }
 
   async function load(): Promise<void> {
@@ -150,6 +177,8 @@ export function App() {
   }, []);
 
   async function createSession(cwd: string, model: Family): Promise<void> {
+    const gate = spawnGate(cliStatus);
+    if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
     // Mint the id here and stand the terminal up BEFORE spawning, so the very first pty bytes land on a
     // live handle. Rows match xterm's pre-fit default (80x24); the view's first fit corrects it.
     const id = newSessionId();
@@ -175,6 +204,8 @@ export function App() {
   // resume bytes land on a live handle), then optimistically mark it adopting — management flips to
   // Managed and the workspace swaps to the live terminal — until the next sync confirms it.
   async function adoptSession(id: string): Promise<void> {
+    const gate = spawnGate(cliStatus);
+    if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
     // Dispose any stale handle from a prior adopt of this id that has since ended (its buffer still holds
     // the old "[process exited]" scrollback), so a re-adopt starts on a fresh terminal.
     terminalStore.dispose(id);
@@ -245,6 +276,11 @@ export function App() {
           query={query}
           onQuery={setQuery}
           account={account}
+          cliStatus={cliStatus}
+          checking={checking}
+          onRecheck={() => void recheckCli()}
+          onTroubleshoot={() => setTroubleshootOpen(true)}
+          canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">
           {isOverview ? (
@@ -254,6 +290,7 @@ export function App() {
               key={selected.id}
               session={selected}
               account={account}
+              canSpawn={spawnGate(cliStatus).canSpawn}
               onAdopt={adoptSession}
             />
           ) : (
@@ -265,6 +302,15 @@ export function App() {
         <NewSessionDialog
           onCreate={createSession}
           onCancel={() => setCreating(false)}
+        />
+      )}
+      {troubleshootOpen && cliStatus && (
+        <CliTroubleshootModal
+          status={cliStatus}
+          checking={checking}
+          onClose={() => setTroubleshootOpen(false)}
+          onRecheck={() => void recheckCli()}
+          onSetBinPath={(p) => void setClaudeBinPath(p)}
         />
       )}
     </div>

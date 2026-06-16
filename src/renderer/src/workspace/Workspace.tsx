@@ -22,10 +22,13 @@ import { ModeLabel } from "./ModeLabel";
 export function Workspace({
   session: s,
   account,
+  canSpawn,
   onAdopt,
 }: {
   session: Session;
   account: Account | null;
+  /** Whether the Claude Code CLI is usable; gates Adopt (resume spawns the CLI), mirroring the rail's New. */
+  canSpawn: boolean;
   onAdopt: (id: string) => Promise<void>;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
@@ -59,7 +62,7 @@ export function Workspace({
             </span>
           </div>
         </div>
-        <HeaderActions session={s} onAdopt={onAdopt} />
+        <HeaderActions session={s} canSpawn={canSpawn} onAdopt={onAdopt} />
       </header>
 
       <div className="min-h-0 flex-1">
