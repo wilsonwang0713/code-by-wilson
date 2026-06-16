@@ -1,6 +1,10 @@
 // tests/provider/shells.test.ts
 import { describe, it, expect } from "vitest";
 import { reconstructShells } from "../../src/main/provider/claude/shells";
+import {
+  tailOutput,
+  stitchSnapshots,
+} from "../../src/main/provider/claude/shells";
 
 const TASKS = "/tmp/claude/proj/sess/tasks";
 
@@ -188,5 +192,52 @@ describe("reconstructShells", () => {
       ),
     ];
     expect(reconstructShells(rows)).toEqual([]);
+  });
+});
+
+describe("tailOutput", () => {
+  it("returns the text unchanged when under the byte cap", () => {
+    expect(tailOutput("hello", 1024)).toEqual({
+      text: "hello",
+      truncatedBytes: 0,
+    });
+  });
+
+  it("keeps the last maxBytes and reports the dropped count", () => {
+    const r = tailOutput("abcdefghij", 4);
+    expect(r.text).toBe("ghij");
+    expect(r.truncatedBytes).toBe(6);
+  });
+});
+
+describe("stitchSnapshots", () => {
+  it("concatenates BashOutput/TaskOutput tool_result chunks for the shell, in order", () => {
+    const poll = (tuid: string, id: string, chunk: string) => [
+      {
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: tuid,
+              name: "TaskOutput",
+              input: { task_id: id },
+            },
+          ],
+        },
+      },
+      {
+        type: "user",
+        message: {
+          content: [{ type: "tool_result", tool_use_id: tuid, content: chunk }],
+        },
+      },
+    ];
+    const rows = [
+      ...poll("p1", "bg1", "line one\n"),
+      ...poll("p2", "bg1", "line two\n"),
+      ...poll("p3", "bg9", "other\n"),
+    ];
+    expect(stitchSnapshots(rows, "bg1")).toBe("line one\nline two\n");
   });
 });

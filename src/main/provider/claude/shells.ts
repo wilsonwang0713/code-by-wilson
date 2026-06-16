@@ -119,3 +119,47 @@ export function reconstructShells(rows: any[]): ShellRecord[] {
     (a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity),
   );
 }
+
+/** Default tail cap: the last 256 KB of a log. Bounds the IPC payload; the renderer labels the drop. */
+const MAX_OUTPUT_BYTES = 256 * 1024;
+
+/** Keep the last `maxBytes` bytes of `text`, reporting how many were dropped (0 when none). A multibyte
+ *  char split at the cut is tolerated — the tail's first line is already partial when truncated. */
+export function tailOutput(
+  text: string,
+  maxBytes = MAX_OUTPUT_BYTES,
+): { text: string; truncatedBytes: number } {
+  const buf = Buffer.from(text, "utf8");
+  if (buf.length <= maxBytes) return { text, truncatedBytes: 0 };
+  const kept = buf.subarray(buf.length - maxBytes);
+  return { text: kept.toString("utf8"), truncatedBytes: buf.length - maxBytes };
+}
+
+/** Best-effort output reconstruction when the `.output` file is gone: concatenate the text of every
+ *  BashOutput/TaskOutput tool_result that polled this shell, in transcript order. */
+export function stitchSnapshots(rows: any[], shellId: string): string {
+  const pollUseIds = new Set<string>();
+  for (const row of rows) {
+    const content = row?.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const b of content) {
+      if (
+        b?.type === "tool_use" &&
+        (b.name === "BashOutput" || b.name === "TaskOutput") &&
+        typeof b.id === "string"
+      ) {
+        const ref = b.input?.task_id ?? b.input?.bash_id ?? b.input?.shell_id;
+        if (ref === shellId) pollUseIds.add(b.id);
+      }
+    }
+  }
+  let out = "";
+  for (const row of rows) {
+    const content = row?.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const b of content)
+      if (b?.type === "tool_result" && pollUseIds.has(b.tool_use_id))
+        out += userText(b.content);
+  }
+  return out;
+}
