@@ -115,10 +115,53 @@ app
     // The registry of app-spawned ids, shared by reference: the terminal IPC writes it on spawn, the
     // provider reads it to label discovered sessions Managed.
     const managed = createManagedRegistry();
+    // The live window's terminal-rename hook, set when a window opens and revoked when it closes. The
+    // reconcile (below) calls through it to follow a /clear, so it's a no-op before the first window.
+    let renameInWindow: (from: string, to: string) => void = () => {};
+    const registerRename = (
+      rename: (from: string, to: string) => void,
+    ): void => {
+      renameInWindow = rename;
+    };
+    // A packaged .app launched from Finder inherits launchd's bare PATH, not the user's shell PATH, so
+    // `claude` (under ~/.local/bin etc.) wouldn't be found and every Managed session would die at spawn.
+    // Recover the real PATH and hand it to each window's terminal IPC — but lazily, on the first spawn,
+    // so the synchronous shell probe never blocks the first window's paint; memoized so only that spawn
+    // pays it. In dev the inherited PATH already carries `claude`, so leave the env untouched (no probe).
+    let recoveredEnv: NodeJS.ProcessEnv | undefined;
+    const childEnv = app.isPackaged
+      ? (): NodeJS.ProcessEnv =>
+          (recoveredEnv ??= { ...process.env, PATH: shellPath() })
+      : undefined;
+    // provider + cliStatus are wired below, AFTER the window. The window's closures only read them on a
+    // later spawn/adopt (never during createWindow), so a holder populated a few lines down is enough —
+    // and it lets the window open before claudeDir, which needs the synchronous login-shell probe.
+    const services: {
+      provider?: ReturnType<typeof createClaudeProvider>;
+      cliStatus?: ReturnType<typeof createCliStatusController>;
+    } = {};
+    // Stand the window up FIRST, before the synchronous login-shell probe + claudeDir-dependent wiring
+    // below. The probe (and the initial sync) run in this same synchronous turn, so the renderer's first
+    // overview() invoke just queues until registerIpc runs a few lines down — but the window has already
+    // painted, so a slow login shell no longer blanks the screen on launch. Mirrors the lazy childEnv above
+    // and the setTimeout'd CLI check below.
+    const openWindow = (): void =>
+      createWindow(
+        managed,
+        (id) => services.provider?.resolveAdoptTarget(id) ?? null,
+        registerRename,
+        childEnv,
+        () => services.cliStatus?.resolvedPath() ?? null,
+      );
+    openWindow();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) openWindow();
+    });
     // One login-shell probe at startup: recover the real PATH and a rc-set CLAUDE_CONFIG_DIR that a
-    // Finder-launched .app doesn't inherit. Packaged-only (dev inherits the shell env); tight timeout.
-    // Resolved BEFORE the settings/statusline/provider readers so they ALL read the recovered dir — not
-    // ~/.claude — when CLAUDE_CONFIG_DIR is relocated, keeping discovery and transcript/adopt reads in sync.
+    // Finder-launched .app doesn't inherit. Packaged-only (dev inherits the shell env); tight timeout. Runs
+    // AFTER createWindow (above) so it never blocks first paint, but BEFORE the settings/statusline/provider
+    // readers so they ALL read the recovered dir — not ~/.claude — when CLAUDE_CONFIG_DIR is relocated,
+    // keeping discovery and transcript/adopt reads in sync.
     const shellEnv = app.isPackaged
       ? probeShellEnv(process.env.SHELL || "/bin/zsh")
       : null;
@@ -141,6 +184,7 @@ app
     }
     const statusLine = createStatusLineReader({ claudeDir });
     const provider = createClaudeProvider({ managed, claudeDir });
+    services.provider = provider;
     const appSettings = createAppSettingsStore({
       dir: app.getPath("userData"),
     });
@@ -152,7 +196,8 @@ app
       // (dev inherits the shell env, so PATH/`command -v` already see `claude`).
       probeShell: app.isPackaged,
     });
-    // Warm the verdict after the window is up so the synchronous probes never block first paint.
+    services.cliStatus = cliStatus;
+    // Warm the verdict in the background; the check is async and the window is already up.
     setTimeout(() => {
       void cliStatus.recheck().catch((err: unknown) => {
         console.error("initial CLI status check failed", err);
@@ -176,14 +221,6 @@ app
       if (modelDefaultsCache === undefined)
         modelDefaultsCache = readModelDefaults(claudeDir, process.env);
       return modelDefaultsCache;
-    };
-    // The live window's terminal-rename hook, set when a window opens and revoked when it closes. The
-    // reconcile (below) calls through it to follow a /clear, so it's a no-op before the first window.
-    let renameInWindow: (from: string, to: string) => void = () => {};
-    const registerRename = (
-      rename: (from: string, to: string) => void,
-    ): void => {
-      renameInWindow = rename;
     };
     // Before each discovery sweep, follow any /clear that rotated a Managed pty's session id: relabel the
     // registry and re-key the live pty + renderer, so the rotated session stays Managed instead of being
@@ -209,7 +246,7 @@ app
     });
 
     try {
-      sync(); // incremental parse of ~/.claude → SQLite once, before the window asks for rows
+      sync(); // incremental parse of ~/.claude → SQLite; the window's first overview() is served right after
     } catch (err) {
       // A failed sync must not cost the user a window. Open with an empty list;
       // a manual Refresh retries, and surfacing the error in the UI is a later issue.
@@ -218,34 +255,6 @@ app
         err,
       );
     }
-
-    // A packaged .app launched from Finder inherits launchd's bare PATH, not the user's shell PATH, so
-    // `claude` (under ~/.local/bin etc.) wouldn't be found and every Managed session would die at spawn.
-    // Recover the real PATH and hand it to each window's terminal IPC — but lazily, on the first spawn,
-    // so the synchronous shell probe never blocks the first window's paint; memoized so only that spawn
-    // pays it. In dev the inherited PATH already carries `claude`, so leave the env untouched (no probe).
-    let recoveredEnv: NodeJS.ProcessEnv | undefined;
-    const childEnv = app.isPackaged
-      ? (): NodeJS.ProcessEnv =>
-          (recoveredEnv ??= { ...process.env, PATH: shellPath() })
-      : undefined;
-    createWindow(
-      managed,
-      (id) => provider.resolveAdoptTarget(id),
-      registerRename,
-      childEnv,
-      () => cliStatus.resolvedPath(),
-    );
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0)
-        createWindow(
-          managed,
-          (id) => provider.resolveAdoptTarget(id),
-          registerRename,
-          childEnv,
-          () => cliStatus.resolvedPath(),
-        );
-    });
   })
   .catch((err) => {
     // Last resort: never let a startup throw vanish as a silent unhandled rejection.
