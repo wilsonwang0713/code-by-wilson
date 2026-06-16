@@ -70,6 +70,17 @@ export function evaluateCliStatus(p: CliProbeInput): CliStatus {
       detail: "unrecognized version",
     };
   }
+  // Guard a colliding non-Claude `claude` on PATH: the real CLI prints "<x.y.z> (Claude Code)". A binary
+  // that parses as a version but doesn't identify as Claude can't be trusted to honor our flags. The
+  // marker is loose (any "claude") so a minor output-format change doesn't false-flag a real install.
+  if (!/claude/i.test(p.version.raw)) {
+    return {
+      ...common,
+      kind: "unknown",
+      version: null,
+      detail: "not Claude Code",
+    };
+  }
   const version = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
   if (compareSemver(version, p.floor) < 0) {
     return {

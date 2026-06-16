@@ -10,7 +10,7 @@ const base: CliProbeInput = {
   source: "shell",
   isRegularFile: true,
   duplicates: ["/Users/me/.local/bin/claude"],
-  version: { status: "ok", raw: "2.1.178" },
+  version: { status: "ok", raw: "2.1.178 (Claude Code)" },
   auth: { status: "ok" },
   floor: MIN_CLAUDE_VERSION,
   installMethod: "native",
@@ -49,10 +49,18 @@ describe("evaluateCliStatus", () => {
   it("outdated when below the floor", () => {
     const r = evaluateCliStatus({
       ...base,
-      version: { status: "ok", raw: "1.9.0" },
+      version: { status: "ok", raw: "1.9.0 (Claude Code)" },
     });
     expect(r.kind).toBe("outdated");
     expect(r.detail).toContain(MIN_CLAUDE_VERSION);
+  });
+  it("unknown when a colliding `claude` prints a version but isn't Claude Code", () => {
+    const r = evaluateCliStatus({
+      ...base,
+      version: { status: "ok", raw: "9.9.9 (SomeOtherTool)" },
+    });
+    expect(r.kind).toBe("unknown");
+    expect(r.detail).toBe("not Claude Code");
   });
   it("loggedOut when compatible but auth status exited 1", () => {
     expect(
