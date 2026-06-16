@@ -53,6 +53,11 @@ export function macEditSequence(e: EditKey): string | null {
  * send the meta+enter sequence (ESC+CR) the prompt treats as a literal newline instead — the same
  * sequence `/terminal-setup` wires Shift+Enter to. This applies on every platform; the mac-only
  * edit keys stay behind `isMac`.
+ *
+ * The remap is pty-wide and not scoped to the prompt: the renderer can't tell which program is
+ * reading the pty, so Shift+Enter sends ESC+CR even when you shell out (where it no longer submits).
+ * That's intentional — this terminal exists to drive the agent prompt, and the macOS readline edit
+ * keys above already take the same all-programs stance.
  */
 export function editSequence(e: EditKey, isMac: boolean): string | null {
   if (
