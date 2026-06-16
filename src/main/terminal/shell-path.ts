@@ -1,4 +1,5 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import { homedir } from "node:os";
 
 /**
@@ -155,6 +156,31 @@ export function probeShellEnv(shell: string): ShellEnv | null {
       },
     });
     return parseShellEnv(out);
+  } catch {
+    return null;
+  }
+}
+
+const execFileAsync = promisify(execFile);
+
+/** Async sibling of probeShellEnv: the same one-shot login-shell env probe, but non-blocking so a
+ *  user-triggered re-check doesn't freeze the main process. Null on any failure. Untested (spawns a
+ *  real shell), like probeShellEnv. */
+export async function probeShellEnvAsync(
+  shell: string,
+): Promise<ShellEnv | null> {
+  try {
+    const { stdout } = await execFileAsync(shell, ["-ilc", SHELL_ENV_SCRIPT], {
+      encoding: "utf8",
+      timeout: 3_000,
+      env: {
+        ...process.env,
+        TERM: "dumb",
+        DISABLE_AUTO_UPDATE: "true",
+        GIT_TERMINAL_PROMPT: "0",
+      },
+    });
+    return parseShellEnv(stdout);
   } catch {
     return null;
   }

@@ -151,11 +151,9 @@ app
     });
     // Warm the verdict after the window is up so the synchronous probes never block first paint.
     setTimeout(() => {
-      try {
-        cliStatus.recheck();
-      } catch (err) {
+      void cliStatus.recheck().catch((err: unknown) => {
         console.error("initial CLI status check failed", err);
-      }
+      });
     }, 0);
     let emailCache: string | null | undefined;
     const accountEmail = (): string | null => {

@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import type { BinSource, InstallMethod } from "@shared/cli-status";
-import { resolveShellPath, probeShellEnv } from "./terminal/shell-path";
+import { resolveShellPath, probeShellEnvAsync } from "./terminal/shell-path";
 
 export interface ResolvedBinary {
   path: string | null;
@@ -73,11 +73,11 @@ function isRegularFile(p: string): boolean {
 }
 
 /** Real wiring: resolve the binary from the persisted override, env, and one login-shell probe. Untested. */
-export function resolveClaudeBinary(
+export async function resolveClaudeBinary(
   overridePath: string | null,
-): ResolvedBinary {
+): Promise<ResolvedBinary> {
   const shell = process.env.SHELL || "/bin/zsh";
-  const env = probeShellEnv(shell);
+  const env = await probeShellEnvAsync(shell);
   return pickBinary({
     overridePath,
     envBin: process.env.CBW_CLAUDE_BIN,
