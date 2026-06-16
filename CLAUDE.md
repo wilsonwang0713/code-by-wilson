@@ -20,19 +20,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Releasing
 
-The maintainer drives releases in two phases. Run the **`release` skill**
-(`.claude/skills/release/SKILL.md`) — it's phase-aware:
-
-1. **"Bump version" (before release).** On a branch: set `package.json` `version`,
-   update `CHANGELOG.md`, commit as `build(release): vX.Y.Z`, `pnpm format` +
-   `lint`, push, and open the PR. Don't tag.
-2. **"Release it" (after the PR merges).** Tag `main` as `vX.Y.Z` and ship. Who
-   pushes the tag is environment-aware: **local Claude Code pushes it directly**;
-   **on the web/remote sandbox the git proxy 403s any ref outside the session
-   branch** (tags included), so hand the maintainer the commands instead. Either
-   way, then shepherd CI to a verified draft.
-
-Full mechanics and recovery are in `docs/RELEASING.md`.
+Releases run in two phases ("bump version", then "release it"). Run the
+**`release` skill** (`.claude/skills/release/SKILL.md`); full mechanics are in
+`docs/RELEASING.md`.
 
 ## Agent skills
 
