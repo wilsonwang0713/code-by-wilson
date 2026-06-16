@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Session, SessionState, Account } from "@shared/types";
+import type { CliStatus } from "@shared/cli-status";
 import { RailAccount } from "./ui/RailAccount";
 import { RailFooter } from "./ui/RailFooter";
 import { groupSessions } from "@shared/overview";
@@ -22,6 +23,9 @@ export function SessionList({
   query,
   onQuery,
   account,
+  cliStatus,
+  onRecheck,
+  onTroubleshoot,
 }: {
   sessions: Session[];
   selectedId: string | null;
@@ -30,6 +34,9 @@ export function SessionList({
   query: string;
   onQuery: (q: string) => void;
   account?: Account | null;
+  cliStatus: CliStatus | null;
+  onRecheck: () => void;
+  onTroubleshoot: () => void;
 }) {
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
   const now = Date.now();
@@ -154,7 +161,11 @@ export function SessionList({
           })
         )}
       </div>
-      <RailFooter version={account?.version} />
+      <RailFooter
+        status={cliStatus}
+        onRecheck={onRecheck}
+        onTroubleshoot={onTroubleshoot}
+      />
     </aside>
   );
 }

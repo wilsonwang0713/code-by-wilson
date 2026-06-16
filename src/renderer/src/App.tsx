@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session, Family, Account } from "@shared/types";
+import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
 import {
   mergeManaged,
@@ -32,6 +33,8 @@ export function App() {
   // adopted row reads Managed/Working immediately, until the next sync confirms it (or its pty exits).
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
+  const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
+  const [troubleshootOpen, setTroubleshootOpen] = useState(false); // modal render comes in Task 14
   const [loading, setLoading] = useState(true);
   // Land on Overview: the app opens to the all-time stats, not a session. The auto-select effect below
   // guards on `!isOverview`, so it never yanks this to a session on first load; the user clicks into a
@@ -45,7 +48,15 @@ export function App() {
   function applyOverview(o: OverviewData): void {
     setSessions(o.sessions);
     setAccount(o.account);
+    setCliStatus(o.cliStatus);
   }
+
+  async function recheckCli(): Promise<void> {
+    setCliStatus(await window.api.recheckCli());
+  }
+  // troubleshootOpen is set by the footer's Troubleshoot button; Task 14 adds the modal that reads it.
+  // Reference it now so the file lints clean until then.
+  void troubleshootOpen;
 
   async function load(): Promise<void> {
     setLoading(true);
@@ -245,6 +256,9 @@ export function App() {
           query={query}
           onQuery={setQuery}
           account={account}
+          cliStatus={cliStatus}
+          onRecheck={() => void recheckCli()}
+          onTroubleshoot={() => setTroubleshootOpen(true)}
         />
         <div className="flex min-w-0 flex-1">
           {isOverview ? (
