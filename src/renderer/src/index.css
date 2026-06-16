@@ -21,10 +21,11 @@
   --color-ink-700: #3a3a3b; /* strong border, focus-adjacent edges */
   --color-ink-600: #49525f; /* Ended state, dim glyphs */
 
-  /* Text */
-  --color-fg: #e8ecf3;
-  --color-fg-muted: #9aa4b4;
-  --color-fg-faint: #5f6878;
+  /* Text — neutral graphite (equal-channel, no temperature), matching the surface stack.
+     fg-faint is lifted to ~5.9:1 on the app base so tertiary/metadata stays comfortably above AA. */
+  --color-fg: #ededee;
+  --color-fg-muted: #a8a8a9;
+  --color-fg-faint: #8b8b8c;
 
   /* Wire — the single brand signal (sky blue): primary actions, focus, links, "managed" */
   --color-primary: #38bdf8;
