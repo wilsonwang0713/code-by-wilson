@@ -148,6 +148,9 @@ app
       settings: appSettings,
       activeConfigDir: claudeDir,
       recoveredConfigDir,
+      // Same gate as the startup probe above: only spawn a login shell to resolve the binary when packaged
+      // (dev inherits the shell env, so PATH/`command -v` already see `claude`).
+      probeShell: app.isPackaged,
     });
     // Warm the verdict after the window is up so the synchronous probes never block first paint.
     setTimeout(() => {

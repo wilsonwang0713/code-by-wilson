@@ -28,7 +28,10 @@ async function runVersion(path: string): Promise<CliProbeInput["version"]> {
   try {
     const { stdout } = await execFileAsync(path, ["--version"], {
       encoding: "utf8",
-      timeout: 5_000,
+      // Generous: a first exec of a Node CLI can be slow (cold cache, AV scan, a network-mounted
+      // ~/.local), and a timeout here classifies as "failed" → unknown → spawning blocked, locking out a
+      // CLI that actually works. The check is async, so a long wait never stalls the main process.
+      timeout: 10_000,
     });
     return { status: "ok", raw: stdout };
   } catch (err) {
@@ -48,29 +51,29 @@ async function runAuth(path: string): Promise<CliProbeInput["auth"]> {
   }
 }
 
-/** Run the real probes and classify. `activeConfigDir`/`recoveredConfigDir` come from the startup probe. */
+/** Run the real probes and classify. `activeConfigDir`/`recoveredConfigDir` come from the startup probe;
+ *  `probeShell` gates the login-shell probe inside resolveClaudeBinary. */
 export async function checkCliStatus(args: {
   overridePath: string | null;
   activeConfigDir: string;
   recoveredConfigDir: string | null;
+  probeShell: boolean;
   now: number;
 }): Promise<CliStatus> {
-  const resolved = await resolveClaudeBinary(args.overridePath);
+  const resolved = await resolveClaudeBinary(
+    args.overridePath,
+    args.probeShell,
+  );
   const version =
     resolved.path && resolved.isRegularFile
       ? await runVersion(resolved.path)
       : { status: "spawnError" as const };
-  const auth =
-    version.status === "ok"
-      ? await runAuth(resolved.path as string)
-      : { status: "unknown" as const };
-  return evaluateCliStatus({
+  const base: Omit<CliProbeInput, "auth"> = {
     path: resolved.path,
     source: resolved.source,
     isRegularFile: resolved.isRegularFile,
     duplicates: resolved.duplicates,
     version,
-    auth,
     floor: MIN_CLAUDE_VERSION,
     installMethod: installMethodForPath(resolved.path),
     configDir: {
@@ -78,7 +81,20 @@ export async function checkCliStatus(args: {
       recovered: args.recoveredConfigDir,
     },
     now: args.now,
+  };
+  // Probe auth only once the binary is confirmed to be a current Claude Code: evaluate with auth unknown
+  // first, and run `<bin> auth status` only when that already lands on "ready" (version ran, identifies as
+  // Claude, meets the floor). For every other verdict auth can't change the outcome — so this skips the
+  // extra child spawn and, crucially, never invokes an arbitrary on-PATH binary before we know it's Claude.
+  const provisional = evaluateCliStatus({
+    ...base,
+    auth: { status: "unknown" },
   });
+  const auth =
+    provisional.kind === "ready" && resolved.path
+      ? await runAuth(resolved.path)
+      : { status: "unknown" as const };
+  return evaluateCliStatus({ ...base, auth });
 }
 
 export interface CliStatusController {
@@ -93,6 +109,8 @@ export interface ControllerDeps {
   settings: AppSettingsStore;
   activeConfigDir: string;
   recoveredConfigDir: string | null;
+  /** Whether to probe the login shell when resolving the binary (index.ts passes `app.isPackaged`). */
+  probeShell: boolean;
   now?: () => number;
 }
 
@@ -107,6 +125,7 @@ export function createCliStatusController(
       overridePath: deps.settings.read().claudeBinPath ?? null,
       activeConfigDir: deps.activeConfigDir,
       recoveredConfigDir: deps.recoveredConfigDir,
+      probeShell: deps.probeShell,
       now: now(),
     });
     return current;
@@ -118,6 +137,13 @@ export function createCliStatusController(
       deps.settings.setClaudeBinPath(path);
       return run();
     },
-    resolvedPath: () => current?.path ?? null,
+    // Hand spawns an absolute path only when we resolved a usable Claude binary. For notFound/unknown the
+    // "path" may be null, a shell-alias string, or a non-Claude binary — passing it to node-pty would spawn
+    // a bogus file; null instead lets the spawn fall back to bare "claude" on the recovered PATH. Same
+    // notFound/unknown predicate the renderer's spawnGate blocks on.
+    resolvedPath: () =>
+      current && current.kind !== "notFound" && current.kind !== "unknown"
+        ? current.path
+        : null,
   };
 }

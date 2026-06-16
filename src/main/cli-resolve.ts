@@ -19,7 +19,11 @@ export interface PickBinaryInput {
   isFile: (p: string) => boolean; // injected fs check
 }
 
-/** Decide the absolute binary path + how we got it. Priority: override > env > shell > fallback. */
+/** Decide the absolute binary path + how we got it. Priority: override > env > shell > fallback. A real
+ *  file always wins in that order, so a genuine binary (even the PATH-scan fallback) beats a shell hit that
+ *  resolved to an alias/function rather than a file — without this, `claude` aliased in the user's rc would
+ *  shadow the real install and read as notFound. Only when nothing resolves to a real file do we surface the
+ *  shell hit (isRegularFile=false) so the UI can hint "alias/function only" instead of a bare "not found". */
 export function pickBinary(i: PickBinaryInput): ResolvedBinary {
   const candidates: { path: string | null; source: BinSource }[] = [
     { path: i.overridePath, source: "override" },
@@ -28,18 +32,24 @@ export function pickBinary(i: PickBinaryInput): ResolvedBinary {
     { path: i.fallbackPath, source: "fallback" },
   ];
   for (const c of candidates) {
-    if (!c.path) continue;
-    // override/env/fallback must be a real file to win; shell wins even if not a file so an
-    // alias/function surfaces as isRegularFile=false (→ notFound with an alias hint).
-    const isFile = i.isFile(c.path);
-    if (c.source === "shell" || isFile) {
+    if (c.path && i.isFile(c.path)) {
       return {
         path: c.path,
         source: c.source,
-        isRegularFile: isFile,
+        isRegularFile: true,
         duplicates: i.shellDuplicates,
       };
     }
+  }
+  // No candidate is a real file. Surface the shell hit if there was one (an alias/function-only install) as
+  // isRegularFile=false, so the modal shows the alias hint rather than masking it as a bare "not found".
+  if (i.shellPath) {
+    return {
+      path: i.shellPath,
+      source: "shell",
+      isRegularFile: false,
+      duplicates: i.shellDuplicates,
+    };
   }
   return {
     path: null,
@@ -72,12 +82,17 @@ function isRegularFile(p: string): boolean {
   }
 }
 
-/** Real wiring: resolve the binary from the persisted override, env, and one login-shell probe. Untested. */
+/** Real wiring: resolve the binary from the persisted override, env, and (when packaged) one login-shell
+ *  probe. `probeShell` mirrors index.ts's `app.isPackaged` gate — in dev the app already inherits the user's
+ *  shell env, so PATH and `command -v` are authoritative and there's no reason to spawn an interactive
+ *  login shell on every re-check. Untested. */
 export async function resolveClaudeBinary(
   overridePath: string | null,
+  probeShell: boolean,
 ): Promise<ResolvedBinary> {
-  const shell = process.env.SHELL || "/bin/zsh";
-  const env = await probeShellEnvAsync(shell);
+  const env = probeShell
+    ? await probeShellEnvAsync(process.env.SHELL || "/bin/zsh")
+    : null;
   return pickBinary({
     overridePath,
     envBin: process.env.CBW_CLAUDE_BIN,

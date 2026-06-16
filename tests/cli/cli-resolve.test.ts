@@ -53,6 +53,21 @@ describe("pickBinary", () => {
     });
     expect(r.isRegularFile).toBe(false);
   });
+  it("a real fallback binary beats a shell alias/function (no false notFound)", () => {
+    const r = pickBinary({
+      overridePath: null,
+      envBin: undefined,
+      shellPath: "claude: aliased to ...", // not a file
+      shellDuplicates: ["claude: aliased to ..."],
+      fallbackPath: "/real/fallback/claude", // a genuine binary on PATH
+      isFile,
+    });
+    expect(r).toMatchObject({
+      path: "/real/fallback/claude",
+      source: "fallback",
+      isRegularFile: true,
+    });
+  });
   it("returns a null path when nothing resolves", () => {
     const r = pickBinary({
       overridePath: null,
