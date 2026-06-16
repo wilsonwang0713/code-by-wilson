@@ -429,6 +429,22 @@ describe("listCandidates", () => {
     expect(ids).toContain("reapedinter");
   });
 
+  it("survives a reaped candidate whose transcript path is unreadable (a directory)", () => {
+    const home = makeHome();
+    // A directory named <id>.jsonl: indexTranscripts admits it, and the reaped-bg check opens it and
+    // hits EISDIR on read. That must degrade to interactive (kept), not throw out of the whole sweep.
+    const dir = join(home, "projects", "-w-bad", "baddir.jsonl");
+    mkdirSync(dir, { recursive: true });
+    utimesSync(dir, new Date(NOW - 1000), new Date(NOW - 1000)); // mtime inside the recency window
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).toContain("baddir");
+  });
+
   it("keeps the freshest registry file per id (max updatedAt)", () => {
     const home = makeHome();
     writeSessionFile(home, {

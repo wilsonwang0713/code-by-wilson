@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -656,5 +656,37 @@ describe("transcriptSessionKind", () => {
       "{ not json\n" + '{"type":"user","sessionKind":"bg"}\n',
     );
     expect(transcriptSessionKind(path)).toBe("bg");
+  });
+
+  it("returns undefined (no throw) when the path is a directory", () => {
+    // indexTranscripts admits any name ending in .jsonl, including a directory; on Linux openSync(dir)
+    // succeeds and readSync throws EISDIR. The read failure must degrade to interactive, not escape and
+    // abort the whole listCandidates sweep.
+    const dir = mkdtempSync(join(tmpdir(), "cbw-sk-"));
+    const asPath = join(dir, "dir.jsonl");
+    mkdirSync(asPath);
+    expect(transcriptSessionKind(asPath)).toBeUndefined();
+  });
+
+  it("finds sessionKind on a line past the old 64KB prefix (large first turn)", () => {
+    // A bg session whose first turn carries a large pasted payload pushes the sessionKind line well past
+    // 64KB; the scan must still reach it within the cap, or the ended bg session resurfaces (#158).
+    const pad = "x".repeat(100 * 1024);
+    const path = tmpTranscript(
+      `{"type":"attachment","pad":"${pad}"}\n` +
+        '{"type":"user","sessionKind":"bg","message":{"content":"hi"}}\n',
+    );
+    expect(transcriptSessionKind(path)).toBe("bg");
+  });
+
+  it("misses sessionKind only when a single line exceeds the scan cap (documented limit)", () => {
+    // A line longer than SESSION_KIND_SCAN_BYTES is truncated and won't parse even though the field is
+    // near its start — the accepted residual limitation. The registry filter still hides such a bg
+    // session while it is live.
+    const pad = "y".repeat(300 * 1024);
+    const path = tmpTranscript(
+      `{"type":"user","sessionKind":"bg","pad":"${pad}"}\n`,
+    );
+    expect(transcriptSessionKind(path)).toBeUndefined();
   });
 });
