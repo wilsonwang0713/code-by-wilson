@@ -115,10 +115,19 @@ app
     // The registry of app-spawned ids, shared by reference: the terminal IPC writes it on spawn, the
     // provider reads it to label discovered sessions Managed.
     const managed = createManagedRegistry();
+    // One login-shell probe at startup: recover the real PATH and a rc-set CLAUDE_CONFIG_DIR that a
+    // Finder-launched .app doesn't inherit. Packaged-only (dev inherits the shell env); tight timeout.
+    // Resolved BEFORE the settings/statusline/provider readers so they ALL read the recovered dir — not
+    // ~/.claude — when CLAUDE_CONFIG_DIR is relocated, keeping discovery and transcript/adopt reads in sync.
+    const shellEnv = app.isPackaged
+      ? probeShellEnv(process.env.SHELL || "/bin/zsh")
+      : null;
+    const recoveredConfigDir = shellEnv?.configDir ?? null;
+    const claudeDir = resolveClaudeDir(undefined, recoveredConfigDir);
     // Wrap the user's statusLine so live cost/context and account rate limits flow to the app
     // (ADR-0001). Idempotent and reversible; a failure must never cost the user a window.
     try {
-      const result = createSettingsManager().install();
+      const result = createSettingsManager({ claudeDir }).install();
       if (result.healed) {
         console.warn(
           "statusLine state.json was missing; recovered the original command from the wrapper and reinstalled",
@@ -130,15 +139,8 @@ app
         err,
       );
     }
-    const statusLine = createStatusLineReader();
-    const provider = createClaudeProvider({ managed });
-    // One login-shell probe at startup: recover the real PATH and a rc-set CLAUDE_CONFIG_DIR that a
-    // Finder-launched .app doesn't inherit. Packaged-only (dev inherits the shell env); tight timeout.
-    const shellEnv = app.isPackaged
-      ? probeShellEnv(process.env.SHELL || "/bin/zsh")
-      : null;
-    const recoveredConfigDir = shellEnv?.configDir ?? null;
-    const claudeDir = resolveClaudeDir(undefined, recoveredConfigDir);
+    const statusLine = createStatusLineReader({ claudeDir });
+    const provider = createClaudeProvider({ managed, claudeDir });
     const appSettings = createAppSettingsStore({
       dir: app.getPath("userData"),
     });
