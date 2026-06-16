@@ -46,7 +46,15 @@ export function StructureDock({
   const [pick, setPick] = useState<{ tab: DockTab; alive: boolean } | null>(
     null,
   );
-  const tab = pick && pick.alive === alive ? pick.tab : defaultDockTab(stats);
+  // While a lane is drilled, hold the Subagents tab so the originating lane (and its active ring) stays
+  // visible above the drill surface — otherwise the fan-out finishing would auto-flip to Turns and orphan
+  // the open drill. An in-phase manual pick still wins, so the user can deliberately flip to Turns.
+  const tab =
+    pick && pick.alive === alive
+      ? pick.tab
+      : activeAgentId
+        ? "subagents"
+        : defaultDockTab(stats);
 
   if (collapsed)
     return (
