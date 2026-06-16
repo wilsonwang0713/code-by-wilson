@@ -147,8 +147,9 @@ The tag is the trigger; CI builds the dmg into a draft release.
 
      Expect `draft: true` and `Code-by-wire-X.Y.Z-arm64.dmg`, its `.blockmap`,
      and `latest-mac.yml`. An empty asset list means the upload step didn't run —
-     read the release job log. (`isLatest` isn't a valid `--json` field; use
-     `isDraft`/`isPrerelease`.)
+     read the release job log. (`isLatest` isn't valid on `gh release view` —
+     use `isDraft`/`isPrerelease` here, or `gh release list --json isLatest` to
+     check which release is latest.)
 4. **Drop the notes in.** Set the draft body from the `X.Y.Z` CHANGELOG section
    so it's ready to read, keeping it a draft:
 
