@@ -6,13 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.1.4] - 2026-06-15
+## [0.1.4] - 2026-06-16
 
 ### Added
 
 - Subagent lanes in the dock: each session's subagents render as a live gantt
   timeline, grouped into collapsible per-batch bands ordered by start time, with
-  the task description and tool count on each lane and a status tally.
+  the task description and tool count on each lane and a status tally. Drill into
+  any lane to open that subagent's transcript on the main surface, with a
+  breadcrumb back to the session.
+- Shift+Enter in the terminal inserts a newline in the Claude Code prompt instead
+  of submitting, matching what `/terminal-setup` wires for a native terminal.
+
+### Changed
+
+- Recolored charts and telemetry with a token-kind palette: wire-blue is reserved
+  for interaction and brand, with steel for Input, violet for Output, and teal as
+  the analytics hue across the cost donut, token bars, KPI strip, contributions
+  heatmap, model-mix donut, and right rail.
+- Neutralized the text scale to graphite and lifted tertiary contrast.
 
 ### Fixed
 
