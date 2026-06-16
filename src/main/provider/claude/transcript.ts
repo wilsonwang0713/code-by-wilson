@@ -1,3 +1,4 @@
+import { closeSync, openSync, readSync } from "node:fs";
 import { basename } from "node:path";
 import { normalizeModelId, type Family } from "@shared/models";
 import type { Usage } from "@shared/types";
@@ -51,6 +52,49 @@ export function firstTranscriptCwd(jsonl: string): string {
     }
   }
   return "";
+}
+
+/** How much of a transcript's head we scan for `sessionKind`. The field lands within the first few
+ *  JSONL lines (the short metadata preamble, then the first attachment/turn line), so a small prefix
+ *  is plenty of headroom. */
+const SESSION_KIND_SCAN_BYTES = 64 * 1024;
+
+/**
+ * The transcript's `sessionKind` ("bg" for a Claude background session), read from a bounded prefix
+ * without a full parse. Claude tags every substantive line of a bg transcript with it, starting at the
+ * first attachment/turn line, so the first occurrence in the head decides. Returns undefined when the
+ * prefix carries none — an interactive session, a bg session with no turns yet, or an unreadable file.
+ *
+ * Bounded, unlike firstTranscriptCwd: an interactive transcript never carries the field, so a
+ * whole-file scan would read the entire (possibly multi-MB) file to the end looking for something that
+ * isn't there. This runs in the per-poll candidate loop, so it stays O(1) in transcript size.
+ */
+export function transcriptSessionKind(path: string): string | undefined {
+  let fd: number;
+  try {
+    fd = openSync(path, "r");
+  } catch {
+    return undefined; // ENOENT or unreadable — treat as interactive, same as the rest of discovery
+  }
+  try {
+    const buf = Buffer.alloc(SESSION_KIND_SCAN_BYTES);
+    const bytes = readSync(fd, buf, 0, SESSION_KIND_SCAN_BYTES, 0);
+    const head = buf.toString("utf8", 0, bytes);
+    for (const line of head.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const row = JSON.parse(trimmed);
+        if (typeof row.sessionKind === "string") return row.sessionKind;
+      } catch {
+        // A truncated trailing line (the prefix may cut mid-line) or a half-written line won't parse;
+        // skip it, same as parseTranscript. sessionKind appears far earlier than the cut.
+      }
+    }
+    return undefined;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /** Claude Code injects '<synthetic>' assistant turns (cancelled or over-limit placeholders) that

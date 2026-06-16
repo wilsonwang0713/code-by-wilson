@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   parseTranscript,
   deriveTitle,
   firstTranscriptCwd,
+  transcriptSessionKind,
 } from "../../src/main/provider/claude/transcript";
 
 const fx = (p: string) =>
@@ -611,5 +613,48 @@ describe("deriveTitle", () => {
     expect(
       deriveTitle(["Render <Button onClick={fn}/> in the modal"], "/x/y"),
     ).toBe("Render <Button onClick={fn}/> in the modal");
+  });
+});
+
+describe("transcriptSessionKind", () => {
+  function tmpTranscript(body: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "cbw-sk-"));
+    const path = join(dir, "t.jsonl");
+    writeFileSync(path, body);
+    return path;
+  }
+
+  it("returns 'bg' from the first line that carries it, past metadata lines", () => {
+    const path = tmpTranscript(
+      '{"type":"last-prompt"}\n' +
+        '{"type":"mode"}\n' +
+        '{"type":"attachment","sessionKind":"bg"}\n' +
+        '{"type":"user","sessionKind":"bg","message":{"content":"hi"}}\n',
+    );
+    expect(transcriptSessionKind(path)).toBe("bg");
+  });
+
+  it("returns undefined for an interactive transcript (no sessionKind)", () => {
+    const path = tmpTranscript(
+      '{"type":"last-prompt"}\n' +
+        '{"type":"user","message":{"content":"hi"}}\n' +
+        '{"type":"assistant","message":{"model":"claude"}}\n',
+    );
+    expect(transcriptSessionKind(path)).toBeUndefined();
+  });
+
+  it("returns undefined for a missing file", () => {
+    expect(transcriptSessionKind("/no/such/transcript.jsonl")).toBeUndefined();
+  });
+
+  it("returns undefined for an empty file", () => {
+    expect(transcriptSessionKind(tmpTranscript(""))).toBeUndefined();
+  });
+
+  it("skips a malformed leading line and still finds sessionKind", () => {
+    const path = tmpTranscript(
+      "{ not json\n" + '{"type":"user","sessionKind":"bg"}\n',
+    );
+    expect(transcriptSessionKind(path)).toBe("bg");
   });
 });
