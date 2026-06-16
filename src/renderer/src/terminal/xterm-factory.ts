@@ -100,6 +100,10 @@ export function createXterm(): {
   const wrapper = document.createElement("div");
   wrapper.style.height = "100%";
   wrapper.style.width = "100%";
+  // Positioned ancestor for the bottom-aligned .xterm (see index.css): FitAddon floors the row count, so
+  // up to ~1 row of slack remains; parking .xterm at the wrapper's bottom puts that slack above the first
+  // line instead of below the last, keeping the prompt flush to the edge (mirrors VSCode's terminal.css).
+  wrapper.style.position = "relative";
   // Rebuild xterm's viewport scroll geometry against the live element, the way VSCode does when a
   // backgrounded terminal is shown (xtermTerminal.forceRefresh → _core.viewport._innerRefresh). The view
   // calls this on re-attach. While the wrapper is detached the pty keeps streaming, and every background

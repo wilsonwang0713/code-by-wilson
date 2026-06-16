@@ -24,6 +24,11 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
     }
 
     const sync = () => {
+      // Don't fit/resize against a collapsed or not-yet-laid-out container — measuring a 0-size element
+      // yields a 0/NaN grid and a bogus pty resize, and seeds xterm with junk dimensions (VSCode's
+      // layout() bails on width/height <= 0). The ResizeObserver fires again with real dimensions once the
+      // flex layout settles.
+      if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
       handle.fit.fit();
       window.api.terminal.resize(sessionId, handle.term.cols, handle.term.rows);
     };
