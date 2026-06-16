@@ -6,6 +6,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-17
+
+### Added
+
+- A live CLI status block at the bottom of the rail that probes the local Claude
+  Code CLI on startup and classifies it as ready, not found, outdated, logged
+  out, or unknown. It resolves the binary across a saved override, your
+  login-shell PATH, and a fallback, recovers a relocated `CLAUDE_CONFIG_DIR`,
+  flags multiple installs, and enforces a minimum version (2.1.177). A spinner
+  and Re-check button rerun the probe on demand, and a Troubleshoot modal
+  explains the failure with per-install-method (native, Homebrew, npm) upgrade
+  commands and a binary-path override. New session and Adopt are disabled while
+  the CLI is unusable.
+
+### Changed
+
+- Hide Claude Code background (`--bg`) sessions from the session list, including
+  ones that have already ended — read from the transcript's recorded session
+  kind, since the registry entry is reaped the moment the session exits.
+
+### Fixed
+
+- Keep the terminal prompt reachable at the bottom after a relayout or
+  re-attach, not just a session switch, by rebuilding the xterm viewport
+  geometry the way VSCode does.
+
 ## [0.1.4] - 2026-06-16
 
 ### Added
@@ -100,7 +126,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/luojiahai/code-by-wire/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/luojiahai/code-by-wire/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/luojiahai/code-by-wire/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/luojiahai/code-by-wire/compare/v0.1.1...v0.1.2
