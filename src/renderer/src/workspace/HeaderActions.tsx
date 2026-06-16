@@ -10,9 +10,13 @@ import { OpenInMenu } from "./OpenInMenu";
  *  live on the header's second line, not here, so this row is purely actions. */
 export function HeaderActions({
   session: s,
+  canSpawn,
   onAdopt,
 }: {
   session: Session;
+  /** Whether the Claude Code CLI is usable. Adopt resumes by spawning the CLI, so it's disabled (like the
+   *  rail's New-session button) when the CLI is notFound/unknown, rather than failing only on click. */
+  canSpawn: boolean;
   onAdopt: (id: string) => Promise<void>;
 }) {
   const canAdopt = s.management === "observed" && s.state === "ended";
@@ -64,7 +68,12 @@ export function HeaderActions({
           <button
             type="button"
             onClick={requestAdopt}
-            disabled={adoptBusy}
+            disabled={adoptBusy || !canSpawn}
+            title={
+              canSpawn
+                ? undefined
+                : "Claude Code CLI isn't usable — see the status at the bottom of the rail."
+            }
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[12px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
           >
             <Icon name="git-pull-request-arrow" size={13} />

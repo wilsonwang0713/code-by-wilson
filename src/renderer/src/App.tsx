@@ -290,6 +290,7 @@ export function App() {
               key={selected.id}
               session={selected}
               account={account}
+              canSpawn={spawnGate(cliStatus).canSpawn}
               onAdopt={adoptSession}
             />
           ) : (
