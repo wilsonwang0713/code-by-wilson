@@ -12,6 +12,10 @@ export interface RawSessionFile {
   cwd: string;
   status?: string;
   updatedAt?: number;
+  /** "interactive" | "bg" from the registry; absent on files that predate the field. */
+  kind?: string;
+  /** Present only on background sessions (agent view / `claude --bg`); the agent-view short id. */
+  jobId?: string;
 }
 
 export interface CandidateDeps {
@@ -70,6 +74,8 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
           cwd: typeof j.cwd === "string" ? j.cwd : "",
           status: j.status,
           updatedAt: j.updatedAt,
+          kind: typeof j.kind === "string" ? j.kind : undefined,
+          jobId: typeof j.jobId === "string" ? j.jobId : undefined,
         });
       }
     } catch {

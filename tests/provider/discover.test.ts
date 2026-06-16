@@ -314,4 +314,26 @@ describe("readSessionFiles", () => {
     writeSessionFile(home, { pid: 9, sessionId: "ok", cwd: "/w/z" });
     expect(readSessionFiles(home).map((s) => s.sessionId)).toEqual(["ok"]);
   });
+
+  it("keeps kind and jobId when present", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 11,
+      sessionId: "bg1",
+      cwd: "/w/bg",
+      kind: "bg",
+      jobId: "bg1",
+    });
+    const [s] = readSessionFiles(home);
+    expect(s.kind).toBe("bg");
+    expect(s.jobId).toBe("bg1");
+  });
+
+  it("leaves kind and jobId undefined on a pre-field registry file", () => {
+    const home = makeHome();
+    writeSessionFile(home, { pid: 12, sessionId: "old", cwd: "/w/old" });
+    const [s] = readSessionFiles(home);
+    expect(s.kind).toBeUndefined();
+    expect(s.jobId).toBeUndefined();
+  });
 });
