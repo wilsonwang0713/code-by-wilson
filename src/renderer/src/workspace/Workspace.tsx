@@ -9,6 +9,7 @@ import { ContextPanel } from "./panels/ContextPanel";
 import { CostPanel } from "./panels/CostPanel";
 import { StructureDock } from "./panels/StructureDock";
 import { SubagentDrill, type SubagentCrumb } from "./SubagentDrill";
+import { useSubagentTranscript } from "./use-subagent-transcript";
 import { TokensPanel } from "./panels/TokensPanel";
 import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
 import { GitPanel } from "./panels/GitPanel";
@@ -128,6 +129,10 @@ function WorkspaceBody({
   // session id in App, so it remounts (and the stack clears) on a session switch.
   const [drill, setDrill] = useState<SubagentCrumb[]>([]);
   const activeAgentId = drill[drill.length - 1]?.agentId;
+  // Lifted here (always mounted, like useTranscript) so the subagent poll survives the Managed Terminal ⇄
+  // Transcript toggle — re-mounting it inside the tab would discard the change token and re-read the whole
+  // file on every flip. Gated on activeAgentId: it polls only while a lane is drilled.
+  const subagentDoc = useSubagentTranscript(s.id, activeAgentId);
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
@@ -135,6 +140,7 @@ function WorkspaceBody({
           <CenterView
             session={s}
             doc={doc}
+            subagentDoc={subagentDoc}
             drill={drill}
             onNavigate={(depth) => setDrill((d) => d.slice(0, depth))}
           />
@@ -179,17 +185,19 @@ type CenterTab = "terminal" | "transcript";
 function CenterView({
   session: s,
   doc,
+  subagentDoc,
   drill,
   onNavigate,
 }: {
   session: Session;
   doc: DocState;
+  subagentDoc: DocState;
   drill: SubagentCrumb[];
   onNavigate: (depth: number) => void;
 }) {
   if (s.management === "observed")
     return drill.length > 0 ? (
-      <SubagentDrill sessionId={s.id} crumbs={drill} onNavigate={onNavigate} />
+      <SubagentDrill crumbs={drill} onNavigate={onNavigate} doc={subagentDoc} />
     ) : (
       <RenderedTranscript session={s} doc={doc} />
     );
@@ -197,6 +205,7 @@ function CenterView({
     <ManagedCenter
       session={s}
       doc={doc}
+      subagentDoc={subagentDoc}
       drill={drill}
       onNavigate={onNavigate}
     />
@@ -211,11 +220,13 @@ function CenterView({
 function ManagedCenter({
   session: s,
   doc,
+  subagentDoc,
   drill,
   onNavigate,
 }: {
   session: Session;
   doc: DocState;
+  subagentDoc: DocState;
   drill: SubagentCrumb[];
   onNavigate: (depth: number) => void;
 }) {
@@ -238,9 +249,9 @@ function ManagedCenter({
           </div>
         ) : drilled ? (
           <SubagentDrill
-            sessionId={s.id}
             crumbs={drill}
             onNavigate={onNavigate}
+            doc={subagentDoc}
           />
         ) : (
           <RenderedTranscript session={s} doc={doc} />

@@ -1,26 +1,26 @@
-import { useSubagentTranscript } from "./use-subagent-transcript";
 import { Center, TranscriptFeed } from "./TranscriptView";
+import type { DocState } from "./use-transcript";
 
 /** One level of the drill path: which subagent, and the label shown in the breadcrumb (its type). */
 export type SubagentCrumb = { agentId: string; label: string };
 
 /**
  * The drilled-in Subagent surface: a breadcrumb (Session › … › <type>, read-only marked) above the
- * shared event feed, fed by the subagent transcript poll. Always read-only — a Subagent is never
- * drivable, even drilled from a Managed Session. The feed is keyed on the current agent id so
- * re-drilling remounts to a fresh tail while same-agent polls preserve scroll.
+ * shared event feed. A pure renderer of the `doc` it's handed — the subagent poll is lifted to
+ * WorkspaceBody so it survives the Managed tab toggle. Always read-only — a Subagent is never drivable,
+ * even drilled from a Managed Session. The feed is keyed on the current agent id so re-drilling remounts
+ * to a fresh tail while same-agent polls preserve scroll.
  */
 export function SubagentDrill({
-  sessionId,
   crumbs,
   onNavigate,
+  doc,
 }: {
-  sessionId: string;
   crumbs: SubagentCrumb[];
   onNavigate: (depth: number) => void;
+  doc: DocState;
 }) {
   const current = crumbs[crumbs.length - 1];
-  const doc = useSubagentTranscript(sessionId, current.agentId);
   return (
     <div className="flex h-full flex-col">
       <Breadcrumb crumbs={crumbs} onNavigate={onNavigate} />

@@ -20,10 +20,15 @@ export type Read<T> =
  * order) or while the window is hidden; reads immediately when the window returns to the foreground. A
  * transient error keeps the last value rather than blanking the view. Tri-state return: `undefined` =
  * the first read hasn't landed, `null` = read and the source is absent, a value once read.
+ *
+ * `enabled` (default true) gates the poll: when false the hook holds at `undefined` and never reads, so
+ * a caller can mount it unconditionally and turn it on only when the source exists (e.g. the subagent
+ * poll, lifted above the tab toggle, runs only while a lane is drilled).
  */
 export function usePolledRead<T>(
   sessionId: string,
   read: (id: string, since?: number) => Promise<Read<T>>,
+  enabled = true,
 ): T | null | undefined {
   const [value, setValue] = useState<T | null | undefined>(undefined);
   const sinceRef = useRef<number | undefined>(undefined); // last seen change token (mtime)
@@ -34,6 +39,7 @@ export function usePolledRead<T>(
     sinceRef.current = undefined;
     inFlightRef.current = false;
     setValue(undefined);
+    if (!enabled) return; // disabled — hold at `undefined`, no interval, no listener
 
     async function poll() {
       if (inFlightRef.current || document.hidden) return;
@@ -73,7 +79,7 @@ export function usePolledRead<T>(
       clearInterval(h);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [sessionId, read]);
+  }, [sessionId, read, enabled]);
 
   return value;
 }
