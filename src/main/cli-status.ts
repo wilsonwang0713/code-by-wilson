@@ -1,10 +1,10 @@
 import type { BinSource, CliStatus, InstallMethod } from "@shared/cli-status";
 import { compareSemver, parseSemver } from "./cli-version";
 
-/** Conservative floor: low enough never to false-flag a working recent install, high enough to
- *  guarantee --session-id / --resume / --model <alias>. A one-line maintainer lever, bumped only when
- *  the app starts relying on a newer CLI behavior. NOT pinned to latest. Verify against the changelog. */
-export const MIN_CLAUDE_VERSION = "2.0.0";
+/** The minimum Claude Code version the app supports. A one-line maintainer lever — bump it when the app
+ *  starts relying on a newer CLI behavior. Set near-latest deliberately: installs below it read as "too
+ *  old" and get nudged to update. Verify against the changelog when changing. */
+export const MIN_CLAUDE_VERSION = "2.1.177";
 
 /** The raw probe results the pure evaluator classifies. Mirrors shell-path.ts's pure/wiring split. */
 export interface CliProbeInput {
