@@ -35,15 +35,11 @@ export interface TerminalHandle {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
-  /** Realign the DOM viewport's scrollTop with xterm's internal scroll position. The view calls this
-   *  after re-attaching the wrapper, where detaching reset scrollTop to 0 and the first wheel tick would
-   *  otherwise jump to the top. `toBottom` pins to the true maximum (a tailing session) rather than the
-   *  proportional position, so the Claude prompt isn't left below the fold. Built in the factory (it
-   *  needs the real buffer API). */
-  syncScroll: (toBottom: boolean) => void;
-  /** Whether the buffer is parked at the bottom. Read on re-attach, before any scrollTop poke perturbs
-   *  the buffer's viewportY, so the view can re-pin a tailing session to the true bottom. */
-  atBottom: () => boolean;
+  /** Rebuild xterm's viewport scroll geometry against the live element (VSCode's forceRefresh →
+   *  _core.viewport._innerRefresh). The view calls this on re-attach: background renders into the detached
+   *  (offsetHeight 0) element shrink the scroll-area and reset scrollTop, leaving the Claude prompt
+   *  unreachable until the geometry is rebuilt. Built in the factory (it needs the real xterm core). */
+  rebuildViewport: () => void;
   opened: boolean;
 }
 
@@ -54,8 +50,7 @@ export interface TerminalStoreDeps {
     term: XtermLike;
     fit: FitLike;
     wrapper: HTMLElement;
-    syncScroll: (toBottom: boolean) => void;
-    atBottom: () => boolean;
+    rebuildViewport: () => void;
   };
   /** True on macOS. Gates the cmd/option editing keys so we never hijack Super+arrow elsewhere. */
   isMac: boolean;
@@ -129,14 +124,13 @@ export function createTerminalStore({
     create(id) {
       const existing = handles.get(id);
       if (existing) return existing;
-      const { term, fit, wrapper, syncScroll, atBottom } = createTerminal();
+      const { term, fit, wrapper, rebuildViewport } = createTerminal();
       const handle: TerminalHandle = {
         id,
         term,
         fit,
         wrapper,
-        syncScroll,
-        atBottom,
+        rebuildViewport,
         opened: false,
       };
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.

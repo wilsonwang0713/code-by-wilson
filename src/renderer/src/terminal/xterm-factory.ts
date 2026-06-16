@@ -5,6 +5,14 @@ import "@xterm/xterm/css/xterm.css";
 import type { FitLike, XtermLike } from "./terminal-store";
 import { viewportScrollTop } from "./viewport-scroll";
 
+/** xterm's internal core, reached the way VSCode does (xtermTerminal.ts: `(raw as ITerminalWithCore)._core`).
+ *  We only need the Viewport's `_innerRefresh`, the same hook VSCode's `forceRefresh()` calls to rebuild the
+ *  scroll geometry. `viewport` only exists after `open()`. Cast through `unknown` so it stays type-checked
+ *  (no `any`) and degrades gracefully if a future xterm renames the hook. */
+interface TerminalWithCore {
+  _core: { viewport?: { _innerRefresh(): void } };
+}
+
 /** xterm options tuned for the Claude TUI: generous scrollback, a dark theme matching the app's ink
  *  palette, a monospace stack, and a steady cursor. convertEol stays off — the TUI emits its own.
  *  customGlyphs + rescaleOverlappingGlyphs only take effect under a GPU renderer (see attachWebgl) —
@@ -67,8 +75,7 @@ export function createXterm(): {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
-  syncScroll: (toBottom: boolean) => void;
-  atBottom: () => boolean;
+  rebuildViewport: () => void;
 } {
   const term = new Terminal(OPTIONS);
   const fit = new FitAddon();
@@ -93,25 +100,26 @@ export function createXterm(): {
   const wrapper = document.createElement("div");
   wrapper.style.height = "100%";
   wrapper.style.width = "100%";
-  // Re-attaching the wrapper on a tab switch resets the DOM viewport's scrollTop to 0 while xterm keeps
-  // its scroll position, so the first wheel tick would otherwise read the stale 0 and jump to the top
-  // (round(0/rowHeight) - viewportY lines up). Re-derive scrollTop from the live buffer's viewportY to
-  // close that gap. No-ops before open() (no viewport yet) and on the DOM-renderer fallback if the
-  // element is missing; harmless on a fresh terminal (viewportY 0 → scrollTop 0).
+  // Rebuild xterm's viewport scroll geometry against the live element, the way VSCode does when a
+  // backgrounded terminal is shown (xtermTerminal.forceRefresh → _core.viewport._innerRefresh). The view
+  // calls this on re-attach. While the wrapper is detached the pty keeps streaming, and every background
+  // render runs xterm's _innerRefresh with the off-DOM element's offsetHeight of 0 — which shrinks the
+  // scroll-area so the last line (the Claude prompt) becomes unreachable, and resets the DOM scrollTop.
+  // A no-op fit on re-attach (the StructureDock pins the terminal to a fixed height, so the size is
+  // unchanged and xterm never gets a resize to rebuild on) leaves that stale geometry in place.
   //
-  // `toBottom` pins to the true scroll maximum instead of the proportional position. The view captures
-  // it BEFORE re-attaching (see atBottom) so a tailing session always lands on the last line: while the
-  // wrapper is detached the pty keeps streaming, and xterm's _innerRefresh records offsetHeight 0 and
-  // shrinks its scroll-area; a proportional scrollTop against that stale, short area gets clamped and
-  // xterm rounds it back to a row ABOVE the prompt. scrollHeight (re-read here, after the geometry is
-  // rebuilt against the live viewport) clamps to exactly viewportY-at-bottom * rowHeight — the prompt.
-  const syncScroll = (toBottom: boolean) => {
-    const viewport = wrapper.querySelector(".xterm-viewport");
-    if (!(viewport instanceof HTMLElement)) return;
-    if (toBottom) {
-      viewport.scrollTop = viewport.scrollHeight;
+  // _innerRefresh re-measures offsetHeight, rebuilds the scroll-area, and re-pins scrollTop = ydisp *
+  // rowHeight using xterm's OWN ignore-flag, so the exact scroll position (bottom or scrolled-up) is
+  // restored without the rounding "knock" a manual scrollTop poke causes. If a future xterm drops the
+  // private hook we fall back to re-deriving scrollTop from the live buffer (the pre-rebuild behaviour).
+  const rebuildViewport = () => {
+    const core = (term as unknown as TerminalWithCore)._core;
+    if (core.viewport) {
+      core.viewport._innerRefresh();
       return;
     }
+    const viewport = wrapper.querySelector(".xterm-viewport");
+    if (!(viewport instanceof HTMLElement)) return;
     const buf = term.buffer.active;
     viewport.scrollTop = viewportScrollTop(
       buf.viewportY,
@@ -119,10 +127,5 @@ export function createXterm(): {
       viewport.scrollHeight,
     );
   };
-  // Is the buffer parked at the bottom (a tailing session)? baseY is the viewportY of the last screen, so
-  // reaching it means the prompt is on screen. Read once on re-attach, before any scrollTop poke can
-  // perturb viewportY, so the deferred re-pin knows to chase the true bottom rather than a knocked row.
-  const atBottom = () =>
-    term.buffer.active.viewportY >= term.buffer.active.baseY;
-  return { term: term, fit, wrapper, syncScroll, atBottom };
+  return { term: term, fit, wrapper, rebuildViewport };
 }
