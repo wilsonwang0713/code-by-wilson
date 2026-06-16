@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   macEditSequence,
+  editSequence,
   type EditKey,
 } from "../../src/renderer/src/terminal/key-bindings";
 
@@ -85,6 +86,49 @@ describe("macEditSequence — readline bytes for the Claude Code prompt", () => 
       macEditSequence(
         key({ key: "Backspace", metaKey: true, isComposing: true }),
       ),
+    ).toBeNull();
+  });
+});
+
+describe("editSequence — Shift+Enter newline plus the mac fallback", () => {
+  it("maps Shift+Enter to the prompt's newline (Esc+CR) on every platform", () => {
+    expect(editSequence(key({ key: "Enter", shiftKey: true }), false)).toBe(
+      "\x1b\r",
+    );
+    expect(editSequence(key({ key: "Enter", shiftKey: true }), true)).toBe(
+      "\x1b\r",
+    );
+  });
+
+  it("leaves plain Enter alone so it still submits", () => {
+    expect(editSequence(key({ key: "Enter" }), false)).toBeNull();
+    expect(editSequence(key({ key: "Enter" }), true)).toBeNull();
+  });
+
+  it("ignores Shift+Enter mid-IME-composition", () => {
+    expect(
+      editSequence(
+        key({ key: "Enter", shiftKey: true, isComposing: true }),
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("ignores Shift+Enter when another modifier is held", () => {
+    expect(
+      editSequence(key({ key: "Enter", shiftKey: true, ctrlKey: true }), false),
+    ).toBeNull();
+    expect(
+      editSequence(key({ key: "Enter", shiftKey: true, altKey: true }), false),
+    ).toBeNull();
+  });
+
+  it("falls back to the mac readline keys on macOS but not elsewhere", () => {
+    expect(editSequence(key({ key: "ArrowLeft", metaKey: true }), true)).toBe(
+      "\x01",
+    );
+    expect(
+      editSequence(key({ key: "ArrowLeft", metaKey: true }), false),
     ).toBeNull();
   });
 });

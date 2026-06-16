@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { FLOW, type TerminalApi } from "@shared/terminal";
-import { macEditSequence } from "./key-bindings";
+import { editSequence } from "./key-bindings";
 
 /** The xterm surface the store and the view actually use. Declared structurally so a real
  *  `@xterm/xterm` Terminal satisfies it AND a test fake can stand in without loading xterm. */
@@ -134,18 +134,16 @@ export function createTerminalStore({
       };
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.
       term.onData((data) => api.write(handle.id, data));
-      // macOS text-editing keys the Claude Code prompt understands but xterm won't emit on its own:
-      // cmd/option + arrows and deletes → readline control bytes (see key-bindings). Reads handle.id
-      // so input still follows a /clear rename. Mac-only so we never hijack Super+arrow elsewhere.
-      if (isMac) {
-        term.attachCustomKeyEventHandler((e) => {
-          const seq = macEditSequence(e);
-          if (seq === null) return true; // not ours — plain keys, copy/paste, etc.
-          e.preventDefault();
-          api.write(handle.id, seq);
-          return false; // we sent the bytes; stop xterm emitting its own sequence
-        });
-      }
+      // Keystrokes the Claude Code prompt understands but xterm won't emit on its own (see
+      // key-bindings): Shift+Enter → newline on every platform, plus cmd/option + arrows and deletes
+      // → readline control bytes on macOS. Reads handle.id so input still follows a /clear rename.
+      term.attachCustomKeyEventHandler((e) => {
+        const seq = editSequence(e, isMac);
+        if (seq === null) return true; // not ours — plain keys, copy/paste, etc.
+        e.preventDefault();
+        api.write(handle.id, seq);
+        return false; // we sent the bytes; stop xterm emitting its own sequence
+      });
       handles.set(id, handle);
       return handle;
     },

@@ -182,12 +182,30 @@ describe("createTerminalStore", () => {
     expect(h.api.write).toHaveBeenCalledWith("b", "\x1bf"); // Esc-f, under the rotated id
   });
 
-  it("does not attach the editing handler on non-mac platforms, but still forwards typed input", () => {
+  it("on non-mac, sends Shift+Enter as a newline but leaves the mac editing combos to xterm", () => {
     const h = harness(false);
     h.store.create("a");
-    expect(h.made[0].attachKeyHandler).not.toHaveBeenCalled();
-    h.made[0].typeInput("x"); // ordinary keystrokes still reach the pty via onData, no editing map in the way
+    expect(h.made[0].attachKeyHandler).toHaveBeenCalled(); // handler attaches everywhere now
+
+    // Shift+Enter → newline (Esc+CR), every platform.
+    const nl = keydown({ key: "Enter", shiftKey: true });
+    expect(h.made[0].pressKey(nl)).toBe(false); // we sent it; xterm must not also emit a CR
+    expect(h.api.write).toHaveBeenCalledWith("a", "\x1b\r");
+
+    // A mac-only combo is left untouched off macOS.
+    const macCombo = keydown({ key: "ArrowLeft", metaKey: true });
+    expect(h.made[0].pressKey(macCombo)).toBe(true);
+
+    h.made[0].typeInput("x"); // ordinary keystrokes still reach the pty via onData
     expect(h.api.write).toHaveBeenCalledWith("a", "x");
+  });
+
+  it("translates Shift+Enter to the prompt's newline on macOS too", () => {
+    const h = harness();
+    h.store.create("a");
+    const nl = keydown({ key: "Enter", shiftKey: true });
+    expect(h.made[0].pressKey(nl)).toBe(false);
+    expect(h.api.write).toHaveBeenCalledWith("a", "\x1b\r");
   });
 
   it("acks consumed output in 5k chunks once xterm finishes the write", () => {
