@@ -24,19 +24,35 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
     }
 
     const sync = () => {
+      // Don't fit/resize against a collapsed or not-yet-laid-out container — measuring a 0-size element
+      // yields a 0/NaN grid and a bogus pty resize, and seeds xterm with junk dimensions (VSCode's
+      // layout() bails on width/height <= 0). The ResizeObserver fires again with real dimensions once the
+      // flex layout settles.
+      if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
       handle.fit.fit();
       window.api.terminal.resize(sessionId, handle.term.cols, handle.term.rows);
+      // Rebuild xterm's viewport geometry against the live element after every (re)layout. While the wrapper
+      // was detached the pty kept streaming, so background renders recorded the off-DOM offsetHeight of 0 —
+      // shrinking the scroll-area and resetting the DOM scrollTop, which buries the bottom-most line (the
+      // Claude prompt). The fit above is a no-op when the size is unchanged (the StructureDock pins a fixed
+      // height across a tab switch), so driving this from sync — not just the mount tick — is what lets the
+      // ResizeObserver re-run it when a collapsed container later gets its real size; otherwise that stale
+      // geometry would survive and the prompt would stay unreachable.
+      handle.rebuildViewport();
     };
     sync();
-    // The wrapper was just re-attached; the DOM viewport's scrollTop reset to 0 while xterm kept its
-    // scroll position, so realign them before any wheel input reads the stale 0 and jumps to the top.
-    handle.syncScroll();
+    // Re-run next frame in case the flex layout hasn't settled this tick: the ResizeObserver only fires on a
+    // size change, so a same-size settle wouldn't otherwise re-drive the rebuild. sync self-guards on a
+    // 0-size container and is idempotent.
+    let raf = 0;
+    raf = requestAnimationFrame(sync);
     handle.term.focus();
 
     const ro = new ResizeObserver(sync);
     ro.observe(container);
 
     return () => {
+      cancelAnimationFrame(raf);
       ro.disconnect();
       handle.wrapper.remove(); // detach, not dispose — the buffer goes back to living off-DOM in the store
     };

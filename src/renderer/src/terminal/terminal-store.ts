@@ -35,10 +35,11 @@ export interface TerminalHandle {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
-  /** Realign the DOM viewport's scrollTop with xterm's internal scroll position. The view calls this
-   *  after re-attaching the wrapper, where detaching reset scrollTop to 0 and the first wheel tick would
-   *  otherwise jump to the top. Built in the factory (it needs the real buffer API). */
-  syncScroll: () => void;
+  /** Rebuild xterm's viewport scroll geometry against the live element (VSCode's forceRefresh →
+   *  _core.viewport._innerRefresh). The view calls this on re-attach: background renders into the detached
+   *  (offsetHeight 0) element shrink the scroll-area and reset scrollTop, leaving the Claude prompt
+   *  unreachable until the geometry is rebuilt. Built in the factory (it needs the real xterm core). */
+  rebuildViewport: () => void;
   opened: boolean;
 }
 
@@ -49,7 +50,7 @@ export interface TerminalStoreDeps {
     term: XtermLike;
     fit: FitLike;
     wrapper: HTMLElement;
-    syncScroll: () => void;
+    rebuildViewport: () => void;
   };
   /** True on macOS. Gates the cmd/option editing keys so we never hijack Super+arrow elsewhere. */
   isMac: boolean;
@@ -123,13 +124,13 @@ export function createTerminalStore({
     create(id) {
       const existing = handles.get(id);
       if (existing) return existing;
-      const { term, fit, wrapper, syncScroll } = createTerminal();
+      const { term, fit, wrapper, rebuildViewport } = createTerminal();
       const handle: TerminalHandle = {
         id,
         term,
         fit,
         wrapper,
-        syncScroll,
+        rebuildViewport,
         opened: false,
       };
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.

@@ -5,6 +5,15 @@ import "@xterm/xterm/css/xterm.css";
 import type { FitLike, XtermLike } from "./terminal-store";
 import { viewportScrollTop } from "./viewport-scroll";
 
+/** xterm's internal core, reached the way VSCode does (xtermTerminal.ts: `(raw as ITerminalWithCore)._core`).
+ *  We only need the Viewport's `syncScrollArea`, the public hook xterm itself calls (on clear/show) to force
+ *  a scroll-geometry rebuild. `viewport` only exists after `open()`. Cast through `unknown` so it stays
+ *  type-checked (no `any`); the call site feature-detects `syncScrollArea`, so it degrades gracefully if a
+ *  future xterm renames or drops it. */
+interface TerminalWithCore {
+  _core: { viewport?: { syncScrollArea(immediate?: boolean): void } };
+}
+
 /** xterm options tuned for the Claude TUI: generous scrollback, a dark theme matching the app's ink
  *  palette, a monospace stack, and a steady cursor. convertEol stays off — the TUI emits its own.
  *  customGlyphs + rescaleOverlappingGlyphs only take effect under a GPU renderer (see attachWebgl) —
@@ -67,7 +76,7 @@ export function createXterm(): {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
-  syncScroll: () => void;
+  rebuildViewport: () => void;
 } {
   const term = new Terminal(OPTIONS);
   const fit = new FitAddon();
@@ -92,12 +101,29 @@ export function createXterm(): {
   const wrapper = document.createElement("div");
   wrapper.style.height = "100%";
   wrapper.style.width = "100%";
-  // Re-attaching the wrapper on a tab switch resets the DOM viewport's scrollTop to 0 while xterm keeps
-  // its scroll position, so the first wheel tick would otherwise read the stale 0 and jump to the top
-  // (round(0/rowHeight) - viewportY lines up). Re-derive scrollTop from the live buffer's viewportY to
-  // close that gap. No-ops before open() (no viewport yet) and on the DOM-renderer fallback if the
-  // element is missing; harmless on a fresh terminal (viewportY 0 → scrollTop 0).
-  const syncScroll = () => {
+  // Positioned ancestor for the bottom-aligned .xterm (see index.css): FitAddon floors the row count, so
+  // up to ~1 row of slack remains; parking .xterm at the wrapper's bottom puts that slack above the first
+  // line instead of below the last, keeping the prompt flush to the edge (mirrors VSCode's terminal.css).
+  wrapper.style.position = "relative";
+  // Rebuild xterm's viewport scroll geometry against the live element, the way xterm itself does when a
+  // backgrounded terminal is shown (it calls viewport.syncScrollArea on clear/show). The view calls this on
+  // re-attach. While the wrapper is detached the pty keeps streaming, and every background render runs
+  // xterm's refresh with the off-DOM element's offsetHeight of 0 — which shrinks the scroll-area so the last
+  // line (the Claude prompt) becomes unreachable, and resets the DOM scrollTop. A no-op fit on re-attach
+  // (the StructureDock pins the terminal to a fixed height, so the size is unchanged and xterm never gets a
+  // resize to rebuild on) leaves that stale geometry in place, so we force the rebuild here.
+  //
+  // syncScrollArea(true) re-syncs the recorded buffer length, rebuilds the scroll-area against the live
+  // offsetHeight, and re-pins scrollTop = ydisp * rowHeight using xterm's OWN ignore-flag, so the exact
+  // scroll position (bottom or scrolled-up) is restored without the rounding "knock" a manual scrollTop poke
+  // causes. Feature-detect it so a future xterm that renames or drops it falls through to re-deriving
+  // scrollTop from the live buffer (the pre-rebuild behaviour) rather than throwing.
+  const rebuildViewport = () => {
+    const vp = (term as unknown as TerminalWithCore)._core.viewport;
+    if (typeof vp?.syncScrollArea === "function") {
+      vp.syncScrollArea(true);
+      return;
+    }
     const viewport = wrapper.querySelector(".xterm-viewport");
     if (!(viewport instanceof HTMLElement)) return;
     const buf = term.buffer.active;
@@ -107,5 +133,5 @@ export function createXterm(): {
       viewport.scrollHeight,
     );
   };
-  return { term: term, fit, wrapper, syncScroll };
+  return { term: term, fit, wrapper, rebuildViewport };
 }
