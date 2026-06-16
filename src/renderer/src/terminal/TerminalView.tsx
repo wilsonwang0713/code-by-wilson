@@ -28,15 +28,34 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
       window.api.terminal.resize(sessionId, handle.term.cols, handle.term.rows);
     };
     sync();
+
     // The wrapper was just re-attached; the DOM viewport's scrollTop reset to 0 while xterm kept its
     // scroll position, so realign them before any wheel input reads the stale 0 and jumps to the top.
-    handle.syncScroll();
+    //
+    // But xterm rebuilds its scroll-area geometry on its OWN animation frame, and the fit above is a
+    // no-op when the size is unchanged (the StructureDock pins the terminal to a fixed height across a
+    // tab switch), so xterm never gets a resize to rebuild on. While detached the pty keeps streaming and
+    // xterm records offsetHeight 0, leaving the scroll area too short. A single synchronous pin races
+    // that rebuild: it's clamped against the stale area and xterm rounds it to a row above the prompt,
+    // burying the bottom-most line. So capture the bottom intent NOW, kick the rebuild with an immediate
+    // pin, then re-pin across the next two frames once the geometry is live and a tailing session lands
+    // exactly on the prompt.
+    const toBottom = handle.atBottom();
+    const pin = () => handle.syncScroll(toBottom);
+    pin();
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(pin);
+    });
     handle.term.focus();
 
     const ro = new ResizeObserver(sync);
     ro.observe(container);
 
     return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
       ro.disconnect();
       handle.wrapper.remove(); // detach, not dispose — the buffer goes back to living off-DOM in the store
     };

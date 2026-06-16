@@ -67,7 +67,8 @@ export function createXterm(): {
   term: XtermLike;
   fit: FitLike;
   wrapper: HTMLElement;
-  syncScroll: () => void;
+  syncScroll: (toBottom: boolean) => void;
+  atBottom: () => boolean;
 } {
   const term = new Terminal(OPTIONS);
   const fit = new FitAddon();
@@ -97,9 +98,20 @@ export function createXterm(): {
   // (round(0/rowHeight) - viewportY lines up). Re-derive scrollTop from the live buffer's viewportY to
   // close that gap. No-ops before open() (no viewport yet) and on the DOM-renderer fallback if the
   // element is missing; harmless on a fresh terminal (viewportY 0 → scrollTop 0).
-  const syncScroll = () => {
+  //
+  // `toBottom` pins to the true scroll maximum instead of the proportional position. The view captures
+  // it BEFORE re-attaching (see atBottom) so a tailing session always lands on the last line: while the
+  // wrapper is detached the pty keeps streaming, and xterm's _innerRefresh records offsetHeight 0 and
+  // shrinks its scroll-area; a proportional scrollTop against that stale, short area gets clamped and
+  // xterm rounds it back to a row ABOVE the prompt. scrollHeight (re-read here, after the geometry is
+  // rebuilt against the live viewport) clamps to exactly viewportY-at-bottom * rowHeight — the prompt.
+  const syncScroll = (toBottom: boolean) => {
     const viewport = wrapper.querySelector(".xterm-viewport");
     if (!(viewport instanceof HTMLElement)) return;
+    if (toBottom) {
+      viewport.scrollTop = viewport.scrollHeight;
+      return;
+    }
     const buf = term.buffer.active;
     viewport.scrollTop = viewportScrollTop(
       buf.viewportY,
@@ -107,5 +119,10 @@ export function createXterm(): {
       viewport.scrollHeight,
     );
   };
-  return { term: term, fit, wrapper, syncScroll };
+  // Is the buffer parked at the bottom (a tailing session)? baseY is the viewportY of the last screen, so
+  // reaching it means the prompt is on screen. Read once on re-attach, before any scrollTop poke can
+  // perturb viewportY, so the deferred re-pin knows to chase the true bottom rather than a knocked row.
+  const atBottom = () =>
+    term.buffer.active.viewportY >= term.buffer.active.baseY;
+  return { term: term, fit, wrapper, syncScroll, atBottom };
 }

@@ -37,8 +37,13 @@ export interface TerminalHandle {
   wrapper: HTMLElement;
   /** Realign the DOM viewport's scrollTop with xterm's internal scroll position. The view calls this
    *  after re-attaching the wrapper, where detaching reset scrollTop to 0 and the first wheel tick would
-   *  otherwise jump to the top. Built in the factory (it needs the real buffer API). */
-  syncScroll: () => void;
+   *  otherwise jump to the top. `toBottom` pins to the true maximum (a tailing session) rather than the
+   *  proportional position, so the Claude prompt isn't left below the fold. Built in the factory (it
+   *  needs the real buffer API). */
+  syncScroll: (toBottom: boolean) => void;
+  /** Whether the buffer is parked at the bottom. Read on re-attach, before any scrollTop poke perturbs
+   *  the buffer's viewportY, so the view can re-pin a tailing session to the true bottom. */
+  atBottom: () => boolean;
   opened: boolean;
 }
 
@@ -49,7 +54,8 @@ export interface TerminalStoreDeps {
     term: XtermLike;
     fit: FitLike;
     wrapper: HTMLElement;
-    syncScroll: () => void;
+    syncScroll: (toBottom: boolean) => void;
+    atBottom: () => boolean;
   };
   /** True on macOS. Gates the cmd/option editing keys so we never hijack Super+arrow elsewhere. */
   isMac: boolean;
@@ -123,13 +129,14 @@ export function createTerminalStore({
     create(id) {
       const existing = handles.get(id);
       if (existing) return existing;
-      const { term, fit, wrapper, syncScroll } = createTerminal();
+      const { term, fit, wrapper, syncScroll, atBottom } = createTerminal();
       const handle: TerminalHandle = {
         id,
         term,
         fit,
         wrapper,
         syncScroll,
+        atBottom,
         opened: false,
       };
       // user keystrokes → pty (independent of DOM attach). Reads handle.id so a rename re-points input too.
