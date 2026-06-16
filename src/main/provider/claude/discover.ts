@@ -3,7 +3,11 @@ import { join } from "node:path";
 import type { PersistedSession, SessionCandidate } from "@shared/types";
 import { normalizeModelId } from "@shared/models";
 import { projectFromCwd } from "../../project-name";
-import { parseTranscript, type TranscriptSummary } from "./transcript";
+import {
+  parseTranscript,
+  transcriptSessionKind,
+  type TranscriptSummary,
+} from "./transcript";
 import { deriveSessionState } from "./state";
 
 export interface RawSessionFile {
@@ -126,13 +130,16 @@ export function registryById(claudeDir: string): Map<string, RawSessionFile> {
 }
 
 /**
- * A background session — agent view, `/bg`, or `claude --bg`. Claude Code hosts these under a
- * supervisor and tags them `kind:"bg"` (always paired with a `jobId`). They are not interactive
- * conversations, so they stay out of the session list. We trigger only on a positive bg signal: a
- * registry file with no `kind` and no `jobId` predates the field and is treated as interactive, and
- * a transcript-only candidate (registry file already reaped) is kept. We can't tell a reaped bg
- * session from a reaped interactive one at this layer, so a finished bg session can still leak in
- * until we filter on the transcript's `sessionKind` (#158).
+ * A live background session — agent view, `/bg`, or `claude --bg` — recognized from its registry
+ * entry. Claude Code hosts these under a supervisor and tags them `kind:"bg"` (always paired with a
+ * `jobId`). They are not interactive conversations, so they stay out of the session list. We trigger
+ * only on a positive bg signal: a registry file with no `kind` and no `jobId` predates the field and
+ * is treated as interactive.
+ *
+ * This reads the live registry entry only, which Claude reaps when the job ends. A finished bg session
+ * is caught instead on its transcript's `sessionKind:"bg"` (see the reaped-bg check in listCandidates):
+ * a transcript-only candidate is NOT always a genuine Ended session, because bg sessions write
+ * transcripts too.
  */
 function isBackground(raw: RawSessionFile | undefined): boolean {
   if (!raw) return false;
@@ -164,8 +171,12 @@ export function listCandidates({
   const out: SessionCandidate[] = [];
   for (const id of ids) {
     const raw = registry.get(id);
-    if (isBackground(raw)) continue; // hide Claude background sessions; see isBackground
+    if (isBackground(raw)) continue; // hide live Claude background sessions; see isBackground
     const t = transcripts.get(id);
+    // Reaped bg: its registry file is gone, but the transcript still reports sessionKind:"bg" (#158).
+    // Only scan a transcript-only candidate — a registered non-bg session is genuinely interactive, so
+    // it needs no read.
+    if (!raw && t && transcriptSessionKind(t.path) === "bg") continue;
     out.push({
       id,
       alive: raw ? isPidAlive(raw.pid) : false,

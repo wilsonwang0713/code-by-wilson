@@ -366,6 +366,69 @@ describe("listCandidates", () => {
     expect(ids).not.toContain("bgsib");
   });
 
+  it("drops a reaped bg session identified by its transcript's sessionKind", () => {
+    const home = makeHome();
+    // No registry file (reaped). Transcript carries sessionKind:"bg" on a turn line, mtime in window.
+    writeTranscript(
+      home,
+      "-w-bg",
+      "reapedbg",
+      '{"type":"user","sessionKind":"bg","message":{"content":"hi"}}\n',
+      NOW / 1000 - 1,
+    );
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).not.toContain("reapedbg");
+  });
+
+  it("keeps a reaped interactive session (transcript with no sessionKind)", () => {
+    const home = makeHome();
+    writeTranscript(
+      home,
+      "-w-i",
+      "reapedinter",
+      '{"type":"user","message":{"content":"hi"}}\n',
+      NOW / 1000 - 1,
+    );
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).toContain("reapedinter");
+  });
+
+  it("drops a reaped bg session but keeps a reaped interactive session in the same pass", () => {
+    const home = makeHome();
+    writeTranscript(
+      home,
+      "-w-bg",
+      "reapedbg",
+      '{"type":"user","sessionKind":"bg","message":{"content":"hi"}}\n',
+      NOW / 1000 - 1,
+    );
+    writeTranscript(
+      home,
+      "-w-i",
+      "reapedinter",
+      '{"type":"user","message":{"content":"hi"}}\n',
+      NOW / 1000 - 1,
+    );
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).not.toContain("reapedbg");
+    expect(ids).toContain("reapedinter");
+  });
+
   it("keeps the freshest registry file per id (max updatedAt)", () => {
     const home = makeHome();
     writeSessionFile(home, {
