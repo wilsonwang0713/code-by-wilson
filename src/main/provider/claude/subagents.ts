@@ -223,6 +223,14 @@ export function subagentsDirFor(transcriptPath: string): string {
   );
 }
 
+/** projects/<proj>/<sid>.jsonl + agentId → that subagent's own transcript file. */
+export function subagentFileFor(
+  transcriptPath: string,
+  agentId: string,
+): string {
+  return join(subagentsDirFor(transcriptPath), `agent-${agentId}.jsonl`);
+}
+
 /** Newest mtime (ms) among the `agent-*.jsonl` files, or 0 when the dir is absent/empty. The transcript
  *  read folds this into its change token so a running subagent's growth re-triggers a poll. */
 export function subagentsNewestMtime(dir: string): number {

@@ -1,14 +1,44 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { SessionState } from "@shared/types";
+import type { TranscriptEvent } from "@shared/transcript";
 import type { DocState } from "./use-transcript";
 import { EventItem } from "./events";
 
 /**
- * A session's rendered transcript: a bottom-sticky feed of events plus a prominent Waiting banner. The
- * polling lives in useTranscript (lifted so the context panel and timeline share one doc); this component
- * is a pure renderer of the doc it's handed. `readOnly` marks an Observed session (no process to type
- * into) and shows the read-only banner; a Managed session reads the same transcript while its terminal
- * drives the CLI, so it passes false.
+ * The shared event feed: a bottom-sticky list of rendered transcript events. Both the Session
+ * TranscriptView and the drilled Subagent view render it. The optional `footer` slot carries the
+ * Session's Waiting banner (the Subagent view passes none — its breadcrumb owns the read-only signal).
+ * Sticks to the bottom when new events arrive — a live, read-only feed.
+ */
+export function TranscriptFeed({
+  events,
+  footer,
+}: {
+  events: TranscriptEvent[];
+  footer?: ReactNode;
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const countRef = useRef(0);
+  useEffect(() => {
+    if (events.length > countRef.current)
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    countRef.current = events.length;
+  }, [events.length]);
+  return (
+    <div className="mx-auto max-w-3xl space-y-4 p-5">
+      {events.map((e, i) => (
+        <EventItem key={i} event={e} />
+      ))}
+      {footer}
+      <div ref={bottomRef} />
+    </div>
+  );
+}
+
+/**
+ * A session's rendered transcript: the shared event feed plus the Session-specific chrome — a read-only
+ * banner for an Observed session and a prominent Waiting banner. The polling lives in useTranscript
+ * (lifted so the context panel and dock share one doc); this is a pure renderer of the doc it's handed.
  */
 export function TranscriptView({
   doc,
@@ -21,17 +51,6 @@ export function TranscriptView({
   state: SessionState;
   readOnly: boolean;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const countRef = useRef(0);
-
-  // Stick to the bottom when new events arrive — this is a live, read-only feed.
-  useEffect(() => {
-    const n = doc?.events.length ?? 0;
-    if (n > countRef.current)
-      bottomRef.current?.scrollIntoView({ block: "end" });
-    countRef.current = n;
-  }, [doc]);
-
   if (doc === null) {
     return (
       <Center>
@@ -50,30 +69,26 @@ export function TranscriptView({
           Observed session.
         </div>
       )}
-
-      <div className="mx-auto max-w-3xl space-y-4 p-5">
-        {doc?.events.map((e, i) => (
-          <EventItem key={i} event={e} />
-        ))}
-
-        {state === "waiting" && (
-          <div className="rounded-lg border border-accent/40 bg-accent/[0.08] p-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-accent-bright">
-              Waiting for you
+      <TranscriptFeed
+        events={doc?.events ?? []}
+        footer={
+          state === "waiting" ? (
+            <div className="rounded-lg border border-accent/40 bg-accent/[0.08] p-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-accent-bright">
+                Waiting for you
+              </div>
+              <p className="mt-1 whitespace-pre-wrap font-mono text-[12px] text-accent-bright">
+                {doc?.waitingReason ?? "Waiting for your input"}
+              </p>
             </div>
-            <p className="mt-1 whitespace-pre-wrap font-mono text-[12px] text-accent-bright">
-              {doc?.waitingReason ?? "Waiting for your input"}
-            </p>
-          </div>
-        )}
-
-        <div ref={bottomRef} />
-      </div>
+          ) : null
+        }
+      />
     </div>
   );
 }
 
-function Center({ children }: { children: ReactNode }) {
+export function Center({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-full items-center justify-center text-[12px] text-fg-faint">
       {children}

@@ -14,6 +14,7 @@ import { parseJsonlRows } from "./transcript-row";
 import {
   buildSubagentForest,
   readSubagentSources,
+  subagentFileFor,
   subagentsDirFor,
   subagentsNewestMtime,
 } from "./subagents";
@@ -267,6 +268,62 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         // A non-ENOENT read failure (EACCES, EIO, …) is transient, not absence. Degrade like
         // summarize does: report an error so the view keeps its last doc, rather than rejecting the
         // IPC or masquerading as "no transcript".
+        return { status: "error" };
+      }
+    },
+    readSubagentTranscript: (id, agentId, sinceMtimeMs) => {
+      try {
+        // We only need the session dir to locate the subagent file; the subagent file's own mtime is the
+        // change token. So use the warm cached path (no stat of the main transcript) when present — the
+        // parallel session poll keeps it fresh and invalidates a moved file — and pay the full resolve
+        // (a projects/ sweep) only on a cold miss.
+        const path = pathById.get(id) ?? resolveTranscript(id)?.path;
+        if (path === undefined) return { status: "absent" };
+        // `agentId` arrives over IPC. A real id is the slug between `agent-` and `.meta.json` in an
+        // on-disk filename, so it can never hold a path separator; reject one that does rather than let
+        // `agent-${agentId}.jsonl` escape the subagents dir (e.g. `x/../../other`). Genuinely absent.
+        if (/[/\\]/.test(agentId)) return { status: "absent" };
+        const file = subagentFileFor(path, agentId);
+        let mtimeMs: number;
+        try {
+          mtimeMs = statSync(file).mtimeMs;
+        } catch (err) {
+          // No such subagent file (or no subagents dir) — genuinely absent. A non-ENOENT stat failure
+          // (EACCES, EIO) is transient: rethrow to the outer catch so it degrades to `error`.
+          if ((err as NodeJS.ErrnoException)?.code === "ENOENT")
+            return { status: "absent" };
+          throw err;
+        }
+        // Keyed on the subagent file alone — the tightest token: a live subagent appending re-triggers
+        // the read, nothing else does.
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        const jsonl = readTextOrNull(file);
+        // Vanished between stat and read. Unlike readTranscript, no forgetSession here: a gone subagent
+        // file doesn't mean the session moved, so its cached path stays valid.
+        if (jsonl === null) return { status: "absent" };
+        // A subagent's file is all-sidechain, so render it with the option on. The drill surface shows
+        // only the event feed, so take just `events` and leave the session-shaped fields honestly empty:
+        // waitingReason/turns/context computed over a subagent's internal turns are meaningless here (a
+        // subagent's pending tool is not the Session waiting on you) and a trap for any future reader.
+        // Nested drilling is a later issue, so the doc carries no forest of its own.
+        const { events } = parseTranscriptEventsFromRows(
+          parseJsonlRows(jsonl),
+          {
+            includeSidechain: true,
+          },
+        );
+        return {
+          status: "changed",
+          mtimeMs,
+          doc: {
+            events,
+            waitingReason: null,
+            turns: [],
+            context: null,
+            subagents: [],
+          },
+        };
+      } catch {
         return { status: "error" };
       }
     },

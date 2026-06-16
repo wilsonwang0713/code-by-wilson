@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Session, Account } from "@shared/types";
+import type { Session, Account, Subagent } from "@shared/types";
 import { Icon } from "../ui/icons";
 import { SegmentedTabs } from "../ui/SegmentedTabs";
 import { TranscriptView } from "./TranscriptView";
@@ -8,6 +8,8 @@ import { useTranscript, type DocState } from "./use-transcript";
 import { ContextPanel } from "./panels/ContextPanel";
 import { CostPanel } from "./panels/CostPanel";
 import { StructureDock } from "./panels/StructureDock";
+import { SubagentDrill, type SubagentCrumb } from "./SubagentDrill";
+import { useSubagentTranscript } from "./use-subagent-transcript";
 import { TokensPanel } from "./panels/TokensPanel";
 import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
 import { GitPanel } from "./panels/GitPanel";
@@ -120,13 +122,38 @@ function WorkspaceBody({
 }) {
   const doc = useTranscript(s.id);
   const tasks = useTasks(s.id);
+  // The drill-stack: empty = the Session transcript, one crumb = drilled into that Subagent. Lives here
+  // because the dock (which triggers the drill) and the center (which renders it) both read it. It's a
+  // stack so N-deep nesting (drilling an inline dispatch, a later issue) can push onto it; this slice
+  // drills one level from a lane, so onDrill sets a fresh single-crumb path. Workspace is keyed by
+  // session id in App, so it remounts (and the stack clears) on a session switch.
+  const [drill, setDrill] = useState<SubagentCrumb[]>([]);
+  const activeAgentId = drill[drill.length - 1]?.agentId;
+  // Lifted here (always mounted, like useTranscript) so the subagent poll survives the Managed Terminal ⇄
+  // Transcript toggle — re-mounting it inside the tab would discard the change token and re-read the whole
+  // file on every flip. Gated on activeAgentId: it polls only while a lane is drilled.
+  const subagentDoc = useSubagentTranscript(s.id, activeAgentId);
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1">
-          <CenterView session={s} doc={doc} />
+          <CenterView
+            session={s}
+            doc={doc}
+            subagentDoc={subagentDoc}
+            drill={drill}
+            onNavigate={(depth) => setDrill((d) => d.slice(0, depth))}
+          />
         </div>
-        <StructureDock tasks={tasks ?? []} doc={doc} now={now} />
+        <StructureDock
+          tasks={tasks ?? []}
+          doc={doc}
+          now={now}
+          activeAgentId={activeAgentId}
+          onDrill={(agent: Subagent) =>
+            setDrill([{ agentId: agent.id, label: agent.type }])
+          }
+        />
       </div>
       <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-ink-800 bg-ink-925 p-4 lg:flex">
         <SessionPanel session={s} />
@@ -152,25 +179,66 @@ function WorkspaceBody({
 
 type CenterTab = "terminal" | "transcript";
 
-/** The center column's live view, dispatched by management kind. Observed = read-only transcript;
- *  Managed gets the Terminal ⇄ Transcript toggle. */
-function CenterView({ session: s, doc }: { session: Session; doc: DocState }) {
+/** The center column's live view, dispatched by management kind. A non-empty drill-stack renders the
+ *  drilled Subagent surface in place of the Session transcript. Observed = read-only transcript; Managed
+ *  gets the Terminal ⇄ Transcript toggle. */
+function CenterView({
+  session: s,
+  doc,
+  subagentDoc,
+  drill,
+  onNavigate,
+}: {
+  session: Session;
+  doc: DocState;
+  subagentDoc: DocState;
+  drill: SubagentCrumb[];
+  onNavigate: (depth: number) => void;
+}) {
   if (s.management === "observed")
-    return <RenderedTranscript session={s} doc={doc} />;
-  return <ManagedCenter session={s} doc={doc} />;
+    return drill.length > 0 ? (
+      <SubagentDrill crumbs={drill} onNavigate={onNavigate} doc={subagentDoc} />
+    ) : (
+      <RenderedTranscript session={s} doc={doc} />
+    );
+  return (
+    <ManagedCenter
+      session={s}
+      doc={doc}
+      subagentDoc={subagentDoc}
+      drill={drill}
+      onNavigate={onNavigate}
+    />
+  );
 }
 
 /** A Managed session has both a live terminal and the transcript the CLI is writing, so it toggles
  *  between them — default Terminal. Toggling away only detaches xterm (the pty keeps buffering), so
- *  toggling back restores full scrollback. */
+ *  toggling back restores full scrollback. Drilling a lane auto-selects the Transcript tab and shows the
+ *  drilled Subagent there; the Terminal stays live, and the user can flip back to it (the drill persists).
+ *  The drill-stack lives only inside the Transcript surface. */
 function ManagedCenter({
   session: s,
   doc,
+  subagentDoc,
+  drill,
+  onNavigate,
 }: {
   session: Session;
   doc: DocState;
+  subagentDoc: DocState;
+  drill: SubagentCrumb[];
+  onNavigate: (depth: number) => void;
 }) {
   const [tab, setTab] = useState<CenterTab>("terminal");
+  const drilled = drill.length > 0;
+  const drilledAgentId = drill[drill.length - 1]?.agentId;
+  // Auto-select Transcript whenever the drilled agent changes — keyed on the agent id, not a boolean, so
+  // drilling a second lane while parked on Terminal still pulls focus. Popping back to the Session (id →
+  // undefined) intentionally leaves the tab where it is rather than forcing back to Terminal.
+  useEffect(() => {
+    if (drilledAgentId) setTab("transcript");
+  }, [drilledAgentId]);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ViewTabs tab={tab} onChange={setTab} />
@@ -179,6 +247,12 @@ function ManagedCenter({
           <div className="h-full">
             <TerminalView sessionId={s.id} />
           </div>
+        ) : drilled ? (
+          <SubagentDrill
+            crumbs={drill}
+            onNavigate={onNavigate}
+            doc={subagentDoc}
+          />
         ) : (
           <RenderedTranscript session={s} doc={doc} />
         )}

@@ -9,6 +9,7 @@ export const IPC = {
   refresh: "sessions:refresh",
   capabilities: "provider:capabilities",
   readTranscript: "transcript:read",
+  readSubagentTranscript: "subagentTranscript:read",
   readTasks: "tasks:read",
   readMetrics: "metrics:read",
   fullscreen: "window:fullscreen",
@@ -51,6 +52,14 @@ export interface IpcApi {
   refresh(): Promise<OverviewData>;
   capabilities(): Promise<ProviderCapabilities>;
   readTranscript(id: string, sinceMtimeMs?: number): Promise<TranscriptRead>;
+  /** Read one subagent's own transcript (its sidechain file) into render-ready events — the read behind
+   *  drilling into a Subagent lane. `sinceMtimeMs` is the change token from the last read; an unchanged
+   *  token skips the read. */
+  readSubagentTranscript(
+    id: string,
+    agentId: string,
+    sinceMtimeMs?: number,
+  ): Promise<TranscriptRead>;
   /** Read one session's task list from ~/.claude/tasks/<id>/. `sinceMtimeMs` is the change token from
    *  the caller's last read; when it still matches, the result is `unchanged`. */
   readTasks(id: string, sinceMtimeMs?: number): Promise<TaskRead>;

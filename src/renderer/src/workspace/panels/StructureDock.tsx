@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Task } from "@shared/types";
+import type { Subagent, Task } from "@shared/types";
 import { Icon } from "../../ui/icons";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
 import type { DocState } from "../use-transcript";
@@ -23,10 +23,14 @@ export function StructureDock({
   tasks,
   doc,
   now,
+  activeAgentId,
+  onDrill,
 }: {
   tasks: Task[];
   doc: DocState;
   now: number;
+  activeAgentId?: string;
+  onDrill: (agent: Subagent) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const subagents = doc?.subagents ?? [];
@@ -42,7 +46,15 @@ export function StructureDock({
   const [pick, setPick] = useState<{ tab: DockTab; alive: boolean } | null>(
     null,
   );
-  const tab = pick && pick.alive === alive ? pick.tab : defaultDockTab(stats);
+  // While a lane is drilled, hold the Subagents tab so the originating lane (and its active ring) stays
+  // visible above the drill surface — otherwise the fan-out finishing would auto-flip to Turns and orphan
+  // the open drill. An in-phase manual pick still wins, so the user can deliberately flip to Turns.
+  const tab =
+    pick && pick.alive === alive
+      ? pick.tab
+      : activeAgentId
+        ? "subagents"
+        : defaultDockTab(stats);
 
   if (collapsed)
     return (
@@ -71,7 +83,13 @@ export function StructureDock({
           {tab === "turns" ? (
             <TurnsTab turns={turns} now={now} />
           ) : (
-            <SubagentsTab subagents={subagents} stats={stats} now={now} />
+            <SubagentsTab
+              subagents={subagents}
+              stats={stats}
+              now={now}
+              activeAgentId={activeAgentId}
+              onDrill={onDrill}
+            />
           )}
         </div>
       </div>

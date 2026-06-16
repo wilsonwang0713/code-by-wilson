@@ -62,6 +62,7 @@ function fakeProvider(candidates: SessionCandidate[]): {
       summarize,
       restate,
       readTranscript: () => ({ status: "absent" }),
+      readSubagentTranscript: () => ({ status: "absent" }),
       readTasks: () => ({ status: "absent" }),
       readMetrics: () => ({ status: "absent" }),
       resolveAdoptTarget: () => null,
