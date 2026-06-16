@@ -20,16 +20,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Releasing
 
-The maintainer drives releases in two phases; full mechanics are in `docs/RELEASING.md`.
+The maintainer drives releases in two phases. Run the **`release` skill**
+(`.claude/skills/release/SKILL.md`) — it's phase-aware:
 
-1. **"Bump version" (before release).** On a branch, do all the doc prep and open the PR — do **not** tag:
-   - Set `version` in `package.json`.
-   - Update `CHANGELOG.md`: open a dated `## [X.Y.Z] - YYYY-MM-DD` section, fill it from the `vLAST..HEAD` commit range (group as Added/Changed/Removed/Fixed), repoint `[Unreleased]`, and add the `[X.Y.Z]` compare link. If a prior version shipped without notes, backfill it too.
-   - Bump + changelog go in one `build(release): vX.Y.Z` commit; keep unrelated changelog backfills as separate `docs(changelog):` commits.
-   - Run `pnpm format` and `pnpm lint`, push, and open the PR. Don't push a tag.
-2. **"Release it" (after the PR merges).** Follow `docs/RELEASING.md`: tag the merged commit on `main` as `vX.Y.Z`, push the tag (CI builds the draft), then remind the maintainer to publish the draft.
-   - **Tag push is the maintainer's job from a local clone.** Claude Code on the web runs behind a git proxy scoped to the session's feature branch; pushing any other ref — tags included — returns HTTP 403, and the GitHub tools here can't create a tag/ref either. So in a web session, prepare and verify everything, then hand the maintainer the exact commands (`git switch main && git pull`, `git tag vX.Y.Z`, `git push origin vX.Y.Z`) to run themselves.
-   - **After the tag is pushed, shepherd the CI run to a verified draft.** The push fires the `Release` workflow. CI success and new tags aren't delivered as webhook events, so wait for the maintainer's "tag pushed" ping (or arm a monitor), then: watch the run (`verify` → the `macos-14` build) via the GitHub Actions tools; if it fails, pull the job logs, report the cause, and re-push the tag to re-trigger if it was a flake (`git push origin :refs/tags/vX.Y.Z && git push origin vX.Y.Z` — also maintainer-only); on success, confirm the **draft** release for `vX.Y.Z` carries all three assets (`Code-by-wire-X.Y.Z-arm64.dmg`, its `.blockmap`, `latest-mac.yml`); then remind the maintainer to publish the draft after checking the notes match the changelog. If the tag was created via the GitHub web release UI (published immediately, no draft), just verify the assets landed on that release instead.
+1. **"Bump version" (before release).** On a branch: set `package.json` `version`,
+   update `CHANGELOG.md`, commit as `build(release): vX.Y.Z`, `pnpm format` +
+   `lint`, push, and open the PR. Don't tag.
+2. **"Release it" (after the PR merges).** Tag `main` as `vX.Y.Z` and ship.
+   **The tag push is the maintainer's job from a local clone** — Claude Code on
+   the web is behind a git proxy that 403s any ref outside the session branch
+   (tags included). Hand off the commands, then shepherd CI to a verified draft.
+
+Full mechanics and recovery are in `docs/RELEASING.md`.
 
 ## Agent skills
 
