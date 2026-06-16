@@ -5,6 +5,9 @@ export interface FooterView {
   statusLabel: string;
   version: string | null;
   path: string | null;
+  /** The actionable one-liner (e.g. "needs ≥ 2.0.0", "not on PATH"). Null when ready/checking, where it
+   *  would only restate the status label. */
+  detail: string | null;
   showTroubleshoot: boolean;
 }
 
@@ -31,6 +34,7 @@ export function footerView(status: CliStatus | null): FooterView {
       statusLabel: "checking…",
       version: null,
       path: null,
+      detail: null,
       showTroubleshoot: false,
     };
   }
@@ -39,6 +43,8 @@ export function footerView(status: CliStatus | null): FooterView {
     statusLabel: LABEL[status.kind],
     version: status.version,
     path: status.path,
+    // ready's detail just restates the label, so suppress it; non-ready details carry the remedy hint.
+    detail: status.kind === "ready" ? null : (status.detail ?? null),
     showTroubleshoot: status.kind !== "ready",
   };
 }

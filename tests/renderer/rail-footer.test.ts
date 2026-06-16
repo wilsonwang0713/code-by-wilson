@@ -21,6 +21,7 @@ describe("footerView", () => {
     expect(v.dot).toBe("ok");
     expect(v.showTroubleshoot).toBe(false);
     expect(v.version).toBe("2.1.178");
+    expect(v.detail).toBeNull(); // ready's detail would just restate the label
   });
   it("red + troubleshoot when not found", () => {
     const v = footerView({
@@ -41,6 +42,7 @@ describe("footerView", () => {
     });
     expect(v.dot).toBe("warn");
     expect(v.showTroubleshoot).toBe(true);
+    expect(v.detail).toBe("needs ≥ 2.0.0"); // remedy hint surfaces in the footer
   });
   it("renders a checking placeholder when status is null", () => {
     expect(footerView(null).statusLabel).toBe("checking…");

@@ -35,6 +35,7 @@ export function RailFooter({
           {v.path ? ` · ${v.path}` : ""}
         </div>
       )}
+      {v.detail && <div className="truncate text-fg-muted">{v.detail}</div>}
       <div className="flex items-center gap-2">
         {v.showTroubleshoot && (
           <button
