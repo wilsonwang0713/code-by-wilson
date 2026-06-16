@@ -70,10 +70,14 @@ export function evaluateCliStatus(p: CliProbeInput): CliStatus {
       detail: "unrecognized version",
     };
   }
-  // Guard a colliding non-Claude `claude` on PATH: the real CLI prints "<x.y.z> (Claude Code)". A binary
-  // that parses as a version but doesn't identify as Claude can't be trusted to honor our flags. The
-  // marker is loose (any "claude") so a minor output-format change doesn't false-flag a real install.
-  if (!/claude/i.test(p.version.raw)) {
+  // Guard a colliding non-Claude `claude` on PATH: the real CLI prints "<x.y.z> (Claude Code)". Reject only
+  // when --version carries a parenthesized product tag that ISN'T Claude (e.g. "9.9.9 (SomeOtherTool)"). A
+  // bare "x.y.z" with no tag is NOT rejected — parseSemver documents that bare output is a valid format, and
+  // blocking a working CLI over a missing suffix (→ unknown → spawning disabled) is worse than tolerating a
+  // vanishingly-rare untagged impostor, which fails at auth/usage anyway. Loose match on the tag so a
+  // "(… Claude …)" wording variant still passes.
+  const tag = /\(([^)]*)\)/.exec(p.version.raw);
+  if (tag && !/claude/i.test(tag[1])) {
     return {
       ...common,
       kind: "unknown",

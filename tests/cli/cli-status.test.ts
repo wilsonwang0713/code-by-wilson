@@ -62,6 +62,20 @@ describe("evaluateCliStatus", () => {
     expect(r.kind).toBe("unknown");
     expect(r.detail).toBe("not Claude Code");
   });
+  it("stays ready on a bare version string with no marker (parseSemver allows bare output)", () => {
+    expect(
+      evaluateCliStatus({
+        ...base,
+        version: { status: "ok", raw: "2.1.178\n" },
+      }).kind,
+    ).toBe("ready");
+  });
+  it("treats a bare below-floor version as outdated, not 'not Claude Code'", () => {
+    expect(
+      evaluateCliStatus({ ...base, version: { status: "ok", raw: "1.9.0" } })
+        .kind,
+    ).toBe("outdated");
+  });
   it("loggedOut when compatible but auth status exited 1", () => {
     expect(
       evaluateCliStatus({ ...base, auth: { status: "loggedOut" } }).kind,
