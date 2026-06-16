@@ -2,12 +2,18 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-/** Resolve the Claude config dir: an explicit override, else `CLAUDE_CONFIG_DIR` (which Claude Code
- *  itself honors to relocate the config), else `~/.claude`. The single place this decision lives so the
- *  provider and the settings manager can never disagree on where Claude's config is. */
-export function resolveClaudeDir(override?: string): string {
+/** Resolve the Claude config dir: an explicit override, else `CLAUDE_CONFIG_DIR`, else a dir recovered
+ *  from the login shell (a Finder-launched .app doesn't inherit a rc-set CLAUDE_CONFIG_DIR), else
+ *  `~/.claude`. The single place this decision lives so the provider and settings manager never disagree. */
+export function resolveClaudeDir(
+  override?: string,
+  recovered?: string | null,
+): string {
   return (
-    override ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude")
+    override ??
+    process.env.CLAUDE_CONFIG_DIR ??
+    (recovered || undefined) ??
+    join(homedir(), ".claude")
   );
 }
 

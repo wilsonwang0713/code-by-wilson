@@ -25,6 +25,19 @@ describe("resolveClaudeDir", () => {
     delete process.env.CLAUDE_CONFIG_DIR;
     expect(resolveClaudeDir()).toBe(join(homedir(), ".claude"));
   });
+
+  it("uses the recovered dir when there is no override or env var", () => {
+    delete process.env.CLAUDE_CONFIG_DIR;
+    expect(resolveClaudeDir(undefined, "/recovered/claude")).toBe(
+      "/recovered/claude",
+    );
+  });
+  it("still prefers the env var over the recovered dir", () => {
+    process.env.CLAUDE_CONFIG_DIR = "/env/claude";
+    expect(resolveClaudeDir(undefined, "/recovered/claude")).toBe(
+      "/env/claude",
+    );
+  });
 });
 
 describe("readTextOrNull", () => {
