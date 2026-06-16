@@ -20,14 +20,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Releasing
 
-The maintainer drives releases in two phases; full mechanics are in `docs/RELEASING.md`.
-
-1. **"Bump version" (before release).** On a branch, do all the doc prep and open the PR — do **not** tag:
-   - Set `version` in `package.json`.
-   - Update `CHANGELOG.md`: open a dated `## [X.Y.Z] - YYYY-MM-DD` section, fill it from the `vLAST..HEAD` commit range (group as Added/Changed/Removed/Fixed), repoint `[Unreleased]`, and add the `[X.Y.Z]` compare link. If a prior version shipped without notes, backfill it too.
-   - Bump + changelog go in one `build(release): vX.Y.Z` commit; keep unrelated changelog backfills as separate `docs(changelog):` commits.
-   - Run `pnpm format` and `pnpm lint`, push, and open the PR. Don't push a tag.
-2. **"Release it" (after the PR merges).** Follow `docs/RELEASING.md`: tag the merged commit on `main` as `vX.Y.Z`, push the tag (CI builds the draft), then remind the maintainer to publish the draft.
+Releases run in two phases ("bump version", then "release it"). Run the
+**`release` skill** (`.claude/skills/release/SKILL.md`); full mechanics are in
+`docs/RELEASING.md`.
 
 ## Agent skills
 

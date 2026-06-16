@@ -8,7 +8,9 @@ release/
 .vite/
 
 # Vendored Claude Code skills — reproducible from skills-lock.json via /setup-matt-pocock-skills
-.claude/skills/
+.claude/skills/*
+# ...except repo-owned skills committed here
+!.claude/skills/release/
 
 # Superpowers plugin state and generated docs: local only, never tracked
 .superpowers/
