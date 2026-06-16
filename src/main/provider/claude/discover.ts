@@ -12,6 +12,10 @@ export interface RawSessionFile {
   cwd: string;
   status?: string;
   updatedAt?: number;
+  /** "interactive" | "bg" from the registry; absent on files that predate the field. */
+  kind?: string;
+  /** Present only on background sessions (agent view / `claude --bg`); the agent-view short id. */
+  jobId?: string;
 }
 
 export interface CandidateDeps {
@@ -70,6 +74,8 @@ export function readSessionFiles(claudeDir: string): RawSessionFile[] {
           cwd: typeof j.cwd === "string" ? j.cwd : "",
           status: j.status,
           updatedAt: j.updatedAt,
+          kind: typeof j.kind === "string" ? j.kind : undefined,
+          jobId: typeof j.jobId === "string" ? j.jobId : undefined,
         });
       }
     } catch {
@@ -120,6 +126,20 @@ export function registryById(claudeDir: string): Map<string, RawSessionFile> {
 }
 
 /**
+ * A background session — agent view, `/bg`, or `claude --bg`. Claude Code hosts these under a
+ * supervisor and tags them `kind:"bg"` (always paired with a `jobId`). They are not interactive
+ * conversations, so they stay out of the session list. We trigger only on a positive bg signal: a
+ * registry file with no `kind` and no `jobId` predates the field and is treated as interactive, and
+ * a transcript-only candidate (registry file already reaped) is kept. We can't tell a reaped bg
+ * session from a reaped interactive one at this layer, so a finished bg session can still leak in
+ * until we filter on the transcript's `sessionKind` (#158).
+ */
+function isBackground(raw: RawSessionFile | undefined): boolean {
+  if (!raw) return false;
+  return raw.kind === "bg" || (raw.jobId !== undefined && raw.jobId !== "");
+}
+
+/**
  * The sessions worth indexing this pass: every registry entry (live or just-reaped), plus every
  * transcript touched within the recency window — a recent Ended session whose registry file Claude
  * already swept. Cheap by design: no transcript is parsed here. That's `summarize`, which the sync
@@ -144,6 +164,7 @@ export function listCandidates({
   const out: SessionCandidate[] = [];
   for (const id of ids) {
     const raw = registry.get(id);
+    if (isBackground(raw)) continue; // hide Claude background sessions; see isBackground
     const t = transcripts.get(id);
     out.push({
       id,

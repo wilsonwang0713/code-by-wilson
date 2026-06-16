@@ -272,6 +272,100 @@ describe("listCandidates", () => {
     expect(c.alive).toBe(false);
   });
 
+  it("drops a live background (kind:'bg') session", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 100,
+      sessionId: "bgsess",
+      cwd: "/w/bg",
+      status: "idle",
+      kind: "bg",
+      jobId: "bgsess",
+      updatedAt: 1,
+    });
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).not.toContain("bgsess");
+  });
+
+  it("drops a session with a jobId but no kind field", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 104,
+      sessionId: "jobonly",
+      cwd: "/w/job",
+      status: "idle",
+      jobId: "jobonly",
+      updatedAt: 1,
+    });
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).not.toContain("jobonly");
+  });
+
+  it("keeps an interactive session and a session with no kind field", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 101,
+      sessionId: "inter",
+      cwd: "/w/i",
+      status: "busy",
+      kind: "interactive",
+      updatedAt: 1,
+    });
+    writeSessionFile(home, {
+      pid: 102,
+      sessionId: "nokind",
+      cwd: "/w/n",
+      status: "idle",
+      updatedAt: 1,
+    });
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).toContain("inter");
+    expect(ids).toContain("nokind");
+  });
+
+  it("keeps a transcript-only session alongside a dropped bg sibling", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 103,
+      sessionId: "bgsib",
+      cwd: "/w/bg",
+      status: "idle",
+      kind: "bg",
+      jobId: "bgsib",
+      updatedAt: 1,
+    });
+    writeTranscript(
+      home,
+      "-w-ended",
+      "endedsess",
+      '{"type":"user","message":{"content":"hi"}}\n',
+      NOW / 1000 - 1,
+    ); // 1s ago, inside the window
+    const ids = listCandidates({
+      claudeDir: home,
+      isPidAlive: () => true,
+      now: NOW,
+      recentWindowMs: WINDOW,
+    }).map((c) => c.id);
+    expect(ids).toContain("endedsess");
+    expect(ids).not.toContain("bgsib");
+  });
+
   it("keeps the freshest registry file per id (max updatedAt)", () => {
     const home = makeHome();
     writeSessionFile(home, {
@@ -313,5 +407,27 @@ describe("readSessionFiles", () => {
     writeSessionFile(home, { pid: -3, sessionId: "neg", cwd: "/w/y" });
     writeSessionFile(home, { pid: 9, sessionId: "ok", cwd: "/w/z" });
     expect(readSessionFiles(home).map((s) => s.sessionId)).toEqual(["ok"]);
+  });
+
+  it("keeps kind and jobId when present", () => {
+    const home = makeHome();
+    writeSessionFile(home, {
+      pid: 11,
+      sessionId: "bg1",
+      cwd: "/w/bg",
+      kind: "bg",
+      jobId: "bg1",
+    });
+    const [s] = readSessionFiles(home);
+    expect(s.kind).toBe("bg");
+    expect(s.jobId).toBe("bg1");
+  });
+
+  it("leaves kind and jobId undefined on a pre-field registry file", () => {
+    const home = makeHome();
+    writeSessionFile(home, { pid: 12, sessionId: "old", cwd: "/w/old" });
+    const [s] = readSessionFiles(home);
+    expect(s.kind).toBeUndefined();
+    expect(s.jobId).toBeUndefined();
   });
 });
