@@ -101,3 +101,61 @@ export function shellPath(): string {
     probe: probeLoginShell,
   });
 }
+
+const FIELD = "__CBW_FIELD__";
+
+export interface ShellEnv {
+  path: string | null;
+  configDir: string | null;
+  claudePath: string | null;
+  duplicates: string[];
+}
+
+/** Prints PATH, CLAUDE_CONFIG_DIR, and every `claude` on PATH, fenced by FIELD delimiters so an rc
+ *  banner can't be mistaken for a value. `command -v -a` lists duplicates; the first is the one a
+ *  shell would run. */
+export const SHELL_ENV_SCRIPT =
+  `printf %s "${FIELD}"; printenv PATH; ` +
+  `printf %s "${FIELD}"; printf %s "$CLAUDE_CONFIG_DIR"; ` +
+  `printf %s "${FIELD}"; command -v -a claude 2>/dev/null; ` +
+  `printf %s "${FIELD}"`;
+
+/** Parse the four fenced fields. Returns null when the fence is absent (shell errored before running). */
+export function parseShellEnv(out: string): ShellEnv | null {
+  const parts = out.split(FIELD);
+  // Expect: [banner, PATH, CONFIG_DIR, claude-list, trailing]
+  if (parts.length < 5) return null;
+  const path = parts[1].trim() || null;
+  const configDir = parts[2].trim() || null;
+  const list = parts[3]
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    path,
+    configDir,
+    claudePath: list[0] ?? null,
+    duplicates: list,
+  };
+}
+
+/** Real wiring: run the login+interactive shell once and parse its env. Null on any failure. Untested
+ *  (spawns a real shell), like probeLoginShell. */
+export function probeShellEnv(shell: string): ShellEnv | null {
+  try {
+    const out = execFileSync(shell, ["-ilc", SHELL_ENV_SCRIPT], {
+      encoding: "utf8",
+      timeout: 3_000,
+      stdio: ["ignore", "pipe", "ignore"],
+      env: {
+        ...process.env,
+        TERM: "dumb",
+        DISABLE_AUTO_UPDATE: "true",
+        GIT_TERMINAL_PROMPT: "0",
+      },
+    });
+    return parseShellEnv(out);
+  } catch {
+    return null;
+  }
+}
