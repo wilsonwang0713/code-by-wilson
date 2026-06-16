@@ -18,6 +18,7 @@ import { projectFromCwd } from "../project-name";
 import type { ManagedRegistry } from "../managed-registry";
 import { createTerminalManager } from "./manager";
 import { createPtyProcess } from "./pty-process";
+import { resolveClaudeBin } from "./resolve-bin";
 
 /**
  * Build the optimistic Managed draft the renderer shows the instant a session is spawned, before
@@ -81,6 +82,9 @@ export function registerTerminalIpc({
     // stay free of the native addon.
     createPty: createPtyProcess,
     env,
+    // Real binary resolution against the (recovered) child PATH, so a missing `claude` is reported as a
+    // clear message rather than a cryptic exit. Only wired here; the manager defaults to skipping it.
+    resolveBin: resolveClaudeBin,
   });
 
   // The renderer mints the id and stands up its terminal BEFORE calling spawn, so the very first pty

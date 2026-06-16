@@ -57,7 +57,14 @@ const passthroughBufferer = (flush: (d: string) => void) => ({
   dispose: () => {},
 });
 
-function harness() {
+interface HarnessOpts {
+  /** Override the injected binary resolver (returns null to simulate a missing `claude`). */
+  resolveBin?: (file: string, path: string) => string | null;
+  /** Override the pty factory (e.g. to throw, simulating a native spawn failure). */
+  createPty?: (o: SpawnOptions) => PtyProcess;
+}
+
+function harness(opts: HarnessOpts = {}) {
   const ptys: ReturnType<typeof fakePty>[] = [];
   const sent: Array<[string, string]> = [];
   const exited: Array<[string, number]> = [];
@@ -73,14 +80,17 @@ function harness() {
       spawnedPids.push(pid);
     },
     onClosed: (id) => closed.push(id),
-    createPty: (o) => {
-      const f = fakePty(nextPid++);
-      f.state.spawnedWith = o;
-      ptys.push(f);
-      return f.proc;
-    },
+    createPty:
+      opts.createPty ??
+      ((o) => {
+        const f = fakePty(nextPid++);
+        f.state.spawnedWith = o;
+        ptys.push(f);
+        return f.proc;
+      }),
     createBufferer: passthroughBufferer,
     env: () => ({ PATH: "/usr/bin" }),
+    resolveBin: opts.resolveBin,
   });
   return { manager, ptys, sent, exited, spawned, spawnedPids, closed };
 }
@@ -126,6 +136,43 @@ describe("createTerminalManager", () => {
       PATH: "/usr/bin",
       COLORTERM: "truecolor",
     });
+  });
+
+  it("when claude can't be resolved, sends an actionable message and reports exit without spawning a pty", () => {
+    const h = harness({ resolveBin: () => null });
+    h.manager.spawn(REQ);
+    // No pty was created and the id was never registered as Managed — the spawn was refused up front.
+    expect(h.ptys).toHaveLength(0);
+    expect(h.spawned).toEqual([]);
+    // The renderer hears a clear message, then a 127 ("command not found") exit instead of a bare 1.
+    expect(h.sent[0][0]).toBe("sess-1");
+    expect(h.sent[0][1]).toContain("Could not start Claude Code");
+    expect(h.exited).toEqual([["sess-1", 127]]);
+  });
+
+  it("passes the resolver the command file and the child PATH", () => {
+    const seen: Array<[string, string]> = [];
+    const h = harness({
+      resolveBin: (file, path) => {
+        seen.push([file, path]);
+        return file; // resolvable
+      },
+    });
+    h.manager.spawn(REQ);
+    expect(seen).toEqual([["claude", "/usr/bin"]]);
+    expect(h.ptys).toHaveLength(1); // resolution passed, so the pty was spawned
+  });
+
+  it("when node-pty throws at spawn, surfaces the failure instead of rejecting", () => {
+    const h = harness({
+      createPty: () => {
+        throw new Error("spawn EACCES");
+      },
+    });
+    h.manager.spawn(REQ);
+    expect(h.spawned).toEqual([]);
+    expect(h.sent[0][1]).toContain("spawn EACCES");
+    expect(h.exited).toEqual([["sess-1", 1]]);
   });
 
   it("reports the pty pid alongside the id, so the registry can anchor Managed-ness to the process", () => {

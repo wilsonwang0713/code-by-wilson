@@ -6,6 +6,7 @@ import {
   type ClaudeCommand,
 } from "./command";
 import { createDataBufferer, type DataBufferer } from "./data-bufferer";
+import { binNotFoundMessage, spawnFailedMessage } from "./resolve-bin";
 // Type-only: importing pty-process for VALUES would pull node-pty (a native addon) into the test
 // graph and break `pnpm test`. The real factory is injected at the composition root (the IPC layer).
 import type { PtyProcess, SpawnOptions } from "./pty-process";
@@ -58,6 +59,11 @@ export interface TerminalManagerDeps {
   /** Returns the child env, resolved at spawn time; defaults to the app's `process.env` (whose PATH must
    *  carry `claude`, as under `pnpm dev`). A thunk so a costly PATH probe runs lazily, not at startup. */
   env?: () => NodeJS.ProcessEnv;
+  /** Resolve the command's executable against the child PATH; returns null when nothing executable is
+   *  found, which the manager turns into an actionable "claude not found" message instead of node-pty's
+   *  bare exit 1. Injected at the composition root (real filesystem); when omitted the check is skipped —
+   *  assume resolvable — so unit tests and the happy path are untouched. */
+  resolveBin?: (file: string, path: string) => string | null;
 }
 
 export interface TerminalManager {
@@ -109,14 +115,38 @@ export function createTerminalManager(
     // (no COLORTERM), which is why this only bites the packaged build; dev and real terminals carry it.
     // Force it (not a default) because our WebGL terminal genuinely is 24-bit capable, so the declaration
     // is ours to make, not the launching shell's.
-    const pty = createPty({
-      file: command.file,
-      args: command.args,
-      cwd,
-      env: { ...(deps.env?.() ?? process.env), COLORTERM: "truecolor" },
-      cols,
-      rows,
-    });
+    const env: NodeJS.ProcessEnv = {
+      ...(deps.env?.() ?? process.env),
+      COLORTERM: "truecolor",
+    };
+
+    // Pre-flight the executable so a missing or misconfigured `claude` becomes an actionable message in
+    // the terminal instead of node-pty's bare exit 1 — its exec failure surfaces only as a non-zero exit,
+    // indistinguishable from claude starting and erroring. Skipped (assume resolvable) when no resolver is
+    // injected, so unit tests and the happy path are untouched.
+    if (deps.resolveBin && !deps.resolveBin(command.file, env.PATH ?? "")) {
+      deps.send(id, binNotFoundMessage(command.file, env.PATH ?? ""));
+      deps.notifyExit(id, 127); // 127 is the shell's conventional "command not found" code
+      return;
+    }
+
+    // node-pty can still throw at spawn (a vanished cwd, a Windows ENOENT, a native error). Catch it so
+    // one bad spawn surfaces a message rather than rejecting the IPC handler.
+    let pty: PtyProcess;
+    try {
+      pty = createPty({
+        file: command.file,
+        args: command.args,
+        cwd,
+        env,
+        cols,
+        rows,
+      });
+    } catch (err) {
+      deps.send(id, spawnFailedMessage(command.file, err));
+      deps.notifyExit(id, 1);
+      return;
+    }
     // The flush reads `term.id`, not the captured `id`, so a rename re-points output without rewiring the
     // bufferer. Safe to reference `term` before its declaration: the closure only runs once data flows.
     const bufferer = createBufferer((data) => deps.send(term.id, data));
