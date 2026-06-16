@@ -26,6 +26,7 @@ export function SessionList({
   cliStatus,
   onRecheck,
   onTroubleshoot,
+  canSpawn,
 }: {
   sessions: Session[];
   selectedId: string | null;
@@ -37,6 +38,7 @@ export function SessionList({
   cliStatus: CliStatus | null;
   onRecheck: () => void;
   onTroubleshoot: () => void;
+  canSpawn: boolean;
 }) {
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
   const now = Date.now();
@@ -94,7 +96,18 @@ export function SessionList({
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 text-[13px] font-semibold text-primary-bright transition-colors hover:border-primary/60 hover:bg-primary/20"
+          disabled={!canSpawn}
+          title={
+            canSpawn
+              ? undefined
+              : "Claude Code CLI isn't usable — see the status at the bottom of the rail."
+          }
+          className={cx(
+            "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
+            canSpawn
+              ? "border-primary/40 bg-primary/10 text-primary-bright hover:border-primary/60 hover:bg-primary/20"
+              : "cursor-not-allowed border-ink-700 bg-ink-900 text-fg-faint",
+          )}
         >
           <Icon name="plus" size={14} />
           New session

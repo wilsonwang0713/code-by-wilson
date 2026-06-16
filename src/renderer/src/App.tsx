@@ -15,6 +15,8 @@ import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
 import { SessionList } from "./SessionList";
+import { CliTroubleshootModal } from "./ui/CliTroubleshootModal";
+import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
 import { OVERVIEW_ID } from "./stats/sentinel";
@@ -54,9 +56,10 @@ export function App() {
   async function recheckCli(): Promise<void> {
     setCliStatus(await window.api.recheckCli());
   }
-  // troubleshootOpen is set by the footer's Troubleshoot button; Task 14 adds the modal that reads it.
-  // Reference it now so the file lints clean until then.
-  void troubleshootOpen;
+
+  async function setClaudeBinPath(path: string | null): Promise<void> {
+    setCliStatus(await window.api.setClaudeBinPath(path));
+  }
 
   async function load(): Promise<void> {
     setLoading(true);
@@ -161,6 +164,8 @@ export function App() {
   }, []);
 
   async function createSession(cwd: string, model: Family): Promise<void> {
+    const gate = spawnGate(cliStatus);
+    if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
     // Mint the id here and stand the terminal up BEFORE spawning, so the very first pty bytes land on a
     // live handle. Rows match xterm's pre-fit default (80x24); the view's first fit corrects it.
     const id = newSessionId();
@@ -186,6 +191,8 @@ export function App() {
   // resume bytes land on a live handle), then optimistically mark it adopting — management flips to
   // Managed and the workspace swaps to the live terminal — until the next sync confirms it.
   async function adoptSession(id: string): Promise<void> {
+    const gate = spawnGate(cliStatus);
+    if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
     // Dispose any stale handle from a prior adopt of this id that has since ended (its buffer still holds
     // the old "[process exited]" scrollback), so a re-adopt starts on a fresh terminal.
     terminalStore.dispose(id);
@@ -259,6 +266,7 @@ export function App() {
           cliStatus={cliStatus}
           onRecheck={() => void recheckCli()}
           onTroubleshoot={() => setTroubleshootOpen(true)}
+          canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">
           {isOverview ? (
@@ -279,6 +287,14 @@ export function App() {
         <NewSessionDialog
           onCreate={createSession}
           onCancel={() => setCreating(false)}
+        />
+      )}
+      {troubleshootOpen && cliStatus && (
+        <CliTroubleshootModal
+          status={cliStatus}
+          onClose={() => setTroubleshootOpen(false)}
+          onRecheck={() => void recheckCli()}
+          onSetBinPath={(p) => void setClaudeBinPath(p)}
         />
       )}
     </div>
