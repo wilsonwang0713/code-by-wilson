@@ -42,6 +42,14 @@ export interface BackgroundShell {
   trigger: "explicit" | "auto" | "user";
 }
 
+/** The drilled-in view of one shell's output: the (byte-bounded) log text, where it came from, and how
+ *  many leading bytes were dropped (0 when whole). */
+export interface ShellOutput {
+  text: string;
+  source: "live" | "snapshot";
+  truncatedBytes: number;
+}
+
 export interface Subagent {
   id: string;
   type: string;

@@ -19,7 +19,7 @@ import {
   subagentsNewestMtime,
 } from "./subagents";
 import { readTasksForSession, tasksNewestMtime } from "./tasks";
-import { reconstructShells } from "./shells";
+import { reconstructShells, tailOutput, stitchSnapshots } from "./shells";
 import { resolveAdoptTarget } from "./adopt-target";
 import { computeTokenSpeed, SPEED_WINDOW_MS } from "./transcript-speed";
 import { firstTranscriptCwd } from "./transcript";
@@ -32,7 +32,7 @@ import type {
   SessionMetrics,
   TokenSpeed,
 } from "@shared/metrics";
-import type { ShellsRead } from "@shared/ipc";
+import type { ShellsRead, ShellOutputRead } from "@shared/ipc";
 
 export interface ClaudeProviderDeps {
   claudeDir?: string;
@@ -359,6 +359,57 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
           ({ outputFile: _omit, ...s }) => s,
         );
         return { status: "changed", mtimeMs, shells };
+      } catch {
+        return { status: "error" };
+      }
+    },
+    readShellOutput: (id, shellId, sinceMtimeMs): ShellOutputRead => {
+      try {
+        // `shellId` crosses IPC. A real id is alphanumeric (a backgroundTaskId), so reject a path
+        // separator rather than risk an escape, even though the path comes from the transcript itself.
+        if (/[/\\]/.test(shellId)) return { status: "absent" };
+        const path = pathById.get(id) ?? resolveTranscript(id)?.path;
+        if (path === undefined) return { status: "absent" };
+        const jsonl = readTextOrNull(path);
+        if (jsonl === null) return { status: "absent" };
+        const rows = parseJsonlRows(jsonl);
+        const shell = reconstructShells(rows).find((s) => s.id === shellId);
+        if (!shell) return { status: "absent" };
+
+        // Prefer the live .output file: its own mtime is the tightest change token.
+        let outMtime = 0;
+        try {
+          outMtime = statSync(shell.outputFile).mtimeMs;
+        } catch {
+          outMtime = 0; // gone → snapshot fallback below
+        }
+        if (outMtime > 0) {
+          if (outMtime === sinceMtimeMs)
+            return { status: "unchanged", mtimeMs: outMtime };
+          const raw = readTextOrNull(shell.outputFile);
+          if (raw !== null) {
+            const { text, truncatedBytes } = tailOutput(raw);
+            return {
+              status: "changed",
+              mtimeMs: outMtime,
+              output: { text, source: "live", truncatedBytes },
+            };
+          }
+          // vanished between stat and read — fall through to the snapshot fallback
+        }
+
+        // Snapshot fallback: stitch the transcript's poll chunks. Token = transcript mtime.
+        const tMtime = statSync(path).mtimeMs;
+        if (tMtime === sinceMtimeMs)
+          return { status: "unchanged", mtimeMs: tMtime };
+        const { text, truncatedBytes } = tailOutput(
+          stitchSnapshots(rows, shellId),
+        );
+        return {
+          status: "changed",
+          mtimeMs: tMtime,
+          output: { text, source: "snapshot", truncatedBytes },
+        };
       } catch {
         return { status: "error" };
       }

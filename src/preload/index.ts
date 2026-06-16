@@ -24,6 +24,8 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.readTasks, id, sinceMtimeMs),
   readShells: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readShells, id, sinceMtimeMs),
+  readShellOutput: (id, shellId, sinceMtimeMs) =>
+    ipcRenderer.invoke(IPC.readShellOutput, id, shellId, sinceMtimeMs),
   readMetrics: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readMetrics, id, sinceMtimeMs),
   platform: process.platform,

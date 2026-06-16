@@ -4,7 +4,7 @@ import type {
   SessionCandidate,
 } from "@shared/types";
 import type { TranscriptRead } from "@shared/transcript";
-import type { TaskRead, ShellsRead } from "@shared/ipc";
+import type { TaskRead, ShellsRead, ShellOutputRead } from "@shared/ipc";
 import type { MetricsRead } from "@shared/metrics";
 
 export interface Provider {
@@ -39,6 +39,14 @@ export interface Provider {
   /** List one session's background bash shells — the on-demand read behind the Shells tab. `sinceMtimeMs`
    *  is the change token (the transcript mtime); an unchanged transcript skips the read. */
   readShells(id: string, sinceMtimeMs?: number): ShellsRead;
+  /** Read one background shell's output — the read behind drilling into a shell. `sinceMtimeMs` is the
+   *  change token (the `.output` mtime, or the transcript mtime for the snapshot fallback). Mirrors
+   *  readSubagentTranscript's changed / unchanged / absent / error contract. */
+  readShellOutput(
+    id: string,
+    shellId: string,
+    sinceMtimeMs?: number,
+  ): ShellOutputRead;
   /** Read one session's lazy metrics (token speed, git, voice, remote). Mirrors readTranscript's path
    *  resolution + change token; skips the recompute when `sinceMtimeMs` still matches. */
   readMetrics(id: string, sinceMtimeMs?: number): MetricsRead;
