@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
   type ReactNode,
 } from "react";
 import { cx } from "./atoms";
@@ -131,6 +132,14 @@ export function OverlayScroll({
     [scheduleHide],
   );
 
+  // The thumb overlays the content with pointer-events:auto, so a wheel landing on it would otherwise hit a
+  // non-scrollable element (its only ancestor is the overflow-hidden wrapper). Forward the delta to the
+  // scroll element so the wheel keeps scrolling the list even with the cursor on the bar.
+  const onThumbWheel = useCallback((e: ReactWheelEvent) => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop += e.deltaY;
+  }, []);
+
   // Re-measure on container resize. Content-height changes (sessions added, groups toggled) re-render this
   // component, and the layout-every-render effect below catches those.
   useEffect(() => {
@@ -175,6 +184,7 @@ export function OverlayScroll({
         onPointerMove={onThumbPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onWheel={onThumbWheel}
       />
     </div>
   );

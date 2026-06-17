@@ -94,6 +94,10 @@ function attachOverlayScrollbar(
     }
     thumb.style.height = `${m.height}px`;
     thumb.style.transform = `translateY(${m.top}px)`;
+    // Pointer-inside and drag never auto-fade (scheduleHide skips them), so when output grows the content
+    // past one screen while the pointer rests in the terminal, reveal the thumb here — otherwise it'd stay
+    // hidden until the next scroll or re-enter. Mirrors OverlayScroll's `data-visible = visible && overflow`.
+    if (pointerInside || dragging) thumb.dataset.visible = "true";
     return true;
   };
 
@@ -157,6 +161,12 @@ function attachOverlayScrollbar(
     if (pointerInside) scheduleHide();
     else thumb.dataset.visible = "false";
   };
+  // The thumb sits over the viewport's reserved strip with pointer-events:auto, so a wheel landing on it
+  // would otherwise hit a non-scrollable element and stall. Forward the delta to the viewport (xterm syncs
+  // off the resulting 'scroll' event) so the wheel keeps scrolling even with the cursor on the bar.
+  const onThumbWheel = (e: WheelEvent) => {
+    viewport.scrollTop += e.deltaY;
+  };
 
   viewport.addEventListener("scroll", onScroll);
   parent.addEventListener("pointerenter", onPointerEnter);
@@ -165,9 +175,20 @@ function attachOverlayScrollbar(
   thumb.addEventListener("pointermove", onThumbMove);
   thumb.addEventListener("pointerup", onThumbUp);
   thumb.addEventListener("pointercancel", onThumbUp);
-  // Re-measure when xterm repaints (output, scrollback growth) or resizes — the viewport geometry shifts
-  // in those cases without firing a DOM 'scroll' event.
-  const render = term.onRender(() => layout());
+  thumb.addEventListener("wheel", onThumbWheel, { passive: true });
+  // Re-measure when xterm repaints (scrollback growth) or resizes — the viewport geometry shifts in those
+  // cases without firing a DOM 'scroll' event. onRender fires on EVERY repaint (cursor blink, spinner,
+  // in-place redraws), so gate the relayout on the buffer line count — a cheap JS read — to skip the layout
+  // reflow on frames where scrollHeight can't have changed. Scroll-position changes are already caught by
+  // the 'scroll' listener; resizes by onResize.
+  let lastBufferLength = -1;
+  const relayoutOnGrowth = () => {
+    const length = term.buffer.active.length;
+    if (length === lastBufferLength) return;
+    lastBufferLength = length;
+    layout();
+  };
+  const render = term.onRender(relayoutOnGrowth);
   const resize = term.onResize(() => layout());
   layout();
 
