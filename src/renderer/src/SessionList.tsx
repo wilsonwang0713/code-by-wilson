@@ -82,7 +82,7 @@ export function SessionList({
           className={cx(
             "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
             canSpawn
-              ? "border-primary/40 bg-primary/10 text-primary-bright hover:border-primary/60 hover:bg-primary/20"
+              ? "border-ink-700 bg-ink-800 text-fg hover:border-ink-600 hover:bg-ink-750"
               : "cursor-not-allowed border-ink-700 bg-ink-900 text-fg-faint",
           )}
         >
