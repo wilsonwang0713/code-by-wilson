@@ -15,7 +15,7 @@ import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
 import { SessionList } from "./SessionList";
-import { CliTroubleshootModal } from "./ui/CliTroubleshootModal";
+import { CliStatusModal } from "./ui/CliStatusModal";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
@@ -36,8 +36,8 @@ export function App() {
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
-  // Whether the CLI-status troubleshooting modal is open (opened from the rail footer's Troubleshoot button).
-  const [troubleshootOpen, setTroubleshootOpen] = useState(false);
+  // Whether the CLI status modal is open (opened from the rail panel's info button).
+  const [cliStatusOpen, setCliStatusOpen] = useState(false);
   // True while a CLI status check (Re-check, or saving a binary-path override) is in flight — drives the spinner.
   const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -277,9 +277,7 @@ export function App() {
           onQuery={setQuery}
           account={account}
           cliStatus={cliStatus}
-          checking={checking}
-          onRecheck={() => void recheckCli()}
-          onTroubleshoot={() => setTroubleshootOpen(true)}
+          onOpenCliStatus={() => setCliStatusOpen(true)}
           canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">
@@ -304,11 +302,15 @@ export function App() {
           onCancel={() => setCreating(false)}
         />
       )}
-      {troubleshootOpen && cliStatus && (
-        <CliTroubleshootModal
+      {cliStatusOpen && cliStatus && (
+        <CliStatusModal
+          // Remount when the values the modal's useState initializers derive from change — kind +
+          // installMethod pick the default install tab; source + path prefill the override — so a
+          // Re-check can't leave them stale. A no-op re-check keeps the instance and any typed input.
+          key={`${cliStatus.kind}:${cliStatus.installMethod}:${cliStatus.source}:${cliStatus.path ?? ""}`}
           status={cliStatus}
           checking={checking}
-          onClose={() => setTroubleshootOpen(false)}
+          onClose={() => setCliStatusOpen(false)}
           onRecheck={() => void recheckCli()}
           onSetBinPath={(p) => void setClaudeBinPath(p)}
         />

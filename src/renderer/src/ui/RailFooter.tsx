@@ -1,8 +1,9 @@
 import type { CliStatus } from "@shared/cli-status";
 import { footerView, type FooterView } from "./rail-footer";
+import { Icon } from "./icons";
+import { cx } from "./atoms";
 
-// Dot hue by state, drawn from the reserved status palette (index.css @theme): teal `working` for ok,
-// amber `accent` for warn, red `danger` for error, slate `ink-600` for the pre-check idle.
+// Dot hue by CLI state, from the reserved status palette: teal ok, amber warn, red error, slate pre-check.
 const DOT_CLASS: Record<FooterView["dot"], string> = {
   ok: "bg-working",
   warn: "bg-accent",
@@ -10,53 +11,44 @@ const DOT_CLASS: Record<FooterView["dot"], string> = {
   idle: "bg-ink-600",
 };
 
-/** A thin strip pinned at the bottom of the rail carrying the live Claude Code CLI status: a state dot,
- *  the label, version + path, a Re-check action, and a Troubleshoot button whenever the CLI isn't ready. */
+// The info button's border/text tone tracks the CLI state so a broken CLI draws the eye.
+const BTN_CLASS: Record<FooterView["dot"], string> = {
+  ok: "border-ink-700 text-fg-faint hover:border-ink-600 hover:text-fg-muted",
+  warn: "border-accent/50 text-accent hover:border-accent",
+  error: "border-danger/50 text-danger hover:border-danger",
+  idle: "border-ink-700 text-fg-faint",
+};
+
+/** A slim strip pinned at the bottom of the rail carrying the live Claude Code CLI status: a state dot,
+ *  the label with its version, the status word, and an info button that opens the CLI status modal (the
+ *  single home for version, path, re-check, and troubleshooting) in any resolved state. */
 export function RailFooter({
   status,
-  checking,
-  onRecheck,
-  onTroubleshoot,
+  onOpenCliStatus,
 }: {
   status: CliStatus | null;
-  /** A check is in flight — spin the Re-check glyph and disable the button. */
-  checking: boolean;
-  onRecheck: () => void;
-  onTroubleshoot: () => void;
+  onOpenCliStatus: () => void;
 }) {
   const v = footerView(status);
+  const canOpen = status !== null;
   return (
-    <div className="flex shrink-0 flex-col gap-1 border-t border-ink-800 px-3 py-2 font-mono text-[10px] text-fg-faint">
-      <div className="flex items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 rounded-full ${DOT_CLASS[v.dot]}`} />
-        <span className="text-fg-muted">Claude Code</span>
-        <span className="ml-auto uppercase tracking-wide">{v.statusLabel}</span>
-      </div>
-      {(v.version || v.path) && (
-        <div className="truncate text-fg-faint">
-          {v.version ? `v${v.version}` : "—"}
-          {v.path ? ` · ${v.path}` : ""}
-        </div>
-      )}
-      {v.detail && <div className="truncate text-fg-muted">{v.detail}</div>}
-      <div className="flex items-center gap-2">
-        {v.showTroubleshoot && (
-          <button
-            onClick={onTroubleshoot}
-            className="text-accent-bright hover:underline"
-          >
-            Troubleshoot
-          </button>
+    <div className="flex shrink-0 items-center gap-1.5 border-t border-ink-800 px-3 py-2 font-mono text-[10px] text-fg-faint">
+      <span className={cx("h-1.5 w-1.5 rounded-full", DOT_CLASS[v.dot])} />
+      <span className="text-fg-muted">Claude Code</span>
+      {v.version && <span className="text-fg-faint">v{v.version}</span>}
+      <span className="uppercase tracking-wide">· {v.statusLabel}</span>
+      <button
+        type="button"
+        onClick={onOpenCliStatus}
+        disabled={!canOpen}
+        aria-label="Claude Code status and settings"
+        className={cx(
+          "ml-auto inline-flex h-5 w-5 items-center justify-center rounded border transition-colors disabled:opacity-40",
+          BTN_CLASS[v.dot],
         )}
-        <button
-          onClick={onRecheck}
-          disabled={checking}
-          className="ml-auto rounded border border-ink-700 px-1.5 py-0.5 hover:border-ink-600 hover:text-fg-muted disabled:opacity-60"
-        >
-          <span className={checking ? "inline-block animate-spin" : ""}>↻</span>{" "}
-          {checking ? "Checking…" : "Re-check"}
-        </button>
-      </div>
+      >
+        <Icon name="info" size={12} />
+      </button>
     </div>
   );
 }

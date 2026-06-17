@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   parseTranscript,
   deriveTitle,
   firstTranscriptCwd,
+  transcriptSessionKind,
 } from "../../src/main/provider/claude/transcript";
 
 const fx = (p: string) =>
@@ -611,5 +613,80 @@ describe("deriveTitle", () => {
     expect(
       deriveTitle(["Render <Button onClick={fn}/> in the modal"], "/x/y"),
     ).toBe("Render <Button onClick={fn}/> in the modal");
+  });
+});
+
+describe("transcriptSessionKind", () => {
+  function tmpTranscript(body: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "cbw-sk-"));
+    const path = join(dir, "t.jsonl");
+    writeFileSync(path, body);
+    return path;
+  }
+
+  it("returns 'bg' from the first line that carries it, past metadata lines", () => {
+    const path = tmpTranscript(
+      '{"type":"last-prompt"}\n' +
+        '{"type":"mode"}\n' +
+        '{"type":"attachment","sessionKind":"bg"}\n' +
+        '{"type":"user","sessionKind":"bg","message":{"content":"hi"}}\n',
+    );
+    expect(transcriptSessionKind(path)).toBe("bg");
+  });
+
+  it("returns undefined for an interactive transcript (no sessionKind)", () => {
+    const path = tmpTranscript(
+      '{"type":"last-prompt"}\n' +
+        '{"type":"user","message":{"content":"hi"}}\n' +
+        '{"type":"assistant","message":{"model":"claude"}}\n',
+    );
+    expect(transcriptSessionKind(path)).toBeUndefined();
+  });
+
+  it("returns undefined for a missing file", () => {
+    expect(transcriptSessionKind("/no/such/transcript.jsonl")).toBeUndefined();
+  });
+
+  it("returns undefined for an empty file", () => {
+    expect(transcriptSessionKind(tmpTranscript(""))).toBeUndefined();
+  });
+
+  it("skips a malformed leading line and still finds sessionKind", () => {
+    const path = tmpTranscript(
+      "{ not json\n" + '{"type":"user","sessionKind":"bg"}\n',
+    );
+    expect(transcriptSessionKind(path)).toBe("bg");
+  });
+
+  it("returns undefined (no throw) when the path is a directory", () => {
+    // indexTranscripts admits any name ending in .jsonl, including a directory; on Linux openSync(dir)
+    // succeeds and readSync throws EISDIR. The read failure must degrade to interactive, not escape and
+    // abort the whole listCandidates sweep.
+    const dir = mkdtempSync(join(tmpdir(), "cbw-sk-"));
+    const asPath = join(dir, "dir.jsonl");
+    mkdirSync(asPath);
+    expect(transcriptSessionKind(asPath)).toBeUndefined();
+  });
+
+  it("finds sessionKind on a line past the old 64KB prefix (large first turn)", () => {
+    // A bg session whose first turn carries a large pasted payload pushes the sessionKind line well past
+    // 64KB; the scan must still reach it within the cap, or the ended bg session resurfaces (#158).
+    const pad = "x".repeat(100 * 1024);
+    const path = tmpTranscript(
+      `{"type":"attachment","pad":"${pad}"}\n` +
+        '{"type":"user","sessionKind":"bg","message":{"content":"hi"}}\n',
+    );
+    expect(transcriptSessionKind(path)).toBe("bg");
+  });
+
+  it("misses sessionKind only when a single line exceeds the scan cap (documented limit)", () => {
+    // A line longer than SESSION_KIND_SCAN_BYTES is truncated and won't parse even though the field is
+    // near its start — the accepted residual limitation. The registry filter still hides such a bg
+    // session while it is live.
+    const pad = "y".repeat(300 * 1024);
+    const path = tmpTranscript(
+      `{"type":"user","sessionKind":"bg","pad":"${pad}"}\n`,
+    );
+    expect(transcriptSessionKind(path)).toBeUndefined();
   });
 });

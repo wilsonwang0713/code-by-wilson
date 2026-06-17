@@ -1,3 +1,4 @@
+import { closeSync, openSync, readSync } from "node:fs";
 import { basename } from "node:path";
 import { normalizeModelId, type Family } from "@shared/models";
 import type { Usage } from "@shared/types";
@@ -51,6 +52,76 @@ export function firstTranscriptCwd(jsonl: string): string {
     }
   }
   return "";
+}
+
+/**
+ * How much of a transcript's head we scan for `sessionKind`. The field lands within the first few JSONL
+ * lines (the short metadata preamble, then the first attachment/turn line), so this only needs to clear
+ * that preamble plus a large first turn — a backstop, not a tuning knob. It is bounded because an
+ * interactive transcript never carries the field: without a cap, a whole-file scan would read a
+ * possibly-multi-MB file to the end looking for something that isn't there. The residual cost of the
+ * cap: a bg transcript whose first `sessionKind`-bearing line is itself larger than this is truncated
+ * (won't parse) and missed, so that pathological bg session can resurface. 256 KiB clears the preamble
+ * plus any realistic first line (a large pasted prompt or attachment).
+ */
+const SESSION_KIND_SCAN_BYTES = 256 * 1024;
+
+/**
+ * The transcript's `sessionKind` ("bg" for a Claude background session), read from a bounded prefix
+ * without a full parse. Claude tags every substantive line of a bg transcript with it, starting at the
+ * first attachment/turn line, so the first occurrence in the head decides. Returns undefined when the
+ * prefix carries none — an interactive session, a bg session with no turns yet, or any read failure (a
+ * missing/unreadable file, or a path that turns out to be a directory): discovery treats every such
+ * case as interactive, so a single bad transcript never throws out of the per-poll candidate sweep
+ * (matching summarize, which degrades the same way on an unreadable transcript).
+ *
+ * Bounded, unlike firstTranscriptCwd, so it stays O(1) in transcript size in that per-poll loop. It
+ * reads up to SESSION_KIND_SCAN_BYTES, draining short reads (a single readSync may return fewer bytes
+ * than asked — e.g. on a network filesystem) until the cap or EOF, then decodes the filled prefix once.
+ */
+export function transcriptSessionKind(path: string): string | undefined {
+  let fd: number;
+  try {
+    fd = openSync(path, "r");
+  } catch {
+    return undefined; // ENOENT or unreadable — treat as interactive, same as the rest of discovery
+  }
+  try {
+    // allocUnsafe is safe here: we only ever decode the [0, filled) range that readSync actually wrote.
+    const buf = Buffer.allocUnsafe(SESSION_KIND_SCAN_BYTES);
+    let filled = 0;
+    while (filled < buf.length) {
+      // Read at the current offset for both buffer and file, so a short read resumes where it left off
+      // instead of dropping the bytes in between.
+      const bytes = readSync(fd, buf, filled, buf.length - filled, filled);
+      if (bytes === 0) break; // EOF
+      filled += bytes;
+    }
+    const head = buf.toString("utf8", 0, filled);
+    for (const line of head.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const row = JSON.parse(trimmed);
+        if (typeof row.sessionKind === "string") return row.sessionKind;
+      } catch {
+        // A truncated trailing line (the prefix may cut mid-line) or a half-written line won't parse;
+        // skip it, same as parseTranscript.
+      }
+    }
+    return undefined;
+  } catch {
+    // A read failure after a successful open — EISDIR (the path is a directory), EIO on a flaky/network
+    // mount, etc. Treat as interactive rather than letting it abort the whole listCandidates sweep.
+    return undefined;
+  } finally {
+    try {
+      closeSync(fd);
+    } catch {
+      // Closing a read-only fd can still fail on a flaky mount; there is nothing to flush, so ignore it
+      // rather than let it escape and sink the sweep.
+    }
+  }
 }
 
 /** Claude Code injects '<synthetic>' assistant turns (cancelled or over-limit placeholders) that
