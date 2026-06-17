@@ -157,6 +157,32 @@ describe("store", () => {
     expect(getSessions(db)[0].createdMs).toBe(1717000000000);
   });
 
+  it("freezes createdMs to the earliest value seen across reparses", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [snap({ id: "f", createdMs: 5000 })]);
+    upsertSessions(db, [snap({ id: "f", createdMs: 3000 })]); // earlier wins
+    expect(getPersisted(db)[0].createdMs).toBe(3000);
+    upsertSessions(db, [snap({ id: "f", createdMs: 9000 })]); // later is ignored
+    expect(getPersisted(db)[0].createdMs).toBe(3000);
+  });
+
+  it("does not clobber a real createdMs with 0 from a timestamp-less reparse", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [snap({ id: "g", createdMs: 4000 })]);
+    upsertSessions(db, [snap({ id: "g", createdMs: 0 })]);
+    expect(getPersisted(db)[0].createdMs).toBe(4000);
+  });
+
+  it("adopts the first real createdMs when the stored value is 0", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [snap({ id: "h", createdMs: 0 })]);
+    upsertSessions(db, [snap({ id: "h", createdMs: 7000 })]);
+    expect(getPersisted(db)[0].createdMs).toBe(7000);
+  });
+
   it("prunes ids outside the keep-set, and clears all on an empty keep-set", () => {
     const db = openTestDb();
     migrate(db);

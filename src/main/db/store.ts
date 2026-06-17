@@ -140,7 +140,11 @@ const UPSERT = `
     model = excluded.model,
     model_raw = excluded.model_raw,
     last_activity_ms = excluded.last_activity_ms,
-    created_ms = excluded.created_ms,
+    created_ms = CASE
+      WHEN excluded.created_ms = 0 THEN sessions.created_ms
+      WHEN sessions.created_ms = 0 THEN excluded.created_ms
+      ELSE MIN(sessions.created_ms, excluded.created_ms)
+    END,
     awaiting_user = excluded.awaiting_user,
     transcript_mtime_ms = excluded.transcript_mtime_ms,
     input_tokens = excluded.input_tokens,
