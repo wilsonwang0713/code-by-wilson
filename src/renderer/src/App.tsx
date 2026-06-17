@@ -304,6 +304,10 @@ export function App() {
       )}
       {cliStatusOpen && cliStatus && (
         <CliStatusModal
+          // Remount when the values the modal's useState initializers derive from change — kind +
+          // installMethod pick the default install tab; source + path prefill the override — so a
+          // Re-check can't leave them stale. A no-op re-check keeps the instance and any typed input.
+          key={`${cliStatus.kind}:${cliStatus.installMethod}:${cliStatus.source}:${cliStatus.path ?? ""}`}
           status={cliStatus}
           checking={checking}
           onClose={() => setCliStatusOpen(false)}

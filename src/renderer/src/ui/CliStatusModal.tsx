@@ -53,6 +53,7 @@ export function CliStatusModal({
   });
   const banner = BANNER[view.tone];
   const [tab, setTab] = useState(remedy.defaultTab ?? "native");
+  const activeInstall = INSTALL_TABS.find((t) => t.method === tab);
   const [binPath, setBinPath] = useState(
     status.source === "override" ? (status.path ?? "") : "",
   );
@@ -104,13 +105,12 @@ export function CliStatusModal({
                         </button>
                       ))}
                     </div>
-                    {INSTALL_TABS.filter((t) => t.method === tab).map((t) => (
+                    {activeInstall && (
                       <CommandRow
-                        key={t.method}
-                        cmd={t.command}
-                        note={t.note}
+                        cmd={activeInstall.command}
+                        note={activeInstall.note}
                       />
-                    ))}
+                    )}
                   </div>
                 )}
                 {remedy.section === "update" && remedy.command && (
@@ -122,11 +122,19 @@ export function CliStatusModal({
                     <code>claude</code> in your shell.
                   </div>
                 )}
-                {remedy.section === "verify" && status.path && (
-                  <CommandRow
-                    cmd={`xattr -d com.apple.quarantine ${status.path}`}
-                    note="If macOS blocked the binary."
-                  />
+                {remedy.section === "verify" && (
+                  <div className="space-y-2">
+                    <div className="text-fg-faint">
+                      Run <code>claude --version</code> in a terminal to check
+                      it works.
+                    </div>
+                    {status.path && (
+                      <CommandRow
+                        cmd={`xattr -d com.apple.quarantine ${status.path}`}
+                        note="If macOS blocked the binary."
+                      />
+                    )}
+                  </div>
                 )}
               </div>
             )}

@@ -40,7 +40,7 @@ export function SessionList({
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
   const now = Date.now();
   // The account gauges only need second granularity for their reset countdowns. Floor the clock so a
-  // burst of filter keystrokes (which re-render this rail) doesn't re-tick RailPanel's countdowns.
+  // burst of filter keystrokes (which re-render this rail) doesn't re-tick the memoized RailPanel.
   const accountClock = Math.floor(now / 1000) * 1000;
   const groups = useMemo(
     () => groupSessions(sessions, query),
@@ -77,7 +77,7 @@ export function SessionList({
           title={
             canSpawn
               ? undefined
-              : "Claude Code CLI isn't usable — open the status panel above."
+              : "Claude Code CLI isn't usable — open the status panel from the rail footer."
           }
           className={cx(
             "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
