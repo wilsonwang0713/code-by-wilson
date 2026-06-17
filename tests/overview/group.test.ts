@@ -24,6 +24,7 @@ function s(
     },
     equivApiValueUsd: 0,
     lastActivityMs: 0,
+    createdMs: 0,
     ...over,
   };
 }
