@@ -11,9 +11,9 @@ import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
 
 /**
- * The master rail: every session grouped by state (Waiting → Working → Idle → Ended) with sticky group
- * headers and counts, narrowed by a filter box. Rows are real <button>s, so the list is keyboard- and
- * screen-reader-navigable. Selecting a row opens it in the detail pane to the right.
+ * The master rail: a headerless Active list (every non-ended session, newest-created first) above a
+ * single collapsible Ended section, narrowed by a filter box. Rows are real <button>s, so the list is
+ * keyboard- and screen-reader-navigable. Selecting a row opens it in the detail pane to the right.
  */
 export function SessionList({
   sessions,
