@@ -5,7 +5,7 @@ import { RailPanel } from "./ui/RailPanel";
 import { RailCliStatus } from "./ui/RailCliStatus";
 import { groupSessions } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
-import { cx, Dot } from "./ui/atoms";
+import { cx, Dot, SessionTile } from "./ui/atoms";
 import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
 
@@ -136,7 +136,7 @@ export function SessionList({
                   </span>
                 </button>
                 {!isCollapsed && (
-                  <div className="flex flex-col gap-1.5 p-2">
+                  <div className="flex flex-col gap-[5px] p-2">
                     {g.items.map((s) => (
                       <SessionRow
                         key={s.id}
@@ -180,48 +180,57 @@ function SessionRow({
         "block w-full rounded-lg border px-2.5 py-2 text-left transition-colors",
         selected
           ? "border-primary/50 bg-primary/[0.06]"
-          : waiting
-            ? "border-accent/50 bg-accent/[0.06]"
-            : "border-ink-800 bg-ink-900 hover:border-ink-700",
+          : "border-ink-800 bg-ink-900 hover:border-ink-700",
       )}
     >
-      <div className="flex items-center gap-2">
-        <Dot state={s.state} management={s.management} />
-        <span
-          className={cx(
-            "min-w-0 flex-1 truncate text-[13px] text-fg",
-            selected ? "font-semibold" : "font-medium",
-          )}
-          title={s.title}
-        >
-          {s.title}
-        </span>
-        {isContextHigh(s.contextPct) && (
-          <span
-            className={cx(
-              "shrink-0 font-mono text-[10px] tabular-nums",
-              ctxTone(s.contextPct),
+      <div className="flex items-stretch gap-[9px]">
+        <SessionTile state={s.state} management={s.management} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cx(
+                "min-w-0 flex-1 truncate text-[13px] text-fg",
+                selected ? "font-semibold" : "font-medium",
+              )}
+              title={s.title}
+            >
+              {s.title}
+            </span>
+            {isContextHigh(s.contextPct) && (
+              <span
+                className={cx(
+                  "shrink-0 font-mono text-[10px] tabular-nums",
+                  ctxTone(s.contextPct),
+                )}
+              >
+                {s.contextPct}%
+              </span>
             )}
+            <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
+              {formatRelativeTime(s.lastActivityMs, now)}
+            </span>
+          </div>
+          <div
+            className="mt-1 truncate font-mono text-[10.5px] text-fg-faint"
+            title={projectLine}
           >
-            {s.contextPct}%
-          </span>
-        )}
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
-          {formatRelativeTime(s.lastActivityMs, now)}
-        </span>
-      </div>
-      <div
-        className="mt-1.5 truncate pl-4 font-mono text-[10.5px] text-fg-faint"
-        title={projectLine}
-      >
-        {projectLine}
+            {projectLine}
+          </div>
+        </div>
       </div>
       {waiting && (
         <div
-          className="ml-4 mt-1.5 truncate text-[11px] text-accent-bright"
+          className="mt-2 flex items-center gap-1.5 rounded-md bg-ink-950 px-2.5 py-1.5 text-[11px] text-accent-bright"
           title={s.waitingReason ?? "Waiting on you"}
         >
-          ⚠ {s.waitingReason ?? "Waiting on you"}
+          <Icon
+            name="triangle-alert"
+            size={12}
+            className="shrink-0 text-accent"
+          />
+          <span className="truncate">
+            {s.waitingReason ?? "Waiting on you"}
+          </span>
         </div>
       )}
     </button>
