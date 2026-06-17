@@ -149,7 +149,10 @@ export function OverlayScroll({
 
   return (
     <div
-      className={cx("relative", className)}
+      // overflow-hidden (like VSCode's .monaco-scrollable-element) clips the absolutely-positioned thumb to
+      // this box, so at the scroll boundary it can't contribute to the document's overflow and flash the
+      // global page scrollbar.
+      className={cx("relative overflow-hidden", className)}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
