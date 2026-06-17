@@ -68,10 +68,9 @@ export function SessionList({
         cliStatus={cliStatus}
         onOpenCliStatus={onOpenCliStatus}
       />
-      {/* Soft seam splits the identity/status zone from the session zone — replaces the old hard
-          per-block dividers. */}
-      <div className="h-px shrink-0 bg-gradient-to-r from-transparent via-ink-800 to-transparent" />
-      <div className="shrink-0 p-3">
+      {/* One divider splits the identity/status zone from the session zone, drawn like every other
+          section divider in the app (solid border-ink-800) rather than the old per-block dividers. */}
+      <div className="shrink-0 border-t border-ink-800 p-3">
         <button
           type="button"
           onClick={onNew}
