@@ -56,7 +56,7 @@ export function SessionTile({
   return (
     <span
       title={glyphTitle(state, management)}
-      className="relative flex w-8 shrink-0 items-center justify-center self-stretch rounded-lg bg-ink-950"
+      className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-950"
     >
       <Icon
         name={STATE_ICON[state]}

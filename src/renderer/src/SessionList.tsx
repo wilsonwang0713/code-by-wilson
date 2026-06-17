@@ -183,7 +183,7 @@ function SessionRow({
           : "border-ink-800 bg-ink-900 hover:border-ink-700",
       )}
     >
-      <div className="flex items-stretch gap-[9px]">
+      <div className="flex items-center gap-[9px]">
         <SessionTile state={s.state} management={s.management} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -211,7 +211,7 @@ function SessionRow({
             </span>
           </div>
           <div
-            className="mt-1 truncate font-mono text-[10.5px] text-fg-faint"
+            className="mt-0.5 truncate font-mono text-[10.5px] text-fg-faint"
             title={projectLine}
           >
             {projectLine}
