@@ -1,53 +1,28 @@
 import type { Account } from "@shared/types";
-import type { CliStatus } from "@shared/cli-status";
 import { Bar, cx } from "./atoms";
 import { barFill } from "./meta";
 import { Icon } from "./icons";
 import { railAccountModel } from "./rail-account";
-import { footerView, type FooterView } from "./rail-footer";
 import { OVERVIEW_ID } from "../stats/sentinel";
 
-// Dot hue by CLI state, from the reserved status palette: teal ok, amber warn, red error, slate pre-check.
-const DOT_CLASS: Record<FooterView["dot"], string> = {
-  ok: "bg-working",
-  warn: "bg-accent",
-  error: "bg-danger",
-  idle: "bg-ink-600",
-};
-
-// The info button's border/text tone tracks the CLI state so a broken CLI draws the eye.
-const BTN_CLASS: Record<FooterView["dot"], string> = {
-  ok: "border-ink-700 text-fg-faint hover:border-ink-600 hover:text-fg-muted",
-  warn: "border-accent/50 text-accent hover:border-accent",
-  error: "border-danger/50 text-danger hover:border-danger",
-  idle: "border-ink-700 text-fg-faint",
-};
-
 /**
- * The rail's pinned identity/status panel: an account card that opens Overview (subscription email + plan
- * + 5h/Weekly gauges, an api endpoint host, or — with no account — a bare Overview label) and a slim CLI
- * status strip whose info button opens the CLI status modal in any resolved state. Replaces RailAccount,
- * the old pinned Overview button, and RailFooter.
+ * The rail's pinned identity panel: an account card that opens Overview (subscription email + plan +
+ * 5h/Weekly gauges, an api endpoint host, or — with no account — a bare Overview label). Replaces the old
+ * RailAccount block and the separate pinned Overview button. CLI status lives in the rail footer.
  */
 export function RailPanel({
   account,
   now,
   selectedId,
   onSelect,
-  cliStatus,
-  onOpenCliStatus,
 }: {
   account: Account | null;
   now: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  cliStatus: CliStatus | null;
-  onOpenCliStatus: () => void;
 }) {
   const view = railAccountModel(account, now);
   const active = selectedId === OVERVIEW_ID;
-  const cli = footerView(cliStatus);
-  const canOpenCli = cliStatus !== null;
 
   return (
     <div className="shrink-0 p-3">
@@ -127,24 +102,6 @@ export function RailPanel({
           </>
         )}
       </button>
-
-      <div className="mt-2 flex items-center gap-1.5 px-1 font-mono text-[10px] text-fg-faint">
-        <span className={cx("h-1.5 w-1.5 rounded-full", DOT_CLASS[cli.dot])} />
-        <span className="text-fg-muted">Claude Code</span>
-        <span className="uppercase tracking-wide">· {cli.statusLabel}</span>
-        <button
-          type="button"
-          onClick={onOpenCliStatus}
-          disabled={!canOpenCli}
-          aria-label="Claude Code status and settings"
-          className={cx(
-            "ml-auto inline-flex h-5 w-5 items-center justify-center rounded border transition-colors disabled:opacity-40",
-            BTN_CLASS[cli.dot],
-          )}
-        >
-          <Icon name="info" size={12} />
-        </button>
-      </div>
     </div>
   );
 }

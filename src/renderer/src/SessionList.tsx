@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Session, SessionState, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import { RailPanel } from "./ui/RailPanel";
+import { RailFooter } from "./ui/RailFooter";
 import { groupSessions } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
 import { cx, Dot } from "./ui/atoms";
@@ -65,8 +66,6 @@ export function SessionList({
         now={accountClock}
         selectedId={selectedId}
         onSelect={onSelect}
-        cliStatus={cliStatus}
-        onOpenCliStatus={onOpenCliStatus}
       />
       {/* One divider splits the identity/status zone from the session zone, drawn like every other
           section divider in the app (solid border-ink-800) rather than the old per-block dividers. */}
@@ -150,6 +149,7 @@ export function SessionList({
           })
         )}
       </div>
+      <RailFooter status={cliStatus} onOpenCliStatus={onOpenCliStatus} />
     </aside>
   );
 }
