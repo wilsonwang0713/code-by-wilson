@@ -1,4 +1,5 @@
 import {
+  ArrowUpRight,
   ChartColumn,
   Check,
   ChevronDown,
@@ -34,6 +35,7 @@ export type { IconName };
  * import it; `satisfies Record<IconName, LucideIcon>` keeps this map and that union exhaustively in sync.
  */
 const ICONS = {
+  "arrow-up-right": ArrowUpRight,
   "chart-column": ChartColumn,
   check: Check,
   "chevron-down": ChevronDown,
