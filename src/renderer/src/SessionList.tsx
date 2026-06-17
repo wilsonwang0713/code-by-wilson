@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import type { Session, SessionState, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import { RailPanel } from "./ui/RailPanel";
-import { RailFooter } from "./ui/RailFooter";
+import { RailCliStatus } from "./ui/RailCliStatus";
 import { groupSessions } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
-import { cx, Dot } from "./ui/atoms";
+import { cx, Dot, SessionTile } from "./ui/atoms";
+import { OverlayScroll } from "./ui/OverlayScroll";
 import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
 
@@ -67,6 +68,7 @@ export function SessionList({
         selectedId={selectedId}
         onSelect={onSelect}
       />
+      <RailCliStatus status={cliStatus} onOpenCliStatus={onOpenCliStatus} />
       {/* One divider splits the identity/status zone from the session zone, drawn like every other
           section divider in the app (solid border-ink-800) rather than the old per-block dividers. */}
       <div className="shrink-0 border-t border-ink-800 p-3">
@@ -77,12 +79,12 @@ export function SessionList({
           title={
             canSpawn
               ? undefined
-              : "Claude Code CLI isn't usable — open the status panel from the rail footer."
+              : "Claude Code CLI isn't usable — open the status panel from the CLI status band above."
           }
           className={cx(
             "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
             canSpawn
-              ? "border-primary/40 bg-primary/10 text-primary-bright hover:border-primary/60 hover:bg-primary/20"
+              ? "border-ink-700 bg-ink-800 text-fg hover:border-ink-600 hover:bg-ink-750"
               : "cursor-not-allowed border-ink-700 bg-ink-900 text-fg-faint",
           )}
         >
@@ -99,7 +101,7 @@ export function SessionList({
           />
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <OverlayScroll className="min-h-0 flex-1">
         {groups.length === 0 ? (
           <p className="px-4 py-5 text-[12px] text-fg-faint">
             No sessions match "{query}".
@@ -134,22 +136,24 @@ export function SessionList({
                     {g.items.length}
                   </span>
                 </button>
-                {!isCollapsed &&
-                  g.items.map((s) => (
-                    <SessionRow
-                      key={s.id}
-                      session={s}
-                      selected={s.id === selectedId}
-                      now={now}
-                      onSelect={() => onSelect(s.id)}
-                    />
-                  ))}
+                {!isCollapsed && (
+                  <div className="flex flex-col gap-1.5 px-3 py-2">
+                    {g.items.map((s) => (
+                      <SessionRow
+                        key={s.id}
+                        session={s}
+                        selected={s.id === selectedId}
+                        now={now}
+                        onSelect={() => onSelect(s.id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })
         )}
-      </div>
-      <RailFooter status={cliStatus} onOpenCliStatus={onOpenCliStatus} />
+      </OverlayScroll>
     </aside>
   );
 }
@@ -174,51 +178,60 @@ function SessionRow({
       aria-pressed={selected}
       aria-label={`Open ${s.title}`}
       className={cx(
-        "block w-full border-b border-l-2 border-ink-850 px-3 py-2.5 text-left transition-colors",
+        "block w-full rounded-lg border p-2.5 text-left transition-colors",
         selected
-          ? "border-l-primary bg-ink-850"
-          : waiting
-            ? "border-l-accent bg-accent/[0.06] hover:bg-ink-900"
-            : "border-l-transparent hover:bg-ink-900",
+          ? "border-primary/50 bg-primary/[0.06]"
+          : "border-ink-800 bg-ink-900 hover:border-ink-700",
       )}
     >
-      <div className="flex items-center gap-2">
-        <Dot state={s.state} management={s.management} />
-        <span
-          className={cx(
-            "min-w-0 flex-1 truncate text-[13px] text-fg",
-            selected ? "font-semibold" : "font-medium",
-          )}
-          title={s.title}
-        >
-          {s.title}
-        </span>
-        {isContextHigh(s.contextPct) && (
-          <span
-            className={cx(
-              "shrink-0 font-mono text-[10px] tabular-nums",
-              ctxTone(s.contextPct),
+      <div className="flex items-center gap-[9px]">
+        <SessionTile state={s.state} management={s.management} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cx(
+                "min-w-0 flex-1 truncate text-[13px] text-fg",
+                selected ? "font-semibold" : "font-medium",
+              )}
+              title={s.title}
+            >
+              {s.title}
+            </span>
+            {isContextHigh(s.contextPct) && (
+              <span
+                className={cx(
+                  "shrink-0 font-mono text-[10px] tabular-nums",
+                  ctxTone(s.contextPct),
+                )}
+              >
+                {s.contextPct}%
+              </span>
             )}
+            <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
+              {formatRelativeTime(s.lastActivityMs, now)}
+            </span>
+          </div>
+          <div
+            className="mt-0.5 truncate font-mono text-[10.5px] text-fg-faint"
+            title={projectLine}
           >
-            {s.contextPct}%
-          </span>
-        )}
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
-          {formatRelativeTime(s.lastActivityMs, now)}
-        </span>
-      </div>
-      <div
-        className="mt-1.5 truncate pl-4 font-mono text-[10.5px] text-fg-faint"
-        title={projectLine}
-      >
-        {projectLine}
+            {projectLine}
+          </div>
+        </div>
       </div>
       {waiting && (
         <div
-          className="ml-4 mt-1.5 truncate text-[11px] text-accent-bright"
+          className="mt-2 flex items-center gap-1.5 rounded-md bg-ink-950 px-2.5 py-1.5 text-[11px] text-accent-bright"
           title={s.waitingReason ?? "Waiting on you"}
         >
-          ⚠ {s.waitingReason ?? "Waiting on you"}
+          <Icon
+            name="triangle-alert"
+            size={12}
+            className="shrink-0 text-accent"
+          />
+          <span className="truncate">
+            {s.waitingReason ?? "Waiting on you"}
+          </span>
         </div>
       )}
     </button>
