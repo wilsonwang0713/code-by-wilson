@@ -9,7 +9,8 @@ import { OVERVIEW_ID } from "../stats/sentinel";
 /**
  * The rail's pinned identity panel: an account card that opens Overview (subscription email + plan +
  * 5h/Weekly gauges, an api endpoint host, or — with no account — a bare Overview label). Replaces the old
- * RailAccount block and the separate pinned Overview button. CLI status lives in the rail footer.
+ * RailAccount block and the separate pinned Overview button. CLI status lives in the band just below this
+ * card (RailCliStatus).
  *
  * Memoized so a burst of filter keystrokes (which re-render the rail) doesn't rebuild the card — `account`,
  * `selectedId`, and `onSelect` are stable across them, and `now` is floored to the second by the caller.

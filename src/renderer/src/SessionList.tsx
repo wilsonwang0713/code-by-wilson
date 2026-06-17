@@ -79,7 +79,7 @@ export function SessionList({
           title={
             canSpawn
               ? undefined
-              : "Claude Code CLI isn't usable — open the status panel from the rail footer."
+              : "Claude Code CLI isn't usable — open the status panel from the CLI status band above."
           }
           className={cx(
             "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
