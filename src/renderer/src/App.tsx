@@ -15,7 +15,7 @@ import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
 import { SessionList } from "./SessionList";
-import { CliTroubleshootModal } from "./ui/CliTroubleshootModal";
+import { CliStatusModal } from "./ui/CliStatusModal";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
@@ -305,7 +305,7 @@ export function App() {
         />
       )}
       {troubleshootOpen && cliStatus && (
-        <CliTroubleshootModal
+        <CliStatusModal
           status={cliStatus}
           checking={checking}
           onClose={() => setTroubleshootOpen(false)}

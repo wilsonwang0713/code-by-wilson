@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { CliStatus } from "@shared/cli-status";
 import { remediesFor, INSTALL_TABS } from "./cli-remedies";
 
-export function CliTroubleshootModal({
+export function CliStatusModal({
   status,
   checking,
   onClose,
@@ -36,7 +36,12 @@ export function CliTroubleshootModal({
       >
         <div className="flex items-center gap-2 border-b border-ink-800 px-4 py-3">
           <span className="text-sm font-semibold text-fg">Claude Code CLI</span>
-          <span className="ml-auto uppercase tracking-wide text-fg-faint">
+          <span className="ml-auto flex items-center gap-2 uppercase tracking-wide text-fg-faint">
+            {status.version && (
+              <span className="font-mono normal-case text-fg-muted">
+                v{status.version}
+              </span>
+            )}
             {status.kind}
           </span>
         </div>
@@ -52,50 +57,54 @@ export function CliTroubleshootModal({
             )}
           </div>
 
-          {remedy.section === "install" && (
-            <div>
-              <div className="mb-2 flex gap-1.5">
-                {INSTALL_TABS.map((t) => (
-                  <button
-                    key={t.method}
-                    onClick={() => setTab(t.method)}
-                    className={
-                      tab === t.method
-                        ? "rounded bg-ink-700 px-2 py-1 text-fg"
-                        : "px-2 py-1"
-                    }
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              {INSTALL_TABS.filter((t) => t.method === tab).map((t) => (
-                <CommandRow key={t.method} cmd={t.command} note={t.note} />
-              ))}
-            </div>
-          )}
-          {remedy.section === "update" && remedy.command && (
-            <CommandRow cmd={remedy.command} />
-          )}
-          {remedy.section === "login" && (
-            <div className="text-fg-faint">
-              Start a session (the terminal prompts you to log in), or run{" "}
-              <code>claude</code> in your shell.
-            </div>
-          )}
-          {remedy.section === "verify" && (
-            <div className="space-y-2 text-fg-faint">
-              <div>
-                Run <code>claude --version</code> in a terminal to check it
-                works.
-              </div>
-              {status.path && (
-                <CommandRow
-                  cmd={`xattr -d com.apple.quarantine ${status.path}`}
-                  note="If macOS blocked the binary."
-                />
+          {status.kind !== "ready" && (
+            <>
+              {remedy.section === "install" && (
+                <div>
+                  <div className="mb-2 flex gap-1.5">
+                    {INSTALL_TABS.map((t) => (
+                      <button
+                        key={t.method}
+                        onClick={() => setTab(t.method)}
+                        className={
+                          tab === t.method
+                            ? "rounded bg-ink-700 px-2 py-1 text-fg"
+                            : "px-2 py-1"
+                        }
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  {INSTALL_TABS.filter((t) => t.method === tab).map((t) => (
+                    <CommandRow key={t.method} cmd={t.command} note={t.note} />
+                  ))}
+                </div>
               )}
-            </div>
+              {remedy.section === "update" && remedy.command && (
+                <CommandRow cmd={remedy.command} />
+              )}
+              {remedy.section === "login" && (
+                <div className="text-fg-faint">
+                  Start a session (the terminal prompts you to log in), or run{" "}
+                  <code>claude</code> in your shell.
+                </div>
+              )}
+              {remedy.section === "verify" && (
+                <div className="space-y-2 text-fg-faint">
+                  <div>
+                    Run <code>claude --version</code> in a terminal to check it
+                    works.
+                  </div>
+                  {status.path && (
+                    <CommandRow
+                      cmd={`xattr -d com.apple.quarantine ${status.path}`}
+                      note="If macOS blocked the binary."
+                    />
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           <div className="border-t border-ink-800 pt-3">
