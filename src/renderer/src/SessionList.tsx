@@ -135,16 +135,19 @@ export function SessionList({
                     {g.items.length}
                   </span>
                 </button>
-                {!isCollapsed &&
-                  g.items.map((s) => (
-                    <SessionRow
-                      key={s.id}
-                      session={s}
-                      selected={s.id === selectedId}
-                      now={now}
-                      onSelect={() => onSelect(s.id)}
-                    />
-                  ))}
+                {!isCollapsed && (
+                  <div className="flex flex-col gap-1.5 p-2">
+                    {g.items.map((s) => (
+                      <SessionRow
+                        key={s.id}
+                        session={s}
+                        selected={s.id === selectedId}
+                        now={now}
+                        onSelect={() => onSelect(s.id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })
@@ -174,12 +177,12 @@ function SessionRow({
       aria-pressed={selected}
       aria-label={`Open ${s.title}`}
       className={cx(
-        "block w-full border-b border-l-2 border-ink-850 px-3 py-2.5 text-left transition-colors",
+        "block w-full rounded-lg border px-2.5 py-2 text-left transition-colors",
         selected
-          ? "border-l-primary bg-ink-850"
+          ? "border-primary/50 bg-primary/[0.06]"
           : waiting
-            ? "border-l-accent bg-accent/[0.06] hover:bg-ink-900"
-            : "border-l-transparent hover:bg-ink-900",
+            ? "border-accent/50 bg-accent/[0.06]"
+            : "border-ink-800 bg-ink-900 hover:border-ink-700",
       )}
     >
       <div className="flex items-center gap-2">
