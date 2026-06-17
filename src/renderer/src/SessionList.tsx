@@ -6,6 +6,7 @@ import { RailCliStatus } from "./ui/RailCliStatus";
 import { groupSessions } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
 import { cx, Dot, SessionTile } from "./ui/atoms";
+import { OverlayScroll } from "./ui/OverlayScroll";
 import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
 
@@ -100,7 +101,7 @@ export function SessionList({
           />
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto rail-scroll">
+      <OverlayScroll className="min-h-0 flex-1">
         {groups.length === 0 ? (
           <p className="px-4 py-5 text-[12px] text-fg-faint">
             No sessions match "{query}".
@@ -152,7 +153,7 @@ export function SessionList({
             );
           })
         )}
-      </div>
+      </OverlayScroll>
     </aside>
   );
 }

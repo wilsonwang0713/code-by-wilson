@@ -140,6 +140,36 @@ body {
   display: none; /* Chromium / Electron */
 }
 
+/* The VSCode-style overlay scrollbar thumb (OverlayScroll.tsx). Absolutely positioned over the list, so it
+   reserves no width; size/position are written imperatively by the component. Slider colours are VSCode's
+   dark-theme defaults (scrollbarSlider.background / hover / active). Fade is asymmetric — 100ms in, 800ms
+   out — gated by the data-visible attribute, mirroring VSCode's reveal-on-scroll/hover, fade-on-idle. */
+.overlay-scroll-thumb {
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 20; /* above the sticky group headers (z-10) so the thumb floats over them, not behind */
+  width: 10px;
+  height: 0;
+  transform: translateY(0);
+  background: rgba(121, 121, 121, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 800ms linear;
+  will-change: transform, opacity;
+}
+.overlay-scroll-thumb[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 100ms linear;
+}
+.overlay-scroll-thumb:hover {
+  background: rgba(100, 100, 100, 0.7);
+}
+.overlay-scroll-thumb[data-active="true"] {
+  background: rgba(191, 191, 191, 0.4);
+}
+
 /* The terminal well: borderless and padded, with an auto-hiding scrollbar pinned to the trailing edge.
    8px of padding on .xterm gives the content breathing room; FitAddon reads this padding when it sizes
    the grid, so cols/rows fit the padded area. .xterm-viewport is absolutely positioned inset:0 and
