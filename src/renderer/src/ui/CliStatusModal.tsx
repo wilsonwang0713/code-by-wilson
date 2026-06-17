@@ -107,26 +107,28 @@ export function CliStatusModal({
             </>
           )}
 
-          <div className="border-t border-ink-800 pt-3">
-            <div className="mb-1 text-fg-faint">
-              Binary path override (works for app launches):
+          {status.kind !== "ready" && (
+            <div className="border-t border-ink-800 pt-3">
+              <div className="mb-1 text-fg-faint">
+                Binary path override (works for app launches):
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={binPath}
+                  onChange={(e) => setBinPath(e.target.value)}
+                  placeholder="/absolute/path/to/claude"
+                  className="flex-1 rounded border border-ink-700 bg-ink-950 px-2 py-1 text-fg"
+                />
+                <button
+                  onClick={() => onSetBinPath(binPath.trim() || null)}
+                  disabled={checking}
+                  className="rounded border border-ink-700 px-2 py-1 disabled:opacity-60"
+                >
+                  Save
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <input
-                value={binPath}
-                onChange={(e) => setBinPath(e.target.value)}
-                placeholder="/absolute/path/to/claude"
-                className="flex-1 rounded border border-ink-700 bg-ink-950 px-2 py-1 text-fg"
-              />
-              <button
-                onClick={() => onSetBinPath(binPath.trim() || null)}
-                disabled={checking}
-                className="rounded border border-ink-700 px-2 py-1 disabled:opacity-60"
-              >
-                Save
-              </button>
-            </div>
-          </div>
+          )}
 
           <div className="text-fg-faint">
             Config dir: {status.configDir.active}
