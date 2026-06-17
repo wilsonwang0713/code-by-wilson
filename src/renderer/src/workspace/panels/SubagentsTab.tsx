@@ -7,6 +7,7 @@ import {
 } from "@shared/format";
 import { spanPct } from "../../ui/charts-geom";
 import { cx } from "../../ui/atoms";
+import { Icon } from "../../ui/icons";
 import { FAMILY_LABEL } from "../../ui/meta";
 import { EmptyState } from "./chrome";
 import {
@@ -257,15 +258,14 @@ function GroupHeader({
       aria-expanded={!collapsed}
       className="flex w-full items-center gap-2 rounded-sm border-b border-ink-850 px-1 py-1 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900"
     >
-      <span
+      <Icon
+        name="chevron-right"
+        size={12}
         className={cx(
-          "w-2.5 shrink-0 text-fg-faint transition-transform",
-          collapsed && "-rotate-90",
+          "shrink-0 text-fg-muted transition-transform",
+          !collapsed && "rotate-90",
         )}
-        aria-hidden
-      >
-        ▾
-      </span>
+      />
       <span className="shrink-0 font-semibold text-fg">{label}</span>
       {type && <span className="min-w-0 truncate text-fg-faint">{type}</span>}
       {autoCollapsed && (
