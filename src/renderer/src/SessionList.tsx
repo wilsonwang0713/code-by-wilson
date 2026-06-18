@@ -5,7 +5,7 @@ import { RailPanel } from "./ui/RailPanel";
 import { RailCliStatus } from "./ui/RailCliStatus";
 import { railSections } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
-import { cx, Dot, SessionTile } from "./ui/atoms";
+import { cx, SessionTile } from "./ui/atoms";
 import { OverlayScroll } from "./ui/OverlayScroll";
 import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
@@ -135,7 +135,6 @@ export function SessionList({
                       endedOpen && "rotate-90",
                     )}
                   />
-                  <Dot state="ended" />
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
                     {STATE_META.ended.label}
                   </span>

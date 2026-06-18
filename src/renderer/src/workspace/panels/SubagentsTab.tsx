@@ -253,13 +253,6 @@ function GroupHeader({
   onToggle: () => void;
 }) {
   const counts = groupCounts(group.agents);
-  // The header's left cap echoes the lane caps: failure red wins, then live teal, else a quiet edge.
-  const capTone =
-    counts.failed > 0
-      ? "border-l-danger"
-      : counts.working > 0
-        ? "border-l-working"
-        : "border-l-ink-700";
   const type = groupUniformType(group);
   const start = groupStartMs(group);
   const label =
@@ -271,10 +264,7 @@ function GroupHeader({
       type="button"
       onClick={onToggle}
       aria-expanded={!collapsed}
-      className={cx(
-        "flex w-full items-center gap-2 rounded-sm border-b border-l-2 border-ink-850 py-1 pl-2 pr-1.5 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900",
-        capTone,
-      )}
+      className="flex w-full items-center gap-2 rounded-sm border-b border-ink-850 py-1 pl-2 pr-1.5 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900"
     >
       <Icon
         name="chevron-right"
