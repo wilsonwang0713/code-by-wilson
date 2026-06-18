@@ -235,6 +235,51 @@ describe("reconstructShells", () => {
     expect(s.durationMs).toBeUndefined();
   });
 
+  it("recognises kill-tool name variants and camelCase id fields", () => {
+    const killRow = (name: string, input: Record<string, string>) => ({
+      type: "assistant",
+      timestamp: "2026-06-11T00:00:09.000Z",
+      message: {
+        id: "mk",
+        content: [{ type: "tool_use", id: "k1", name, input }],
+      },
+    });
+    for (const [name, input] of [
+      ["KillBash", { bash_id: "bg1" }],
+      ["TaskStop", { task_id: "bg1" }],
+      ["KillTask", { shellId: "bg1" }], // a renamed tool + a camelCase id field
+    ] as const) {
+      const rows = [
+        bashUse("t1", "tail -f log"),
+        startResult("t1", "bg1", "2026-06-11T00:00:01.000Z"),
+        killRow(name, input),
+      ];
+      expect(reconstructShells(rows)[0].status).toBe("killed");
+    }
+  });
+
+  it("never reads a BashOutput/TaskOutput poll as a kill", () => {
+    const rows = [
+      bashUse("t1", "pnpm dev"),
+      startResult("t1", "bg1", "2026-06-11T00:00:01.000Z"),
+      {
+        type: "assistant",
+        message: {
+          id: "mp",
+          content: [
+            {
+              type: "tool_use",
+              id: "p1",
+              name: "BashOutput",
+              input: { bash_id: "bg1" },
+            },
+          ],
+        },
+      },
+    ];
+    expect(reconstructShells(rows)[0].status).toBe("running");
+  });
+
   it("orders shells by start time", () => {
     const rows = [
       bashUse("t1", "first"),

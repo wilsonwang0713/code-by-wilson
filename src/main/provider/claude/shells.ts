@@ -22,7 +22,32 @@ interface BashUse {
   description?: string;
 }
 
-const KILL_TOOLS = new Set(["KillShell", "KillBash", "TaskStop"]);
+/** Whether a tool_use stops a background shell — matched by name shape (kill / stop / terminate) rather
+ *  than an exact list, so a rename across CLI/harness versions (KillShell, KillBash, KillTask, TaskStop…)
+ *  still registers. The pattern never matches the poll tools (BashOutput/TaskOutput), so a still-running
+ *  poll is never misread as a kill. The authoritative kill signal is the notification's
+ *  <status>killed</status> (third pass); this is only the fallback for a kill with no notification. */
+function isKillTool(name: unknown): boolean {
+  return typeof name === "string" && /kill|terminate|stop/i.test(name);
+}
+
+/** The background-shell id a kill tool_use targets: the first string among the id-shaped input fields,
+ *  in snake_case or camelCase. The fourth pass only applies a kill whose ref is a known shell id, so an
+ *  over-broad match here is harmless. */
+function killRef(input: any): string | undefined {
+  for (const k of [
+    "shell_id",
+    "shellId",
+    "task_id",
+    "taskId",
+    "bash_id",
+    "bashId",
+    "id",
+  ]) {
+    if (typeof input?.[k] === "string") return input[k];
+  }
+  return undefined;
+}
 
 /** Pull the absolute output path out of the start tool_result text:
  *  "...Output is being written to: <path>". Empty when the line shape changed. */
@@ -75,13 +100,9 @@ export function reconstructShells(rows: any[]): ShellRecord[] {
         if (typeof b.input.description === "string" && b.input.description)
           use.description = b.input.description;
         bashUses.set(b.id, use);
-      } else if (KILL_TOOLS.has(b.name)) {
-        const ref =
-          b.input?.shell_id ??
-          b.input?.task_id ??
-          b.input?.bash_id ??
-          b.input?.id;
-        if (typeof ref === "string") {
+      } else if (isKillTool(b.name)) {
+        const ref = killRef(b.input);
+        if (ref) {
           const killMs = Date.parse(row?.timestamp);
           killed.set(ref, Number.isFinite(killMs) ? killMs : undefined);
         }
