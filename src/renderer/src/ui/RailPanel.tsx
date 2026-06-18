@@ -124,7 +124,7 @@ export const RailPanel = memo(function RailPanel({
                     onClick={() => setRevealed((v) => !v)}
                     aria-pressed={revealed}
                     aria-label={revealed ? "Hide email" : "Show email"}
-                    className="pointer-events-auto shrink-0 text-fg-faint transition-colors hover:text-fg-muted"
+                    className="pointer-events-auto shrink-0 rounded-sm text-fg-faint transition-colors hover:text-fg-muted focus-visible:text-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
                   >
                     <Icon name={revealed ? "eye-off" : "eye"} size={12} />
                   </button>
