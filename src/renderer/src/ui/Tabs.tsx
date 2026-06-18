@@ -33,11 +33,11 @@ export function Tabs<T extends string>({
 }) {
   return (
     <div
-      className={
+      className={cx(
         variant === "lozenge"
           ? "inline-flex items-center gap-0.5"
-          : "flex items-stretch"
-      }
+          : "flex items-stretch",
+      )}
     >
       {tabs.map((t) => {
         const active = value === t.id;
