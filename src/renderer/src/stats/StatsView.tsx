@@ -107,9 +107,19 @@ export function StatsView() {
 
   const handleReset = useCallback(async () => {
     setConfirmReset(false);
-    const r = await window.api.resetAnalytics();
-    if (r.ok) setResetNonce((n) => n + 1);
-    else setResetError(true);
+    try {
+      const r = await window.api.resetAnalytics();
+      // ok:false (no store / failed clear) and a thrown bridge failure both land on the error banner; on
+      // success clear any stale banner from a prior attempt and bump the nonce to re-run the poll.
+      if (r.ok) {
+        setResetError(false);
+        setResetNonce((n) => n + 1);
+      } else {
+        setResetError(true);
+      }
+    } catch {
+      setResetError(true);
+    }
   }, []);
 
   useEffect(() => {

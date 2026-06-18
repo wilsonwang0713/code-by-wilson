@@ -382,6 +382,11 @@ export function registerIpc({
     if (!analyticsDb) return { ok: false };
     try {
       clearAnalytics(analyticsDb);
+      // clearAnalytics DELETEs every turn, so the rebuild reuses rowids from 1 — the max-rowid insert
+      // signal yearsCache memoizes against is no longer monotonic across this clear. Drop the cache so a
+      // single-step rebuild that lands back on the same max rowid recomputes the year list instead of
+      // serving the pre-reset one.
+      yearsCache = null;
       return { ok: true };
     } catch (err) {
       console.error("analytics reset failed", err);
