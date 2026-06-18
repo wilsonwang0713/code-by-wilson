@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import type { Subagent, Task } from "@shared/types";
+import type { Subagent, Task, BackgroundShell } from "@shared/types";
 import { Icon } from "../../ui/icons";
 import { SegmentedTabs } from "../../ui/SegmentedTabs";
 import type { DocState } from "../use-transcript";
 import { DockTasks } from "./DockTasks";
 import { TurnsTab } from "./TurnsTab";
 import { SubagentsTab } from "./SubagentsTab";
+import { ShellsTab } from "./ShellsTab";
 import { OverlayScroll } from "../../ui/OverlayScroll";
 import {
   type DockTab,
@@ -23,15 +24,21 @@ import {
 export function StructureDock({
   tasks,
   doc,
+  shells,
   now,
   activeAgentId,
+  activeShellId,
   onDrill,
+  onDrillShell,
 }: {
   tasks: Task[];
   doc: DocState;
+  shells: BackgroundShell[];
   now: number;
   activeAgentId?: string;
+  activeShellId?: string;
   onDrill: (agent: Subagent) => void;
+  onDrillShell: (shell: BackgroundShell) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const subagents = doc?.subagents ?? [];
@@ -53,9 +60,11 @@ export function StructureDock({
   const tab =
     pick && pick.alive === alive
       ? pick.tab
-      : activeAgentId
-        ? "subagents"
-        : defaultDockTab(stats);
+      : activeShellId
+        ? "shells"
+        : activeAgentId
+          ? "subagents"
+          : defaultDockTab(stats);
 
   if (collapsed)
     return (
@@ -81,18 +90,26 @@ export function StructureDock({
           onChange={(t) => setPick({ tab: t, alive })}
           turnCount={turns.length}
           subagentCount={stats.total}
+          shellCount={shells.length}
           onCollapse={() => setCollapsed(true)}
         />
         <OverlayScroll className="min-h-0 flex-1">
           {tab === "turns" ? (
             <TurnsTab turns={turns} now={now} />
-          ) : (
+          ) : tab === "subagents" ? (
             <SubagentsTab
               subagents={subagents}
               stats={stats}
               now={now}
               activeAgentId={activeAgentId}
               onDrill={onDrill}
+            />
+          ) : (
+            <ShellsTab
+              shells={shells}
+              now={now}
+              activeShellId={activeShellId}
+              onDrill={onDrillShell}
             />
           )}
         </OverlayScroll>
@@ -108,12 +125,14 @@ function DockTabBar({
   onChange,
   turnCount,
   subagentCount,
+  shellCount,
   onCollapse,
 }: {
   tab: DockTab;
   onChange: (t: DockTab) => void;
   turnCount: number;
   subagentCount: number;
+  shellCount: number;
   onCollapse: () => void;
 }) {
   return (
@@ -122,6 +141,7 @@ function DockTabBar({
         tabs={[
           { id: "turns", label: "Turns", count: turnCount },
           { id: "subagents", label: "Subagents", count: subagentCount },
+          { id: "shells", label: "Shells", count: shellCount },
         ]}
         value={tab}
         onChange={onChange}

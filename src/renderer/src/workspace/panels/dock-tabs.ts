@@ -4,7 +4,7 @@ import { niceAxisMax, round2, spanPct } from "../../ui/charts-geom";
 // JSX-free dock logic, so the tests can import it under tsconfig.node.json (mirrors open-in-items.ts).
 
 /** The dock's right-area tabs. */
-export type DockTab = "turns" | "subagents";
+export type DockTab = "turns" | "subagents" | "shells";
 
 /** The forest tallies the dock needs, gathered in a single walk: total nodes (the Subagents count badge)
  *  and the per-status counts (the live-fan-out signal, the collapsed tally's working count, and the

@@ -19,6 +19,12 @@ import {
   subagentsNewestMtime,
 } from "./subagents";
 import { readTasksForSession, tasksNewestMtime } from "./tasks";
+import {
+  reconstructShells,
+  tailOutput,
+  stitchSnapshots,
+  toBackgroundShell,
+} from "./shells";
 import { resolveAdoptTarget } from "./adopt-target";
 import { computeTokenSpeed, SPEED_WINDOW_MS } from "./transcript-speed";
 import { firstTranscriptCwd } from "./transcript";
@@ -31,6 +37,7 @@ import type {
   SessionMetrics,
   TokenSpeed,
 } from "@shared/metrics";
+import type { ShellsRead, ShellOutputRead } from "@shared/ipc";
 
 export interface ClaudeProviderDeps {
   claudeDir?: string;
@@ -339,6 +346,82 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         };
       } catch {
         return { status: "error" }; // transient read failure — caller keeps its last list
+      }
+    },
+    readShells: (id, sinceMtimeMs): ShellsRead => {
+      try {
+        const resolved = resolveTranscript(id);
+        if (!resolved) return { status: "absent" };
+        const { path, mtimeMs } = resolved;
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        const jsonl = readTextOrNull(path);
+        if (jsonl === null) {
+          forgetSession(id);
+          return { status: "absent" };
+        }
+        // Strip outputFile: the list is renderer-facing; the log path stays server-side (readShellOutput).
+        const shells = reconstructShells(parseJsonlRows(jsonl)).map(
+          toBackgroundShell,
+        );
+        return { status: "changed", mtimeMs, shells };
+      } catch {
+        return { status: "error" };
+      }
+    },
+    readShellOutput: (id, shellId, sinceMtimeMs): ShellOutputRead => {
+      try {
+        // `shellId` crosses IPC. A real id is alphanumeric (a backgroundTaskId), so reject a path
+        // separator rather than risk an escape, even though the path comes from the transcript itself.
+        if (/[/\\]/.test(shellId)) return { status: "absent" };
+        const path = pathById.get(id) ?? resolveTranscript(id)?.path;
+        if (path === undefined) return { status: "absent" };
+        const jsonl = readTextOrNull(path);
+        if (jsonl === null) return { status: "absent" };
+        const rows = parseJsonlRows(jsonl);
+        const shell = reconstructShells(rows).find((s) => s.id === shellId);
+        if (!shell) return { status: "absent" };
+
+        // Prefer the live .output file: its own mtime is the tightest change token.
+        let outMtime = 0;
+        try {
+          outMtime = statSync(shell.outputFile).mtimeMs;
+        } catch (err) {
+          // ENOENT (or an empty path from an unparsed start line) → the live file is gone; fall back to
+          // the stitched snapshot below. A non-ENOENT stat failure (EACCES, EIO) is transient, not
+          // absence: rethrow so the outer catch degrades to `error` and the renderer keeps its last
+          // value rather than flashing a stale snapshot. Mirrors readSubagentTranscript's split.
+          if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
+          outMtime = 0; // gone → snapshot fallback below
+        }
+        if (outMtime > 0) {
+          if (outMtime === sinceMtimeMs)
+            return { status: "unchanged", mtimeMs: outMtime };
+          const raw = readTextOrNull(shell.outputFile);
+          if (raw !== null) {
+            const { text, truncatedBytes } = tailOutput(raw);
+            return {
+              status: "changed",
+              mtimeMs: outMtime,
+              output: { text, source: "live", truncatedBytes },
+            };
+          }
+          // vanished between stat and read — fall through to the snapshot fallback
+        }
+
+        // Snapshot fallback: stitch the transcript's poll chunks. Token = transcript mtime.
+        const tMtime = statSync(path).mtimeMs;
+        if (tMtime === sinceMtimeMs)
+          return { status: "unchanged", mtimeMs: tMtime };
+        const { text, truncatedBytes } = tailOutput(
+          stitchSnapshots(rows, shellId),
+        );
+        return {
+          status: "changed",
+          mtimeMs: tMtime,
+          output: { text, source: "snapshot", truncatedBytes },
+        };
+      } catch {
+        return { status: "error" };
       }
     },
     readMetrics: (id, sinceMtimeMs): MetricsRead => {

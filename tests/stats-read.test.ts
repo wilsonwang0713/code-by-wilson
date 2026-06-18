@@ -56,6 +56,8 @@ const provider: Provider = {
   readTranscript: () => ({ status: "absent" }),
   readSubagentTranscript: () => ({ status: "absent" }),
   readTasks: () => ({ status: "absent" }),
+  readShells: () => ({ status: "absent" }),
+  readShellOutput: () => ({ status: "absent" }),
   readMetrics: () => ({ status: "absent" }),
   resolveAdoptTarget: () => null,
 };

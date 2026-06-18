@@ -1,4 +1,11 @@
-import type { Session, ProviderCapabilities, Account, Task } from "./types";
+import type {
+  Session,
+  ProviderCapabilities,
+  Account,
+  Task,
+  BackgroundShell,
+  ShellOutput,
+} from "./types";
 import type { TranscriptRead, ReadSettled } from "./transcript";
 import type { TerminalApi } from "./terminal";
 import type { MetricsRead } from "./metrics";
@@ -12,6 +19,8 @@ export const IPC = {
   readTranscript: "transcript:read",
   readSubagentTranscript: "subagentTranscript:read",
   readTasks: "tasks:read",
+  readShells: "shells:read",
+  readShellOutput: "shellOutput:read",
   readMetrics: "metrics:read",
   fullscreen: "window:fullscreen",
   modelDefaults: "model:defaults",
@@ -42,6 +51,18 @@ export type TaskRead =
   | { status: "changed"; mtimeMs: number; tasks: Task[] }
   | ReadSettled;
 
+/** The result of a background-shells list read: the session's shells with a change token, or a shared
+ *  settled outcome. The list omits each shell's output path; the log is read separately via readShellOutput. */
+export type ShellsRead =
+  | { status: "changed"; mtimeMs: number; shells: BackgroundShell[] }
+  | ReadSettled;
+
+/** The result of a drilled shell-output read: the output with a change token, or a settled outcome.
+ *  Polled only while a shell is open (gated like the subagent read). */
+export type ShellOutputRead =
+  | { status: "changed"; mtimeMs: number; output: ShellOutput }
+  | ReadSettled;
+
 /** The result of a Stats poll: a fresh snapshot with a change token the renderer echoes back as `since`,
  *  or `unchanged` when nothing the snapshot depends on has moved (no new turn, same local day, scan caught
  *  up, no in-place rewrite) — so the handler skips every aggregate and the renderer skips the re-render.
@@ -68,6 +89,16 @@ export interface IpcApi {
   /** Read one session's task list from ~/.claude/tasks/<id>/. `sinceMtimeMs` is the change token from
    *  the caller's last read; when it still matches, the result is `unchanged`. */
   readTasks(id: string, sinceMtimeMs?: number): Promise<TaskRead>;
+  /** List one session's background shells (compact metadata for the dock). `sinceMtimeMs` is the change
+   *  token; an unchanged transcript skips the read. */
+  readShells(id: string, sinceMtimeMs?: number): Promise<ShellsRead>;
+  /** Read one background shell's output — the read behind drilling into a shell. Prefers the live
+   *  `.output` file, falls back to stitched transcript snapshots. `sinceMtimeMs` is the change token. */
+  readShellOutput(
+    id: string,
+    shellId: string,
+    sinceMtimeMs?: number,
+  ): Promise<ShellOutputRead>;
   /** Read one session's lazy metrics (token speed, git, voice, remote). `sinceMtimeMs` is the change
    *  token from the last read; an unchanged token skips the recompute. */
   readMetrics(id: string, sinceMtimeMs?: number): Promise<MetricsRead>;
