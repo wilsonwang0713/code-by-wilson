@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import { openDb } from "./db/sqlite";
 import type { SqliteDb } from "./db/driver";
 import { migrate } from "./db/store";
@@ -13,7 +14,7 @@ import { registerIpc } from "./ipc";
 import { createSettingsManager } from "./settings/manager";
 import { createStatusLineReader } from "./statusline/reader";
 import { registerTerminalIpc } from "./terminal/ipc";
-import { shellPath } from "./terminal/shell-path";
+import { buildChildEnv } from "./terminal/child-env";
 import { readAccountEmail } from "./settings/account-email";
 import { readApiConfig, type ApiConfig } from "./settings/api-config";
 import { readModelDefaults } from "./settings/model-defaults";
@@ -21,7 +22,7 @@ import type { ModelDefaults } from "@shared/models";
 import { resolveClaudeDir } from "./claude-config";
 import { createAppSettingsStore } from "./app-settings";
 import { createCliStatusController } from "./cli-check";
-import { probeShellEnv } from "./terminal/shell-path";
+import { probeShellEnv, resolveShellPath } from "./terminal/shell-path";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
 
@@ -123,16 +124,24 @@ app
     ): void => {
       renameInWindow = rename;
     };
-    // A packaged .app launched from Finder inherits launchd's bare PATH, not the user's shell PATH, so
-    // `claude` (under ~/.local/bin etc.) wouldn't be found and every Managed session would die at spawn.
-    // Recover the real PATH and hand it to each window's terminal IPC — but lazily, on the first spawn,
-    // so the synchronous shell probe never blocks the first window's paint; memoized so only that spawn
-    // pays it. In dev the inherited PATH already carries `claude`, so leave the env untouched (no probe).
-    let recoveredEnv: NodeJS.ProcessEnv | undefined;
-    const childEnv = app.isPackaged
-      ? (): NodeJS.ProcessEnv =>
-          (recoveredEnv ??= { ...process.env, PATH: shellPath() })
-      : undefined;
+    // Inputs for the spawned-session env, late-bound after the startup login-shell probe resolves
+    // claudeDir + the recovered PATH below. childEnv is read lazily at the first spawn — always after
+    // this holder is populated — so the window can still open before the (synchronous) probe runs.
+    let childEnvInputs: {
+      claudeDir: string;
+      correctedPath: string | null;
+    } | null = null;
+    let childEnvMemo: NodeJS.ProcessEnv | undefined;
+    // Env for every spawned/resumed `claude`: pins CLAUDE_CONFIG_DIR to the dir the app reads from (no
+    // split brain) and, when packaged, corrects PATH so a Finder-launched .app can find `claude`. The
+    // fallback resolve is defensive — childEnv is only ever invoked at first spawn, after the holder is
+    // set — so the env is coherent even if that invariant were ever broken.
+    const childEnv = (): NodeJS.ProcessEnv =>
+      (childEnvMemo ??= buildChildEnv({
+        baseEnv: process.env,
+        claudeDir: childEnvInputs?.claudeDir ?? resolveClaudeDir(),
+        correctedPath: childEnvInputs?.correctedPath ?? null,
+      }));
     // provider + cliStatus are wired below, AFTER the window. The window's closures only read them on a
     // later spawn/adopt (never during createWindow), so a holder populated a few lines down is enough —
     // and it lets the window open before claudeDir, which needs the synchronous login-shell probe.
@@ -167,6 +176,21 @@ app
       : null;
     const recoveredConfigDir = shellEnv?.configDir ?? null;
     const claudeDir = resolveClaudeDir(undefined, recoveredConfigDir);
+    // Freeze the spawned-session env inputs now that the probe has run: the same dir the readers use,
+    // and (packaged only) the recovered PATH — reusing shellEnv.path from the one startup probe instead
+    // of spawning a second login shell.
+    childEnvInputs = {
+      claudeDir,
+      correctedPath: app.isPackaged
+        ? resolveShellPath({
+            platform: process.platform,
+            shell: process.env.SHELL,
+            home: homedir(),
+            currentPath: process.env.PATH,
+            probe: () => shellEnv?.path ?? null,
+          })
+        : null,
+    };
     // Wrap the user's statusLine so live cost/context and account rate limits flow to the app
     // (ADR-0001). Idempotent and reversible; a failure must never cost the user a window.
     try {
