@@ -130,6 +130,45 @@ body {
   background: transparent;
 }
 
+/* OverlayScroll's scroll element hides the native scrollbar (both axes); the floating overlay thumb stands
+   in for it, so the app's scroll areas read consistently. The element still scrolls by wheel / trackpad. */
+.overlay-scroll-area {
+  scrollbar-width: none; /* Firefox */
+}
+.overlay-scroll-area::-webkit-scrollbar {
+  display: none; /* Chromium / Electron */
+}
+
+/* The VSCode-style overlay scrollbar thumb (OverlayScroll.tsx). Absolutely positioned over the list, so it
+   reserves no width; size/position are written imperatively by the component. Slider colours are VSCode's
+   dark-theme defaults (scrollbarSlider.background / hover / active). Fade is asymmetric — 100ms in, 800ms
+   out — gated by the data-visible attribute, mirroring VSCode's reveal-on-scroll/hover, fade-on-idle. */
+.overlay-scroll-thumb {
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 20; /* above the sticky group headers (z-10) so the thumb floats over them, not behind */
+  width: 10px;
+  height: 0;
+  transform: translateY(0);
+  background: rgba(121, 121, 121, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 800ms linear;
+  will-change: transform, opacity;
+}
+.overlay-scroll-thumb[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 100ms linear;
+}
+.overlay-scroll-thumb:hover {
+  background: rgba(100, 100, 100, 0.7);
+}
+.overlay-scroll-thumb[data-active="true"] {
+  background: rgba(191, 191, 191, 0.4);
+}
+
 /* The terminal well: borderless and padded, with an auto-hiding scrollbar pinned to the trailing edge.
    8px of padding on .xterm gives the content breathing room; FitAddon reads this padding when it sizes
    the grid, so cols/rows fit the padded area. .xterm-viewport is absolutely positioned inset:0 and
@@ -158,20 +197,16 @@ body {
   background: transparent;
 }
 
-/* Auto-hide overlay: the thumb is invisible at rest and fades in on hover or while scrolling. The
-   .is-scrolling class is toggled from xterm-factory on scroll, cleared after an idle beat. This
-   overrides the global always-on scrollbar above, just for the terminal viewport. */
+/* xterm owns this viewport's scrolling; we keep its native scrollbar ONLY to reserve the 10px right strip
+   (matching the overlay thumb width, so terminal text stays clear of it) and render it permanently
+   invisible. The visible scrollbar is the custom .overlay-scroll-thumb attached in xterm-factory: VSCode's
+   terminal scrollbar IS xterm's own ScrollableElement widget, which @xterm/xterm 5.5.0 doesn't expose, so
+   we reproduce its overlay/fade/drag design with the app's shared overlay thumb. */
 .xterm .xterm-viewport::-webkit-scrollbar {
-  width: 8px;
-} /* slimmer than the app-wide 10px */
+  width: 10px;
+}
 .xterm .xterm-viewport::-webkit-scrollbar-thumb {
   background: transparent;
-  border-radius: 8px;
-  transition: background 0.3s ease;
-}
-.xterm .xterm-viewport:hover::-webkit-scrollbar-thumb,
-.xterm .xterm-viewport.is-scrolling::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
 }
 
 /* The cockpit plate: flat graphite with two whisper-faint signal washes — cool top-right, warm

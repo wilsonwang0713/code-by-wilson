@@ -1,5 +1,13 @@
 import type { Management, SessionState } from "@shared/types";
-import { glyphClass, glyphPulses, glyphTitle } from "./session-glyph";
+import {
+  glyphClass,
+  glyphPulses,
+  glyphTitle,
+  glyphSpins,
+  glyphTone,
+  STATE_ICON,
+} from "./session-glyph";
+import { Icon } from "./icons";
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -29,6 +37,37 @@ export function Dot({
             "animate-pulse-soft",
           )}
         />
+      )}
+    </span>
+  );
+}
+
+/** The session ROW indicator: a monochrome state icon in a recessed tile. Shape = state (via STATE_ICON),
+ *  tone = management (managed muted, observed faint). Working spins; Waiting carries a single static amber
+ *  corner dot. The tile self-stretches so it spans the title and the project line. Color lives in the group
+ *  headers' Dot, not here. */
+export function SessionTile({
+  state,
+  management,
+}: {
+  state: SessionState;
+  management: Management;
+}) {
+  return (
+    <span
+      title={glyphTitle(state, management)}
+      className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-950"
+    >
+      <Icon
+        name={STATE_ICON[state]}
+        size={18}
+        className={cx(
+          glyphTone(management),
+          glyphSpins(state) && "animate-spin",
+        )}
+      />
+      {state === "waiting" && (
+        <span className="absolute -right-[3px] -top-[3px] h-[9px] w-[9px] rounded-full bg-accent ring-2 ring-ink-900" />
       )}
     </span>
   );

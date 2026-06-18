@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
-import type { Session, SessionState, Account } from "@shared/types";
+import type { Session, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import { RailPanel } from "./ui/RailPanel";
-import { RailFooter } from "./ui/RailFooter";
-import { groupSessions } from "@shared/overview";
+import { RailCliStatus } from "./ui/RailCliStatus";
+import { railSections } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
-import { cx, Dot } from "./ui/atoms";
+import { cx, Dot, SessionTile } from "./ui/atoms";
+import { OverlayScroll } from "./ui/OverlayScroll";
 import { Icon } from "./ui/icons";
 import { STATE_META, ctxTone, isContextHigh } from "./ui/meta";
 
 /**
- * The master rail: every session grouped by state (Waiting → Working → Idle → Ended) with sticky group
- * headers and counts, narrowed by a filter box. Rows are real <button>s, so the list is keyboard- and
- * screen-reader-navigable. Selecting a row opens it in the detail pane to the right.
+ * The master rail: a headerless Active list (every non-ended session, newest-created first) above a
+ * single collapsible Ended section, narrowed by a filter box. Rows are real <button>s, so the list is
+ * keyboard- and screen-reader-navigable. Selecting a row opens it in the detail pane to the right.
  */
 export function SessionList({
   sessions,
@@ -42,23 +43,15 @@ export function SessionList({
   // The account gauges only need second granularity for their reset countdowns. Floor the clock so a
   // burst of filter keystrokes (which re-render this rail) doesn't re-tick the memoized RailPanel.
   const accountClock = Math.floor(now / 1000) * 1000;
-  const groups = useMemo(
-    () => groupSessions(sessions, query),
+  const { active, ended } = useMemo(
+    () => railSections(sessions, query),
     [sessions, query],
   );
-  // Collapsed groups, by state. Ended is collapsed by default — it's the archive, not the live work.
-  // An active filter force-expands every group so a match can't hide inside a collapsed one.
-  const [collapsed, setCollapsed] = useState<Set<SessionState>>(
-    () => new Set<SessionState>(["ended"]),
-  );
+  // Only Ended collapses — it's the archive. Active is your live work and stays open. An active filter
+  // force-expands Ended so a match can't hide inside it.
+  const [endedCollapsed, setEndedCollapsed] = useState(true);
   const filtering = query.trim() !== "";
-  const toggle = (state: SessionState): void =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(state)) next.delete(state);
-      else next.add(state);
-      return next;
-    });
+  const endedOpen = filtering || !endedCollapsed;
   return (
     <aside className="flex w-[332px] shrink-0 flex-col border-r border-ink-800 bg-ink-925">
       <RailPanel
@@ -67,6 +60,7 @@ export function SessionList({
         selectedId={selectedId}
         onSelect={onSelect}
       />
+      <RailCliStatus status={cliStatus} onOpenCliStatus={onOpenCliStatus} />
       {/* One divider splits the identity/status zone from the session zone, drawn like every other
           section divider in the app (solid border-ink-800) rather than the old per-block dividers. */}
       <div className="shrink-0 border-t border-ink-800 p-3">
@@ -77,12 +71,12 @@ export function SessionList({
           title={
             canSpawn
               ? undefined
-              : "Claude Code CLI isn't usable — open the status panel from the rail footer."
+              : "Claude Code CLI isn't usable — open the status panel from the CLI status band above."
           }
           className={cx(
             "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
             canSpawn
-              ? "border-primary/40 bg-primary/10 text-primary-bright hover:border-primary/60 hover:bg-primary/20"
+              ? "border-ink-700 bg-ink-800 text-fg hover:border-ink-600 hover:bg-ink-750"
               : "cursor-not-allowed border-ink-700 bg-ink-900 text-fg-faint",
           )}
         >
@@ -99,23 +93,38 @@ export function SessionList({
           />
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {groups.length === 0 ? (
+      <OverlayScroll className="min-h-0 flex-1">
+        {active.length === 0 && ended.length === 0 ? (
           <p className="px-4 py-5 text-[12px] text-fg-faint">
             No sessions match "{query}".
           </p>
         ) : (
-          groups.map((g) => {
-            const isCollapsed = !filtering && collapsed.has(g.state);
-            return (
-              <div key={g.state}>
+          <>
+            {/* Active rows carry no top padding: the filter box's p-3 already sets the gap to the
+                first card, so it sits a uniform 12px below the filter, matching the px-3 sides and the
+                flush Ended header that leads the list when there are no Active rows. */}
+            {active.length > 0 && (
+              <div className="flex flex-col gap-1.5 px-3 pb-2">
+                {active.map((s) => (
+                  <SessionRow
+                    key={s.id}
+                    session={s}
+                    selected={s.id === selectedId}
+                    now={now}
+                    onSelect={() => onSelect(s.id)}
+                  />
+                ))}
+              </div>
+            )}
+            {ended.length > 0 && (
+              <div>
                 <button
                   type="button"
-                  // While filtering, every group is force-expanded; let the header toggle no-op rather
-                  // than silently flip the persisted collapsed state with no visible effect.
-                  onClick={filtering ? undefined : () => toggle(g.state)}
+                  onClick={
+                    filtering ? undefined : () => setEndedCollapsed((v) => !v)
+                  }
                   disabled={filtering}
-                  aria-expanded={!isCollapsed}
+                  aria-expanded={endedOpen}
                   className="sticky top-0 z-10 flex w-full items-center gap-2 border-b border-ink-850 bg-ink-900 px-3.5 py-1.5 text-left transition-colors enabled:hover:bg-ink-850"
                 >
                   <Icon
@@ -123,33 +132,35 @@ export function SessionList({
                     size={12}
                     className={cx(
                       "shrink-0 text-fg-faint transition-transform",
-                      !isCollapsed && "rotate-90",
+                      endedOpen && "rotate-90",
                     )}
                   />
-                  <Dot state={g.state} />
+                  <Dot state="ended" />
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                    {STATE_META[g.state].label}
+                    {STATE_META.ended.label}
                   </span>
                   <span className="font-mono text-[10px] text-fg-faint">
-                    {g.items.length}
+                    {ended.length}
                   </span>
                 </button>
-                {!isCollapsed &&
-                  g.items.map((s) => (
-                    <SessionRow
-                      key={s.id}
-                      session={s}
-                      selected={s.id === selectedId}
-                      now={now}
-                      onSelect={() => onSelect(s.id)}
-                    />
-                  ))}
+                {endedOpen && (
+                  <div className="flex flex-col gap-1.5 px-3 py-2">
+                    {ended.map((s) => (
+                      <SessionRow
+                        key={s.id}
+                        session={s}
+                        selected={s.id === selectedId}
+                        now={now}
+                        onSelect={() => onSelect(s.id)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            );
-          })
+            )}
+          </>
         )}
-      </div>
-      <RailFooter status={cliStatus} onOpenCliStatus={onOpenCliStatus} />
+      </OverlayScroll>
     </aside>
   );
 }
@@ -174,51 +185,60 @@ function SessionRow({
       aria-pressed={selected}
       aria-label={`Open ${s.title}`}
       className={cx(
-        "block w-full border-b border-l-2 border-ink-850 px-3 py-2.5 text-left transition-colors",
+        "block w-full rounded-lg border p-2.5 text-left transition-colors",
         selected
-          ? "border-l-primary bg-ink-850"
-          : waiting
-            ? "border-l-accent bg-accent/[0.06] hover:bg-ink-900"
-            : "border-l-transparent hover:bg-ink-900",
+          ? "border-primary/50 bg-primary/[0.06]"
+          : "border-ink-800 bg-ink-900 hover:border-ink-700",
       )}
     >
-      <div className="flex items-center gap-2">
-        <Dot state={s.state} management={s.management} />
-        <span
-          className={cx(
-            "min-w-0 flex-1 truncate text-[13px] text-fg",
-            selected ? "font-semibold" : "font-medium",
-          )}
-          title={s.title}
-        >
-          {s.title}
-        </span>
-        {isContextHigh(s.contextPct) && (
-          <span
-            className={cx(
-              "shrink-0 font-mono text-[10px] tabular-nums",
-              ctxTone(s.contextPct),
+      <div className="flex items-center gap-[9px]">
+        <SessionTile state={s.state} management={s.management} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={cx(
+                "min-w-0 flex-1 truncate text-[13px] text-fg",
+                selected ? "font-semibold" : "font-medium",
+              )}
+              title={s.title}
+            >
+              {s.title}
+            </span>
+            {isContextHigh(s.contextPct) && (
+              <span
+                className={cx(
+                  "shrink-0 font-mono text-[10px] tabular-nums",
+                  ctxTone(s.contextPct),
+                )}
+              >
+                {s.contextPct}%
+              </span>
             )}
+            <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
+              {formatRelativeTime(s.lastActivityMs, now)}
+            </span>
+          </div>
+          <div
+            className="mt-0.5 truncate font-mono text-[10.5px] text-fg-faint"
+            title={projectLine}
           >
-            {s.contextPct}%
-          </span>
-        )}
-        <span className="shrink-0 font-mono text-[10px] tabular-nums text-fg-faint">
-          {formatRelativeTime(s.lastActivityMs, now)}
-        </span>
-      </div>
-      <div
-        className="mt-1.5 truncate pl-4 font-mono text-[10.5px] text-fg-faint"
-        title={projectLine}
-      >
-        {projectLine}
+            {projectLine}
+          </div>
+        </div>
       </div>
       {waiting && (
         <div
-          className="ml-4 mt-1.5 truncate text-[11px] text-accent-bright"
+          className="mt-2 flex items-center gap-1.5 rounded-md bg-ink-950 px-2.5 py-1.5 text-[11px] text-accent-bright"
           title={s.waitingReason ?? "Waiting on you"}
         >
-          ⚠ {s.waitingReason ?? "Waiting on you"}
+          <Icon
+            name="triangle-alert"
+            size={12}
+            className="shrink-0 text-accent"
+          />
+          <span className="truncate">
+            {s.waitingReason ?? "Waiting on you"}
+          </span>
         </div>
       )}
     </button>
