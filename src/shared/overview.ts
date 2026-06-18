@@ -23,10 +23,7 @@ export function railSections(sessions: Session[], query: string): RailSections {
   const visible = sessions.filter((s) => matchesQuery(s, q));
   const active = visible
     .filter((s) => s.state !== "ended")
-    .sort(
-      (a, b) =>
-        b.createdMs - a.createdMs || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    );
+    .sort((a, b) => b.createdMs - a.createdMs || a.id.localeCompare(b.id));
   const ended = visible
     .filter((s) => s.state === "ended")
     .sort((a, b) => b.lastActivityMs - a.lastActivityMs);
