@@ -16,7 +16,7 @@ one live dashboard. Every session on your machine in one place, with live state,
 the full transcript, an embedded terminal to drive or take over, and the
 telemetry the terminal hides. One pane instead of a dozen terminal windows.
 
-[![Download for macOS (Apple Silicon)](https://img.shields.io/badge/Download%20for%20macOS%20%28Apple%20Silicon%29-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/luojiahai/code-by-wire/releases/latest)
+**[Download for macOS (Apple Silicon)](https://github.com/luojiahai/code-by-wire/releases/latest)**
 
 ## What you get
 

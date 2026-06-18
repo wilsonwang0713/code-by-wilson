@@ -14,7 +14,7 @@ Claude Code 一边工作，一边把丰富的轨迹写进 `.claude` 目录：每
 一块实时仪表盘。你机器上的每个会话都集中到一处：实时状态、完整记录、一个可驱动或随时接管的
 内嵌终端，以及终端从不展示给你的遥测。一块面板，取代十几个终端窗口。
 
-[![下载 macOS 版（Apple Silicon）](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%20macOS%20%E7%89%88%EF%BC%88Apple%20Silicon%EF%BC%89-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/luojiahai/code-by-wire/releases/latest)
+**[下载 macOS 版（Apple Silicon）](https://github.com/luojiahai/code-by-wire/releases/latest)**
 
 ## 你能得到什么
 
