@@ -133,15 +133,22 @@ app
     } | null = null;
     let childEnvMemo: NodeJS.ProcessEnv | undefined;
     // Env for every spawned/resumed `claude`: pins CLAUDE_CONFIG_DIR to the dir the app reads from (no
-    // split brain) and, when packaged, corrects PATH so a Finder-launched .app can find `claude`. The
-    // fallback resolve is defensive — childEnv is only ever invoked at first spawn, after the holder is
-    // set — so the env is coherent even if that invariant were ever broken.
-    const childEnv = (): NodeJS.ProcessEnv =>
-      (childEnvMemo ??= buildChildEnv({
+    // split brain) and, when packaged, corrects PATH so a Finder-launched .app can find `claude`.
+    // childEnv is only ever invoked at first spawn, always after the holder below is populated. If that
+    // ordering ever broke, fail loud here rather than silently pinning a different dir than the readers
+    // use (the very split brain this env exists to prevent).
+    const childEnv = (): NodeJS.ProcessEnv => {
+      if (!childEnvInputs) {
+        throw new Error(
+          "childEnv invoked before the startup probe populated its inputs",
+        );
+      }
+      return (childEnvMemo ??= buildChildEnv({
         baseEnv: process.env,
-        claudeDir: childEnvInputs?.claudeDir ?? resolveClaudeDir(),
-        correctedPath: childEnvInputs?.correctedPath ?? null,
+        claudeDir: childEnvInputs.claudeDir,
+        correctedPath: childEnvInputs.correctedPath,
       }));
+    };
     // provider + cliStatus are wired below, AFTER the window. The window's closures only read them on a
     // later spawn/adopt (never during createWindow), so a holder populated a few lines down is enough —
     // and it lets the window open before claudeDir, which needs the synchronous login-shell probe.
@@ -174,6 +181,16 @@ app
     const shellEnv = app.isPackaged
       ? probeShellEnv(process.env.SHELL || "/bin/zsh")
       : null;
+    // Packaged but the probe came back empty: a slow/wedged login shell timed out, or its rc printed
+    // nothing usable. PATH and CLAUDE_CONFIG_DIR then fall back to the well-known dirs / ~/.claude, so a
+    // `claude` installed somewhere exotic won't be found. Say so once rather than degrading silently.
+    if (app.isPackaged && shellEnv === null) {
+      console.warn(
+        "could not recover the login-shell environment (slow shell startup or a wedged rc file); " +
+          "falling back to well-known dirs for PATH. If sessions can't find `claude`, speed up your " +
+          "shell startup or check its config.",
+      );
+    }
     const recoveredConfigDir = shellEnv?.configDir ?? null;
     const claudeDir = resolveClaudeDir(undefined, recoveredConfigDir);
     // Freeze the spawned-session env inputs now that the probe has run: the same dir the readers use,

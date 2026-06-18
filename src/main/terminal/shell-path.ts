@@ -53,6 +53,11 @@ export function resolveShellPath(deps: ResolvePathDeps): string {
 
 const FIELD = "__CBW_FIELD__";
 
+/** Budget for the one-shot login-shell env probe. Heavy rc files (nvm/conda/pyenv/oh-my-zsh) can take a
+ *  few seconds to source, so allow 5s before giving up; a wedged shell still can't stall startup past
+ *  that. On timeout the probe returns null and the caller falls back to the well-known dirs. */
+const SHELL_PROBE_TIMEOUT_MS = 5_000;
+
 export interface ShellEnv {
   path: string | null;
   configDir: string | null;
@@ -94,7 +99,7 @@ export function probeShellEnv(shell: string): ShellEnv | null {
   try {
     const out = execFileSync(shell, ["-ilc", SHELL_ENV_SCRIPT], {
       encoding: "utf8",
-      timeout: 3_000,
+      timeout: SHELL_PROBE_TIMEOUT_MS,
       stdio: ["ignore", "pipe", "ignore"],
       env: {
         ...process.env,
@@ -113,7 +118,7 @@ export function probeShellEnv(shell: string): ShellEnv | null {
  *  user-triggered re-check doesn't freeze the main process. Uses `spawn` (not execFile) so it can apply the
  *  same stdio discipline as the sync probe — ignore stdin and DISCARD the child's stderr. execFile has no
  *  stdio option and would buffer a chatty login rc's stderr into its (1 MB) maxBuffer, rejecting the whole
- *  probe → a spurious notFound. Null on any failure or the 3s timeout. Untested (spawns a real shell). */
+ *  probe → a spurious notFound. Null on any failure or the timeout. Untested (spawns a real shell). */
 export function probeShellEnvAsync(shell: string): Promise<ShellEnv | null> {
   return new Promise((resolve) => {
     let settled = false;
@@ -135,7 +140,7 @@ export function probeShellEnvAsync(shell: string): Promise<ShellEnv | null> {
       const timer = setTimeout(() => {
         child.kill();
         done(null);
-      }, 3_000);
+      }, SHELL_PROBE_TIMEOUT_MS);
       let out = "";
       child.stdout?.setEncoding("utf8");
       child.stdout?.on("data", (chunk: string) => {
