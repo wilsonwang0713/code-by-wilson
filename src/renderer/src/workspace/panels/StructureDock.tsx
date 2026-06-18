@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Subagent, Task, BackgroundShell } from "@shared/types";
 import { Icon } from "../../ui/icons";
-import { SegmentedTabs } from "../../ui/SegmentedTabs";
+import { Tabs } from "../../ui/Tabs";
 import type { DocState } from "../use-transcript";
 import { DockTasks } from "./DockTasks";
 import { TurnsTab } from "./TurnsTab";
@@ -118,7 +118,7 @@ export function StructureDock({
   );
 }
 
-/** The dock's tab bar: the shared SegmentedTabs pill of Turns / Subagents (each with a count) plus a
+/** The dock's tab bar: the shared lozenge Tabs of Turns / Subagents / Shells (each with a count) plus a
  *  collapse glyph. */
 function DockTabBar({
   tab,
@@ -136,8 +136,8 @@ function DockTabBar({
   onCollapse: () => void;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-ink-800 px-3 py-2">
-      <SegmentedTabs<DockTab>
+    <div className="flex shrink-0 items-center gap-2 border-b border-ink-800 px-3 py-1.5">
+      <Tabs<DockTab>
         tabs={[
           { id: "turns", label: "Turns", count: turnCount },
           { id: "subagents", label: "Subagents", count: subagentCount },
@@ -145,6 +145,7 @@ function DockTabBar({
         ]}
         value={tab}
         onChange={onChange}
+        variant="lozenge"
       />
       <button
         type="button"
