@@ -385,7 +385,12 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         let outMtime = 0;
         try {
           outMtime = statSync(shell.outputFile).mtimeMs;
-        } catch {
+        } catch (err) {
+          // ENOENT (or an empty path from an unparsed start line) → the live file is gone; fall back to
+          // the stitched snapshot below. A non-ENOENT stat failure (EACCES, EIO) is transient, not
+          // absence: rethrow so the outer catch degrades to `error` and the renderer keeps its last
+          // value rather than flashing a stale snapshot. Mirrors readSubagentTranscript's split.
+          if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
           outMtime = 0; // gone → snapshot fallback below
         }
         if (outMtime > 0) {

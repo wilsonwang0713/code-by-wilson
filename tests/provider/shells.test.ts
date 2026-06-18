@@ -117,6 +117,20 @@ describe("reconstructShells", () => {
     expect(s.exitCode).toBe(1);
   });
 
+  it("reads a negative exit code (a signalled command)", () => {
+    const rows = [
+      bashUse("t1", "./run.sh"),
+      startResult("t1", "bg1", "2026-06-11T00:00:01.000Z"),
+      notification(
+        "bg1",
+        "t1",
+        "2026-06-11T00:00:05.000Z",
+        'Background command "run" completed (exit code -1)',
+      ),
+    ];
+    expect(reconstructShells(rows)[0].exitCode).toBe(-1);
+  });
+
   it("detects the assistant-auto-background and Ctrl+B triggers", () => {
     const auto = reconstructShells([
       bashUse("t1", "a"),
@@ -154,7 +168,35 @@ describe("reconstructShells", () => {
         },
       },
     ];
-    expect(reconstructShells(rows)[0].status).toBe("killed");
+    const [s] = reconstructShells(rows);
+    expect(s.status).toBe("killed");
+    // Duration is dated from the kill's own timestamp (start 00:00:01 → kill 00:00:09), so a
+    // long-running killed shell doesn't render as 0s.
+    expect(s.durationMs).toBe(8_000);
+  });
+
+  it("leaves a killed shell's duration absent when the kill row has no timestamp", () => {
+    const rows = [
+      bashUse("t1", "tail -f log"),
+      startResult("t1", "bg1", "2026-06-11T00:00:01.000Z"),
+      {
+        type: "assistant",
+        message: {
+          id: "mk",
+          content: [
+            {
+              type: "tool_use",
+              id: "k1",
+              name: "KillShell",
+              input: { shell_id: "bg1" },
+            },
+          ],
+        },
+      },
+    ];
+    const [s] = reconstructShells(rows);
+    expect(s.status).toBe("killed");
+    expect(s.durationMs).toBeUndefined();
   });
 
   it("orders shells by start time", () => {

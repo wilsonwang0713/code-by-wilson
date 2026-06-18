@@ -45,7 +45,9 @@ function tag(body: string, name: string): string | undefined {
  */
 export function reconstructShells(rows: any[]): ShellRecord[] {
   const bashUses = new Map<string, BashUse>();
-  const killed = new Set<string>(); // task ids referenced by a kill tool_use
+  // task id → the kill tool_use's wall-clock (ms), or undefined when its row had no parseable
+  // timestamp. The timestamp lets a kill with no completion notification still report a duration.
+  const killed = new Map<string, number | undefined>();
   // First pass: index Bash tool_uses (the command source + the scope guard) and kill references.
   for (const row of rows) {
     const content = row?.message?.content;
@@ -63,7 +65,10 @@ export function reconstructShells(rows: any[]): ShellRecord[] {
           b.input?.task_id ??
           b.input?.bash_id ??
           b.input?.id;
-        if (typeof ref === "string") killed.add(ref);
+        if (typeof ref === "string") {
+          const killMs = Date.parse(row?.timestamp);
+          killed.set(ref, Number.isFinite(killMs) ? killMs : undefined);
+        }
       }
     }
   }
@@ -112,16 +117,26 @@ export function reconstructShells(rows: any[]): ShellRecord[] {
     rec.status = status === "killed" ? "killed" : "completed";
     const out = tag(body, "output-file");
     if (out) rec.outputFile = out; // authoritative path
-    const exit = tag(body, "summary")?.match(/\(exit code (\d+)\)/);
+    const exit = tag(body, "summary")?.match(/\(exit code (-?\d+)\)/);
     if (exit) rec.exitCode = Number(exit[1]);
     const endMs = Date.parse(row?.timestamp);
     if (Number.isFinite(endMs) && rec.startMs !== undefined)
       rec.durationMs = endMs - rec.startMs;
   }
 
-  // Fourth pass: a kill with no completion notification marks the shell killed.
-  for (const [id, rec] of byId)
-    if (rec.status === "running" && killed.has(id)) rec.status = "killed";
+  // Fourth pass: a kill with no completion notification marks the shell killed, and dates the duration
+  // from the kill's own timestamp so a long-running killed shell doesn't read as 0s.
+  for (const [id, rec] of byId) {
+    if (rec.status !== "running" || !killed.has(id)) continue;
+    rec.status = "killed";
+    const killMs = killed.get(id);
+    if (
+      killMs !== undefined &&
+      rec.startMs !== undefined &&
+      killMs >= rec.startMs
+    )
+      rec.durationMs = killMs - rec.startMs;
+  }
 
   return [...byId.values()].sort(
     (a, b) => (a.startMs ?? Infinity) - (b.startMs ?? Infinity),
