@@ -27,6 +27,7 @@ export const IPC = {
   readStats: "stats:read",
   recheckCli: "cli:recheck",
   setClaudeBinPath: "cli:setBinPath",
+  resetAnalytics: "analytics:reset",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -118,6 +119,10 @@ export interface IpcApi {
   recheckCli(): Promise<CliStatus>;
   /** Persist an absolute binary-path override (null clears it) and re-check. */
   setClaudeBinPath(path: string | null): Promise<CliStatus>;
+  /** Drop the durable analytics store (turns + scan high-water marks) so the next stats poll rebuilds it
+   *  from the transcripts on disk. Resolves `{ ok: false }` when no analytics store is wired or the clear
+   *  fails; never rejects. */
+  resetAnalytics(): Promise<{ ok: boolean }>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
