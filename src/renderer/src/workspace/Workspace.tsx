@@ -330,7 +330,7 @@ function ViewTabs({
   onChange: (t: CenterTab) => void;
 }) {
   return (
-    <div className="flex h-[34px] shrink-0 items-stretch border-b border-ink-800 bg-ink-925 px-3">
+    <div className="flex h-[34px] shrink-0 items-stretch border-b border-ink-800 bg-ink-925 pr-3">
       <Tabs<CenterTab>
         tabs={CENTER_TABS}
         value={tab}
