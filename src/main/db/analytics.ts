@@ -128,6 +128,16 @@ export function upsertTurns(db: SqliteDb, turns: AnalyticsTurn[]): void {
   });
 }
 
+/** Empty the analytics store: drop every turn and every high-water mark, in one transaction so the store
+ *  is never left half-cleared. The transcripts on disk are untouched; clearing processed_files makes the
+ *  next scan re-ingest every file from zero, rebuilding turns from source. Backs the Stats "Reset" action. */
+export function clearAnalytics(db: SqliteDb): void {
+  transaction(db, () => {
+    db.exec("DELETE FROM turns");
+    db.exec("DELETE FROM processed_files");
+  });
+}
+
 /** A file's incremental high-water mark: the mtime at which it was last fully processed (or the partial
  *  sentinel mid-file — see scan.ts), and the count of newline-terminated lines already ingested. */
 export interface ProcessedFile {
