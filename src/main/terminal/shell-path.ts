@@ -1,5 +1,4 @@
 import { execFileSync, spawn } from "node:child_process";
-import { homedir } from "node:os";
 
 /**
  * A macOS .app launched from Finder/Spotlight/Dock inherits launchd's bare PATH
@@ -52,57 +51,12 @@ export function resolveShellPath(deps: ResolvePathDeps): string {
   return deduped.join(":");
 }
 
-const DELIM = "__CBW_PATH_DELIM__";
-
-/** Pull the fenced PATH out of the probe's stdout. The value sits between two delimiters so an rc-file
- *  banner the interactive shell prints (before or after it) can't be mistaken for PATH. Exported so the
- *  parse is unit-tested without spawning a real shell. Returns null when the fence or value is missing. */
-export function parseProbedPath(out: string): string | null {
-  const start = out.indexOf(DELIM);
-  const end = out.indexOf(DELIM, start + DELIM.length);
-  if (start === -1 || end === -1) return null;
-  return out.slice(start + DELIM.length, end).trim() || null;
-}
-
-/** Run the login+interactive shell and print just its PATH, fenced by delimiters. `printenv PATH` reads
- *  the colon-joined env var directly, so it's right for every shell (fish stores PATH as a list that
- *  `"$PATH"` would join with spaces, not colons). A short timeout keeps a wedged shell from stalling the
- *  first spawn; any failure returns null so the caller falls back to the well-known dirs. */
-function probeLoginShell(shell: string): string | null {
-  try {
-    const out = execFileSync(
-      shell,
-      ["-ilc", `printf %s "${DELIM}"; printenv PATH; printf %s "${DELIM}"`],
-      {
-        encoding: "utf8",
-        timeout: 5_000,
-        stdio: ["ignore", "pipe", "ignore"],
-        env: {
-          ...process.env,
-          TERM: "dumb",
-          DISABLE_AUTO_UPDATE: "true",
-          GIT_TERMINAL_PROMPT: "0",
-        },
-      },
-    );
-    return parseProbedPath(out);
-  } catch {
-    return null;
-  }
-}
-
-/** Real-world wiring: resolve the child PATH from the live process and a one-shot login-shell probe. */
-export function shellPath(): string {
-  return resolveShellPath({
-    platform: process.platform,
-    shell: process.env.SHELL,
-    home: homedir(),
-    currentPath: process.env.PATH,
-    probe: probeLoginShell,
-  });
-}
-
 const FIELD = "__CBW_FIELD__";
+
+/** Budget for the one-shot login-shell env probe. Heavy rc files (nvm/conda/pyenv/oh-my-zsh) can take a
+ *  few seconds to source, so allow 5s before giving up; a wedged shell still can't stall startup past
+ *  that. On timeout the probe returns null and the caller falls back to the well-known dirs. */
+const SHELL_PROBE_TIMEOUT_MS = 5_000;
 
 export interface ShellEnv {
   path: string | null;
@@ -140,12 +94,12 @@ export function parseShellEnv(out: string): ShellEnv | null {
 }
 
 /** Real wiring: run the login+interactive shell once and parse its env. Null on any failure. Untested
- *  (spawns a real shell), like probeLoginShell. */
+ *  (spawns a real shell). */
 export function probeShellEnv(shell: string): ShellEnv | null {
   try {
     const out = execFileSync(shell, ["-ilc", SHELL_ENV_SCRIPT], {
       encoding: "utf8",
-      timeout: 3_000,
+      timeout: SHELL_PROBE_TIMEOUT_MS,
       stdio: ["ignore", "pipe", "ignore"],
       env: {
         ...process.env,
@@ -164,7 +118,7 @@ export function probeShellEnv(shell: string): ShellEnv | null {
  *  user-triggered re-check doesn't freeze the main process. Uses `spawn` (not execFile) so it can apply the
  *  same stdio discipline as the sync probe — ignore stdin and DISCARD the child's stderr. execFile has no
  *  stdio option and would buffer a chatty login rc's stderr into its (1 MB) maxBuffer, rejecting the whole
- *  probe → a spurious notFound. Null on any failure or the 3s timeout. Untested (spawns a real shell). */
+ *  probe → a spurious notFound. Null on any failure or the timeout. Untested (spawns a real shell). */
 export function probeShellEnvAsync(shell: string): Promise<ShellEnv | null> {
   return new Promise((resolve) => {
     let settled = false;
@@ -186,7 +140,7 @@ export function probeShellEnvAsync(shell: string): Promise<ShellEnv | null> {
       const timer = setTimeout(() => {
         child.kill();
         done(null);
-      }, 3_000);
+      }, SHELL_PROBE_TIMEOUT_MS);
       let out = "";
       child.stdout?.setEncoding("utf8");
       child.stdout?.on("data", (chunk: string) => {
