@@ -23,6 +23,7 @@ import {
   turnsMaxRowid,
   emptyTotals,
   hasAnyTurns,
+  clearAnalytics,
 } from "./db/analytics";
 import {
   scanStep,
@@ -372,6 +373,26 @@ export function registerIpc({
       };
     },
   );
+
+  // The Stats "Reset" action: drop the durable store so the next poll rebuilds it from disk. Clearing
+  // processed_files forces a full re-scan; clearing turns drops the change token to zero, so the renderer's
+  // very next readStats returns a fresh, still-rebuilding snapshot on its own. Never rejects: a missing
+  // store or a failed clear resolves ok:false so the renderer can surface it without a thrown rejection.
+  ipcMain.handle(IPC.resetAnalytics, (): { ok: boolean } => {
+    if (!analyticsDb) return { ok: false };
+    try {
+      clearAnalytics(analyticsDb);
+      // clearAnalytics DELETEs every turn, so the rebuild reuses rowids from 1 — the max-rowid insert
+      // signal yearsCache memoizes against is no longer monotonic across this clear. Drop the cache so a
+      // single-step rebuild that lands back on the same max rowid recomputes the year list instead of
+      // serving the pre-reset one.
+      yearsCache = null;
+      return { ok: true };
+    } catch (err) {
+      console.error("analytics reset failed", err);
+      return { ok: false };
+    }
+  });
 
   return { sync };
 }

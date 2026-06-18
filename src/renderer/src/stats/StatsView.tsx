@@ -39,6 +39,7 @@ import {
   formatMonthShort,
 } from "@shared/format";
 import { Icon } from "../ui/icons";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
   Donut,
   BarSeries,
@@ -95,6 +96,31 @@ export function StatsView() {
   // The last change token from stats:read, echoed back as `since`. Reset on a range/year change so a filter
   // switch always forces a full snapshot.
   const tokenRef = useRef<string | undefined>(undefined);
+
+  // Reset: a confirm-gated drop of the analytics store. Bumping resetNonce re-runs the poll effect, which
+  // blanks the snapshot and clears the token, so the next poll shows "Building history…" as the rebuild runs.
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetError, setResetError] = useState(false);
+  const [resetNonce, setResetNonce] = useState(0);
+  // The icon spins / disables while a backfill is in progress — the post-reset rebuild and the first cold run.
+  const rebuilding = !!snap && !snap.progress.done;
+
+  const handleReset = useCallback(async () => {
+    setConfirmReset(false);
+    try {
+      const r = await window.api.resetAnalytics();
+      // ok:false (no store / failed clear) and a thrown bridge failure both land on the error banner; on
+      // success clear any stale banner from a prior attempt and bump the nonce to re-run the poll.
+      if (r.ok) {
+        setResetError(false);
+        setResetNonce((n) => n + 1);
+      } else {
+        setResetError(true);
+      }
+    } catch {
+      setResetError(true);
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -154,7 +180,7 @@ export function StatsView() {
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [range, calendarYear]);
+  }, [range, calendarYear, resetNonce]);
 
   return (
     <OverlayScroll className="h-full min-w-0 flex-1 bg-ink-950 text-fg">
@@ -177,8 +203,41 @@ export function StatsView() {
             )}
             <CacheToggle on={includeCache} onChange={setIncludeCache} />
             <RangeFilter value={range} onChange={setRange} />
+            <span aria-hidden className="h-5 w-px bg-ink-800" />
+            <button
+              type="button"
+              onClick={() => {
+                setResetError(false);
+                setConfirmReset(true);
+              }}
+              disabled={rebuilding}
+              aria-label="Reset analytics"
+              title="Reset analytics"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-fg-faint transition-colors hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon
+                name="rotate-ccw"
+                size={14}
+                className={rebuilding ? "animate-spin" : undefined}
+              />
+            </button>
           </div>
         </header>
+        {confirmReset && (
+          <ConfirmDialog
+            title="Reset analytics?"
+            body="This clears the computed stats and rebuilds them from your Claude transcripts. Nothing is permanently deleted, your history is recomputed from scratch, which takes a few seconds."
+            confirmLabel="Reset"
+            tone="danger"
+            onCancel={() => setConfirmReset(false)}
+            onConfirm={() => void handleReset()}
+          />
+        )}
+        {resetError && (
+          <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-[11px] text-danger">
+            Couldn&apos;t reset analytics. Please try again.
+          </div>
+        )}
         {/* null = first poll in flight: blank below the header (matches EmptyDetail's loading). */}
         {snap && (
           <>

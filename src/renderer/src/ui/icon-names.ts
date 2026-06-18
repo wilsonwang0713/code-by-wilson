@@ -28,6 +28,7 @@ export type IconName =
   | "pause"
   | "pencil"
   | "plus"
+  | "rotate-ccw"
   | "search"
   | "square"
   | "square-dashed-mouse-pointer"

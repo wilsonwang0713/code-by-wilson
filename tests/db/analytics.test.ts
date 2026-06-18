@@ -16,6 +16,7 @@ import {
   hasAnyTurns,
   readCalendar,
   readCalendarYears,
+  clearAnalytics,
 } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
 
@@ -1807,5 +1808,30 @@ describe("readCalendarYears", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     expect(readCalendarYears(db)).toEqual([]);
+  });
+});
+
+describe("clearAnalytics", () => {
+  it("empties turns and processed_files in one call", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [turn({ messageId: "a" }), turn({ messageId: "b" })]);
+    upsertProcessedFile(db, "/a.jsonl", 111, 3);
+    expect(hasAnyTurns(db)).toBe(true);
+    expect(readProcessedFiles(db).size).toBe(1);
+
+    clearAnalytics(db);
+
+    expect(hasAnyTurns(db)).toBe(false);
+    expect(readTotals(db).turns).toBe(0);
+    expect(readProcessedFiles(db).size).toBe(0);
+  });
+
+  it("is a no-op on an already-empty store", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    clearAnalytics(db); // must not throw on empty tables
+    expect(readTotals(db).turns).toBe(0);
+    expect(readProcessedFiles(db).size).toBe(0);
   });
 });
