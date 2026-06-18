@@ -9,12 +9,12 @@ English | [简体中文](README.zh-CN.md)
 
 **The cockpit for local Claude Code.**
 
-Claude Code writes a rich trail to `~/.claude` as it works: every turn, every
-token, every tool call, the running cost, the context window. The CLI shows you
-almost none of it. Code-by-wire reads that trail and turns it into one live
-dashboard. Every session on your machine in one place, with live state, the full
-transcript, an embedded terminal to drive or take over, and the telemetry the
-terminal hides. One pane instead of a dozen terminal windows.
+Claude Code writes a rich trail to the `.claude` directory as it works: every
+turn, every token, every tool call, the running cost, the context window. The
+CLI shows you almost none of it. Code-by-wire reads that trail and turns it into
+one live dashboard. Every session on your machine in one place, with live state,
+the full transcript, an embedded terminal to drive or take over, and the
+telemetry the terminal hides. One pane instead of a dozen terminal windows.
 
 [![Download for macOS (Apple Silicon)](https://img.shields.io/badge/Download%20for%20macOS%20%28Apple%20Silicon%29-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/luojiahai/code-by-wire/releases/latest)
 
@@ -31,7 +31,7 @@ terminal hides. One pane instead of a dozen terminal windows.
 - **The whole story.** A cross-session overview with a year-long contributions
   calendar and exact, never-estimated totals.
 - **Knows your account.** Reads your plan and rate-limit gauges straight from
-  `~/.claude`.
+  the `.claude` directory.
 
 ## Features
 
@@ -109,7 +109,7 @@ else.
 
 ### 💳 Know your account
 
-The rail header reads your account straight from `~/.claude`. On a subscription
+The rail header reads your account straight from the `.claude` directory. On a subscription
 (Pro or Max) it shows your plan and rate-limit gauges with live reset
 countdowns, so you can see how close you are to a wall. On an API account it
 shows the endpoint host and plan.
@@ -157,7 +157,7 @@ pnpm rebuild:native   # rebuild better-sqlite3 + node-pty for Electron's ABI
 pnpm dev              # launch the app
 ```
 
-`pnpm test` runs the provider read tests over the redacted `~/.claude` fixtures
+`pnpm test` runs the provider read tests over the redacted `.claude` fixtures
 in `tests/fixtures/`. `pnpm typecheck` checks the main and renderer projects.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
