@@ -16,6 +16,8 @@ one live dashboard. Every session on your machine in one place, with live state,
 the full transcript, an embedded terminal to drive or take over, and the
 telemetry the terminal hides. One pane instead of a dozen terminal windows.
 
+![Code-by-wire](docs/assets/cbw-demo.gif)
+
 **[Download for macOS (Apple Silicon)](https://github.com/luojiahai/code-by-wire/releases/latest)**
 
 ## What you get
