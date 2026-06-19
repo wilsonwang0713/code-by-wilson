@@ -74,6 +74,23 @@ export function installMethodForPath(path: string | null): InstallMethod {
   return "unknown";
 }
 
+/** Candidate filenames for the claude binary on PATH. POSIX has the one; Windows resolves by PATHEXT,
+ *  and we prefer a real `.exe` over the `.cmd`/`.ps1` npm shims (a shim can't be launched by CreateProcess
+ *  without a shell — see the terminal launch layer). Pure + tested across platforms. */
+export function claudeBinaryNames(
+  platform: NodeJS.Platform,
+  pathext?: string,
+): string[] {
+  if (platform !== "win32") return ["claude"];
+  const order = [".exe", ".cmd", ".ps1"];
+  const fromEnv = (pathext ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const exts = [...order, ...fromEnv.filter((e) => !order.includes(e))];
+  return exts.map((e) => `claude${e}`);
+}
+
 function isRegularFile(p: string): boolean {
   try {
     return existsSync(p) && statSync(p).isFile();

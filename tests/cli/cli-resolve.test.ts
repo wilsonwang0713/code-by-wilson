@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { pickBinary, installMethodForPath } from "../../src/main/cli-resolve";
+import {
+  pickBinary,
+  installMethodForPath,
+  claudeBinaryNames,
+} from "../../src/main/cli-resolve";
 
 const isFile = (p: string) => p.startsWith("/real/");
 
@@ -90,5 +94,23 @@ describe("installMethodForPath", () => {
     ).toBe("npm");
     expect(installMethodForPath("/weird/place/claude")).toBe("unknown");
     expect(installMethodForPath(null)).toBe("unknown");
+  });
+});
+
+describe("claudeBinaryNames", () => {
+  it("is just 'claude' on posix", () => {
+    expect(claudeBinaryNames("darwin")).toEqual(["claude"]);
+    expect(claudeBinaryNames("linux")).toEqual(["claude"]);
+  });
+
+  it("prefers .exe, then .cmd, then .ps1 on win32", () => {
+    const names = claudeBinaryNames("win32", ".COM;.EXE;.BAT;.CMD");
+    expect(names[0]).toBe("claude.exe");
+    expect(names).toContain("claude.cmd");
+    expect(names).toContain("claude.ps1");
+  });
+
+  it("falls back to a default PATHEXT when none is given", () => {
+    expect(claudeBinaryNames("win32")).toContain("claude.exe");
   });
 });
