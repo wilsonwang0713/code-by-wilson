@@ -154,9 +154,9 @@ describe("scanPath", () => {
 
 describe("installMethodForPath (windows)", () => {
   it("labels the native installer dir", () => {
-    expect(
-      installMethodForPath("C:\\Users\\me\\.local\\bin\\claude.exe"),
-    ).toBe("native");
+    expect(installMethodForPath("C:\\Users\\me\\.local\\bin\\claude.exe")).toBe(
+      "native",
+    );
   });
   it("labels the npm global dir", () => {
     expect(

@@ -11,6 +11,16 @@ import type { AppSettingsStore } from "./app-settings";
 
 const execFileAsync = promisify(execFile);
 
+/** Node 24 refuses to execFile a .cmd/.bat on Windows without shell:true (CVE-2024-27980). A real .exe
+ *  runs directly. Pure + tested so the platform rule isn't re-derived per call site. */
+export function execOptionsForBinary(
+  path: string,
+  platform: NodeJS.Platform,
+): { shell: boolean } {
+  const isShim = /\.(cmd|bat|ps1)$/i.test(path);
+  return { shell: platform === "win32" && isShim };
+}
+
 /** Map a failed `claude --version` to a probe status from the child-process error `code`: a spawn
  *  failure (ENOENT) means the binary isn't really there; anything else (non-zero exit, timeout → null)
  *  means it's there but unusable. Pure + exported so the classification is unit-tested without spawning. */
@@ -32,6 +42,7 @@ async function runVersion(path: string): Promise<CliProbeInput["version"]> {
       // ~/.local), and a timeout here classifies as "failed" → unknown → spawning blocked, locking out a
       // CLI that actually works. The check is async, so a long wait never stalls the main process.
       timeout: 10_000,
+      ...execOptionsForBinary(path, process.platform),
     });
     return { status: "ok", raw: stdout };
   } catch (err) {
@@ -44,6 +55,7 @@ async function runAuth(path: string): Promise<CliProbeInput["auth"]> {
     await execFileAsync(path, ["auth", "status"], {
       encoding: "utf8",
       timeout: 5_000,
+      ...execOptionsForBinary(path, process.platform),
     });
     return { status: "ok" }; // exit 0 → logged in
   } catch (err) {
