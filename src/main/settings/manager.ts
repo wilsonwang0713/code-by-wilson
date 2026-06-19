@@ -12,6 +12,7 @@ import {
 import { join } from "node:path";
 import { readTextOrNull, resolveClaudeDir } from "../claude-config";
 import { recoverWrappedCommand, wrapperScript } from "./wrapper";
+import { recoverWrappedCommandWin, wrapperScriptWin } from "./wrapper-win";
 
 /** The Claude Code statusLine block. `additionalProperties: false` upstream means we must not stash our
  *  own fields inside it — bookkeeping lives in our own state file instead. While installed we replace this
@@ -49,6 +50,8 @@ export interface SettingsManagerDeps {
   claudeDir?: string;
   /** Wall clock (ms) for the backup timestamp; injected so tests are deterministic. */
   now?: () => number;
+  /** Host platform; defaults to process.platform. Tests inject "win32" or "darwin" to exercise both paths. */
+  platform?: NodeJS.Platform;
 }
 
 export interface InstallResult {
@@ -72,14 +75,23 @@ export function createSettingsManager(
 ): SettingsManager {
   const claudeDir = resolveClaudeDir(deps.claudeDir);
   const now = deps.now ?? (() => Date.now());
+  const platform = deps.platform ?? process.platform;
+  const isWin = platform === "win32";
 
   const settingsPath = join(claudeDir, "settings.json");
   const appDir = join(claudeDir, ".code-by-wire");
   const statePath = join(appDir, "state.json");
-  // The wrapper script the installed statusLine points at. Issue #11 materializes it; this slice only
-  // records what it must call through to. Quoted so a space in the path survives `sh -c`.
-  const wrapperPath = join(appDir, "statusline-wrapper.sh");
-  const appCommand = `"${wrapperPath}"`;
+  // The wrapper script the installed statusLine points at. Platform-aware: .ps1 on win32, .sh on POSIX.
+  // Issue #11 materializes it; this slice only records what it must call through to.
+  const wrapperName = isWin
+    ? "statusline-wrapper.ps1"
+    : "statusline-wrapper.sh";
+  const wrapperPath = join(appDir, wrapperName);
+  // Forward slashes in the PowerShell -File path avoid quoting issues; on POSIX, the bare quoted path is used.
+  const toForwardSlashes = (p: string): string => p.replace(/\\/g, "/");
+  const appCommand = isWin
+    ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${toForwardSlashes(wrapperPath)}"`
+    : `"${wrapperPath}"`;
 
   /** Read + parse settings.json. Returns nulls when absent. Throws (before any write) on a file we can't
    *  safely round-trip: invalid JSON, or valid JSON that isn't an object (an array / null / primitive would
@@ -180,10 +192,14 @@ export function createSettingsManager(
   }
 
   /** Materialize the executable wrapper the installed statusLine points at (issue #11). Idempotent:
-   *  rewritten on every install so a deleted or stale wrapper self-heals. 0755 so the bare `"<path>"`
-   *  command in settings.json is directly executable. */
+   *  rewritten on every install so a deleted or stale wrapper self-heals. On POSIX, chmod 0755 so the
+   *  bare `"<path>"` command in settings.json is directly executable; on Windows executability comes
+   *  from the `powershell -File` invocation, so no chmod is applied. */
   function writeWrapper(wrappedCommand: string | null): void {
-    writeFileAtomic(wrapperPath, wrapperScript({ wrappedCommand }), 0o755);
+    const src = isWin
+      ? wrapperScriptWin({ wrappedCommand })
+      : wrapperScript({ wrappedCommand });
+    writeFileAtomic(wrapperPath, src, isWin ? undefined : 0o755);
   }
 
   function isInstalled(): boolean {
@@ -265,7 +281,11 @@ export function createSettingsManager(
       // reconstruct the pre-install settings so freshInstall backs up the original, not the wrapped bytes.
       const wrapperSrc = readTextOrNull(wrapperPath);
       const recovered =
-        wrapperSrc === null ? null : recoverWrappedCommand(wrapperSrc);
+        wrapperSrc === null
+          ? null
+          : (isWin ? recoverWrappedCommandWin : recoverWrappedCommand)(
+              wrapperSrc,
+            );
       const statusLine =
         recovered !== null
           ? { type: "command", command: recovered }

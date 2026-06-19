@@ -14,6 +14,8 @@ import { join } from "node:path";
 import { createSettingsManager } from "../../src/main/settings/manager";
 import { tempHomes } from "../helpers/temp-home";
 
+const makeWinHome = tempHomes("cbw-mgr-win-");
+
 const NOW = 1781000000000; // fixed clock (ms) for deterministic backup timestamps
 
 const makeHome = tempHomes("cbw-settings-");
@@ -25,6 +27,7 @@ const readState = (home: string) =>
   JSON.parse(readFileSync(join(home, ".code-by-wire", "state.json"), "utf8"));
 
 // The exact command install writes — the contract the wrapper script (issue #11) will live behind.
+// Uses "linux" as the injected platform so these POSIX tests exercise the sh path on all host OSes.
 const appCommandFor = (home: string) =>
   `"${join(home, ".code-by-wire", "statusline-wrapper.sh")}"`;
 
@@ -39,7 +42,11 @@ describe("install — clean (AC #2)", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(mgr.isInstalled()).toBe(false);
     const result = mgr.install();
@@ -57,7 +64,11 @@ describe("install — clean (AC #2)", () => {
 
   it("creates settings.json from scratch when the file is absent", () => {
     const home = makeHome();
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(existsSync(settingsPath(home))).toBe(false);
     const result = mgr.install();
@@ -78,7 +89,11 @@ describe("install — backup before modification (AC #3)", () => {
     // taken from the reserialized in-memory settings instead of the raw pre-install bytes.
     const original = '{"theme":"dark"}';
     writeFileSync(settingsPath(home), original);
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const { backupPath } = mgr.install();
 
@@ -90,7 +105,11 @@ describe("install — backup before modification (AC #3)", () => {
 
   it("writes no backup when there was no settings.json to back up", () => {
     const home = makeHome();
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const { backupPath } = mgr.install();
 
@@ -116,7 +135,11 @@ describe("install — wrap an existing statusLine (AC #1)", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const result = mgr.install();
 
@@ -135,7 +158,11 @@ describe("install — wrap an existing statusLine (AC #1)", () => {
 
   it("records originalAbsent + null wrappedCommand when settings.json did not exist", () => {
     const home = makeHome();
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     mgr.install();
 
@@ -153,7 +180,11 @@ describe("uninstall — restore byte-for-byte (AC #4)", () => {
     const original =
       '{\n    "theme": "dark",\n    "statusLine": {"type":"command","command":"my-prompt","padding":2}\n}';
     writeFileSync(settingsPath(home), original);
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const { backupPath } = mgr.install();
     expect(readRaw(home)).not.toBe(original); // proves install actually changed the file
@@ -166,7 +197,11 @@ describe("uninstall — restore byte-for-byte (AC #4)", () => {
 
   it('restores "no settings.json" by deleting the file install created', () => {
     const home = makeHome();
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     mgr.install();
     expect(existsSync(settingsPath(home))).toBe(true);
@@ -186,7 +221,11 @@ describe("uninstall — restore byte-for-byte (AC #4)", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const { backupPath } = mgr.install();
     rmSync(backupPath!); // the backup vanishes
@@ -210,7 +249,11 @@ describe("trust-safety", () => {
         2,
       ) + "\n";
     writeFileSync(settingsPath(home), original);
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const first = mgr.install();
     const second = mgr.install(); // must be a no-op
@@ -228,7 +271,11 @@ describe("trust-safety", () => {
     const home = makeHome();
     const malformed = "{ this is not valid json";
     writeFileSync(settingsPath(home), malformed);
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(() => mgr.install()).toThrow();
     expect(readRaw(home)).toBe(malformed); // untouched
@@ -240,7 +287,11 @@ describe("trust-safety", () => {
     const home = makeHome();
     const original = JSON.stringify({ theme: "dark" }, null, 2);
     writeFileSync(settingsPath(home), original);
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(() => mgr.uninstall()).not.toThrow();
     expect(readRaw(home)).toBe(original); // untouched
@@ -258,7 +309,11 @@ describe("trust-safety", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     const result = mgr.install();
 
@@ -276,7 +331,11 @@ describe("trust-safety", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
 
     writeFileSync(
@@ -301,7 +360,11 @@ describe("trust-safety — desync between settings.json and state.json", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
 
     rmSync(join(home, ".code-by-wire", "state.json")); // the record we rely on vanishes while still wrapped
@@ -320,7 +383,11 @@ describe("trust-safety — desync between settings.json and state.json", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
 
     rmSync(join(home, ".code-by-wire", "state.json")); // the record vanishes while the wrapper survives
@@ -351,7 +418,11 @@ describe("trust-safety — desync between settings.json and state.json", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
 
     rmSync(join(home, ".code-by-wire"), { recursive: true }); // state.json AND wrapper both wiped
@@ -373,7 +444,11 @@ describe("trust-safety — desync between settings.json and state.json", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
 
     writeFileSync(join(home, ".code-by-wire", "state.json"), "{}"); // valid JSON, wrong shape
@@ -387,7 +462,11 @@ describe("trust-safety — valid-but-non-object settings.json", () => {
   it("refuses a settings.json that is a JSON array, leaving it untouched", () => {
     const home = makeHome();
     writeFileSync(settingsPath(home), "[]");
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(() => mgr.install()).toThrow(/not a JSON object/i);
     expect(readRaw(home)).toBe("[]"); // untouched
@@ -398,7 +477,11 @@ describe("trust-safety — valid-but-non-object settings.json", () => {
   it("refuses a settings.json that is the literal null, with a clear error not a raw TypeError", () => {
     const home = makeHome();
     writeFileSync(settingsPath(home), "null");
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(() => mgr.install()).toThrow(/not a JSON object/i);
     expect(readRaw(home)).toBe("null"); // untouched
@@ -415,7 +498,11 @@ describe("trust-safety — reinstall after uninstall (backup collision)", () => 
         2,
       ) + "\n";
     writeFileSync(settingsPath(home), original);
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     mgr.install();
     mgr.uninstall(); // keeps the first backup as an audit trail
@@ -441,7 +528,11 @@ describe.skipIf(process.platform === "win32")(
         ),
       );
       symlinkSync(real, settingsPath(home)); // settings.json → real-settings.json, e.g. linked into a dotfiles repo
-      const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+      const mgr = createSettingsManager({
+        claudeDir: home,
+        now: () => NOW,
+        platform: "linux",
+      });
 
       mgr.install();
 
@@ -474,7 +565,11 @@ describe.skipIf(process.platform === "win32")(
         ),
       );
       chmodSync(settingsPath(home), 0o600);
-      const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+      const mgr = createSettingsManager({
+        claudeDir: home,
+        now: () => NOW,
+        platform: "linux",
+      });
 
       const { backupPath } = mgr.install();
 
@@ -502,7 +597,11 @@ describe("install — materializes the wrapper script (issue #11)", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     mgr.install();
 
@@ -516,7 +615,11 @@ describe("install — materializes the wrapper script (issue #11)", () => {
 
   it("writes a capture-only wrapper (no call-through) on a clean install with no original", () => {
     const home = makeHome();
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     mgr.install();
 
@@ -535,7 +638,11 @@ describe("install — materializes the wrapper script (issue #11)", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
     rmSync(wrapperPath(home)); // the wrapper vanishes while still wrapped
 
@@ -555,7 +662,11 @@ describe("install — materializes the wrapper script (issue #11)", () => {
         2,
       ),
     );
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
     mgr.install();
     expect(existsSync(wrapperPath(home))).toBe(true);
 
@@ -568,9 +679,124 @@ describe("install — materializes the wrapper script (issue #11)", () => {
   it("writes no wrapper when it refuses a malformed settings.json", () => {
     const home = makeHome();
     writeFileSync(settingsPath(home), "{ not valid json");
-    const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
 
     expect(() => mgr.install()).toThrow();
     expect(existsSync(wrapperPath(home))).toBe(false); // bailed before ensureAppDir/writeWrapper
+  });
+});
+
+describe("install — win32 platform selection", () => {
+  it("installs a .ps1 wrapper and a powershell command on win32", () => {
+    const dir = makeWinHome();
+    const mgr = createSettingsManager({
+      claudeDir: dir,
+      now: () => NOW,
+      platform: "win32",
+    });
+    mgr.install();
+    const settings = JSON.parse(
+      readFileSync(join(dir, "settings.json"), "utf8"),
+    );
+    expect(settings.statusLine.command).toMatch(
+      /powershell.*statusline-wrapper\.ps1/i,
+    );
+    expect(
+      existsSync(join(dir, ".code-by-wire", "statusline-wrapper.ps1")),
+    ).toBe(true);
+  });
+
+  it("does NOT write a .sh wrapper on win32", () => {
+    const dir = makeWinHome();
+    const mgr = createSettingsManager({
+      claudeDir: dir,
+      now: () => NOW,
+      platform: "win32",
+    });
+    mgr.install();
+    expect(
+      existsSync(join(dir, ".code-by-wire", "statusline-wrapper.sh")),
+    ).toBe(false);
+  });
+
+  it("win32 install is idempotent and uninstall restores to nothing", () => {
+    const dir = makeWinHome();
+    const mgr = createSettingsManager({
+      claudeDir: dir,
+      now: () => NOW,
+      platform: "win32",
+    });
+    mgr.install();
+    mgr.install(); // idempotent
+    mgr.uninstall();
+    expect(existsSync(join(dir, "settings.json"))).toBe(false);
+  });
+
+  it("win32 wrapper round-trips the wrapped command via the .ps1 file", () => {
+    const dir = makeWinHome();
+    writeFileSync(
+      join(dir, "settings.json"),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "my-prompt" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: dir,
+      now: () => NOW,
+      platform: "win32",
+    });
+    mgr.install();
+
+    const ps1 = readFileSync(
+      join(dir, ".code-by-wire", "statusline-wrapper.ps1"),
+      "utf8",
+    );
+    expect(ps1).toContain("my-prompt"); // call-through baked
+    expect(ps1).toContain("CBW_CALL_THROUGH"); // recoverable
+
+    mgr.uninstall();
+    const restored = JSON.parse(
+      readFileSync(join(dir, "settings.json"), "utf8"),
+    );
+    expect(restored.statusLine.command).toBe("my-prompt");
+  });
+
+  it("self-heals a win32 wrapper with no state record by recovering from the .ps1", () => {
+    const dir = makeWinHome();
+    writeFileSync(
+      join(dir, "settings.json"),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: dir,
+      now: () => NOW,
+      platform: "win32",
+    });
+    mgr.install();
+    rmSync(join(dir, ".code-by-wire", "state.json"));
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(healed.wrappedExisting).toBe(true);
+    expect(
+      JSON.parse(readFileSync(join(dir, ".code-by-wire", "state.json"), "utf8"))
+        .wrappedCommand,
+    ).toBe("mine");
+
+    mgr.uninstall();
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8")).statusLine
+        .command,
+    ).toBe("mine");
   });
 });

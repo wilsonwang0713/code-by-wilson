@@ -42,12 +42,16 @@ describe("wrapperScriptWin (pure source)", () => {
 describe("recoverWrappedCommandWin (exact inverse of the bake)", () => {
   it("round-trips a plain command verbatim", () => {
     const cmd = "npx ccusage statusline";
-    expect(recoverWrappedCommandWin(wrapperScriptWin({ wrappedCommand: cmd }))).toBe(cmd);
+    expect(
+      recoverWrappedCommandWin(wrapperScriptWin({ wrappedCommand: cmd })),
+    ).toBe(cmd);
   });
 
   it("round-trips a command with special characters", () => {
     const cmd = "my-prompt --flag=value --other";
-    expect(recoverWrappedCommandWin(wrapperScriptWin({ wrappedCommand: cmd }))).toBe(cmd);
+    expect(
+      recoverWrappedCommandWin(wrapperScriptWin({ wrappedCommand: cmd })),
+    ).toBe(cmd);
   });
 
   it("returns null for a capture-only wrapper (no original command)", () => {
