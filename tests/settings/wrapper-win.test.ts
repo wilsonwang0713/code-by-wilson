@@ -26,6 +26,13 @@ describe("wrapperScriptWin (pure source)", () => {
     expect(src).toContain("notmatch"); // rejects traversal ids
   });
 
+  it("reads stdin as UTF-8 so non-ASCII capture data isn't mangled", () => {
+    const src = wrapperScriptWin({ wrappedCommand: null });
+    expect(src).toContain("OpenStandardInput"); // raw stdin stream
+    expect(src).toContain("UTF8Encoding"); // decoded as UTF-8, not the console codepage
+    expect(src).not.toContain("[Console]::In.ReadToEnd()"); // not the codepage-dependent read
+  });
+
   it("includes the call-through when a wrapped command is given", () => {
     const src = wrapperScriptWin({ wrappedCommand: "my-prompt --color" });
     expect(src).toContain("my-prompt --color");

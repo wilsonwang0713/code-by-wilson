@@ -43,7 +43,10 @@ export function wrapperScriptWin({ wrappedCommand }: WrapperSpec): string {
   return (
     `# code-by-wire statusLine wrapper (PowerShell) — AUTO-GENERATED, do not edit.\n` +
     `$ErrorActionPreference = 'SilentlyContinue'\n` +
-    `$json = [Console]::In.ReadToEnd()\n` +
+    // Read stdin as UTF-8 off the raw stream. [Console]::In.ReadToEnd() decodes under the legacy console
+    // codepage, so non-ASCII in Claude's JSON (a project path or prompt with accented/CJK chars) would be
+    // mangled before it's persisted. A StreamReader with an explicit UTF-8 encoding decodes it faithfully.
+    `$json = (New-Object IO.StreamReader([Console]::OpenStandardInput(), [Text.UTF8Encoding]::new($false))).ReadToEnd()\n` +
     `$dir = Join-Path $PSScriptRoot 'statusline'\n` +
     `New-Item -ItemType Directory -Force -Path $dir | Out-Null\n` +
     `$sid = if ($json -match '"session_id"\\s*:\\s*"([^"]+)"') { $Matches[1] } else { $null }\n` +
