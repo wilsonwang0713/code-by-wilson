@@ -82,6 +82,9 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
     createBufferer: passthroughBufferer,
     env: () => ({ PATH: "/usr/bin" }),
     statDir: over.statDir ?? (() => true),
+    // Pin POSIX so the bare-`claude` command and `/work/app` fixtures aren't reshaped by the Windows
+    // launch shim when the test runs on a Windows host; the win32 launch form is covered in spawn-bin.
+    platform: "linux",
   });
   return { manager, ptys, sent, exited, spawned, spawnedPids, closed };
 }

@@ -48,6 +48,15 @@ export function launchForm(
       ],
     };
   }
+  // A bare command name like `claude` (no directory separator, no extension) — the fallback when no
+  // absolute bin was resolved yet (the pending CLI check, or a bare CBW_CLAUDE_BIN). It must be resolved
+  // on PATH through PATHEXT, which CreateProcess does NOT do: it only appends `.exe`, so it never finds
+  // the `claude.cmd`/`.ps1` npm shim and the session dies with a bare "[process exited]". Route it through
+  // cmd.exe, which resolves PATHEXT, exactly as the resolved-`.cmd` path does. A resolved absolute path
+  // (which always carries its extension) is left to launch directly.
+  if (!/[\\/]/.test(cmd.file) && !/\.[^.]+$/.test(cmd.file)) {
+    return { file: "cmd.exe", args: ["/c", cmd.file, ...cmd.args] };
+  }
   return cmd;
 }
 
