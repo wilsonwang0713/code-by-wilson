@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter as pathDelimiter, join as pathJoin } from "node:path";
 import type { BinSource, InstallMethod } from "@shared/cli-status";
+import { toPosixPath } from "@shared/platform";
 import { resolveShellPath, probeShellEnvAsync } from "./terminal/shell-path";
 
 export interface ResolvedBinary {
@@ -63,15 +64,11 @@ export function pickBinary(i: PickBinaryInput): ResolvedBinary {
 /** Best-effort install method from the resolved path. */
 export function installMethodForPath(path: string | null): InstallMethod {
   if (!path) return "unknown";
-  const p = path.replace(/\\/g, "/").toLowerCase();
+  const p = toPosixPath(path).toLowerCase();
   if (p.includes("/.local/bin/")) return "native";
   if (p.includes("/homebrew/") || p.includes("/cellar/")) return "homebrew";
-  if (
-    p.includes("/node/") ||
-    p.includes("/.nvm/") ||
-    p.includes("/npm") ||
-    p.includes("/appdata/roaming/npm")
-  )
+  // "/npm" already matches the Windows global dir (…/appdata/roaming/npm/…), so no separate clause for it.
+  if (p.includes("/node/") || p.includes("/.nvm/") || p.includes("/npm"))
     return "npm";
   return "unknown";
 }

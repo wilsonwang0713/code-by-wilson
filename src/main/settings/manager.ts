@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { toPosixPath } from "@shared/platform";
 import { readTextOrNull, resolveClaudeDir } from "../claude-config";
 import { recoverWrappedCommand, wrapperScript } from "./wrapper";
 import { recoverWrappedCommandWin, wrapperScriptWin } from "./wrapper-win";
@@ -88,9 +89,8 @@ export function createSettingsManager(
     : "statusline-wrapper.sh";
   const wrapperPath = join(appDir, wrapperName);
   // Forward slashes in the PowerShell -File path avoid quoting issues; on POSIX, the bare quoted path is used.
-  const toForwardSlashes = (p: string): string => p.replace(/\\/g, "/");
   const appCommand = isWin
-    ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${toForwardSlashes(wrapperPath)}"`
+    ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${toPosixPath(wrapperPath)}"`
     : `"${wrapperPath}"`;
 
   /** Read + parse settings.json. Returns nulls when absent. Throws (before any write) on a file we can't
