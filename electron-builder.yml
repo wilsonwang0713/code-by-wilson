@@ -12,6 +12,11 @@ files:
   - package.json
 asarUnpack:
   - "**/*.node"
+  # node-pty's winpty fallback (selected on Windows builds < 18309 — see terminal/conpty.ts) loads
+  # winpty.dll and forks winpty-agent.exe as filesystem siblings of pty.node. Neither is a *.node file,
+  # so without this they stay inside app.asar where Windows can't LoadLibrary the DLL or spawn the agent,
+  # and every Managed session on an older build dies as "[process exited]".
+  - "**/node-pty/build/Release/*"
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.png
