@@ -263,6 +263,7 @@ describe("createTerminalManager", () => {
     expect(h.ptys).toHaveLength(0); // no pty spawned
     expect(h.spawned).toEqual([]); // never registered Managed (onSpawned never fired)
     expect(h.exited).toEqual([["sess-1", 1]]); // exit surfaced under the session id
+    expect(h.sent).toHaveLength(1);
     expect(h.sent[0]).toEqual([
       "sess-1",
       expect.stringContaining("/work/app"), // the message names the bad dir

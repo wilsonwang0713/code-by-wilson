@@ -123,7 +123,9 @@ export function createTerminalManager(
     if (!statDir(cwd)) {
       // A bad cwd makes node-pty throw asynchronously and surface as a bare "[process exited]". Validate
       // up front and surface the reason through the existing channels instead. No pty is created, so
-      // onSpawned never fires and the session is never labelled Managed.
+      // onSpawned never fires and the session is never labelled Managed. Both spawn and adopt funnel
+      // through start(), so this guard covers adopt too; its IPC handler has already returned { ok: true },
+      // so the message and exit supersede the optimistic "adopting" state.
       deps.send(
         id,
         `\r\n\x1b[31mStarting directory does not exist: ${cwd}\x1b[0m\r\n`,
