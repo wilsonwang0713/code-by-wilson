@@ -1,6 +1,8 @@
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { delimiter as pathDelimiter, join as pathJoin } from "node:path";
 import type { BinSource, InstallMethod } from "@shared/cli-status";
+import { toPosixPath } from "@shared/platform";
 import { resolveShellPath, probeShellEnvAsync } from "./terminal/shell-path";
 
 export interface ResolvedBinary {
@@ -62,16 +64,52 @@ export function pickBinary(i: PickBinaryInput): ResolvedBinary {
 /** Best-effort install method from the resolved path. */
 export function installMethodForPath(path: string | null): InstallMethod {
   if (!path) return "unknown";
-  if (path.includes("/.local/bin/")) return "native";
-  if (path.includes("/homebrew/") || path.includes("/Cellar/"))
-    return "homebrew";
-  if (
-    path.includes("/node/") ||
-    path.includes("/.nvm/") ||
-    path.includes("/npm")
-  )
+  const p = toPosixPath(path).toLowerCase();
+  if (p.includes("/.local/bin/")) return "native";
+  if (p.includes("/homebrew/") || p.includes("/cellar/")) return "homebrew";
+  // "/npm" already matches the Windows global dir (…/appdata/roaming/npm/…), so no separate clause for it.
+  if (p.includes("/node/") || p.includes("/.nvm/") || p.includes("/npm"))
     return "npm";
   return "unknown";
+}
+
+/** Candidate filenames for the claude binary on PATH. POSIX has the one; Windows resolves by PATHEXT,
+ *  and we prefer a real `.exe` over the `.cmd`/`.ps1` npm shims (a shim can't be launched by CreateProcess
+ *  without a shell — see the terminal launch layer). Pure + tested across platforms. */
+export function claudeBinaryNames(
+  platform: NodeJS.Platform,
+  pathext?: string,
+): string[] {
+  if (platform !== "win32") return ["claude"];
+  const order = [".exe", ".cmd", ".ps1"];
+  const fromEnv = (pathext ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const exts = [...order, ...fromEnv.filter((e) => !order.includes(e))];
+  return exts.map((e) => `claude${e}`);
+}
+
+/** Pure PATH scan: first dir (in PATH order) whose first matching candidate name (in `names` order) is a
+ *  real file. Cross-OS via injected delimiter/join/isFile, so the Windows PATHEXT behavior is unit-tested
+ *  on any host. */
+export function scanPath(
+  pathEnv: string,
+  opts: {
+    delimiter: string;
+    names: string[];
+    isFile: (p: string) => boolean;
+    join: (dir: string, name: string) => string;
+  },
+): string | null {
+  for (const dir of pathEnv.split(opts.delimiter)) {
+    if (!dir) continue;
+    for (const name of opts.names) {
+      const candidate = opts.join(dir, name);
+      if (opts.isFile(candidate)) return candidate;
+    }
+  }
+  return null;
 }
 
 function isRegularFile(p: string): boolean {
@@ -90,9 +128,10 @@ export async function resolveClaudeBinary(
   overridePath: string | null,
   probeShell: boolean,
 ): Promise<ResolvedBinary> {
-  const env = probeShell
-    ? await probeShellEnvAsync(process.env.SHELL || "/bin/zsh")
-    : null;
+  const env =
+    probeShell && process.platform !== "win32"
+      ? await probeShellEnvAsync(process.env.SHELL || "/bin/zsh")
+      : null;
   return pickBinary({
     overridePath,
     envBin: process.env.CBW_CLAUDE_BIN,
@@ -112,10 +151,10 @@ export async function resolveClaudeBinary(
 }
 
 function scanFallback(pathEnv: string): string | null {
-  for (const dir of pathEnv.split(":")) {
-    if (!dir) continue;
-    const candidate = `${dir}/claude`;
-    if (isRegularFile(candidate)) return candidate;
-  }
-  return null;
+  return scanPath(pathEnv, {
+    delimiter: pathDelimiter,
+    names: claudeBinaryNames(process.platform, process.env.PATHEXT),
+    isFile: isRegularFile,
+    join: pathJoin,
+  });
 }

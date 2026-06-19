@@ -1,8 +1,10 @@
+import { statSync } from "node:fs";
 import type { Family } from "@shared/models";
 import { FLOW } from "@shared/terminal";
 import {
   buildClaudeCommand,
   buildResumeCommand,
+  launchForm,
   type ClaudeCommand,
 } from "./command";
 import { createDataBufferer, type DataBufferer } from "./data-bufferer";
@@ -60,6 +62,11 @@ export interface TerminalManagerDeps {
   /** Returns the child env, resolved at spawn time; defaults to the app's `process.env` (whose PATH must
    *  carry `claude`, as under `pnpm dev`). A thunk so a costly PATH probe runs lazily, not at startup. */
   env?: () => NodeJS.ProcessEnv;
+  /** Host platform; injected so the Windows launch shim is unit-testable. Defaults to process.platform. */
+  platform?: NodeJS.Platform;
+  /** Validates a session's cwd before spawn. Injected in tests; defaults to a real statSync isDirectory
+   *  check — a node:fs call, not the native pty addon, so it is safe here and tests inject a fake. */
+  statDir?: (cwd: string) => boolean;
 }
 
 export interface TerminalManager {
@@ -90,6 +97,16 @@ export function createTerminalManager(
 ): TerminalManager {
   const createPty = deps.createPty;
   const createBufferer = deps.createBufferer ?? createDataBufferer;
+  const platform = deps.platform ?? process.platform;
+  const statDir =
+    deps.statDir ??
+    ((cwd: string) => {
+      try {
+        return statSync(cwd).isDirectory();
+      } catch {
+        return false;
+      }
+    });
   const terms = new Map<string, Term>();
 
   // Stand up one pty for `id` running `command` in `cwd`. The body is identical for a fresh spawn and an
@@ -103,6 +120,19 @@ export function createTerminalManager(
     model?: Family,
   ): void {
     if (terms.has(id)) return; // idempotent — a double start of one id is a no-op
+    if (!statDir(cwd)) {
+      // A bad cwd makes node-pty throw asynchronously and surface as a bare "[process exited]". Validate
+      // up front and surface the reason through the existing channels instead. No pty is created, so
+      // onSpawned never fires and the session is never labelled Managed. Both spawn and adopt funnel
+      // through start(), so this guard covers adopt too; its IPC handler has already returned { ok: true },
+      // so the message and exit supersede the optimistic "adopting" state.
+      deps.send(
+        id,
+        `\r\n\x1b[31mStarting directory does not exist: ${cwd}\x1b[0m\r\n`,
+      );
+      deps.notifyExit(id, 1);
+      return;
+    }
     // Resolve the child env here, not at construction: the PATH probe behind `deps.env` is a synchronous
     // shell spawn we keep off the startup path, so it runs (once, memoized) on the first real spawn.
     // Declare COLORTERM=truecolor on top: the pty's TERM is only xterm-256color (see pty-process), so
@@ -111,9 +141,13 @@ export function createTerminalManager(
     // (no COLORTERM), which is why this only bites the packaged build; dev and real terminals carry it.
     // Force it (not a default) because our WebGL terminal genuinely is 24-bit capable, so the declaration
     // is ours to make, not the launching shell's.
+    const launched = launchForm(
+      { file: command.file, args: command.args },
+      platform,
+    );
     const pty = createPty({
-      file: command.file,
-      args: command.args,
+      file: launched.file,
+      args: launched.args,
       cwd,
       env: { ...(deps.env?.() ?? process.env), COLORTERM: "truecolor" },
       cols,
@@ -198,6 +232,11 @@ export function createTerminalManager(
     write: (id, data) => terms.get(id)?.pty.write(data),
     resize: (id, cols, rows) => terms.get(id)?.pty.resize(cols, rows),
     ack,
+    // We kill the pty synchronously here and in disposeAll — on Windows too, unlike VSCode, which defers
+    // an immediate kill on Windows to dodge a ConPTY hang. VSCode can afford the deferral because its
+    // pty-host process outlives the window and force-kills after a timeout; we run ptys in the main
+    // process and tear down on window-close / app-quit, where a deferred timer may never fire (the process
+    // can exit first) and would orphan the claude child. So synchronous best-effort kill is correct here.
     kill: (id) => terms.get(id)?.pty.kill(),
     disposeAll: () => {
       for (const [id, term] of terms) {

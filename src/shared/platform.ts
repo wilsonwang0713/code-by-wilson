@@ -8,3 +8,8 @@
 /** True when a platform string (`process.platform` or `window.api.platform`) is macOS. */
 export const isMacPlatform = (platform: string): boolean =>
   platform === "darwin";
+
+/** Normalize a path's separators to forward slashes — for cross-platform substring matching (install-method
+ *  heuristics) and for the forward-slash paths PowerShell prefers. Owned here so the one regex doesn't drift
+ *  between the cli-status and settings layers. */
+export const toPosixPath = (path: string): string => path.replace(/\\/g, "/");

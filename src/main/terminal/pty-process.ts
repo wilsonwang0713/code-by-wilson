@@ -1,4 +1,6 @@
+import os from "node:os";
 import { spawn, type IPty } from "node-pty";
+import { wantsConpty } from "./conpty";
 
 /** The narrow surface the manager drives. Matches node-pty's IPty subset we use, so a test fake can
  *  stand in for the real thing without pulling the native addon into the test runner. */
@@ -37,6 +39,9 @@ export function createPtyProcess(o: SpawnOptions): PtyProcess {
     rows: o.rows,
     cwd: o.cwd,
     env: o.env,
+    // Decide ConPTY-vs-winpty ourselves (build >= 18309), rather than relying on node-pty's internal
+    // default. Ignored off Windows; selects winpty on an older build. See conpty.ts.
+    useConpty: wantsConpty(process.platform, os.release()),
   });
   return {
     pid: pty.pid,

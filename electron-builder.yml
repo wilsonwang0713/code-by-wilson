@@ -12,6 +12,11 @@ files:
   - package.json
 asarUnpack:
   - "**/*.node"
+  # node-pty's winpty fallback (selected on Windows builds < 18309 — see terminal/conpty.ts) loads
+  # winpty.dll and forks winpty-agent.exe as filesystem siblings of pty.node. Neither is a *.node file,
+  # so without this they stay inside app.asar where Windows can't LoadLibrary the DLL or spawn the agent,
+  # and every Managed session on an older build dies as "[process exited]".
+  - "**/node-pty/build/Release/*"
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.png
@@ -26,6 +31,18 @@ mac:
     - target: dmg
 dmg:
   title: ${productName} ${version}
+win:
+  # icon-win.png fills ~90% of the canvas; the macOS-grid margin in icon.png makes the icon look small
+  # on the Windows taskbar/Start menu, which draws it edge-to-edge with no rounded-rect frame.
+  icon: build/icon-win.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
 publish:
   provider: github
   owner: luojiahai

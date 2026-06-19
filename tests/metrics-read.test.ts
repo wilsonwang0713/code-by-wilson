@@ -97,7 +97,7 @@ function scaffold(): { claudeDir: string; id: string; repo: string } {
   return { claudeDir, id, repo };
 }
 
-describe.skipIf(process.platform === "win32")("provider.readMetrics", () => {
+describe("provider.readMetrics", () => {
   it("returns token speed and git for the session, with a change token", () => {
     const { claudeDir, id } = scaffold();
     const provider = createClaudeProvider({ claudeDir });

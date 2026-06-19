@@ -26,7 +26,7 @@ function initRepo(): string {
   return dir;
 }
 
-describe.skipIf(process.platform === "win32")("readGit", () => {
+describe("readGit", () => {
   it("returns null outside a repo", () => {
     expect(readGit(makeHome())).toBeNull();
   });

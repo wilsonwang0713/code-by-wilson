@@ -6,8 +6,12 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -18,6 +22,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+
+  # Aggregate gate: a single, stable `test` check for branch protection to
+  # require. The matrix above reports per-OS names (`tests (ubuntu-latest)`,
+  # ...), so requiring those directly breaks every time the OS list changes;
+  # requiring this job instead survives matrix edits.
+  test:
+    needs: tests
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: '[ "${{ needs.tests.result }}" = "success" ]'
 
   lint:
     runs-on: ubuntu-latest

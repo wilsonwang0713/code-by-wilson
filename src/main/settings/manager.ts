@@ -10,8 +10,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { toPosixPath } from "@shared/platform";
 import { readTextOrNull, resolveClaudeDir } from "../claude-config";
 import { recoverWrappedCommand, wrapperScript } from "./wrapper";
+import { recoverWrappedCommandWin, wrapperScriptWin } from "./wrapper-win";
 
 /** The Claude Code statusLine block. `additionalProperties: false` upstream means we must not stash our
  *  own fields inside it — bookkeeping lives in our own state file instead. While installed we replace this
@@ -49,6 +51,8 @@ export interface SettingsManagerDeps {
   claudeDir?: string;
   /** Wall clock (ms) for the backup timestamp; injected so tests are deterministic. */
   now?: () => number;
+  /** Host platform; defaults to process.platform. Tests inject "win32" or "darwin" to exercise both paths. */
+  platform?: NodeJS.Platform;
 }
 
 export interface InstallResult {
@@ -72,14 +76,22 @@ export function createSettingsManager(
 ): SettingsManager {
   const claudeDir = resolveClaudeDir(deps.claudeDir);
   const now = deps.now ?? (() => Date.now());
+  const platform = deps.platform ?? process.platform;
+  const isWin = platform === "win32";
 
   const settingsPath = join(claudeDir, "settings.json");
   const appDir = join(claudeDir, ".code-by-wire");
   const statePath = join(appDir, "state.json");
-  // The wrapper script the installed statusLine points at. Issue #11 materializes it; this slice only
-  // records what it must call through to. Quoted so a space in the path survives `sh -c`.
-  const wrapperPath = join(appDir, "statusline-wrapper.sh");
-  const appCommand = `"${wrapperPath}"`;
+  // The wrapper script the installed statusLine points at. Platform-aware: .ps1 on win32, .sh on POSIX.
+  // Issue #11 materializes it; this slice only records what it must call through to.
+  const wrapperName = isWin
+    ? "statusline-wrapper.ps1"
+    : "statusline-wrapper.sh";
+  const wrapperPath = join(appDir, wrapperName);
+  // Forward slashes in the PowerShell -File path avoid quoting issues; on POSIX, the bare quoted path is used.
+  const appCommand = isWin
+    ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${toPosixPath(wrapperPath)}"`
+    : `"${wrapperPath}"`;
 
   /** Read + parse settings.json. Returns nulls when absent. Throws (before any write) on a file we can't
    *  safely round-trip: invalid JSON, or valid JSON that isn't an object (an array / null / primitive would
@@ -180,10 +192,14 @@ export function createSettingsManager(
   }
 
   /** Materialize the executable wrapper the installed statusLine points at (issue #11). Idempotent:
-   *  rewritten on every install so a deleted or stale wrapper self-heals. 0755 so the bare `"<path>"`
-   *  command in settings.json is directly executable. */
+   *  rewritten on every install so a deleted or stale wrapper self-heals. On POSIX, chmod 0755 so the
+   *  bare `"<path>"` command in settings.json is directly executable; on Windows executability comes
+   *  from the `powershell -File` invocation, so no chmod is applied. */
   function writeWrapper(wrappedCommand: string | null): void {
-    writeFileAtomic(wrapperPath, wrapperScript({ wrappedCommand }), 0o755);
+    const src = isWin
+      ? wrapperScriptWin({ wrappedCommand })
+      : wrapperScript({ wrappedCommand });
+    writeFileAtomic(wrapperPath, src, isWin ? undefined : 0o755);
   }
 
   function isInstalled(): boolean {
@@ -246,34 +262,60 @@ export function createSettingsManager(
     return { wrappedExisting, backupPath };
   }
 
+  // Every wrapper we might have written into appDir, each with its recoverer. A statusLine command "is ours"
+  // when it references one of these paths — the current-platform wrapper, or a leftover from another platform
+  // or an older build (a .sh still referenced on Windows, say). Matched on a slash-normalized, lowercased path
+  // so separator/case differences don't hide our own wrapper.
+  const ownWrappers = [
+    {
+      path: join(appDir, "statusline-wrapper.ps1"),
+      recover: recoverWrappedCommandWin,
+    },
+    {
+      path: join(appDir, "statusline-wrapper.sh"),
+      recover: recoverWrappedCommand,
+    },
+  ];
+  function ownWrapperFor(command: string) {
+    const c = toPosixPath(command).toLowerCase();
+    return ownWrappers.find((w) =>
+      c.includes(toPosixPath(w.path).toLowerCase()),
+    );
+  }
+
   function install(): InstallResult {
     const { raw, parsed } = readSettings(); // single read; throws on a file we can't safely touch
-    const alreadyWrapped = parsed?.statusLine?.command === appCommand;
+    const current = parsed?.statusLine?.command;
 
-    if (alreadyWrapped) {
+    // Wrapped with our current command and an intact record → idempotent: rewrite the wrapper (self-heals a
+    // deleted/stale one) and report the recorded state.
+    if (current === appCommand) {
       const state = readState(); // throws on a corrupt record
       if (state !== null) {
-        writeWrapper(state.wrappedCommand); // rewrite in case the wrapper file was deleted or is stale
+        writeWrapper(state.wrappedCommand);
         return {
           wrappedExisting: state.wrappedExisting,
           backupPath: state.backupPath,
           healed: false,
         };
       }
-      // Wrapped on disk but the record vanished. Re-wrapping as-is would wrap our own wrapper (recursion) and
-      // lose the user's original. Instead recover their command from the wrapper script and reinstall clean:
-      // reconstruct the pre-install settings so freshInstall backs up the original, not the wrapped bytes.
-      const wrapperSrc = readTextOrNull(wrapperPath);
-      const recovered =
-        wrapperSrc === null ? null : recoverWrappedCommand(wrapperSrc);
+    }
+
+    // The statusLine points at one of OUR wrappers — our current command with a vanished record, or a wrapper
+    // from another platform / an older build. Re-wrapping as-is would bury the user's real command behind our
+    // own wrapper path (and on Windows a .sh path hands the prompt to cmd's file association). Recover their
+    // original from the wrapper the command points at and reinstall clean, so freshInstall backs up the
+    // original, not the wrapped bytes.
+    const own =
+      typeof current === "string" ? ownWrapperFor(current) : undefined;
+    if (own) {
+      const wrapperSrc = readTextOrNull(own.path);
+      const recovered = wrapperSrc === null ? null : own.recover(wrapperSrc);
       const statusLine =
         recovered !== null
           ? { type: "command", command: recovered }
           : undefined;
-      const healedSettings: ClaudeSettings = {
-        ...parsed,
-        statusLine,
-      };
+      const healedSettings: ClaudeSettings = { ...parsed, statusLine };
       const healedRaw = JSON.stringify(healedSettings, null, 2) + "\n";
       return { ...freshInstall(healedRaw, healedSettings), healed: true };
     }
@@ -307,9 +349,10 @@ export function createSettingsManager(
       chmodSync(settingsPath, statSync(state.backupPath).mode & 0o777); // ...and its original permissions
     }
 
-    // Our own artifacts go too — the wrapper script and any captured side-channel files. Best-effort:
+    // Our own artifacts go too — every wrapper we might have written (the current platform's and any
+    // leftover from another platform / an older build) and the captured side-channel files. Best-effort:
     // a failure here must not block restoring the user's settings, which already succeeded above.
-    rmSync(wrapperPath, { force: true });
+    for (const w of ownWrappers) rmSync(w.path, { force: true });
     rmSync(join(appDir, "statusline"), { recursive: true, force: true });
     rmSync(statePath, { force: true });
   }
