@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { statSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { GitInfo } from "@shared/metrics";
 
 const TTL_MS = 5000;
@@ -46,13 +46,20 @@ function parseShortstat(out: string | null): {
   };
 }
 
+/** Resolve git's reported --git-dir against cwd. git returns a relative `.git` in the common case but an
+ *  absolute path for worktrees; `isAbsolute` recognizes both POSIX (`/…`) and Windows (`C:\…`) absolutes,
+ *  unlike a `startsWith('/')` check. Pure + tested. */
+export function joinGitDir(cwd: string, gitDir: string): string {
+  return isAbsolute(gitDir) ? gitDir : join(cwd, gitDir);
+}
+
 /** Resolve the absolute .git dir for `cwd`, or null when `cwd` isn't a work tree (a bare repo or the
  *  .git dir itself counts as "no glance"). Two spawns, run only on first sight or after the TTL. */
 function resolveGitDir(cwd: string): string | null {
   if (git(cwd, ["rev-parse", "--is-inside-work-tree"]) !== "true") return null;
   const gitDir = git(cwd, ["rev-parse", "--git-dir"]);
   if (gitDir === null) return null;
-  return gitDir.startsWith("/") ? gitDir : join(cwd, gitDir);
+  return joinGitDir(cwd, gitDir);
 }
 
 /** Cheap freshness token with no spawn: the mtimes of HEAD and index. A commit/checkout/stage moves one
