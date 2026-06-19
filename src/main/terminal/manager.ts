@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import type { Family } from "@shared/models";
 import { FLOW } from "@shared/terminal";
 import {
@@ -63,6 +64,9 @@ export interface TerminalManagerDeps {
   env?: () => NodeJS.ProcessEnv;
   /** Host platform; injected so the Windows launch shim is unit-testable. Defaults to process.platform. */
   platform?: NodeJS.Platform;
+  /** Validates a session's cwd before spawn. Injected in tests; defaults to a real statSync isDirectory
+   *  check — a node:fs call, not the native pty addon, so it is safe here and tests inject a fake. */
+  statDir?: (cwd: string) => boolean;
 }
 
 export interface TerminalManager {
@@ -94,6 +98,15 @@ export function createTerminalManager(
   const createPty = deps.createPty;
   const createBufferer = deps.createBufferer ?? createDataBufferer;
   const platform = deps.platform ?? process.platform;
+  const statDir =
+    deps.statDir ??
+    ((cwd: string) => {
+      try {
+        return statSync(cwd).isDirectory();
+      } catch {
+        return false;
+      }
+    });
   const terms = new Map<string, Term>();
 
   // Stand up one pty for `id` running `command` in `cwd`. The body is identical for a fresh spawn and an
@@ -107,6 +120,17 @@ export function createTerminalManager(
     model?: Family,
   ): void {
     if (terms.has(id)) return; // idempotent — a double start of one id is a no-op
+    if (!statDir(cwd)) {
+      // A bad cwd makes node-pty throw asynchronously and surface as a bare "[process exited]". Validate
+      // up front and surface the reason through the existing channels instead. No pty is created, so
+      // onSpawned never fires and the session is never labelled Managed.
+      deps.send(
+        id,
+        `\r\n\x1b[31mStarting directory does not exist: ${cwd}\x1b[0m\r\n`,
+      );
+      deps.notifyExit(id, 1);
+      return;
+    }
     // Resolve the child env here, not at construction: the PATH probe behind `deps.env` is a synchronous
     // shell spawn we keep off the startup path, so it runs (once, memoized) on the first real spawn.
     // Declare COLORTERM=truecolor on top: the pty's TERM is only xterm-256color (see pty-process), so

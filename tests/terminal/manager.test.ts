@@ -57,7 +57,7 @@ const passthroughBufferer = (flush: (d: string) => void) => ({
   dispose: () => {},
 });
 
-function harness() {
+function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
   const ptys: ReturnType<typeof fakePty>[] = [];
   const sent: Array<[string, string]> = [];
   const exited: Array<[string, number]> = [];
@@ -81,6 +81,7 @@ function harness() {
     },
     createBufferer: passthroughBufferer,
     env: () => ({ PATH: "/usr/bin" }),
+    statDir: over.statDir ?? (() => true),
   });
   return { manager, ptys, sent, exited, spawned, spawnedPids, closed };
 }
@@ -254,5 +255,17 @@ describe("createTerminalManager", () => {
     h.manager.adopt(ADOPT_REQ);
     expect(h.ptys).toHaveLength(1);
     expect(h.spawned).toEqual(["sess-1"]);
+  });
+
+  it("rejects a spawn whose cwd is not a directory: no pty, a readable message, and an exit", () => {
+    const h = harness({ statDir: () => false });
+    h.manager.spawn(REQ);
+    expect(h.ptys).toHaveLength(0); // no pty spawned
+    expect(h.spawned).toEqual([]); // never registered Managed (onSpawned never fired)
+    expect(h.exited).toEqual([["sess-1", 1]]); // exit surfaced under the session id
+    expect(h.sent[0]).toEqual([
+      "sess-1",
+      expect.stringContaining("/work/app"), // the message names the bad dir
+    ]);
   });
 });

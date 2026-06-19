@@ -23,6 +23,7 @@ const baseDeps = {
   notifyExit: vi.fn(),
   onSpawned: vi.fn(),
   onClosed: vi.fn(),
+  statDir: () => true,
 };
 
 describe("manager passes the resolved bin to the pty", () => {
