@@ -513,43 +513,40 @@ describe("trust-safety — reinstall after uninstall (backup collision)", () => 
   });
 });
 
-describe(
-  "trust-safety — symlinked settings.json",
-  () => {
-    it("writes through a symlinked settings.json instead of replacing the link (dotfiles-style)", () => {
-      const home = makeHome();
-      const real = join(home, "real-settings.json");
-      writeFileSync(
-        real,
-        JSON.stringify(
-          { statusLine: { type: "command", command: "mine" } },
-          null,
-          2,
-        ),
-      );
-      symlinkSync(real, settingsPath(home)); // settings.json → real-settings.json, e.g. linked into a dotfiles repo
-      const mgr = createSettingsManager({
-        claudeDir: home,
-        now: () => NOW,
-        platform: "linux",
-      });
-
-      mgr.install();
-
-      expect(lstatSync(settingsPath(home)).isSymbolicLink()).toBe(true); // link preserved, not clobbered to a file
-      expect(JSON.parse(readFileSync(real, "utf8")).statusLine.command).toBe(
-        appCommandFor(home),
-      ); // written through
-
-      mgr.uninstall();
-
-      expect(lstatSync(settingsPath(home)).isSymbolicLink()).toBe(true); // still a link after restore
-      expect(JSON.parse(readFileSync(real, "utf8")).statusLine.command).toBe(
-        "mine",
-      ); // restored through the link
+describe("trust-safety — symlinked settings.json", () => {
+  it("writes through a symlinked settings.json instead of replacing the link (dotfiles-style)", () => {
+    const home = makeHome();
+    const real = join(home, "real-settings.json");
+    writeFileSync(
+      real,
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    symlinkSync(real, settingsPath(home)); // settings.json → real-settings.json, e.g. linked into a dotfiles repo
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
     });
-  },
-);
+
+    mgr.install();
+
+    expect(lstatSync(settingsPath(home)).isSymbolicLink()).toBe(true); // link preserved, not clobbered to a file
+    expect(JSON.parse(readFileSync(real, "utf8")).statusLine.command).toBe(
+      appCommandFor(home),
+    ); // written through
+
+    mgr.uninstall();
+
+    expect(lstatSync(settingsPath(home)).isSymbolicLink()).toBe(true); // still a link after restore
+    expect(JSON.parse(readFileSync(real, "utf8")).statusLine.command).toBe(
+      "mine",
+    ); // restored through the link
+  });
+});
 
 // POSIX fixture: Windows chmod does not enforce POSIX file mode bits (0o600 vs 0o666)
 describe.skipIf(process.platform === "win32")(

@@ -38,7 +38,14 @@ export function launchForm(
   if (/\.ps1$/i.test(cmd.file)) {
     return {
       file: "powershell.exe",
-      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", cmd.file, ...cmd.args],
+      args: [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        cmd.file,
+        ...cmd.args,
+      ],
     };
   }
   return cmd;
