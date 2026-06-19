@@ -66,6 +66,13 @@ describe("manager passes the resolved bin to the pty", () => {
       bin: "C:\\npm\\claude.cmd",
     });
     expect(seen.file).toBe("cmd.exe");
-    expect(seen.args?.slice(0, 2)).toEqual(["/c", "C:\\npm\\claude.cmd"]);
+    expect(seen.args).toEqual([
+      "/c",
+      "C:\\npm\\claude.cmd",
+      "--session-id",
+      "s1",
+      "--model",
+      "opus",
+    ]);
   });
 });

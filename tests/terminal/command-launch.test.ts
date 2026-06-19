@@ -13,6 +13,21 @@ describe("launchForm", () => {
       args: ["/c", "C:\\npm\\claude.cmd", "--resume", "x"],
     });
   });
+  it("wraps a .ps1 via powershell on win32", () => {
+    const c = { file: "C:\\bin\\claude.ps1", args: ["--session-id", "x"] };
+    expect(launchForm(c, "win32")).toEqual({
+      file: "powershell.exe",
+      args: [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\bin\\claude.ps1",
+        "--session-id",
+        "x",
+      ],
+    });
+  });
   it("passes through unchanged on posix", () => {
     const c = { file: "claude", args: ["--model", "opus"] };
     expect(launchForm(c, "darwin")).toEqual(c);
