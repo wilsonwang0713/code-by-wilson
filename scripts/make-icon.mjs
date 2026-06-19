@@ -5,9 +5,9 @@
 // Two outputs from the one source:
 //   build/icon.png      — macOS/Linux. Keeps the artwork's ~10% grid margin (the rounded tile
 //                         fills 824/1024), which is the Apple icon convention.
-//   build/icon-win.png  — Windows. Same artwork re-cropped to a tighter viewBox so the tile fills
-//                         ~90% of the canvas. Windows draws icons edge-to-edge with no rounded-rect
-//                         frame, so the macOS margin would make the icon look small on the taskbar.
+//   build/icon-win.png  — Windows. Same artwork re-cropped to the tile's exact bounds so the rounded
+//                         tile runs edge-to-edge (full bleed). Windows draws icons with no rounded-rect
+//                         frame, so the macOS grid margin would make the icon look small on the taskbar.
 //
 // Forces a 2x device scale and downscales, so the result is crisp regardless of the
 // host's display (a 1x monitor would otherwise rasterize 1:1 with no supersampling),
@@ -21,10 +21,11 @@ const SIZE = 1024;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const svg = readFileSync(join(root, "build", "icon.svg"), "utf8");
-// Re-crop the camera (not the artwork) to the tile + a slim margin so the icon fills ~90% on Windows.
+// Re-crop the camera (not the artwork) to the tile's exact bounds (x/y 100, 824x824) so the rounded
+// tile runs edge-to-edge on Windows instead of sitting in the macOS grid margin.
 const svgWin = svg.replace(
   'viewBox="0 0 1024 1024"',
-  'viewBox="54 54 916 916"',
+  'viewBox="100 100 824 824"',
 );
 
 const htmlFor = (src) =>
