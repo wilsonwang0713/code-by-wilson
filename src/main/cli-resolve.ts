@@ -1,5 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { delimiter as pathDelimiter, join as pathJoin } from "node:path";
 import type { BinSource, InstallMethod } from "@shared/cli-status";
 import { resolveShellPath, probeShellEnvAsync } from "./terminal/shell-path";
 
@@ -91,6 +92,28 @@ export function claudeBinaryNames(
   return exts.map((e) => `claude${e}`);
 }
 
+/** Pure PATH scan: first dir (in PATH order) whose first matching candidate name (in `names` order) is a
+ *  real file. Cross-OS via injected delimiter/join/isFile, so the Windows PATHEXT behavior is unit-tested
+ *  on any host. */
+export function scanPath(
+  pathEnv: string,
+  opts: {
+    delimiter: string;
+    names: string[];
+    isFile: (p: string) => boolean;
+    join: (dir: string, name: string) => string;
+  },
+): string | null {
+  for (const dir of pathEnv.split(opts.delimiter)) {
+    if (!dir) continue;
+    for (const name of opts.names) {
+      const candidate = opts.join(dir, name);
+      if (opts.isFile(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
 function isRegularFile(p: string): boolean {
   try {
     return existsSync(p) && statSync(p).isFile();
@@ -129,10 +152,10 @@ export async function resolveClaudeBinary(
 }
 
 function scanFallback(pathEnv: string): string | null {
-  for (const dir of pathEnv.split(":")) {
-    if (!dir) continue;
-    const candidate = `${dir}/claude`;
-    if (isRegularFile(candidate)) return candidate;
-  }
-  return null;
+  return scanPath(pathEnv, {
+    delimiter: pathDelimiter,
+    names: claudeBinaryNames(process.platform, process.env.PATHEXT),
+    isFile: isRegularFile,
+    join: pathJoin,
+  });
 }

@@ -3,6 +3,7 @@ import {
   pickBinary,
   installMethodForPath,
   claudeBinaryNames,
+  scanPath,
 } from "../../src/main/cli-resolve";
 
 const isFile = (p: string) => p.startsWith("/real/");
@@ -112,5 +113,41 @@ describe("claudeBinaryNames", () => {
 
   it("falls back to a default PATHEXT when none is given", () => {
     expect(claudeBinaryNames("win32")).toContain("claude.exe");
+  });
+});
+
+describe("scanPath", () => {
+  const join = (d: string, n: string) => `${d}\\${n}`;
+  it("splits on the given delimiter and returns the first hit by name order", () => {
+    const present = new Set(["C:\\bin\\claude.cmd"]);
+    const hit = scanPath("C:\\bin;C:\\other", {
+      delimiter: ";",
+      names: ["claude.exe", "claude.cmd"],
+      isFile: (p) => present.has(p),
+      join,
+    });
+    expect(hit).toBe("C:\\bin\\claude.cmd");
+  });
+
+  it("prefers an earlier name in the same dir", () => {
+    const present = new Set(["C:\\bin\\claude.exe", "C:\\bin\\claude.cmd"]);
+    const hit = scanPath("C:\\bin", {
+      delimiter: ";",
+      names: ["claude.exe", "claude.cmd"],
+      isFile: (p) => present.has(p),
+      join,
+    });
+    expect(hit).toBe("C:\\bin\\claude.exe");
+  });
+
+  it("returns null when nothing matches", () => {
+    expect(
+      scanPath("/usr/bin", {
+        delimiter: ":",
+        names: ["claude"],
+        isFile: () => false,
+        join: (d, n) => `${d}/${n}`,
+      }),
+    ).toBeNull();
   });
 });
