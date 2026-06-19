@@ -7,6 +7,7 @@ allowBuilds:
   node-pty: true
   electron: true
   esbuild: true
-  # Windows-installer tooling pulled in transitively by electron-builder. This is
-  # a mac-only app, so its build scripts never need to run.
+  # Squirrel.Windows tooling pulled in transitively by electron-builder. The
+  # Windows build uses NSIS (app-builder), not Squirrel, so these install
+  # scripts never need to run.
   electron-winstaller: false

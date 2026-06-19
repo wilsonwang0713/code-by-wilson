@@ -26,6 +26,16 @@ mac:
     - target: dmg
 dmg:
   title: ${productName} ${version}
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
 publish:
   provider: github
   owner: luojiahai
