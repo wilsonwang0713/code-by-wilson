@@ -26,9 +26,9 @@ body:
     validations:
       required: true
   - type: input
-    id: macos
+    id: os
     attributes:
-      label: macOS version
-      placeholder: e.g. 14.5 (Apple Silicon)
+      label: Operating system
+      placeholder: e.g. macOS 14.5 (Apple Silicon), or Windows 11 (x64)
     validations:
       required: true

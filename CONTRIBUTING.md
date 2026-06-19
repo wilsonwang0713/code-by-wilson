@@ -71,4 +71,4 @@ language and locked decisions are documented and worth reading:
 - `CONTEXT.md`: the glossary. Use its vocabulary in code and issues.
 - `docs/adr/`: the architectural decisions that are settled.
 - `docs/agents/`: how issues, triage labels, and domain docs are managed.
-- `docs/RELEASING.md`: how to cut a versioned `.dmg` release.
+- `docs/RELEASING.md`: how to cut a versioned `.dmg` / `.exe` release.

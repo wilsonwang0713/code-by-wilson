@@ -143,21 +143,25 @@ SmartScreen may warn — click **More info → Run anyway**. Build from source w
 
 ### Build from source
 
-Build an unsigned `.dmg` locally instead:
+Build an unsigned app locally instead. Run the command for your platform:
 
 ```
 pnpm install
 pnpm rebuild:native   # rebuild better-sqlite3 + node-pty for Electron's ABI
-pnpm dist             # writes the .dmg to release/
+pnpm dist             # macOS: writes the .dmg to release/
+pnpm dist:win         # Windows: writes the .exe to release/
 ```
 
-Open the `.dmg` from `release/` and drag Code-by-wire to Applications. Because
-it's unsigned, the first launch may need a right-click → **Open**, or clearing
-the quarantine flag:
+On macOS, open the `.dmg` from `release/` and drag Code-by-wire to Applications.
+Because it's unsigned, the first launch may need a right-click → **Open**, or
+clearing the quarantine flag:
 
 ```
 xattr -dr com.apple.quarantine /Applications/Code-by-wire.app
 ```
+
+On Windows, run the `.exe` from `release/`. It's unsigned, so SmartScreen may
+warn — click **More info → Run anyway**.
 
 ## Requirements
 
