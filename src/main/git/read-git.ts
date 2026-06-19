@@ -46,11 +46,23 @@ function parseShortstat(out: string | null): {
   };
 }
 
+/** A minimal slice of `node:path` — the host module by default, or `path.win32`/`path.posix` for
+ *  deterministic cross-platform tests. */
+export interface PathOps {
+  isAbsolute: (p: string) => boolean;
+  join: (...parts: string[]) => string;
+}
+
 /** Resolve git's reported --git-dir against cwd. git returns a relative `.git` in the common case but an
  *  absolute path for worktrees; `isAbsolute` recognizes both POSIX (`/…`) and Windows (`C:\…`) absolutes,
- *  unlike a `startsWith('/')` check. Pure + tested. */
-export function joinGitDir(cwd: string, gitDir: string): string {
-  return isAbsolute(gitDir) ? gitDir : join(cwd, gitDir);
+ *  unlike a `startsWith('/')` check. `pathOps` is injected so the platform behavior is unit-testable on any
+ *  host (tests pass `path.win32`/`path.posix`); production uses the host `node:path`. */
+export function joinGitDir(
+  cwd: string,
+  gitDir: string,
+  pathOps: PathOps = { isAbsolute, join },
+): string {
+  return pathOps.isAbsolute(gitDir) ? gitDir : pathOps.join(cwd, gitDir);
 }
 
 /** Resolve the absolute .git dir for `cwd`, or null when `cwd` isn't a work tree (a bare repo or the
