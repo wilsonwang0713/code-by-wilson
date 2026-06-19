@@ -10,8 +10,10 @@ import type { WrapperSpec } from "./wrapper";
 const HEREDOC_OPEN = "$cbwCmd = @'\n";
 const HEREDOC_CLOSE = "\n'@\n";
 
-/** The fixed script tail emitted after the (optional) call-through. */
-const SCRIPT_TAIL = "# CBW_END\n";
+/** The fixed script tail emitted after the (optional) call-through. The explicit `exit 0` mirrors the
+ *  POSIX wrapper (ADR-0001): a faulty wrapped command can never fail the prompt, regardless of whether the
+ *  `powershell -File` invocation propagates $LASTEXITCODE. */
+const SCRIPT_TAIL = "# CBW_END\nexit 0\n";
 
 /**
  * PowerShell statusLine wrapper (ADR-0001) for Windows. Captures Claude Code's stdin JSON to a
@@ -43,7 +45,13 @@ export function wrapperScriptWin({ wrappedCommand }: WrapperSpec): string {
   return (
     `# code-by-wire statusLine wrapper (PowerShell) — AUTO-GENERATED, do not edit.\n` +
     `$ErrorActionPreference = 'SilentlyContinue'\n` +
-    `$json = [Console]::In.ReadToEnd()\n` +
+    // Read stdin and feed the call-through as UTF-8, independent of the host console code page. Windows
+    // PowerShell's default $OutputEncoding is US-ASCII, which would turn every non-ASCII byte (a cwd under
+    // C:\Users\José, say) into '?'; and [Console]::In decodes with the console's code page, not UTF-8. So
+    // read raw stdin through a UTF-8 reader and pin $OutputEncoding to UTF-8, matching the POSIX wrapper's
+    // byte-exact replay so a non-ASCII path round-trips to the wrapped command intact.
+    `$OutputEncoding = [Text.UTF8Encoding]::new($false)\n` +
+    `$json = (New-Object IO.StreamReader([Console]::OpenStandardInput(), [Text.UTF8Encoding]::new($false))).ReadToEnd()\n` +
     `$dir = Join-Path $PSScriptRoot 'statusline'\n` +
     `New-Item -ItemType Directory -Force -Path $dir | Out-Null\n` +
     `$sid = if ($json -match '"session_id"\\s*:\\s*"([^"]+)"') { $Matches[1] } else { $null }\n` +

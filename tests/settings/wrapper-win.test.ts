@@ -32,6 +32,30 @@ describe("wrapperScriptWin (pure source)", () => {
     expect(src).toContain("cmd.exe /c");
   });
 
+  it("reads stdin and pipes the call-through as UTF-8, not the host code page", () => {
+    // Windows PowerShell's default $OutputEncoding is US-ASCII, which turns every non-ASCII byte in the
+    // piped JSON (e.g. a cwd under C:\Users\José) into '?'. The wrapper must read stdin as UTF-8 and set
+    // $OutputEncoding to UTF-8 so a non-ASCII cwd/path round-trips to the wrapped command intact, matching
+    // the POSIX wrapper's byte-exact replay.
+    const src = wrapperScriptWin({ wrappedCommand: "my-prompt" });
+    expect(src).toContain("$OutputEncoding"); // pins the call-through pipe encoding
+    expect(src).toContain("UTF8Encoding"); // ...to UTF-8
+    expect(src).toContain("OpenStandardInput"); // reads raw stdin as UTF-8, not the console code page
+    expect(src).not.toContain("[Console]::In.ReadToEnd()"); // the code-page-dependent read is gone
+  });
+
+  it("ends with an explicit exit 0 so a faulty wrapped command can never fail the prompt", () => {
+    // ADR-0001: a blank statusLine is the worst case, never a stalled/failed prompt. The POSIX wrapper
+    // enforces this with `exit 0`; the Windows port must too, so the guarantee doesn't rely on the
+    // `powershell -File` invocation happening not to propagate $LASTEXITCODE.
+    expect(wrapperScriptWin({ wrappedCommand: "my-prompt" }).trimEnd()).toMatch(
+      /exit 0$/,
+    );
+    expect(wrapperScriptWin({ wrappedCommand: null }).trimEnd()).toMatch(
+      /exit 0$/,
+    );
+  });
+
   it("omits the call-through when there was no original statusLine", () => {
     const src = wrapperScriptWin({ wrappedCommand: null });
     expect(src).not.toContain("cmd.exe /c");
