@@ -49,7 +49,7 @@ const shellRows = (id: string, tuid: string, taskId: string) => [
   },
 ];
 
-describe.skipIf(process.platform === "win32")("provider.readShells", () => {
+describe("provider.readShells", () => {
   it("lists the session's background shells without the output path", () => {
     const claudeDir = makeHome();
     writeTranscript(claudeDir, "s1", shellRows("s1", "t1", "bg1"));
@@ -94,7 +94,7 @@ describe.skipIf(process.platform === "win32")("provider.readShells", () => {
   });
 });
 
-describe.skipIf(process.platform === "win32")(
+describe(
   "provider.readShellOutput",
   () => {
     it("reads the live .output file and labels the source", () => {

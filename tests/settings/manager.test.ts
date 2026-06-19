@@ -513,7 +513,7 @@ describe("trust-safety — reinstall after uninstall (backup collision)", () => 
   });
 });
 
-describe.skipIf(process.platform === "win32")(
+describe(
   "trust-safety — symlinked settings.json",
   () => {
     it("writes through a symlinked settings.json instead of replacing the link (dotfiles-style)", () => {
@@ -551,6 +551,7 @@ describe.skipIf(process.platform === "win32")(
   },
 );
 
+// POSIX fixture: Windows chmod does not enforce POSIX file mode bits (0o600 vs 0o666)
 describe.skipIf(process.platform === "win32")(
   "trust-safety — file permissions",
   () => {

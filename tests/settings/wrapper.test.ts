@@ -56,6 +56,7 @@ describe("recoverWrappedCommand (exact inverse of the bake)", () => {
   });
 });
 
+// POSIX fixture: execFileSync("sh", ...) — no sh wrapper available on Windows
 describe.skipIf(process.platform === "win32")(
   "wrapper end-to-end (runs the generated sh)",
   () => {
