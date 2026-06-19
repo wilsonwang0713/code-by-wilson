@@ -151,3 +151,16 @@ describe("scanPath", () => {
     ).toBeNull();
   });
 });
+
+describe("installMethodForPath (windows)", () => {
+  it("labels the native installer dir", () => {
+    expect(
+      installMethodForPath("C:\\Users\\me\\.local\\bin\\claude.exe"),
+    ).toBe("native");
+  });
+  it("labels the npm global dir", () => {
+    expect(
+      installMethodForPath("C:\\Users\\me\\AppData\\Roaming\\npm\\claude.cmd"),
+    ).toBe("npm");
+  });
+});

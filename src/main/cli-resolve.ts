@@ -63,13 +63,14 @@ export function pickBinary(i: PickBinaryInput): ResolvedBinary {
 /** Best-effort install method from the resolved path. */
 export function installMethodForPath(path: string | null): InstallMethod {
   if (!path) return "unknown";
-  if (path.includes("/.local/bin/")) return "native";
-  if (path.includes("/homebrew/") || path.includes("/Cellar/"))
-    return "homebrew";
+  const p = path.replace(/\\/g, "/").toLowerCase();
+  if (p.includes("/.local/bin/")) return "native";
+  if (p.includes("/homebrew/") || p.includes("/cellar/")) return "homebrew";
   if (
-    path.includes("/node/") ||
-    path.includes("/.nvm/") ||
-    path.includes("/npm")
+    p.includes("/node/") ||
+    p.includes("/.nvm/") ||
+    p.includes("/npm") ||
+    p.includes("/appdata/roaming/npm")
   )
     return "npm";
   return "unknown";
@@ -130,9 +131,10 @@ export async function resolveClaudeBinary(
   overridePath: string | null,
   probeShell: boolean,
 ): Promise<ResolvedBinary> {
-  const env = probeShell
-    ? await probeShellEnvAsync(process.env.SHELL || "/bin/zsh")
-    : null;
+  const env =
+    probeShell && process.platform !== "win32"
+      ? await probeShellEnvAsync(process.env.SHELL || "/bin/zsh")
+      : null;
   return pickBinary({
     overridePath,
     envBin: process.env.CBW_CLAUDE_BIN,
