@@ -77,18 +77,20 @@ the macOS leg, and `Code-by-wire Setup X.Y.Z.exe` (+ `.blockmap`) and
 `latest.yml` from the Windows leg. An empty or partial asset list means an upload
 step didn't run or failed — read the relevant `build` job log.
 
-## Build a dmg locally (testing only, no publish)
+## Build the app locally (testing only, no publish)
 
-For a throwaway dmg to smoke-test packaging, never for a release:
+For a throwaway build to smoke-test packaging, never for a release. Run the
+command for your platform:
 
 ```
 pnpm rebuild:native   # rebuild better-sqlite3 + node-pty for Electron's ABI first
-pnpm dist             # electron-vite build && electron-builder --mac --publish never
+pnpm dist             # macOS:   electron-vite build && electron-builder --mac --publish never
+pnpm dist:win         # Windows: electron-vite build && electron-builder --win --publish never
 ```
 
-The dmg lands in `release/`. It's your current arch only and unsigned. `pnpm
-dist` does **not** run `rebuild:native` for you; skip it and the app crashes on
-launch with a native-module ABI mismatch.
+The artifact lands in `release/`. It's your current platform and arch only, and
+unsigned. Neither command runs `rebuild:native` for you; skip it and the app
+crashes on launch with a native-module ABI mismatch.
 
 ## Recovering a botched release
 
