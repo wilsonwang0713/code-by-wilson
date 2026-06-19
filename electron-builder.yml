@@ -27,7 +27,9 @@ mac:
 dmg:
   title: ${productName} ${version}
 win:
-  icon: build/icon.png
+  # icon-win.png fills ~90% of the canvas; the macOS-grid margin in icon.png makes the icon look small
+  # on the Windows taskbar/Start menu, which draws it edge-to-edge with no rounded-rect frame.
+  icon: build/icon-win.png
   target:
     - target: nsis
       arch:
