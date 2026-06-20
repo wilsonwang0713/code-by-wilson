@@ -1,11 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createClaudeProvider } from "../src/main/provider/claude";
+import { _setPrRunner, _resetPrCache } from "../src/main/git/read-pr";
 import { tempHomes } from "./helpers/temp-home";
 
 const makeHome = tempHomes("cbw-metrics-");
+
+beforeEach(() => {
+  _resetPrCache();
+  _setPrRunner(async () => null); // never spawn gh in tests
+});
 
 function git(cwd: string, ...args: string[]): void {
   execFileSync("git", args, {
