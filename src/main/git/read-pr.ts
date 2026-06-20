@@ -63,7 +63,7 @@ export function readPr(
   now: Clock = Date.now,
 ): PrInfo | null {
   if (!cwd || !branch) return null;
-  const key = `${cwd} ${branch}`;
+  const key = `${cwd}\u0000${branch}`;
   const hit = cache.get(key);
   const t = now();
   if (hit && hit.expiry > t) return hit.value; // fresh
