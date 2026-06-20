@@ -6,6 +6,7 @@ import { Icon } from "../ui/icons";
 import type { IconName } from "../ui/icon-names";
 import { Wordmark, cx } from "../ui/atoms";
 import { footerView, type FooterView } from "../ui/rail-footer";
+import { cliStatusView } from "../ui/cli-status-view";
 
 type Section = "system" | "account" | "appearance" | "about";
 
@@ -169,7 +170,8 @@ function SystemSection({
   checking: boolean;
   onRecheck: () => void;
 }) {
-  const v = footerView(cliStatus);
+  const view = cliStatus ? cliStatusView(cliStatus) : null;
+  const tone: FooterView["dot"] = view?.tone ?? "idle";
   return (
     <>
       <Header
@@ -177,21 +179,32 @@ function SystemSection({
         lede="code-by-wire reads sessions through the Claude Code CLI and your local transcripts. This is the engine. Keep it green."
       />
       <Card title="Claude Code CLI">
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          <span className={cx("h-2.5 w-2.5 rounded-full", DOT_CLASS[v.dot])} />
+        <div className="flex items-start gap-3 border-b border-ink-850 px-4 py-3.5">
+          <span
+            className={cx("mt-1 h-2.5 w-2.5 rounded-full", DOT_CLASS[tone])}
+          />
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] text-fg">
-              {v.version ? `Claude Code v${v.version}` : "Claude Code"}
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-medium text-fg">
+                {view ? view.headline : "Checking…"}
+              </span>
+              {cliStatus?.version && (
+                <span className="font-mono text-[11px] text-fg-muted">
+                  v{cliStatus.version}
+                </span>
+              )}
             </div>
-            <div className="mt-0.5 text-[11.5px] capitalize text-fg-faint">
-              {v.statusLabel}
-            </div>
+            {view && (
+              <div className="mt-0.5 text-[11.5px] text-fg-muted">
+                {view.detail}
+              </div>
+            )}
           </div>
           <button
             type="button"
             onClick={onRecheck}
             disabled={checking || cliStatus === null}
-            className="inline-flex items-center gap-1.5 rounded-md border border-ink-700 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-600 hover:text-fg disabled:opacity-40"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-ink-700 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-600 hover:text-fg disabled:opacity-40"
           >
             <Icon
               name="rotate-ccw"
@@ -201,8 +214,115 @@ function SystemSection({
             Recheck
           </button>
         </div>
+
+        <DetailRow
+          label="Version"
+          value={cliStatus?.version ? `v${cliStatus.version}` : "not detected"}
+        />
+        <DetailRow
+          label="Binary"
+          value={cliStatus?.path ?? "no binary resolved"}
+          warn={
+            cliStatus && cliStatus.duplicates.length > 1
+              ? "Multiple claude installs found; the app uses the first."
+              : undefined
+          }
+        />
+        <DetailRow
+          label="Config"
+          value={cliStatus?.configDir.active ?? "~/.claude"}
+          warn={
+            cliStatus?.configDir.mismatch
+              ? `The CLI uses ${cliStatus.configDir.recovered}; restart after fixing.`
+              : undefined
+          }
+        />
+
+        <div className="flex flex-col gap-2 px-4 py-3.5">
+          {requirementsFor(cliStatus).map((r) => (
+            <Req key={r.label} state={r.state} label={r.label} />
+          ))}
+        </div>
       </Card>
     </>
+  );
+}
+
+/** A labelled CLI readout row: faint label, mono value, optional amber caveat. */
+function DetailRow({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: string;
+  warn?: string;
+}) {
+  return (
+    <div className="flex gap-3 border-b border-ink-850 px-4 py-2.5 text-[12px]">
+      <span className="w-16 shrink-0 text-fg-faint">{label}</span>
+      <div className="min-w-0 flex-1">
+        <div className="break-all font-mono text-fg-muted">{value}</div>
+        {warn && (
+          <div className="mt-1 text-[11px] text-accent-bright">{warn}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type ReqState = "pass" | "fail" | "unknown";
+
+/** The CLI status kind is the rollup of these gates; surface them as a checklist so a tripped CLI shows
+ *  *which* gate failed. notFound/unknown can't probe version or auth, so those read as unknown, not pass. */
+function requirementsFor(
+  status: CliStatus | null,
+): { label: string; state: ReqState }[] {
+  const kind = status?.kind;
+  const found: ReqState =
+    kind === undefined || kind === "unknown"
+      ? "unknown"
+      : kind === "notFound"
+        ? "fail"
+        : "pass";
+  // version and auth are only knowable once a binary resolved and reported.
+  const probeable =
+    kind === "ready" || kind === "outdated" || kind === "loggedOut";
+  const version: ReqState = !probeable
+    ? "unknown"
+    : kind === "outdated"
+      ? "fail"
+      : "pass";
+  const auth: ReqState = !probeable
+    ? "unknown"
+    : kind === "loggedOut"
+      ? "fail"
+      : "pass";
+  return [
+    { label: "CLI found on PATH", state: found },
+    { label: "Version meets minimum", state: version },
+    { label: "Authenticated", state: auth },
+  ];
+}
+
+function Req({ state, label }: { state: ReqState; label: string }) {
+  return (
+    <div className="flex items-center gap-2 text-[12px]">
+      {state === "unknown" ? (
+        <span className="flex h-3.5 w-3.5 items-center justify-center">
+          <span className="h-px w-2 bg-ink-600" />
+        </span>
+      ) : (
+        <Icon
+          name={state === "pass" ? "check" : "triangle-alert"}
+          size={13}
+          className={state === "pass" ? "text-working" : "text-danger"}
+        />
+      )}
+      <span className={state === "fail" ? "text-fg" : "text-fg-muted"}>
+        {label}
+      </span>
+    </div>
   );
 }
 
