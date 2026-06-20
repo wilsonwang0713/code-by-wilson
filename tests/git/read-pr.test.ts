@@ -21,10 +21,12 @@ describe("readPr", () => {
     let calls = 0;
     _setPrRunner(() => {
       calls++;
-      return Promise.resolve(JSON.stringify({
-        number: 166,
-        url: "https://github.com/o/r/pull/166",
-      }));
+      return Promise.resolve(
+        JSON.stringify({
+          number: 166,
+          url: "https://github.com/o/r/pull/166",
+        }),
+      );
     });
     const clock = 1000;
     const now = (): number => clock;
@@ -88,7 +90,9 @@ describe("readPr", () => {
   it("nulls a previously-cached PR when a later refresh rejects", async () => {
     let clock = 1000;
     const now = (): number => clock;
-    _setPrRunner(() => Promise.resolve(JSON.stringify({ number: 1, url: "u" })));
+    _setPrRunner(() =>
+      Promise.resolve(JSON.stringify({ number: 1, url: "u" })),
+    );
     expect(readPr("/repo", "main", now)).toBeNull();
     await flush();
     expect(readPr("/repo", "main", now)).toEqual({ number: 1, url: "u" });
