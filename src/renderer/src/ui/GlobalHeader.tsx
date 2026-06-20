@@ -39,12 +39,13 @@ const LAMP_CLASS: Record<FooterView["dot"], string> = {
  */
 export function GlobalHeader({
   cliStatus,
-  onOpenCliStatus,
+  onOpenSystem,
   onOpenSettings,
   settingsActive,
 }: {
   cliStatus: CliStatus | null;
-  onOpenCliStatus: () => void;
+  /** The Sys lamp jumps to Settings → System (the CLI status home). */
+  onOpenSystem: () => void;
   onOpenSettings: () => void;
   settingsActive: boolean;
 }) {
@@ -69,9 +70,8 @@ export function GlobalHeader({
       <div className="no-drag ml-auto flex items-center gap-2">
         <button
           type="button"
-          onClick={onOpenCliStatus}
-          disabled={cliStatus === null}
-          aria-label="Claude Code status and settings"
+          onClick={onOpenSystem}
+          aria-label="Claude Code status"
           title={
             v.version
               ? `Claude Code v${v.version} · ${v.statusLabel}`

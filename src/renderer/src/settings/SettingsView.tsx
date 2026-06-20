@@ -10,10 +10,11 @@ import { cliStatusView } from "../ui/cli-status-view";
 import { railAccountModel } from "../ui/rail-account";
 import { RateBar } from "../ui/charts";
 import { ctxColor } from "../ui/meta";
+import { remediesFor, INSTALL_TABS } from "../ui/cli-remedies";
 
-type Section = "system" | "account" | "appearance" | "about";
+export type SettingsSection = "system" | "account" | "appearance" | "about";
 
-const NAV: { key: Section; label: string; icon: IconName }[] = [
+const NAV: { key: SettingsSection; label: string; icon: IconName }[] = [
   { key: "system", label: "System", icon: "monitor" },
   { key: "account", label: "Account", icon: "circle-user" },
   { key: "appearance", label: "Appearance", icon: "palette" },
@@ -32,21 +33,26 @@ const DOT_CLASS: Record<FooterView["dot"], string> = {
 /**
  * The Settings view: a full Workspace-pane view (like the Overview) reached from the title-bar gear. A left
  * sub-nav switches between System (CLI/engine health), Account (identity + limits), Appearance, and About.
- * System and Account read the live cliStatus/account already on hand; the deeper CLI detail list and the
- * rate gauges land in later slices.
+ * The Sys lamp and the title-bar gear both route here; System is the new home for the Claude Code CLI
+ * status (it replaced the standalone modal), so the binary override and remedy commands live in it too.
  */
 export function SettingsView({
   cliStatus,
   account,
   checking,
   onRecheck,
+  onSetBinPath,
+  section,
+  onSectionChange,
 }: {
   cliStatus: CliStatus | null;
   account: Account | null;
   checking: boolean;
   onRecheck: () => void;
+  onSetBinPath: (path: string | null) => void;
+  section: SettingsSection;
+  onSectionChange: (section: SettingsSection) => void;
 }) {
-  const [section, setSection] = useState<Section>("system");
   const cliDot = footerView(cliStatus).dot;
   const cliTrips = cliDot === "warn" || cliDot === "error";
 
@@ -62,7 +68,7 @@ export function SettingsView({
             <button
               key={n.key}
               type="button"
-              onClick={() => setSection(n.key)}
+              onClick={() => onSectionChange(n.key)}
               className={cx(
                 "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors",
                 active
@@ -96,6 +102,7 @@ export function SettingsView({
               cliStatus={cliStatus}
               checking={checking}
               onRecheck={onRecheck}
+              onSetBinPath={onSetBinPath}
             />
           )}
           {section === "account" && <AccountSection account={account} />}
@@ -168,10 +175,12 @@ function SystemSection({
   cliStatus,
   checking,
   onRecheck,
+  onSetBinPath,
 }: {
   cliStatus: CliStatus | null;
   checking: boolean;
   onRecheck: () => void;
+  onSetBinPath: (path: string | null) => void;
 }) {
   const view = cliStatus ? cliStatusView(cliStatus) : null;
   const tone: FooterView["dot"] = view?.tone ?? "idle";
@@ -218,6 +227,12 @@ function SystemSection({
           </button>
         </div>
 
+        {cliStatus && cliStatus.kind !== "ready" && (
+          <div className="border-b border-ink-850 px-4 py-3">
+            <Remedy status={cliStatus} />
+          </div>
+        )}
+
         <DetailRow
           label="Version"
           value={cliStatus?.version ? `v${cliStatus.version}` : "not detected"}
@@ -247,7 +262,143 @@ function SystemSection({
           ))}
         </div>
       </Card>
+
+      <BinaryOverride
+        cliStatus={cliStatus}
+        checking={checking}
+        onSetBinPath={onSetBinPath}
+      />
     </>
+  );
+}
+
+/** The remedy block for a non-ready CLI: install tabs, an update/verify command, or login guidance, plus
+ *  a docs link. Ported from the old CLI status modal so a tripped CLI can be fixed without it. */
+function Remedy({ status }: { status: CliStatus }) {
+  const remedy = remediesFor({
+    kind: status.kind,
+    installMethod: status.installMethod,
+  });
+  const [tab, setTab] = useState(remedy.defaultTab ?? "native");
+  const activeInstall = INSTALL_TABS.find((t) => t.method === tab);
+  return (
+    <div className="flex flex-col gap-2.5">
+      {remedy.section === "install" && (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-1.5">
+            {INSTALL_TABS.map((t) => (
+              <button
+                key={t.method}
+                type="button"
+                onClick={() => setTab(t.method)}
+                className={cx(
+                  "rounded-md px-2 py-1 text-[12px] transition-colors",
+                  tab === t.method
+                    ? "bg-ink-700 text-fg"
+                    : "text-fg-muted hover:text-fg",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {activeInstall && (
+            <CommandRow cmd={activeInstall.command} note={activeInstall.note} />
+          )}
+        </div>
+      )}
+      {remedy.section === "update" && remedy.command && (
+        <CommandRow cmd={remedy.command} />
+      )}
+      {remedy.section === "login" && (
+        <div className="text-[12px] text-fg-faint">
+          Start a session (the terminal prompts you to log in), or run{" "}
+          <code className="font-mono">claude</code> in your shell.
+        </div>
+      )}
+      {remedy.section === "verify" && (
+        <div className="flex flex-col gap-2">
+          <div className="text-[12px] text-fg-faint">
+            Run <code className="font-mono">claude --version</code> in a
+            terminal to check it works.
+          </div>
+          {status.path && (
+            <CommandRow
+              cmd={`xattr -d com.apple.quarantine ${status.path}`}
+              note="If macOS blocked the binary."
+            />
+          )}
+        </div>
+      )}
+      <a
+        href="https://code.claude.com/docs/en/setup"
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-[12px] text-primary transition-colors hover:text-primary-bright"
+      >
+        <Icon name="arrow-up-right" size={12} />
+        Install docs
+      </a>
+    </div>
+  );
+}
+
+function CommandRow({ cmd, note }: { cmd: string; note?: string }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 rounded-md border border-ink-800 bg-ink-950 px-2 py-1.5">
+        <code className="flex-1 overflow-x-auto font-mono text-[12px] text-working">
+          {cmd}
+        </code>
+        <button
+          type="button"
+          onClick={() => void navigator.clipboard.writeText(cmd)}
+          className="shrink-0 text-[12px] text-fg-faint transition-colors hover:text-fg"
+        >
+          copy
+        </button>
+      </div>
+      {note && <div className="mt-1 text-[10px] text-fg-faint">{note}</div>}
+    </div>
+  );
+}
+
+function BinaryOverride({
+  cliStatus,
+  checking,
+  onSetBinPath,
+}: {
+  cliStatus: CliStatus | null;
+  checking: boolean;
+  onSetBinPath: (path: string | null) => void;
+}) {
+  const [binPath, setBinPath] = useState(
+    cliStatus?.source === "override" ? (cliStatus.path ?? "") : "",
+  );
+  return (
+    <Card title="Binary override">
+      <div className="px-4 py-3.5">
+        <p className="text-[11.5px] text-fg-faint">
+          Point the app at a specific claude binary. Applies to app launches.
+        </p>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={binPath}
+            onChange={(e) => setBinPath(e.target.value)}
+            placeholder="/absolute/path/to/claude"
+            className="min-w-0 flex-1 rounded-md border border-ink-700 bg-well px-2.5 py-1.5 font-mono text-[12px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+          />
+          <button
+            type="button"
+            onClick={() => onSetBinPath(binPath.trim() || null)}
+            disabled={checking}
+            className="shrink-0 rounded-md border border-ink-700 bg-ink-925 px-3 py-1.5 text-[13px] text-fg transition-colors hover:bg-ink-850 disabled:opacity-60"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </Card>
   );
 }
 

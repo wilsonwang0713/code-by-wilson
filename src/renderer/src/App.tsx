@@ -15,12 +15,11 @@ import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
 import { SessionList } from "./SessionList";
-import { CliStatusModal } from "./ui/CliStatusModal";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
 import { OVERVIEW_ID } from "./stats/sentinel";
-import { SettingsView } from "./settings/SettingsView";
+import { SettingsView, type SettingsSection } from "./settings/SettingsView";
 import { SETTINGS_ID } from "./settings/sentinel";
 
 /** How often the session list re-syncs in the background, so an open workspace's state (and the
@@ -38,8 +37,10 @@ export function App() {
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
-  // Whether the CLI status modal is open (opened from the rail panel's info button).
-  const [cliStatusOpen, setCliStatusOpen] = useState(false);
+  // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
+  // reopens wherever the user last was.
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("system");
   // True while a CLI status check (Re-check, or saving a binary-path override) is in flight — drives the spinner.
   const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -272,7 +273,10 @@ export function App() {
     <div className="app-bg flex h-screen flex-col text-fg">
       <GlobalHeader
         cliStatus={cliStatus}
-        onOpenCliStatus={() => setCliStatusOpen(true)}
+        onOpenSystem={() => {
+          setSettingsSection("system");
+          setSelectedId(SETTINGS_ID);
+        }}
         onOpenSettings={() => setSelectedId(SETTINGS_ID)}
         settingsActive={isSettings}
       />
@@ -292,6 +296,9 @@ export function App() {
               account={account}
               checking={checking}
               onRecheck={() => void recheckCli()}
+              onSetBinPath={(p) => void setClaudeBinPath(p)}
+              section={settingsSection}
+              onSectionChange={setSettingsSection}
             />
           ) : isOverview ? (
             <StatsView />
@@ -312,19 +319,6 @@ export function App() {
         <NewSessionDialog
           onCreate={createSession}
           onCancel={() => setCreating(false)}
-        />
-      )}
-      {cliStatusOpen && cliStatus && (
-        <CliStatusModal
-          // Remount when the values the modal's useState initializers derive from change — kind +
-          // installMethod pick the default install tab; source + path prefill the override — so a
-          // Re-check can't leave them stale. A no-op re-check keeps the instance and any typed input.
-          key={`${cliStatus.kind}:${cliStatus.installMethod}:${cliStatus.source}:${cliStatus.path ?? ""}`}
-          status={cliStatus}
-          checking={checking}
-          onClose={() => setCliStatusOpen(false)}
-          onRecheck={() => void recheckCli()}
-          onSetBinPath={(p) => void setClaudeBinPath(p)}
         />
       )}
     </div>
