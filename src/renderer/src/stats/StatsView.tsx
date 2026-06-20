@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -14,7 +13,6 @@ import {
   type StatsTotals,
   type StatsByModel,
   type StatsByProject,
-  type StatsByBranch,
   type StatsBySession,
   type StatsRange,
   type RangePreset,
@@ -22,7 +20,6 @@ import {
   type CalendarDay,
   DEFAULT_RANGE,
   emptySnapshot,
-  branchRowKey,
   tokensOf,
   isDayRange,
   rangeWindow,
@@ -41,17 +38,12 @@ import {
 import { Icon } from "../ui/icons";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
-  Donut,
   BarSeries,
   CalendarHeatmap,
   StackedBar,
   type DayColumn,
 } from "../ui/charts";
-import {
-  MODEL_SEGMENT_COLORS,
-  COST_SEGMENT_COLORS,
-  CALENDAR_RAMP,
-} from "../ui/meta";
+import { KIND_SEGMENT_COLORS, modelColorOf, CALENDAR_RAMP } from "../ui/meta";
 import {
   calendarGrid,
   intensityThresholds,
@@ -67,7 +59,6 @@ import {
   type SessionSort,
   type SessionSortKey,
 } from "./session-sort";
-import { groupProjectBranches, TOP_PROJECTS } from "./project-branches";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -186,7 +177,9 @@ export function StatsView() {
     <OverlayScroll className="h-full min-w-0 flex-1 bg-ink-950 text-fg">
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 px-6 py-6">
         <header className="flex items-center justify-between">
-          <h1 className="font-display text-lg text-fg">Overall stats</h1>
+          <h1 className="font-display text-xl font-semibold tracking-tight text-fg">
+            Usage
+          </h1>
           <div className="flex items-center gap-2">
             {isDayRange(range) && (
               <button
@@ -275,6 +268,7 @@ export function StatsView() {
                     daily={snap.daily}
                     byModel={snap.byModel}
                     range={range}
+                    includeCache={includeCache}
                   />
                 )}
                 {(snap.byModel.length > 0 || snap.byProject.length > 0) && (
@@ -294,7 +288,6 @@ export function StatsView() {
                     {snap.byProject.length > 0 && (
                       <ByProject
                         rows={snap.byProject}
-                        branches={snap.byBranch}
                         includeCache={includeCache}
                       />
                     )}
@@ -609,14 +602,14 @@ function KpiStrip({
   // only, so drop the two cache segments — then the bar composition matches the number above it.
   const kindSegments = includeCache
     ? [
-        { value: totals.inputTokens, color: COST_SEGMENT_COLORS[0] },
-        { value: totals.outputTokens, color: COST_SEGMENT_COLORS[1] },
-        { value: totals.cacheReadTokens, color: COST_SEGMENT_COLORS[2] },
-        { value: totals.cacheCreationTokens, color: COST_SEGMENT_COLORS[3] },
+        { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
+        { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
+        { value: totals.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
+        { value: totals.cacheCreationTokens, color: KIND_SEGMENT_COLORS[3] },
       ]
     : [
-        { value: totals.inputTokens, color: COST_SEGMENT_COLORS[0] },
-        { value: totals.outputTokens, color: COST_SEGMENT_COLORS[1] },
+        { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
+        { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
       ];
   const tokenTotal = includeCache
     ? totals.inputTokens +
@@ -625,7 +618,7 @@ function KpiStrip({
       totals.cacheCreationTokens
     : totals.inputTokens + totals.outputTokens;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-ink-800 bg-ink-925 lg:grid-cols-4">
       <KpiCard
         label="Sessions"
         value={totals.sessions.toLocaleString("en-US")}
@@ -636,7 +629,7 @@ function KpiStrip({
         <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] text-fg-faint">
           {KIND_LABELS.slice(0, kindSegments.length).map((label, i) => (
             <span key={label} className="flex items-center gap-1">
-              <Swatch color={COST_SEGMENT_COLORS[i]} />
+              <Swatch color={KIND_SEGMENT_COLORS[i]} />
               {label}
             </span>
           ))}
@@ -675,11 +668,11 @@ function KpiCard({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col rounded-xl border border-ink-800 bg-ink-925 px-4 py-3.5">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-faint">
+    <div className="flex flex-col border-r border-ink-850 px-4 py-3.5 last:border-r-0">
+      <div className="font-display text-[9.5px] font-semibold uppercase tracking-[0.13em] text-fg-faint">
         {label}
       </div>
-      <div className="mt-1.5 font-display text-[28px] leading-none tracking-tight text-fg">
+      <div className="mt-1.5 font-mono text-[25px] font-medium leading-none tracking-tight tabular-nums text-fg">
         {value}
       </div>
       {children}
@@ -694,7 +687,7 @@ type StackBy = "kind" | "model";
 const STACK_LABELS: Record<StackBy, string> = { kind: "Kind", model: "Model" };
 const STACK_OPTS = Object.entries(STACK_LABELS) as [StackBy, string][];
 
-/** The by-kind segment labels, paired by index with COST_SEGMENT_COLORS (input/output/cache-read/
+/** The by-kind segment labels, paired by index with KIND_SEGMENT_COLORS (input/output/cache-read/
  *  cache-write). One source for the legend, the tooltip, and the stack order. */
 const KIND_LABELS = ["Input", "Output", "Cache read", "Cache write"] as const;
 
@@ -708,23 +701,26 @@ const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
  * The daily usage time-series (#114): one stacked SVG bar per local calendar day across the active range,
  * with a readable Y axis and a hover tooltip giving that day's exact numbers. The stack-by toggle (in this
  * panel's header, top-right) switches between token kind (default) and model; both stackings ride the same
- * payload, so it never re-fetches. The chart shows the full token composition regardless of the page's
- * "Include cache" pill — cache is its own segment here, not a hidden total.
+ * payload, so it never re-fetches. The by-kind view honors the page's "Include cache" pill: cache folds out
+ * to leave input + output when it's off, matching the rest of the page. The by-model view always shows full
+ * totals, since the daily buckets carry only a per-model total, with no per-model kind split to fold.
  *
  * The store's daily buckets are sparse (only days with turns); we densify the contiguous range so a quiet
  * day reads as a gap. The range's start and end days come from rangeWindow (the same bounds main scopes
- * to): a single-day range renders one column; all-time starts at the earliest bucket. The model series order and colors come from the snapshot's
- * byModel (its store order, tokens desc), so the chart matches the By-model panel in the default cache-on
- * view; with "Include cache" off that panel re-ranks and can recolor, which the chart doesn't follow.
+ * to): a single-day range renders one column; all-time starts at the earliest bucket. The model series order
+ * comes from the snapshot's byModel (store order, tokens desc); each model's hue is its fixed identity color
+ * (modelColorOf), so it matches the By-model panel whether or not cache is included.
  */
 function DailyUsage({
   daily,
   byModel,
   range,
+  includeCache,
 }: {
   daily: DailyBucket[];
   byModel: StatsByModel[];
   range: StatsRange;
+  includeCache: boolean;
 }) {
   const [stackBy, setStackBy] = useState<StackBy>("kind");
 
@@ -738,18 +734,31 @@ function DailyUsage({
     sinceMs != null ? localDayKey(sinceMs) : (daily[0]?.day ?? endDay);
   const days = densifyDays(daily, startDay, endDay);
 
+  // Token-kind segments for a day, in stack order. Cache folds out when the page's "Include cache" pill is
+  // off, so the by-kind chart shows fresh input + output only (matching the rest of the page) instead of
+  // always rendering the full composition.
+  const kindCount = includeCache ? 4 : 2;
+  const kindSegments = (d: DailyBucket) =>
+    [d.inputTokens, d.outputTokens, d.cacheReadTokens, d.cacheCreationTokens]
+      .slice(0, kindCount)
+      .map((value, idx) => ({
+        label: KIND_LABELS[idx],
+        value,
+        color: KIND_SEGMENT_COLORS[idx],
+      }));
+
   // Model series: the snapshot's byModel order (tokens desc), each paired by store index to a cycled color,
   // so the hue matches the By-model panel's cache-on assignment. Drop any model that never lands on a
   // rendered day: in the all-time view byModel can carry a model whose turns are all unknown-time (ts=0),
-  // which daily excludes — without this it would sit in the legend with no bar. Pairing the color before the
-  // filter keeps the survivors' hues aligned with the By-model panel (it indexes by the same store order).
+  // which daily excludes — without this it would sit in the legend with no bar. Color keys off the model
+  // family (modelColorOf), so a model's hue matches the By-model panel and stays put as the set changes.
   const presentModels = new Set<string>();
   for (const d of days)
     for (const e of d.byModel) presentModels.add(modelKey(e.modelRaw));
   const series = byModel
-    .map((r, i) => ({
+    .map((r) => ({
       modelRaw: r.modelRaw,
-      color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
+      color: modelColorOf(r.modelRaw),
     }))
     .filter((s) => presentModels.has(modelKey(s.modelRaw)));
 
@@ -764,12 +773,10 @@ function DailyUsage({
     stackBy === "kind"
       ? {
           key: d.day,
-          segments: [
-            { value: d.inputTokens, color: COST_SEGMENT_COLORS[0] },
-            { value: d.outputTokens, color: COST_SEGMENT_COLORS[1] },
-            { value: d.cacheReadTokens, color: COST_SEGMENT_COLORS[2] },
-            { value: d.cacheCreationTokens, color: COST_SEGMENT_COLORS[3] },
-          ],
+          segments: kindSegments(d).map((s) => ({
+            value: s.value,
+            color: s.color,
+          })),
         }
       : {
           key: d.day,
@@ -791,9 +798,9 @@ function DailyUsage({
 
   const legend =
     stackBy === "kind"
-      ? KIND_LABELS.map((label, i) => ({
+      ? KIND_LABELS.slice(0, kindCount).map((label, i) => ({
           label,
-          color: COST_SEGMENT_COLORS[i],
+          color: KIND_SEGMENT_COLORS[i],
         }))
       : series.map((s) => ({
           label: s.modelRaw ?? "Unknown",
@@ -802,35 +809,9 @@ function DailyUsage({
 
   const renderTooltip = (i: number): ReactNode => {
     const d = days[i];
-    const total =
-      d.inputTokens +
-      d.outputTokens +
-      d.cacheReadTokens +
-      d.cacheCreationTokens;
     const rows =
       stackBy === "kind"
-        ? [
-            {
-              label: "Input",
-              value: d.inputTokens,
-              color: COST_SEGMENT_COLORS[0],
-            },
-            {
-              label: "Output",
-              value: d.outputTokens,
-              color: COST_SEGMENT_COLORS[1],
-            },
-            {
-              label: "Cache read",
-              value: d.cacheReadTokens,
-              color: COST_SEGMENT_COLORS[2],
-            },
-            {
-              label: "Cache write",
-              value: d.cacheCreationTokens,
-              color: COST_SEGMENT_COLORS[3],
-            },
-          ].filter((r) => r.value > 0)
+        ? kindSegments(d).filter((r) => r.value > 0)
         : series
             .map((s) => ({
               label: s.modelRaw ?? "Unknown",
@@ -838,6 +819,9 @@ function DailyUsage({
               color: s.color,
             }))
             .filter((r) => r.value > 0);
+    // Sum the shown rows: the kind view drops cache when the pill is off, the model view always totals all
+    // kinds — so the tooltip total tracks exactly what the bar stacks.
+    const total = rows.reduce((sum, r) => sum + r.value, 0);
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
@@ -967,8 +951,9 @@ function ByModel({
   // Skip on a window with no tokens at all, judged on the full total so flipping the toggle never makes the
   // whole panel vanish; at worst the donut hides on a pure-cache window in exclude mode (below).
   if (!rows.some((r) => r.totalTokens > 0)) return null;
-  // Re-rank by the displayed metric so the table reads biggest-first and the donut colors pair to it; ties
-  // break by raw id for stability. Color is assigned after the sort so it tracks the row, not the model.
+  // Re-rank by the displayed metric so the table reads biggest-first; ties break by raw id for stability.
+  // Each row takes its model's fixed identity color (the same hue it carries everywhere else), so the
+  // bars are a legend you only learn once.
   const ranked = rows
     .map((r) => ({ ...r, tokens: tokensOf(r, includeCache) }))
     .sort(
@@ -976,212 +961,137 @@ function ByModel({
         b.tokens - a.tokens ||
         (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
     )
-    .map((r, i) => ({
+    .map((r) => ({
       ...r,
-      color: MODEL_SEGMENT_COLORS[i % MODEL_SEGMENT_COLORS.length],
+      color: modelColorOf(r.modelRaw),
     }));
-  // When the chosen metric is zero for every row (a pure cache-read window in exclude mode) the donut would
-  // be a featureless track, so drop it and let the table stand alone.
-  const segments = ranked.map((r) => ({ value: r.tokens, color: r.color }));
-  const hasDonut = segments.some((s) => s.value > 0);
+  const max = Math.max(...ranked.map((r) => r.tokens), 1);
   return (
     <StatsPanel title="By model">
-      <div className="flex items-center gap-4">
-        {hasDonut && <Donut segments={segments} />}
-        <table className="min-w-0 flex-1 text-[12px]">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
-              <th scope="col" className="pb-1.5 text-left font-normal">
-                Model
-              </th>
-              <th scope="col" className="pb-1.5 text-right font-normal">
-                Tokens
-              </th>
-              <th scope="col" className="pb-1.5 text-right font-normal">
-                Equiv API value
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Key on the raw id (unique per GROUP BY row); the null "Unknown" bucket gets a NUL sentinel a
-                real model id can never be, so it can't collide with a model whose raw string is "unknown". */}
-            {ranked.map((r) => (
-              <tr
-                key={r.modelRaw ?? "\u0000"}
-                className="border-t border-ink-850"
-              >
-                <td className="py-1 pr-2">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <Swatch color={r.color} />
-                    <span className="truncate text-fg">
-                      {r.modelRaw ?? "Unknown"}
-                    </span>
-                  </span>
-                </td>
-                <td className="py-1 text-right font-mono tabular-nums text-fg-muted">
-                  {formatTokensShort(r.tokens)}
-                </td>
-                <td className="py-1 text-right font-mono tabular-nums text-fg-muted">
-                  {r.equivApiValueUsd == null
-                    ? "n/a"
-                    : formatUsd(r.equivApiValueUsd)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex flex-col gap-3.5">
+        {/* Key on the raw id (unique per GROUP BY row); the null "Unknown" bucket gets a NUL sentinel a
+            real model id can never be, so it can't collide with a model whose raw string is "unknown". */}
+        {ranked.map((r) => (
+          <div
+            key={r.modelRaw ?? "\u0000"}
+            className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1.5"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <Swatch color={r.color} />
+              <span className="truncate text-[12.5px] text-fg">
+                {r.modelRaw ?? "Unknown"}
+              </span>
+            </span>
+            <span className="font-mono text-[11.5px] tabular-nums text-fg-muted">
+              {formatTokensShort(r.tokens)}
+            </span>
+            <span className="w-16 text-right font-mono text-[11.5px] tabular-nums text-fg">
+              {r.equivApiValueUsd == null
+                ? "n/a"
+                : formatUsd(r.equivApiValueUsd)}
+            </span>
+            <div className="col-span-3 h-[5px] overflow-hidden rounded-full bg-ink-850">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${(r.tokens / max) * 100}%`,
+                  background: r.color,
+                }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </StatsPanel>
   );
 }
 
-/** The per-project breakdown (#112), now with its branches folded in. Top projects as horizontal bars with
- *  tokens and Equivalent API value; a project with real branch detail carries a disclosure caret that
- *  reveals its branches (label, tokens, Equiv) as indented sub-rows. Keyed on the full cwd so two repos that
- *  share a basename stay separate and a branch never lands under the wrong one; projects and branches both
- *  rank by the displayed Tokens metric, so order and caps follow the page's Include-cache toggle. Capped to
- *  the top N projects with a "+N more" note that flags when those hidden projects still carry branch detail
- *  (folded under the top-N, it's otherwise unreachable); each expanded project caps its branches the same way. */
+/** Display cap for the By-project panel: projects past the top N roll into a "+N more" note. */
+const TOP_PROJECTS = 5;
+
+/** The per-project breakdown (#112). Top projects as horizontal bars with tokens and Equivalent API value,
+ *  keyed on the full cwd so two repos that share a basename stay separate. Ranks by the displayed Tokens
+ *  metric, so order follows the page's Include-cache toggle; capped to the top N with a "+N more" note. */
 function ByProject({
   rows,
-  branches,
   includeCache,
 }: {
   rows: StatsByProject[];
-  branches: StatsByBranch[];
   includeCache: boolean;
 }) {
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
   if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const groups = groupProjectBranches(rows, branches, includeCache);
-  const top = groups.slice(0, TOP_PROJECTS);
+  const ranked = rows
+    .slice()
+    .sort(
+      (a, b) =>
+        tokensOf(b, includeCache) - tokensOf(a, includeCache) ||
+        a.cwd.localeCompare(b.cwd),
+    );
+  const top = ranked.slice(0, TOP_PROJECTS);
   // Bars size on the displayed metric; the denominator is the largest shown value. A zero denominator (a
   // pure cache window in exclude mode) yields empty bars rather than a divide-by-zero.
   const max = Math.max(...top.map((r) => tokensOf(r, includeCache)));
-  // Projects past the cap roll into the "+N more" note. Flag when any of them still carries branch detail:
-  // folding branches under the top-N projects means those branches are otherwise unreachable on the page.
-  const hidden = groups.slice(TOP_PROJECTS);
-  const rest = hidden.length;
-  const hiddenHaveBranches = hidden.some((g) => g.expandable);
-  const toggle = (cwd: string): void =>
-    setOpen((s) => {
-      const next = new Set(s);
-      if (next.has(cwd)) next.delete(cwd);
-      else next.add(cwd);
-      return next;
-    });
+  const rest = ranked.length - top.length;
   return (
     <StatsPanel title="By project">
-      <table className="w-full text-[12px]">
+      <table className="w-full table-fixed text-[12px]">
+        <colgroup>
+          <col className="w-[58%]" />
+          <col className="w-[21%]" />
+          <col className="w-[21%]" />
+        </colgroup>
         <thead>
           <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
-            <th scope="col" className="pb-1.5 text-left font-normal">
+            <th
+              scope="col"
+              className="whitespace-nowrap pb-1.5 text-left font-normal"
+            >
               Project
             </th>
-            <th scope="col" className="pb-1.5 text-right font-normal">
+            <th
+              scope="col"
+              className="whitespace-nowrap pb-1.5 text-right font-normal"
+            >
               Tokens
             </th>
-            <th scope="col" className="pb-1.5 text-right font-normal">
-              Equiv API value
+            <th
+              scope="col"
+              className="whitespace-nowrap pb-1.5 text-right font-normal"
+            >
+              Equiv. value
             </th>
           </tr>
         </thead>
         <tbody>
-          {top.map((r) => {
-            // Gate on expandable too: a project can lose its last real branch on a later poll (a trailing
-            // window ages it out), dropping the chevron while its cwd lingers in `open`. Without this the
-            // sub-rows would render stuck open with nothing to collapse them; folding it in also makes any
-            // stranded `open` entry inert.
-            const isOpen = r.expandable && open.has(r.cwd);
-            return (
-              <Fragment key={r.cwd}>
-                <tr className="border-t border-ink-850">
-                  <td className="py-1.5 pr-3 align-middle">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      {r.expandable ? (
-                        <button
-                          type="button"
-                          onClick={() => toggle(r.cwd)}
-                          aria-expanded={isOpen}
-                          title={r.cwd}
-                          className="flex min-w-0 items-center gap-1 text-left text-fg"
-                        >
-                          <Icon
-                            name="chevron-right"
-                            size={11}
-                            className={`shrink-0 text-fg-faint transition-transform ${
-                              isOpen ? "rotate-90" : ""
-                            }`}
-                          />
-                          <span className="truncate">{r.project}</span>
-                        </button>
-                      ) : (
-                        <span
-                          className="truncate pl-[15px] text-fg"
-                          title={r.cwd}
-                        >
-                          {r.project}
-                        </span>
-                      )}
-                      <Bar
-                        pct={
-                          max > 0 ? (tokensOf(r, includeCache) / max) * 100 : 0
-                        }
-                        fill="bg-working/70"
-                        className="w-full"
-                      />
-                    </div>
-                  </td>
-                  <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
-                    {formatTokensShort(tokensOf(r, includeCache))}
-                  </td>
-                  <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
-                    {r.equivApiValueUsd == null
-                      ? "n/a"
-                      : formatUsd(r.equivApiValueUsd)}
-                  </td>
-                </tr>
-                {isOpen &&
-                  r.branches.map((b) => (
-                    <tr
-                      key={branchRowKey(b.cwd, b.branch)}
-                      className="bg-ink-900/30"
-                    >
-                      <td className="py-1 pr-3 pl-[22px]">
-                        <span className="block truncate font-mono text-[11px] text-fg-muted">
-                          {b.branch ?? "—"}
-                        </span>
-                      </td>
-                      <td className="py-1 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-                        {formatTokensShort(tokensOf(b, includeCache))}
-                      </td>
-                      <td className="py-1 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-                        {b.equivApiValueUsd == null
-                          ? "n/a"
-                          : formatUsd(b.equivApiValueUsd)}
-                      </td>
-                    </tr>
-                  ))}
-                {isOpen && r.branchOverflow > 0 && (
-                  <tr className="bg-ink-900/30">
-                    <td
-                      colSpan={3}
-                      className="py-1 pl-[22px] text-[10px] text-fg-faint"
-                    >
-                      +{r.branchOverflow}{" "}
-                      {r.branchOverflow === 1 ? "more branch" : "more branches"}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
+          {top.map((r) => (
+            <tr key={r.cwd} className="border-t border-ink-850">
+              <td className="py-1.5 pr-3 align-middle">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-fg" title={r.cwd}>
+                    {r.project}
+                  </span>
+                  <Bar
+                    pct={max > 0 ? (tokensOf(r, includeCache) / max) * 100 : 0}
+                    fill="bg-[var(--color-data-1)]"
+                    className="w-full"
+                  />
+                </div>
+              </td>
+              <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
+                {formatTokensShort(tokensOf(r, includeCache))}
+              </td>
+              <td className="py-1.5 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
+                {r.equivApiValueUsd == null
+                  ? "n/a"
+                  : formatUsd(r.equivApiValueUsd)}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
       {rest > 0 && (
         <p className="mt-2 text-[11px] text-fg-faint">
           +{rest} more {rest === 1 ? "project" : "projects"}
-          {hiddenHaveBranches && " (branches hidden)"}
         </p>
       )}
     </StatsPanel>
@@ -1191,7 +1101,7 @@ function ByProject({
 /** A capped display list: the per-Session table can run to hundreds of rows over all-time, so it shows the
  *  top N by the ACTIVE sort with a "+N more" note — sort-then-cap, so re-sorting by cost surfaces the most
  *  expensive sessions across all history, not a reshuffle of the most-recent N. */
-const TOP_SESSIONS = 50;
+const TOP_SESSIONS = 25;
 
 /** One sortable column header: a button that toggles the active sort. Clicking an inactive column sorts it
  *  by its natural first direction (defaultDirFor); clicking the active column flips direction. The active
@@ -1216,14 +1126,16 @@ function SortHeader({
       aria-sort={
         active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"
       }
-      className={`pb-1.5 font-normal ${
+      className={`whitespace-nowrap pb-1.5 font-normal ${
         align === "right" ? "text-right" : "text-left"
       }`}
     >
       <button
         type="button"
         onClick={() => onSort(column)}
-        className={`inline-flex items-center gap-0.5 transition-colors hover:text-fg ${
+        // Buttons don't inherit text-transform from the uppercase <tr>, so set it here or the
+        // sortable headers render mixed-case while the By-project <th>s above stay uppercase.
+        className={`inline-flex items-center gap-0.5 uppercase transition-colors hover:text-fg ${
           align === "right" ? "flex-row-reverse" : ""
         } ${active ? "text-fg-muted" : ""}`}
       >
@@ -1268,7 +1180,16 @@ function BySession({
   const now = Date.now();
   return (
     <StatsPanel title="By session">
-      <table className="w-full text-[12px]">
+      <table className="w-full table-fixed text-[12px]">
+        <colgroup>
+          <col className="w-[24%]" />
+          <col className="w-[15%]" />
+          <col className="w-[14%]" />
+          <col className="w-[11%]" />
+          <col className="w-[10%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+        </colgroup>
         <thead>
           <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
             <SortHeader
@@ -1310,7 +1231,7 @@ function BySession({
               onSort={onSort}
             />
             <SortHeader
-              label="Equiv API value"
+              label="Equiv. value"
               column="cost"
               sort={sort}
               onSort={onSort}
@@ -1327,8 +1248,11 @@ function BySession({
                 </span>
               </td>
               <td className="py-1 pr-3">
-                <span className="block truncate font-mono text-fg-muted">
-                  {r.modelRaw ?? "Unknown"}
+                <span className="flex min-w-0 items-center gap-2">
+                  <Swatch color={modelColorOf(r.modelRaw)} />
+                  <span className="truncate font-mono text-fg-muted">
+                    {r.modelRaw ?? "Unknown"}
+                  </span>
                 </span>
               </td>
               <td className="py-1 pl-2 text-right tabular-nums text-fg-muted">
@@ -1389,7 +1313,7 @@ function StatsPanel({
   return (
     <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
       <header className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted">
+        <h2 className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-fg-faint">
           {title}
         </h2>
         {right}

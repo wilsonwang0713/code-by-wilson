@@ -72,7 +72,7 @@ export function HeaderActions({
             title={
               canSpawn
                 ? undefined
-                : "Claude Code CLI isn't usable — see the status at the bottom of the rail."
+                : "Claude Code CLI isn't usable — see Sys status in the title bar."
             }
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[12px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
           >

@@ -14,12 +14,15 @@ import { Workspace } from "./workspace/Workspace";
 import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
+import { CautionBanner } from "./ui/CautionBanner";
+import { cliStatusView } from "./ui/cli-status-view";
 import { SessionList } from "./SessionList";
-import { CliStatusModal } from "./ui/CliStatusModal";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
 import { OVERVIEW_ID } from "./stats/sentinel";
+import { SettingsView, type SettingsSection } from "./settings/SettingsView";
+import { SETTINGS_ID } from "./settings/sentinel";
 
 /** How often the session list re-syncs in the background, so an open workspace's state (and the
  *  Overview) tracks a session as it moves. Slower than the transcript poll: metadata changes less
@@ -36,8 +39,10 @@ export function App() {
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
-  // Whether the CLI status modal is open (opened from the rail panel's info button).
-  const [cliStatusOpen, setCliStatusOpen] = useState(false);
+  // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
+  // reopens wherever the user last was.
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection>("system");
   // True while a CLI status check (Re-check, or saving a binary-path override) is in flight — drives the spinner.
   const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,7 +51,6 @@ export function App() {
   // session to leave it.
   const [selectedId, setSelectedId] = useState<string | null>(OVERVIEW_ID);
   const [creating, setCreating] = useState(false);
-  const [query, setQuery] = useState("");
 
   // Sessions and account come from one overview read, so apply them together — a stale or failed
   // half can't leave the list and the account disagreeing.
@@ -236,25 +240,28 @@ export function App() {
     [sessions, drafts, adopting],
   );
   const isOverview = selectedId === OVERVIEW_ID;
+  const isSettings = selectedId === SETTINGS_ID;
+  // Both pinned views (Overview, Settings) are non-session selections: the per-session lookup and the
+  // auto-select effect must treat them as valid, never as a stale/missing session to re-home.
+  const isPinned = isOverview || isSettings;
   const selected =
-    !isOverview && selectedId !== null
+    !isPinned && selectedId !== null
       ? (all.find((s) => s.id === selectedId) ?? null)
       : null;
 
-  // The selection follows the unfiltered list, not the rail's `query` — filtering the rail must never
-  // yank the open session away. Re-home only when the list first arrives, the open session vanishes, or
-  // the list empties. Keyed on the id list so it can't loop on a fresh `all` each render; setting the
-  // same id is a no-op.
+  // Re-home the selection only when the list first arrives, the open session vanishes, or the list
+  // empties. Keyed on the id list so it can't loop on a fresh `all` each render; setting the same id is
+  // a no-op.
   const ids = useMemo(() => all.map((s) => s.id).join(","), [all]);
   useEffect(() => {
     if (all.length === 0) {
-      // Overview is a valid selection even with no sessions (it shows the empty state); only clear a
-      // stale *session* selection.
-      if (selectedId !== null && !isOverview) setSelectedId(null);
+      // The pinned views (Overview, Settings) are valid even with no sessions (Overview shows the empty
+      // state); only clear a stale *session* selection.
+      if (selectedId !== null && !isPinned) setSelectedId(null);
       return;
     }
     if (
-      !isOverview &&
+      !isPinned &&
       (selectedId === null || !all.some((s) => s.id === selectedId))
     ) {
       // Pick the rail's top row (Active newest-created first, then Ended) so the auto-opened session
@@ -264,24 +271,47 @@ export function App() {
     }
   }, [ids]);
 
+  const showSystem = (): void => {
+    setSettingsSection("system");
+    setSelectedId(SETTINGS_ID);
+  };
+  // The master-caution strip shows whenever the CLI is non-ok, except while already in Settings (the strip
+  // deep-links there) and during the pre-first-check window (no status to judge yet).
+  const showCaution =
+    cliStatus !== null && !isSettings && cliStatusView(cliStatus).tone !== "ok";
+
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
-      <GlobalHeader />
+      <GlobalHeader
+        cliStatus={cliStatus}
+        onOpenSystem={showSystem}
+        onOpenSettings={() => setSelectedId(SETTINGS_ID)}
+        settingsActive={isSettings}
+      />
+      {showCaution && cliStatus && (
+        <CautionBanner status={cliStatus} onOpenSystem={showSystem} />
+      )}
       <div className="flex min-h-0 flex-1">
         <SessionList
           sessions={all}
           selectedId={selectedId}
           onSelect={setSelectedId}
           onNew={() => setCreating(true)}
-          query={query}
-          onQuery={setQuery}
           account={account}
-          cliStatus={cliStatus}
-          onOpenCliStatus={() => setCliStatusOpen(true)}
           canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">
-          {isOverview ? (
+          {isSettings ? (
+            <SettingsView
+              cliStatus={cliStatus}
+              account={account}
+              checking={checking}
+              onRecheck={() => void recheckCli()}
+              onSetBinPath={(p) => void setClaudeBinPath(p)}
+              section={settingsSection}
+              onSectionChange={setSettingsSection}
+            />
+          ) : isOverview ? (
             <StatsView />
           ) : selected ? (
             <Workspace
@@ -300,19 +330,6 @@ export function App() {
         <NewSessionDialog
           onCreate={createSession}
           onCancel={() => setCreating(false)}
-        />
-      )}
-      {cliStatusOpen && cliStatus && (
-        <CliStatusModal
-          // Remount when the values the modal's useState initializers derive from change — kind +
-          // installMethod pick the default install tab; source + path prefill the override — so a
-          // Re-check can't leave them stale. A no-op re-check keeps the instance and any typed input.
-          key={`${cliStatus.kind}:${cliStatus.installMethod}:${cliStatus.source}:${cliStatus.path ?? ""}`}
-          status={cliStatus}
-          checking={checking}
-          onClose={() => setCliStatusOpen(false)}
-          onRecheck={() => void recheckCli()}
-          onSetBinPath={(p) => void setClaudeBinPath(p)}
         />
       )}
     </div>

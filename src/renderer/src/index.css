@@ -1,18 +1,21 @@
 @import "tailwindcss";
 
-/* code-by-wire — cockpit dark theme.
-   A designed-from-scratch visual language: a neutral, near-black graphite surface stack (equal RGB,
-   no temperature), ONE sky-blue brand signal ("wire"), and a reserved status palette — teal Working,
-   amber Waiting, slate Idle, faint Ended.
+/* code-by-wire — "Instrument" glass-cockpit theme.
+   A calibrated-instrument visual language: the established neutral graphite surface stack (no
+   temperature), ONE engaged-teal signal ("wire"/managed), and a status palette reserved STRICTLY for
+   live state —
+   blue Working, amber Waiting/caution, red Warning/failed, slate Idle, faint Ended. Color never
+   decorates; if something isn't a state, it stays graphite.
 
    Token NAMES are kept from the prior theme (ink-*, fg*, primary, accent, danger, ok); only their
-   VALUES are remapped, so existing utility classes adopt the new palette without a rename. New roles
-   get new names: `working` (teal, the Working state), `idle` (slate), `well` (the sunken plane under
-   terminals and inputs), and a data/telemetry pair — `steel` and `violet` — that give charts their own
-   hue language so they read as information, not affordances. Fonts are named here and loaded via <link>
-   in index.html. */
+   VALUES are remapped, so existing utility classes adopt the new palette without a rename. `working`
+   (now blue), `accent` (amber caution), `idle` (slate), and `well` (the sunken plane under terminals
+   and inputs) carry over. The data/telemetry pair `steel`/`violet` still names chart series; the
+   cockpit port migrates those readouts to a monochrome tonal ramp so they read as information, not
+   affordances. Fonts are named here and bundled via @fontsource in main.tsx. */
 @theme {
-  /* Surface stack (neutral graphite, equal RGB), darkest → lightest */
+  /* Surface stack (neutral graphite, equal RGB), darkest → lightest. Kept from the prior theme — the
+     Instrument redesign refines the signals and type, not the graphite base. */
   --color-well: #080808; /* sunken: terminal, inputs, code blocks */
   --color-ink-950: #0c0c0d; /* app base */
   --color-ink-925: #141414; /* cards, rails, panels */
@@ -23,43 +26,61 @@
   --color-ink-700: #3a3a3b; /* strong border, focus-adjacent edges */
   --color-ink-600: #49525f; /* Ended state, dim glyphs */
 
-  /* Text — neutral graphite (equal-channel, no temperature), matching the surface stack.
-     fg-faint is lifted to ~5.9:1 on the app base so tertiary/metadata stays comfortably above AA. */
+  /* Text — neutral graphite, matching the surface stack.
+     fg-faint is held above AA (~5.9:1 on the app base) so tertiary/metadata stays legible. */
   --color-fg: #ededee;
   --color-fg-muted: #a8a8a9;
   --color-fg-faint: #8b8b8c;
 
-  /* Wire — the single brand signal (sky blue): primary actions, focus, links, "managed" */
-  --color-primary: #38bdf8;
-  --color-primary-bright: #7dd3fc;
-  --color-primary-deep: #0ea5e9;
+  /* Wire — the single brand signal (engaged teal): primary actions, focus, links, "managed" */
+  --color-primary: #14b8a6;
+  --color-primary-bright: #2dd4bf;
+  --color-primary-deep: #0d8276;
 
   /* Status hues — reserved for session state, never decorative */
-  --color-working: #2dd4bf; /* Working — live, teal, pulses */
-  --color-working-bright: #5ee6d3;
-  --color-accent: #f0a93b; /* Waiting — blocked on you, amber, pulses; also context-fill warnings */
-  --color-accent-bright: #f7c065;
-  --color-idle: #748196; /* Idle — calm slate */
+  --color-working: #2f95f5; /* Working — live, blue (running), pulses; distinct from the teal wire */
+  --color-working-bright: #5aa9f8;
+  --color-accent: #f2b33d; /* Waiting — blocked on you, amber, pulses; also context-fill caution */
+  --color-accent-bright: #f7c766;
+  --color-idle: #6e7782; /* Idle — calm slate */
 
   /* Semantic */
-  --color-danger: #e5614f; /* diff remove, failed, destructive */
+  --color-danger: #f2685c; /* diff remove, failed, destructive */
   --color-ok: #46c57a; /* diff add, cache savings, done */
 
-  /* Data / telemetry — charts and readouts get their own language so they read as information, not
-     affordances. Sky (wire) is reserved for interaction & brand, so token kinds split by HUE: steel
-     Input, violet Output, green (ok) cache; teal (--color-working, reused) is the analytics hue for
-     the contributions heatmap and magnitude bars. */
-  --color-steel: #8a97ac; /* Input / neutral data magnitude — slate-steel */
-  --color-violet: #a98bf0; /* Output — violet (model-mix series) */
+  /* Data / telemetry. `steel` fills the context ring while roomy; `violet` renders ANSI magenta in shell
+     output. The token-kind breakdown's fresh split gets dedicated teal tones (Input lighter, Output deeper)
+     so it reads as its own telemetry family — clear of the jewel models and softer than the brand wire;
+     cache and the cost magnitude ramp grey back below. */
+  --color-steel: #8a97ac; /* neutral data magnitude — slate-steel (context ring) */
+  --color-violet: #907bc9; /* ANSI magenta (shell output) */
+  --color-token-input: #54bcae; /* Input — light teal (fresh-token split) */
+  --color-token-output: #2a8579; /* Output — deep teal (fresh-token split) */
 
-  /* Type — display for the wordmark/headings/numerals, sans for UI/body, mono for all data. The
-     "* Variable" families are the bundled @fontsource-variable builds (imported in main.tsx); the
-     plain names stay as a fallback for anyone with the static font installed locally. */
-  --font-display:
-    "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  /* Magnitude ramp — a monochrome tonal scale for the cost/token breakdowns. Instrument discipline:
+     charts read as data, never affordances, so hue is reserved for live state. Light → deep by token
+     kind, with a dimmest tail for cache-write. */
+  --color-data-1: #c2c9d2; /* lightest — Input */
+  --color-data-2: #9098a3; /* Output */
+  --color-data-3: #646c77; /* Cache read / Cached */
+  --color-data-4: #474e58; /* dimmest — Cache write */
+
+  /* Model identity colors (Aurora) — one fixed hue per known family, reused everywhere a model appears
+     (By model bars, daily stack-by-model, By session). Restrained jewel tones, held off the danger/
+     waiting/working state hues AND the teal wire so a model swatch never reads as a state lamp or the
+     brand signal; an unknown model falls to --color-data-1 (white/mono). */
+  --color-model-fable: #8b81dd; /* periwinkle */
+  --color-model-opus: #5e9adf; /* steel-blue */
+  --color-model-sonnet: #b37bd9; /* orchid */
+  --color-model-haiku: #db7fa4; /* rose */
+
+  /* Type — Saira Semi Condensed placards/labels, Inter for UI/body, JetBrains Mono for all telemetry
+     and identifiers. The "* Variable" names are the bundled @fontsource-variable builds (Inter, mono);
+     Saira Semi Condensed is static. Plain names stay as a fallback for a locally-installed static font. */
+  --font-display: "Saira Semi Condensed", system-ui, sans-serif;
   --font-sans:
-    "Hanken Grotesk Variable", "Hanken Grotesk", system-ui, -apple-system,
-    "Segoe UI", Roboto, sans-serif;
+    "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
   --font-mono:
     "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo,
     Consolas, monospace;
@@ -81,7 +102,7 @@ body {
 }
 
 ::selection {
-  background: rgba(56, 189, 248, 0.3);
+  background: rgba(20, 184, 166, 0.28);
   color: var(--color-fg);
 }
 
@@ -209,21 +230,10 @@ body {
   background: transparent;
 }
 
-/* The cockpit plate: flat graphite with two whisper-faint signal washes — cool top-right, warm
-   lower-left. No banding, no purple gradients. */
+/* The cockpit plate: flat graphite. Instrument discipline — no decorative washes; depth comes from
+   the surface stack and hairlines, not gradients. */
 .app-bg {
-  background:
-    radial-gradient(
-      1100px 560px at 78% -12%,
-      rgba(56, 189, 248, 0.06),
-      transparent 58%
-    ),
-    radial-gradient(
-      820px 480px at -6% 112%,
-      rgba(240, 169, 59, 0.035),
-      transparent 55%
-    ),
-    var(--color-ink-950);
+  background: var(--color-ink-950);
 }
 
 /* Title-bar drag regions for the frameless window. The header opts the whole strip into dragging;

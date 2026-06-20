@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "./atoms";
 import {
-  donutGradient,
-  ringGradient,
   segmentPercents,
   niceAxisMax,
   axisTicks,
@@ -10,80 +8,6 @@ import {
   type Segment,
 } from "./charts-geom";
 import type { CalendarCell } from "./contributions-geom";
-
-// The default ring/donut track and the center hole. The mask punches a transparent core into the
-// conic ring; the centered children sit in a separate, unmasked layer.
-const TRACK = "var(--color-ink-850)";
-const HOLE = "radial-gradient(farthest-side, transparent 62%, #000 63%)";
-
-/** A masked conic circle. `gradient` is a ready conic-gradient string; children overlay the center. */
-function Gauge({
-  gradient,
-  size,
-  children,
-}: {
-  gradient: string;
-  size: number;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{
-          backgroundImage: gradient,
-          WebkitMaskImage: HOLE,
-          maskImage: HOLE,
-        }}
-      />
-      {children ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-          {children}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** A progress ring filling toward a ceiling. `fill` is a CSS color (e.g. ctxColor(pct)). */
-export function Ring({
-  pct,
-  fill,
-  size = 88,
-  track = TRACK,
-  children,
-}: {
-  pct: number;
-  fill: string;
-  size?: number;
-  track?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <Gauge gradient={ringGradient(pct, fill, track)} size={size}>
-      {children}
-    </Gauge>
-  );
-}
-
-/** A composition donut. Segment order is the legend order. */
-export function Donut({
-  segments,
-  size = 74,
-  track = TRACK,
-  children,
-}: {
-  segments: Segment[];
-  size?: number;
-  track?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <Gauge gradient={donutGradient(segments, track)} size={size}>
-      {children}
-    </Gauge>
-  );
-}
 
 /** A 100%-stacked horizontal bar. Widths come from each segment's share of the sum. */
 export function StackedBar({
@@ -113,7 +37,7 @@ export function StackedBar({
 }
 
 /** One labeled throughput row: label, a mini-bar, a right-aligned value. `pct` is the already-scaled
- *  0..100 fill (the caller derives it via ratePct against the reference rate); we clamp defensively. */
+ *  0..100 fill the caller passes in; we clamp defensively. */
 export function RateBar({
   label,
   value,
@@ -140,6 +64,116 @@ export function RateBar({
       <span className="w-[52px] shrink-0 text-right font-mono text-[12px] tabular-nums text-fg">
         {value}
       </span>
+    </div>
+  );
+}
+
+/**
+ * A horizontal fill gauge with caution/danger zones and threshold ticks — the cockpit's "fuel gauge".
+ * `pct` fills 0..100 in `fill`; the zones tint the track from `caution`% and `danger`% so the redline is
+ * visible even before the fill reaches it, and a tick marks the danger threshold ahead of the fill.
+ */
+export function FillGauge({
+  pct,
+  fill,
+  caution,
+  danger,
+  height = 10,
+}: {
+  pct: number;
+  fill: string;
+  caution: number;
+  danger: number;
+  height?: number;
+}) {
+  const w = Math.min(100, Math.max(0, pct));
+  return (
+    <div
+      className="relative overflow-hidden rounded-full bg-ink-850"
+      style={{ height }}
+    >
+      {/* Caution and danger zones, drawn under the fill so the redline shows where the fill hasn't reached. */}
+      <span
+        className="absolute inset-y-0"
+        style={{
+          left: `${caution}%`,
+          right: `${100 - danger}%`,
+          background:
+            "color-mix(in srgb, var(--color-accent) 12%, transparent)",
+        }}
+      />
+      <span
+        className="absolute inset-y-0"
+        style={{
+          left: `${danger}%`,
+          right: 0,
+          background:
+            "color-mix(in srgb, var(--color-accent) 22%, transparent)",
+        }}
+      />
+      <span
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{ width: `${w}%`, background: fill }}
+      />
+      <span
+        className="absolute -inset-y-px w-px bg-accent"
+        style={{ left: `${danger}%` }}
+      />
+    </div>
+  );
+}
+
+/**
+ * A trend sparkline — a tiny area+line of recent samples, the cockpit's vertical-speed instrument. The
+ * x-axis is sample index (not exact time), the y-axis scales to the run's max. Renders nothing below two
+ * samples; the caller shows the headline number alone until the buffer fills. The path uses a 0..100
+ * percent x-space stretched to width (non-scaling stroke keeps the line crisp); the current-value dot is
+ * an HTML node pinned to the right edge so it never distorts.
+ */
+export function Sparkline({
+  values,
+  height = 44,
+}: {
+  values: number[];
+  height?: number;
+}) {
+  if (values.length < 2) return null;
+  const max = Math.max(...values, 1);
+  const n = values.length;
+  const pad = 2;
+  const y = (v: number): number =>
+    pad + (1 - Math.max(0, v) / max) * (height - pad * 2);
+  const x = (i: number): number => (i / (n - 1)) * 100;
+  const line = values
+    .map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(2)},${y(v).toFixed(2)}`)
+    .join(" ");
+  const area =
+    `M0,${height} ` +
+    values.map((v, i) => `L${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ") +
+    ` L100,${height} Z`;
+  return (
+    <div className="relative" style={{ height }}>
+      <svg
+        viewBox={`0 0 100 ${height}`}
+        preserveAspectRatio="none"
+        className="absolute inset-0 h-full w-full"
+      >
+        <path
+          d={area}
+          fill="color-mix(in srgb, var(--color-data-2) 16%, transparent)"
+        />
+        <path
+          d={line}
+          fill="none"
+          stroke="var(--color-data-1)"
+          strokeWidth={1.4}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <span
+        className="absolute right-0 h-1.5 w-1.5 rounded-full bg-fg"
+        style={{ top: y(values[n - 1]), transform: "translateY(-50%)" }}
+      />
     </div>
   );
 }

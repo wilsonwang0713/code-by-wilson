@@ -1,5 +1,9 @@
 import type { SessionState } from "@shared/types";
-import { isKnownModelString, type Family } from "@shared/models";
+import {
+  isKnownModelString,
+  normalizeModelId,
+  type Family,
+} from "@shared/models";
 
 export interface StateMeta {
   label: string;
@@ -11,7 +15,7 @@ export interface StateMeta {
   text: string;
 }
 
-/** Per-state display metadata. Working = teal, Waiting = amber, Idle = slate, Ended = faint. */
+/** Per-state display metadata. Working = blue, Waiting = amber, Idle = slate, Ended = faint. */
 export const STATE_META: Record<SessionState, StateMeta> = {
   working: {
     label: "Working",
@@ -50,10 +54,12 @@ export const FAMILY_LABEL: Record<Family, string> = {
 /** Below this %, the context gauge is noise; at or above it the sidebar row surfaces the number and
  *  ctxTone warms it to amber. One constant so the "show it" gate and the color never disagree. */
 export const CONTEXT_WARN_PCT = 70;
+/** At or above this %, the context gauge redlines: bright amber fill and a danger tick. */
+export const CONTEXT_DANGER_PCT = 85;
 
 /** Tailwind text tone for a context %: muted when roomy, amber and brightening as it fills. */
 export function ctxTone(pct: number): string {
-  if (pct >= 85) return "text-accent-bright";
+  if (pct >= CONTEXT_DANGER_PCT) return "text-accent-bright";
   if (pct >= CONTEXT_WARN_PCT) return "text-accent";
   return "text-fg-muted";
 }
@@ -78,54 +84,56 @@ export function barFill(pct: number, high = 85): string {
  * breakpoints as `ctxTone`, so the ring's color and the % text inside it never disagree on "how full".
  */
 export function ctxColor(pct: number): string {
-  if (pct >= 85) return "var(--color-accent-bright)";
-  if (pct >= 70) return "var(--color-accent)";
+  if (pct >= CONTEXT_DANGER_PCT) return "var(--color-accent-bright)";
+  if (pct >= CONTEXT_WARN_PCT) return "var(--color-accent)";
   return "var(--color-steel)";
 }
 
 /**
- * Semantic token-kind palette: each token KIND owns one stable hue, read by HUE not by two near-identical
- * blues — steel Input, violet Output, green cache (read solid, write dimmed). Sky (wire) is reserved for
- * interaction & brand, so charts read as data, not buttons. Used by the cost donut + legend and the token
- * stacked bar + legend, so the diagram and its legend always agree. CSS var strings (and one color-mix for
- * the dim cache-write) so a retone stays in index.css.
+ * The token-kind breakdown palette, shared by the Overview breakdowns and the cockpit's Tokens panel so
+ * the two read the same: input and output carry color (the fresh-token split is the meaningful part of a
+ * usage chart), cache greys back. Input / Output use dedicated teal tones — their own telemetry family,
+ * distinct from the model jewels. CSS var strings so a retone stays in index.css.
  */
-export const COST_SEGMENT_COLORS = [
-  "var(--color-steel)", // Input — neutral slate-steel
-  "var(--color-violet)", // Output — violet
-  "var(--color-ok)", // Cache read — green
-  "color-mix(in srgb, var(--color-ok) 50%, transparent)", // Cache write — dim green
+export const KIND_SEGMENT_COLORS = [
+  "var(--color-token-input)", // Input — light teal
+  "var(--color-token-output)", // Output — deep teal
+  "var(--color-data-3)", // Cache read — grey
+  "var(--color-data-4)", // Cache write — grey (dimmest)
 ] as const;
 
-export const TOKEN_SEGMENT_COLORS = [
-  "var(--color-steel)", // Input
-  "var(--color-violet)", // Output
-  "var(--color-ok)", // Cached
-] as const;
+/** Model identity colors (Aurora): one fixed hue per known family, looked up BY family — not cycled by row
+ *  index — so a model reads the same color everywhere it appears (By model, daily stack-by-model, By
+ *  session). Chosen off the danger/waiting/working state hues and the teal wire so a swatch never reads as
+ *  a state lamp or the brand signal; the tokens live in index.css. */
+export const MODEL_FAMILY_COLORS: Record<Family, string> = {
+  fable: "var(--color-model-fable)",
+  opus: "var(--color-model-opus)",
+  sonnet: "var(--color-model-sonnet)",
+  haiku: "var(--color-model-haiku)",
+};
 
-/** The per-model breakdown's donut + legend palette (#111), cycled by row index. Distinct hues so adjacent
- *  models read apart, deliberately led off violet (not sky) so the brand accent never doubles as a data
- *  color; CSS var strings so a retone stays in index.css. More models than colors wraps — fine for a legend
- *  read top-down against its donut. */
-export const MODEL_SEGMENT_COLORS = [
-  "var(--color-violet)",
-  "var(--color-working)",
-  "var(--color-accent)",
-  "var(--color-ok)",
-  "var(--color-steel)",
-  "var(--color-danger)",
-] as const;
+/** Any model the breakdown can't place — null, or a raw string matching no known family — stays
+ *  white/mono, so identity color is reserved for the recognized families. */
+export const MODEL_OTHER_COLOR = "var(--color-data-1)";
+
+/** The identity color for a raw model id: its family's fixed hue when recognized, else the neutral
+ *  "other" tone. Drives the By-model bars, the daily stack-by-model, and the By-session model swatch. */
+export function modelColorOf(raw: string | null): string {
+  return raw && isKnownModelString(raw)
+    ? MODEL_FAMILY_COLORS[normalizeModelId(raw)]
+    : MODEL_OTHER_COLOR;
+}
 
 /** The contributions calendar's intensity ramp (#115), indexed by intensityLevel's 0..4 output: level 0 is
- *  the empty-day track, 1–4 ramp the analytics teal --color-working from faint to full via color-mix
- *  opacity — its own data identity, distinct from brand sky so the heatmap reads as information rather than
- *  a giant button. CSS var / color-mix strings so a retone stays in index.css. */
+ *  the empty-day track; 1–4 climb an engaged-teal heat (faint → full via color-mix opacity). The Overview's
+ *  one spot of accent — activity-over-time gets the single splash of color. Tokens stay in index.css. */
 export const CALENDAR_RAMP = [
   "var(--color-ink-850)", // 0 — no activity
-  "color-mix(in srgb, var(--color-working) 30%, transparent)", // 1
-  "color-mix(in srgb, var(--color-working) 55%, transparent)", // 2
-  "color-mix(in srgb, var(--color-working) 78%, transparent)", // 3
-  "var(--color-working)", // 4 — peak
+  "color-mix(in srgb, var(--color-primary) 28%, transparent)", // 1
+  "color-mix(in srgb, var(--color-primary) 52%, transparent)", // 2
+  "color-mix(in srgb, var(--color-primary) 76%, transparent)", // 3
+  "var(--color-primary)", // 4 — peak
 ] as const;
 
 /** A session's model label: the family name, plus the real resolved id in parens when we have one.

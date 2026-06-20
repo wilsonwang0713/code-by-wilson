@@ -11,7 +11,6 @@ import { TranscriptView } from "./TranscriptView";
 import { TerminalView } from "../terminal/TerminalView";
 import { useTranscript, type DocState } from "./use-transcript";
 import { ContextPanel } from "./panels/ContextPanel";
-import { CostPanel } from "./panels/CostPanel";
 import { StructureDock } from "./panels/StructureDock";
 import { SubagentDrill, type DrillCrumb } from "./SubagentDrill";
 import { ShellDrill } from "./ShellDrill";
@@ -20,12 +19,10 @@ import { useShells } from "./use-shells";
 import { useShellOutput, type ShellOutputState } from "./use-shell-output";
 import { TokensPanel } from "./panels/TokensPanel";
 import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
-import { GitPanel } from "./panels/GitPanel";
 import { useTasks } from "./use-tasks";
 import { useMetrics, type MetricsState } from "./use-metrics";
-import { SessionPanel } from "./panels/SessionPanel";
 import { HeaderActions } from "./HeaderActions";
-import { ModeLabel } from "./ModeLabel";
+import { Annunciator } from "./Annunciator";
 import { OverlayScroll } from "../ui/OverlayScroll";
 
 export function Workspace({
@@ -45,33 +42,17 @@ export function Workspace({
   const metrics = useMetrics(s.id);
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-950 text-fg">
-      <header className="flex shrink-0 items-center gap-3 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
+      <header className="shrink-0 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="min-w-0 truncate text-sm font-semibold text-fg">
               {s.title}
             </span>
-            <button
-              type="button"
-              disabled
-              title="Rename (coming soon)"
-              aria-label="Rename session"
-              className="inline-flex shrink-0 items-center justify-center rounded p-0.5 text-fg-faint opacity-40"
-            >
-              <Icon name="pencil" size={12} />
-            </button>
             <SessionIdChip id={s.id} />
           </div>
-          <div className="mt-1 flex min-w-0 items-center gap-2 text-[11px]">
-            <ModeLabel session={s} />
-            <span className="text-ink-700">·</span>
-            <span className="min-w-0 truncate font-mono text-fg-faint">
-              {s.project}
-              {s.branch && ` · ${s.branch}`}
-            </span>
-          </div>
+          <HeaderActions session={s} canSpawn={canSpawn} onAdopt={onAdopt} />
         </div>
-        <HeaderActions session={s} canSpawn={canSpawn} onAdopt={onAdopt} />
+        <Annunciator session={s} git={metrics?.git} />
       </header>
 
       <div className="min-h-0 flex-1">
@@ -180,22 +161,19 @@ function WorkspaceBody({
         className="hidden w-72 shrink-0 border-l border-ink-800 bg-ink-925 lg:block"
         contentClassName="flex flex-col gap-4 p-4"
       >
-        <SessionPanel session={s} />
         <ContextPanel
           live={s.liveContext ?? null}
           context={doc?.context ?? null}
           contextPct={s.contextPct}
           contextWindow={s.contextWindow}
         />
-        <CostPanel
+        <TokensPanel
           usage={s.usage}
           model={s.model}
           liveCostUsd={s.liveCostUsd}
           billingMode={account?.billingMode}
         />
-        <TokensPanel usage={s.usage} />
         <TokenSpeedPanel speed={metrics ? metrics.tokenSpeed : null} />
-        <GitPanel git={metrics ? metrics.git : null} />
       </OverlayScroll>
     </div>
   );

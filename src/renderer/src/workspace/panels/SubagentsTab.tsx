@@ -31,7 +31,7 @@ import {
 } from "./subagent-group";
 
 /** Per-status lane treatment: the glyph char, the duration fill, its left cap, and the glyph tone.
- *  Working pulses; done stays calm so working (teal) and failed (red) pop as the states worth acting on. */
+ *  Working pulses; done stays calm so working (blue) and failed (red) pop as the states worth acting on. */
 const LANE_META: Record<
   Subagent["status"],
   { char: string; fill: string; cap: string; tone: string }
