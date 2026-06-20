@@ -17,6 +17,7 @@ const api: AppApi = {
   recheckCli: () => ipcRenderer.invoke(IPC.recheckCli),
   setClaudeBinPath: (path) => ipcRenderer.invoke(IPC.setClaudeBinPath, path),
   resetAnalytics: () => ipcRenderer.invoke(IPC.resetAnalytics),
+  openExternal: (url) => ipcRenderer.invoke(IPC.openExternal, url),
   readTranscript: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readTranscript, id, sinceMtimeMs),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
