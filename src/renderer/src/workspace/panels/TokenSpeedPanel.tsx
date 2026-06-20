@@ -1,23 +1,38 @@
+import { useEffect, useState } from "react";
 import type { TokenSpeed } from "@shared/metrics";
 import { formatTps } from "@shared/format";
-import { RateBar } from "../../ui/charts";
-import { ratePct } from "../../ui/charts-geom";
+import { Sparkline } from "../../ui/charts";
 import { SPEED_WINDOW_LABEL } from "./speed-window";
 import { PanelSection, PanelHeading } from "./chrome";
 
 const SPEED_INFO =
-  "Token throughput over the last 60s of active generation: output, input, and total per second. Idle gaps between turns don't count.";
+  "Token throughput over the last 60s of active generation. The sparkline traces total tokens/sec across recent samples; idle gaps between turns don't count.";
 
-/** Rolling-window token throughput: a hero total over two rate bars (output, input) scaled to the faster
- *  of the two. Renders nothing while metrics haven't reported a speed (no completed request yet) — the
- *  whole section hides (empty-state rule). */
+const SPARK_SAMPLES = 30;
+
+/** Accumulate a ring buffer of total-tps samples across polls, so the sparkline has a series to draw from a
+ *  metric that only reports a current snapshot. Appends when the value changes (each poll re-rolls the 60s
+ *  window, so it rarely repeats); resets with the panel, which the Workspace remounts per session. */
+function useSpeedHistory(tps: number | null): number[] {
+  const [history, setHistory] = useState<number[]>([]);
+  useEffect(() => {
+    if (tps == null) return;
+    setHistory((h) => [...h, tps].slice(-SPARK_SAMPLES));
+  }, [tps]);
+  return history;
+}
+
+/** Rolling-window token throughput: a hero total over a trend sparkline, with the output/input split below.
+ *  Stays visible once a session has reported throughput — the sparkline persists the trend across turns
+ *  instead of flickering out in the idle gap between them. Renders nothing only before the first sample
+ *  (an idle/observed/ended session with no generation has no speed to chart). */
 export function TokenSpeedPanel({
   speed,
 }: {
   speed: TokenSpeed | null | undefined;
 }) {
-  if (!speed) return null;
-  const max = Math.max(speed.outputTps, speed.inputTps);
+  const history = useSpeedHistory(speed?.totalTps ?? null);
+  if (!speed && history.length < 2) return null;
   return (
     <PanelSection>
       <PanelHeading
@@ -30,24 +45,29 @@ export function TokenSpeedPanel({
       >
         Token speed
       </PanelHeading>
-      <div className="mt-1 flex items-baseline justify-between">
-        <span className="text-[11px] text-fg-muted">Total throughput</span>
-        <span className="font-mono text-base font-bold tabular-nums text-fg">
-          {formatTps(speed.totalTps)}
-        </span>
+      <div className="flex items-baseline justify-between">
+        {speed ? (
+          <span className="font-mono text-[22px] font-semibold tabular-nums text-fg">
+            {formatTps(speed.totalTps)}
+          </span>
+        ) : (
+          <span className="font-mono text-[16px] font-semibold tabular-nums text-fg-faint">
+            idle
+          </span>
+        )}
+        <span className="text-[10.5px] text-fg-faint">total throughput</span>
       </div>
-      <RateBar
-        label="Output"
-        value={formatTps(speed.outputTps)}
-        pct={ratePct(speed.outputTps, max)}
-        color="var(--color-violet)"
-      />
-      <RateBar
-        label="Input"
-        value={formatTps(speed.inputTps)}
-        pct={ratePct(speed.inputTps, max)}
-        color="var(--color-fg-muted)"
-      />
+      <Sparkline values={history} />
+      {speed && (
+        <div className="flex justify-between font-mono text-[11px] text-fg-muted">
+          <span>
+            Input <span className="text-fg">{formatTps(speed.inputTps)}</span>
+          </span>
+          <span>
+            Output <span className="text-fg">{formatTps(speed.outputTps)}</span>
+          </span>
+        </div>
+      )}
     </PanelSection>
   );
 }

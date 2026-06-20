@@ -144,6 +144,116 @@ export function RateBar({
   );
 }
 
+/**
+ * A horizontal fill gauge with caution/danger zones and threshold ticks — the cockpit's "fuel gauge".
+ * `pct` fills 0..100 in `fill`; the zones tint the track from `caution`% and `danger`% so the redline is
+ * visible even before the fill reaches it, and a tick marks the danger threshold ahead of the fill.
+ */
+export function FillGauge({
+  pct,
+  fill,
+  caution,
+  danger,
+  height = 10,
+}: {
+  pct: number;
+  fill: string;
+  caution: number;
+  danger: number;
+  height?: number;
+}) {
+  const w = Math.min(100, Math.max(0, pct));
+  return (
+    <div
+      className="relative overflow-hidden rounded-full bg-ink-850"
+      style={{ height }}
+    >
+      {/* Caution and danger zones, drawn under the fill so the redline shows where the fill hasn't reached. */}
+      <span
+        className="absolute inset-y-0"
+        style={{
+          left: `${caution}%`,
+          right: `${100 - danger}%`,
+          background:
+            "color-mix(in srgb, var(--color-accent) 12%, transparent)",
+        }}
+      />
+      <span
+        className="absolute inset-y-0"
+        style={{
+          left: `${danger}%`,
+          right: 0,
+          background:
+            "color-mix(in srgb, var(--color-accent) 22%, transparent)",
+        }}
+      />
+      <span
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{ width: `${w}%`, background: fill }}
+      />
+      <span
+        className="absolute -inset-y-px w-px bg-accent"
+        style={{ left: `${danger}%` }}
+      />
+    </div>
+  );
+}
+
+/**
+ * A trend sparkline — a tiny area+line of recent samples, the cockpit's vertical-speed instrument. The
+ * x-axis is sample index (not exact time), the y-axis scales to the run's max. Renders nothing below two
+ * samples; the caller shows the headline number alone until the buffer fills. The path uses a 0..100
+ * percent x-space stretched to width (non-scaling stroke keeps the line crisp); the current-value dot is
+ * an HTML node pinned to the right edge so it never distorts.
+ */
+export function Sparkline({
+  values,
+  height = 44,
+}: {
+  values: number[];
+  height?: number;
+}) {
+  if (values.length < 2) return null;
+  const max = Math.max(...values, 1);
+  const n = values.length;
+  const pad = 2;
+  const y = (v: number): number =>
+    pad + (1 - Math.max(0, v) / max) * (height - pad * 2);
+  const x = (i: number): number => (i / (n - 1)) * 100;
+  const line = values
+    .map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(2)},${y(v).toFixed(2)}`)
+    .join(" ");
+  const area =
+    `M0,${height} ` +
+    values.map((v, i) => `L${x(i).toFixed(2)},${y(v).toFixed(2)}`).join(" ") +
+    ` L100,${height} Z`;
+  return (
+    <div className="relative" style={{ height }}>
+      <svg
+        viewBox={`0 0 100 ${height}`}
+        preserveAspectRatio="none"
+        className="absolute inset-0 h-full w-full"
+      >
+        <path
+          d={area}
+          fill="color-mix(in srgb, var(--color-data-2) 16%, transparent)"
+        />
+        <path
+          d={line}
+          fill="none"
+          stroke="var(--color-data-1)"
+          strokeWidth={1.4}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <span
+        className="absolute right-0 h-1.5 w-1.5 rounded-full bg-fg"
+        style={{ top: y(values[n - 1]), transform: "translateY(-50%)" }}
+      />
+    </div>
+  );
+}
+
 /** One day's column for the BarSeries: a stable React key and the segments to stack bottom-up (each a raw
  *  value and a CSS color). The caller decides what the segments mean (token kind or model). */
 export interface DayColumn {

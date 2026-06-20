@@ -3,19 +3,24 @@ import type { ContextBreakdown } from "@shared/transcript";
 import { contextView } from "@shared/context";
 import { formatTokensShort } from "@shared/format";
 import { cx } from "../../ui/atoms";
-import { Ring } from "../../ui/charts";
-import { ctxColor, ctxTone } from "../../ui/meta";
+import { FillGauge } from "../../ui/charts";
+import {
+  ctxColor,
+  ctxTone,
+  CONTEXT_WARN_PCT,
+  CONTEXT_DANGER_PCT,
+} from "../../ui/meta";
 import { PanelSection, PanelHeading } from "./chrome";
-import { MetricRow } from "./MetricRow";
 
 const CONTEXT_INFO =
-  "How much of the model's context window the current prompt fills: used tokens over the window size. The ring warms to amber as it fills.";
+  "How much of the model's context window the current prompt fills: used tokens over the window size. The gauge warms to amber past 70% and redlines past 85%.";
 
 /**
- * The current context window fill, as a ring toward the window ceiling. Prefers Claude's own numbers from
- * the statusLine capture (the current_usage total and the used_percentage), so the panel's % matches the
- * Overview's for the same Session; falls back to the transcript-derived split over the window when no
- * capture reported them. null view means no source has any context yet.
+ * The current context window fill, as a linear fuel gauge toward the window ceiling. Prefers Claude's own
+ * numbers from the statusLine capture (the current_usage total and used_percentage), so the panel's %
+ * matches the Overview's for the same Session; falls back to the transcript-derived split over the window
+ * when no capture reported them. The gauge's caution/danger bands show how much headroom is left. null
+ * view means no source has any context yet.
  */
 export function ContextPanel({
   live,
@@ -52,24 +57,30 @@ export function ContextPanel({
   return (
     <PanelSection>
       <PanelHeading info={CONTEXT_INFO}>Context</PanelHeading>
-      <div className="flex items-center gap-3.5">
-        <Ring pct={pct} fill={ctxColor(pct)}>
-          <span
-            className={cx(
-              "font-mono text-[19px] font-bold tabular-nums",
-              ctxTone(pct),
-            )}
-          >
-            {pct}%
-          </span>
-        </Ring>
-        <div className="flex-1 space-y-0.5">
-          <MetricRow
-            label="Used"
-            value={`${formatTokensShort(total)} / ${formatTokensShort(contextWindow)}`}
-          />
-          <MetricRow label="Free" value={formatTokensShort(free)} />
+      <div className="flex items-baseline justify-between">
+        <div
+          className={cx(
+            "font-mono text-[26px] font-medium leading-none tabular-nums",
+            ctxTone(pct),
+          )}
+        >
+          {pct}
+          <span className="text-[15px] text-fg-faint">%</span>
         </div>
+        <div className="font-mono text-[11px] text-fg-faint">
+          {formatTokensShort(contextWindow)} window
+        </div>
+      </div>
+      <FillGauge
+        pct={pct}
+        fill={ctxColor(pct)}
+        caution={CONTEXT_WARN_PCT}
+        danger={CONTEXT_DANGER_PCT}
+      />
+      <div className="font-mono text-[11px] text-fg-muted">
+        <span className="text-fg">{formatTokensShort(total)}</span> used
+        <span className="mx-1.5 text-ink-700">·</span>
+        <span className="text-fg">{formatTokensShort(free)}</span> free
       </div>
     </PanelSection>
   );

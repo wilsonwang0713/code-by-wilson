@@ -48,10 +48,18 @@
   --color-danger: #f2685c; /* diff remove, failed, destructive */
   --color-ok: #46c57a; /* diff add, cache savings, done */
 
-  /* Data / telemetry — chart series. The cockpit port moves breakdowns to a monochrome tonal ramp
-     (state hue stays out of data); these names persist for the readouts not yet migrated. */
-  --color-steel: #8a97ac; /* Input / neutral data magnitude — slate-steel */
+  /* Data / telemetry — chart series. `steel`/`violet` remain for the model-mix series and the context
+     bar; the cost/token breakdowns read off the monochrome magnitude ramp below. */
+  --color-steel: #8a97ac; /* neutral data magnitude — slate-steel (model-mix, context bar) */
   --color-violet: #a98bf0; /* Output — violet (model-mix series) */
+
+  /* Magnitude ramp — a monochrome tonal scale for the cost/token breakdowns. Instrument discipline:
+     charts read as data, never affordances, so hue is reserved for live state. Light → deep by token
+     kind, with a dimmest tail for cache-write. */
+  --color-data-1: #c2c9d2; /* lightest — Input */
+  --color-data-2: #9098a3; /* Output */
+  --color-data-3: #646c77; /* Cache read / Cached */
+  --color-data-4: #474e58; /* dimmest — Cache write */
 
   /* Type — Saira Semi Condensed placards/labels, Inter for UI/body, JetBrains Mono for all telemetry
      and identifiers. The "* Variable" names are the bundled @fontsource-variable builds (Inter, mono);

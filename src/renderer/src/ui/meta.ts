@@ -50,10 +50,12 @@ export const FAMILY_LABEL: Record<Family, string> = {
 /** Below this %, the context gauge is noise; at or above it the sidebar row surfaces the number and
  *  ctxTone warms it to amber. One constant so the "show it" gate and the color never disagree. */
 export const CONTEXT_WARN_PCT = 70;
+/** At or above this %, the context gauge redlines: bright amber fill and a danger tick. */
+export const CONTEXT_DANGER_PCT = 85;
 
 /** Tailwind text tone for a context %: muted when roomy, amber and brightening as it fills. */
 export function ctxTone(pct: number): string {
-  if (pct >= 85) return "text-accent-bright";
+  if (pct >= CONTEXT_DANGER_PCT) return "text-accent-bright";
   if (pct >= CONTEXT_WARN_PCT) return "text-accent";
   return "text-fg-muted";
 }
@@ -78,29 +80,28 @@ export function barFill(pct: number, high = 85): string {
  * breakpoints as `ctxTone`, so the ring's color and the % text inside it never disagree on "how full".
  */
 export function ctxColor(pct: number): string {
-  if (pct >= 85) return "var(--color-accent-bright)";
-  if (pct >= 70) return "var(--color-accent)";
+  if (pct >= CONTEXT_DANGER_PCT) return "var(--color-accent-bright)";
+  if (pct >= CONTEXT_WARN_PCT) return "var(--color-accent)";
   return "var(--color-steel)";
 }
 
 /**
- * Semantic token-kind palette: each token KIND owns one stable hue, read by HUE not by two near-identical
- * blues — steel Input, violet Output, green cache (read solid, write dimmed). Sky (wire) is reserved for
- * interaction & brand, so charts read as data, not buttons. Used by the cost donut + legend and the token
- * stacked bar + legend, so the diagram and its legend always agree. CSS var strings (and one color-mix for
- * the dim cache-write) so a retone stays in index.css.
+ * The cost/token breakdown palette: a monochrome magnitude ramp (Instrument discipline — charts read as
+ * data, never affordances, so hue is reserved for live state). Light → deep by token kind, with a dimmest
+ * tail for cache-write. Used by the cost donut + legend and the token stacked bar + legend, so each diagram
+ * and its legend always agree. CSS var strings so a retone stays in index.css.
  */
 export const COST_SEGMENT_COLORS = [
-  "var(--color-steel)", // Input — neutral slate-steel
-  "var(--color-violet)", // Output — violet
-  "var(--color-ok)", // Cache read — green
-  "color-mix(in srgb, var(--color-ok) 50%, transparent)", // Cache write — dim green
+  "var(--color-data-1)", // Input — lightest
+  "var(--color-data-2)", // Output
+  "var(--color-data-3)", // Cache read
+  "var(--color-data-4)", // Cache write — dimmest
 ] as const;
 
 export const TOKEN_SEGMENT_COLORS = [
-  "var(--color-steel)", // Input
-  "var(--color-violet)", // Output
-  "var(--color-ok)", // Cached
+  "var(--color-data-1)", // Input
+  "var(--color-data-2)", // Output
+  "var(--color-data-3)", // Cached
 ] as const;
 
 /** The per-model breakdown's donut + legend palette (#111), cycled by row index. Distinct hues so adjacent
