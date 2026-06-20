@@ -176,6 +176,7 @@ export function buildSubagentForest(
     if (description) node.description = description;
     const batchId = dispatchMsgOf.get(a.meta.toolUseId);
     if (batchId !== undefined) node.batchId = batchId;
+    if (a.meta.toolUseId) node.dispatchId = a.meta.toolUseId;
     nodeById.set(a.agentId, node);
   }
 

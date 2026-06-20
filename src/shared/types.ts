@@ -71,6 +71,10 @@ export interface Subagent {
    *  (one fan-out batch); the Subagents gantt groups lanes by it. Absent when the dispatch
    *  could not be located (empty/unknown toolUseId, or a dispatch row with no message id). */
   batchId?: string;
+  /** The id of the Task/Agent tool_use that spawned this agent (its parent's dispatch). Equals the
+   *  inline transcript event's toolUseId; resolves an inline-dispatch drill to this node. Absent only
+   *  when the meta carried no toolUseId. */
+  dispatchId?: string;
   children?: Subagent[];
 }
 

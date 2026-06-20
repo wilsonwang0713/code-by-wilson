@@ -251,7 +251,12 @@ describe("parseTranscriptEvents — events", () => {
       }),
     );
     expect(events).toEqual([
-      { kind: "subagent", agentType: "Explore", description: "x", toolUseId: "" },
+      {
+        kind: "subagent",
+        agentType: "Explore",
+        description: "x",
+        toolUseId: "",
+      },
     ]);
   });
 
