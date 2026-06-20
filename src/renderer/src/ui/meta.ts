@@ -118,15 +118,14 @@ export const MODEL_SEGMENT_COLORS = [
 ] as const;
 
 /** The contributions calendar's intensity ramp (#115), indexed by intensityLevel's 0..4 output: level 0 is
- *  the empty-day track, 1–4 ramp the analytics teal --color-working from faint to full via color-mix
- *  opacity — its own data identity, distinct from brand sky so the heatmap reads as information rather than
- *  a giant button. CSS var / color-mix strings so a retone stays in index.css. */
+ *  the empty-day track; 1–4 climb the monochrome magnitude ramp (dimmest → brightest), so the heatmap reads
+ *  as data, not affordance — hue stays reserved for live state. CSS var strings so a retone stays in index.css. */
 export const CALENDAR_RAMP = [
   "var(--color-ink-850)", // 0 — no activity
-  "color-mix(in srgb, var(--color-working) 30%, transparent)", // 1
-  "color-mix(in srgb, var(--color-working) 55%, transparent)", // 2
-  "color-mix(in srgb, var(--color-working) 78%, transparent)", // 3
-  "var(--color-working)", // 4 — peak
+  "var(--color-data-4)", // 1
+  "var(--color-data-3)", // 2
+  "var(--color-data-2)", // 3
+  "var(--color-data-1)", // 4 — peak
 ] as const;
 
 /** A session's model label: the family name, plus the real resolved id in parens when we have one.
