@@ -20,6 +20,8 @@ import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
 import { OVERVIEW_ID } from "./stats/sentinel";
+import { SettingsView } from "./settings/SettingsView";
+import { SETTINGS_ID } from "./settings/sentinel";
 
 /** How often the session list re-syncs in the background, so an open workspace's state (and the
  *  Overview) tracks a session as it moves. Slower than the transcript poll: metadata changes less
@@ -235,8 +237,12 @@ export function App() {
     [sessions, drafts, adopting],
   );
   const isOverview = selectedId === OVERVIEW_ID;
+  const isSettings = selectedId === SETTINGS_ID;
+  // Both pinned views (Overview, Settings) are non-session selections: the per-session lookup and the
+  // auto-select effect must treat them as valid, never as a stale/missing session to re-home.
+  const isPinned = isOverview || isSettings;
   const selected =
-    !isOverview && selectedId !== null
+    !isPinned && selectedId !== null
       ? (all.find((s) => s.id === selectedId) ?? null)
       : null;
 
@@ -246,13 +252,13 @@ export function App() {
   const ids = useMemo(() => all.map((s) => s.id).join(","), [all]);
   useEffect(() => {
     if (all.length === 0) {
-      // Overview is a valid selection even with no sessions (it shows the empty state); only clear a
-      // stale *session* selection.
-      if (selectedId !== null && !isOverview) setSelectedId(null);
+      // The pinned views (Overview, Settings) are valid even with no sessions (Overview shows the empty
+      // state); only clear a stale *session* selection.
+      if (selectedId !== null && !isPinned) setSelectedId(null);
       return;
     }
     if (
-      !isOverview &&
+      !isPinned &&
       (selectedId === null || !all.some((s) => s.id === selectedId))
     ) {
       // Pick the rail's top row (Active newest-created first, then Ended) so the auto-opened session
@@ -267,6 +273,8 @@ export function App() {
       <GlobalHeader
         cliStatus={cliStatus}
         onOpenCliStatus={() => setCliStatusOpen(true)}
+        onOpenSettings={() => setSelectedId(SETTINGS_ID)}
+        settingsActive={isSettings}
       />
       <div className="flex min-h-0 flex-1">
         <SessionList
@@ -278,7 +286,14 @@ export function App() {
           canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">
-          {isOverview ? (
+          {isSettings ? (
+            <SettingsView
+              cliStatus={cliStatus}
+              account={account}
+              checking={checking}
+              onRecheck={() => void recheckCli()}
+            />
+          ) : isOverview ? (
             <StatsView />
           ) : selected ? (
             <Workspace

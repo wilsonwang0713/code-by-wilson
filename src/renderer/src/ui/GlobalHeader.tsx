@@ -1,5 +1,6 @@
 import type { CliStatus } from "@shared/cli-status";
 import { Wordmark, cx } from "./atoms";
+import { Icon } from "./icons";
 import { footerView, type FooterView } from "./rail-footer";
 import { useZoomFactor } from "./use-zoom-factor";
 import { useFullscreen } from "./use-fullscreen";
@@ -39,9 +40,13 @@ const LAMP_CLASS: Record<FooterView["dot"], string> = {
 export function GlobalHeader({
   cliStatus,
   onOpenCliStatus,
+  onOpenSettings,
+  settingsActive,
 }: {
   cliStatus: CliStatus | null;
   onOpenCliStatus: () => void;
+  onOpenSettings: () => void;
+  settingsActive: boolean;
 }) {
   const isMac = isMacPlatform(window.api.platform);
   const isFullscreen = useFullscreen();
@@ -61,7 +66,7 @@ export function GlobalHeader({
       }}
     >
       <Wordmark />
-      <div className="no-drag ml-auto flex items-center">
+      <div className="no-drag ml-auto flex items-center gap-2">
         <button
           type="button"
           onClick={onOpenCliStatus}
@@ -85,6 +90,20 @@ export function GlobalHeader({
             )}
           />
           Sys
+        </button>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          title="Settings"
+          className={cx(
+            "inline-flex items-center justify-center rounded-md border p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
+            settingsActive
+              ? "border-ink-700 bg-ink-900 text-fg"
+              : "border-ink-800 text-fg-faint hover:border-ink-700 hover:text-fg-muted",
+          )}
+        >
+          <Icon name="settings" size={15} />
         </button>
       </div>
     </header>
