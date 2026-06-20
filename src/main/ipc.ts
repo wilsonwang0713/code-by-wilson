@@ -1,4 +1,4 @@
-import { ipcMain, shell } from "electron";
+import { ipcMain, shell, clipboard } from "electron";
 import { IPC, type OverviewData, type StatsRead } from "@shared/ipc";
 import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
@@ -189,6 +189,9 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.openExternal, (_e, url: string) => {
     if (isHttpUrl(url)) void shell.openExternal(url);
+  });
+  ipcMain.handle(IPC.clipboardWriteText, (_e, text: string) => {
+    clipboard.writeText(text);
   });
 
   // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan
