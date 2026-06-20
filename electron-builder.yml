@@ -32,8 +32,9 @@ mac:
 dmg:
   title: ${productName} ${version}
 win:
-  # icon-win.png fills ~90% of the canvas; the macOS-grid margin in icon.png makes the icon look small
-  # on the Windows taskbar/Start menu, which draws it edge-to-edge with no rounded-rect frame.
+  # icon.png is a hard-cornered full-bleed square so macOS Tahoe can mask it to a squircle; Windows
+  # draws icons as-is with no rounded-rect frame, so it gets its own render with the tile's rounded
+  # corners baked in.
   icon: build/icon-win.png
   target:
     - target: nsis
