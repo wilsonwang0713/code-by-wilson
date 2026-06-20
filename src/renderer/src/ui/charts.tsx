@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cx } from "./atoms";
 import {
-  donutGradient,
-  ringGradient,
   segmentPercents,
   niceAxisMax,
   axisTicks,
@@ -10,80 +8,6 @@ import {
   type Segment,
 } from "./charts-geom";
 import type { CalendarCell } from "./contributions-geom";
-
-// The default ring/donut track and the center hole. The mask punches a transparent core into the
-// conic ring; the centered children sit in a separate, unmasked layer.
-const TRACK = "var(--color-ink-850)";
-const HOLE = "radial-gradient(farthest-side, transparent 62%, #000 63%)";
-
-/** A masked conic circle. `gradient` is a ready conic-gradient string; children overlay the center. */
-function Gauge({
-  gradient,
-  size,
-  children,
-}: {
-  gradient: string;
-  size: number;
-  children?: ReactNode;
-}) {
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <div
-        className="absolute inset-0 rounded-full"
-        style={{
-          backgroundImage: gradient,
-          WebkitMaskImage: HOLE,
-          maskImage: HOLE,
-        }}
-      />
-      {children ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-          {children}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** A progress ring filling toward a ceiling. `fill` is a CSS color (e.g. ctxColor(pct)). */
-export function Ring({
-  pct,
-  fill,
-  size = 88,
-  track = TRACK,
-  children,
-}: {
-  pct: number;
-  fill: string;
-  size?: number;
-  track?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <Gauge gradient={ringGradient(pct, fill, track)} size={size}>
-      {children}
-    </Gauge>
-  );
-}
-
-/** A composition donut. Segment order is the legend order. */
-export function Donut({
-  segments,
-  size = 74,
-  track = TRACK,
-  children,
-}: {
-  segments: Segment[];
-  size?: number;
-  track?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <Gauge gradient={donutGradient(segments, track)} size={size}>
-      {children}
-    </Gauge>
-  );
-}
 
 /** A 100%-stacked horizontal bar. Widths come from each segment's share of the sum. */
 export function StackedBar({
@@ -113,7 +37,7 @@ export function StackedBar({
 }
 
 /** One labeled throughput row: label, a mini-bar, a right-aligned value. `pct` is the already-scaled
- *  0..100 fill (the caller derives it via ratePct against the reference rate); we clamp defensively. */
+ *  0..100 fill the caller passes in; we clamp defensively. */
 export function RateBar({
   label,
   value,
