@@ -31,7 +31,7 @@ export function Annunciator({
     s.model,
     s.modelId ?? s.modelRaw,
     s.modelDisplayName,
-    { compact: true, known: managed },
+    { known: managed },
   );
   const repo = s.project;
   const branch = git?.branch ?? s.branch;
@@ -55,9 +55,17 @@ export function Annunciator({
       >
         {mode.label}
       </Cell>
-      <Cell label="Model · Effort" grow={1.5} seam>
-        {model}
-        {s.effortLevel && <span className="text-fg"> · {s.effortLevel}</span>}
+      <Cell
+        label="Model · Effort"
+        grow={2}
+        seam
+        raw
+        title={s.effortLevel ? `${model} · ${s.effortLevel}` : model}
+      >
+        <span className="min-w-0 truncate">
+          {model}
+          {s.effortLevel && <span className="text-fg"> · {s.effortLevel}</span>}
+        </span>
       </Cell>
       <Cell label="Git" grow={2.4} raw tooltip={git ? gitTip(git) : undefined}>
         <span className="flex min-w-0 items-center">
