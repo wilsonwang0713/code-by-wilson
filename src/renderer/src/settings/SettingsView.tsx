@@ -7,6 +7,9 @@ import type { IconName } from "../ui/icon-names";
 import { Wordmark, cx } from "../ui/atoms";
 import { footerView, type FooterView } from "../ui/rail-footer";
 import { cliStatusView } from "../ui/cli-status-view";
+import { railAccountModel } from "../ui/rail-account";
+import { RateBar } from "../ui/charts";
+import { ctxColor } from "../ui/meta";
 
 type Section = "system" | "account" | "appearance" | "about";
 
@@ -327,13 +330,8 @@ function Req({ state, label }: { state: ReqState; label: string }) {
 }
 
 function AccountSection({ account }: { account: Account | null }) {
-  const mode = account?.billingMode;
-  const modeLabel =
-    mode === "subscription"
-      ? "Subscription"
-      : mode === "api"
-        ? "API"
-        : "Unknown";
+  const model = railAccountModel(account, Date.now());
+  const plan = model?.plan ?? "Claude";
   return (
     <>
       <Header
@@ -346,10 +344,40 @@ function AccountSection({ account }: { account: Account | null }) {
             {account?.email ?? "—"}
           </span>
         </Row>
-        <Row label="Billing" desc="Detected from rate-limit presence">
-          <span className="text-[12.5px] text-fg">{modeLabel}</span>
+        <Row label="Plan" desc="Detected from rate-limit presence">
+          <span className="text-[12.5px] text-fg">{plan}</span>
         </Row>
       </Card>
+
+      {model?.mode === "subscription" && model.gauges.length > 0 && (
+        <Card title="Rate limits">
+          <div className="flex flex-col gap-2.5 px-4 py-3.5">
+            {model.gauges.map((g) => (
+              <div key={g.label}>
+                <RateBar
+                  label={g.label}
+                  pct={g.pct}
+                  value={`${g.pct}%`}
+                  color={ctxColor(g.pct)}
+                />
+                <div className="ml-14 mt-0.5 text-[10.5px] text-fg-faint">
+                  resets in {g.reset}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {model?.mode === "api" && (
+        <Card title="Endpoint">
+          <Row label="Gateway" desc="API billing endpoint">
+            <span className="font-mono text-[12px] text-fg">
+              {model.baseUrl}
+            </span>
+          </Row>
+        </Card>
+      )}
     </>
   );
 }
