@@ -266,7 +266,10 @@ export function App() {
 
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
-      <GlobalHeader />
+      <GlobalHeader
+        cliStatus={cliStatus}
+        onOpenCliStatus={() => setCliStatusOpen(true)}
+      />
       <div className="flex min-h-0 flex-1">
         <SessionList
           sessions={all}
@@ -276,8 +279,6 @@ export function App() {
           query={query}
           onQuery={setQuery}
           account={account}
-          cliStatus={cliStatus}
-          onOpenCliStatus={() => setCliStatusOpen(true)}
           canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">

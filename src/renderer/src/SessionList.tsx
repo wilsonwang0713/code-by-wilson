@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Session, Account } from "@shared/types";
-import type { CliStatus } from "@shared/cli-status";
 import { RailPanel } from "./ui/RailPanel";
-import { RailCliStatus } from "./ui/RailCliStatus";
 import { railSections } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
 import { cx, SessionTile } from "./ui/atoms";
@@ -23,8 +21,6 @@ export function SessionList({
   query,
   onQuery,
   account,
-  cliStatus,
-  onOpenCliStatus,
   canSpawn,
 }: {
   sessions: Session[];
@@ -34,8 +30,6 @@ export function SessionList({
   query: string;
   onQuery: (q: string) => void;
   account?: Account | null;
-  cliStatus: CliStatus | null;
-  onOpenCliStatus: () => void;
   canSpawn: boolean;
 }) {
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
@@ -60,9 +54,8 @@ export function SessionList({
         selectedId={selectedId}
         onSelect={onSelect}
       />
-      <RailCliStatus status={cliStatus} onOpenCliStatus={onOpenCliStatus} />
-      {/* One divider splits the identity/status zone from the session zone, drawn like every other
-          section divider in the app (solid border-ink-800) rather than the old per-block dividers. */}
+      {/* One divider splits the account card from the session zone, drawn like every other section
+          divider in the app (solid border-ink-800) rather than the old per-block dividers. */}
       <div className="shrink-0 border-t border-ink-800 p-3">
         <button
           type="button"
@@ -71,7 +64,7 @@ export function SessionList({
           title={
             canSpawn
               ? undefined
-              : "Claude Code CLI isn't usable — open the status panel from the CLI status band above."
+              : "Claude Code CLI isn't usable — open Sys status in the title bar."
           }
           className={cx(
             "inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border text-[13px] font-semibold transition-colors",
