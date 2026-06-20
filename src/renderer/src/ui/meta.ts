@@ -92,11 +92,12 @@ export function ctxColor(pct: number): string {
 /**
  * The token-kind breakdown palette, shared by the Overview breakdowns and the cockpit's Tokens panel so
  * the two read the same: input and output carry color (the fresh-token split is the meaningful part of a
- * usage chart), cache greys back. CSS var strings so a retone stays in index.css.
+ * usage chart), cache greys back. Input / Output reuse the Sonnet / Fable model hues so the breakdown sits
+ * in the same jewel palette. CSS var strings so a retone stays in index.css.
  */
 export const KIND_SEGMENT_COLORS = [
-  "var(--color-azure)", // Input — muted blue (its own data hue, detached from the brand wire)
-  "var(--color-violet)", // Output — muted violet
+  "var(--color-model-sonnet)", // Input — shares Sonnet's orchid
+  "var(--color-model-fable)", // Output — shares Fable's periwinkle
   "var(--color-data-3)", // Cache read — grey
   "var(--color-data-4)", // Cache write — grey (dimmest)
 ] as const;

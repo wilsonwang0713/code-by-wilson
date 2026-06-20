@@ -48,13 +48,11 @@
   --color-danger: #f2685c; /* diff remove, failed, destructive */
   --color-ok: #46c57a; /* diff add, cache savings, done */
 
-  /* Data / telemetry — chart series. `steel` fills the context ring while roomy; `azure`/`violet` are the
-     token-kind fresh-split pair (Input / Output) in the cost/token breakdowns, kept muted so they sit in
-     the jewel register and never compete with the wire. Cache and the cost magnitude ramp grey back below,
-     so hue stays on the meaningful fresh-token split. */
+  /* Data / telemetry. `steel` fills the context ring while roomy; `violet` renders ANSI magenta in shell
+     output. The token-kind breakdown's fresh split (Input / Output) borrows the Sonnet / Fable jewel hues
+     instead of its own tokens (see KIND_SEGMENT_COLORS); cache and the cost magnitude ramp grey back below. */
   --color-steel: #8a97ac; /* neutral data magnitude — slate-steel (context ring) */
-  --color-azure: #6e90bf; /* Input — muted blue (token-kind); detached from the brand wire */
-  --color-violet: #9585bf; /* Output — muted violet (token-kind) */
+  --color-violet: #907bc9; /* ANSI magenta (shell output) */
 
   /* Magnitude ramp — a monochrome tonal scale for the cost/token breakdowns. Instrument discipline:
      charts read as data, never affordances, so hue is reserved for live state. Light → deep by token
@@ -65,13 +63,13 @@
   --color-data-4: #474e58; /* dimmest — Cache write */
 
   /* Model identity colors (Aurora) — one fixed hue per known family, reused everywhere a model appears
-     (By model bars, daily stack-by-model, By session). Muted jewel tones, held off the danger/waiting/
-     working state hues AND the teal wire so a model swatch never reads as a state lamp or the brand
-     signal; an unknown model falls to --color-data-1 (white/mono). */
-  --color-model-fable: #948dd1; /* dusty periwinkle */
-  --color-model-opus: #6f9bce; /* muted steel-blue */
-  --color-model-sonnet: #b187cd; /* muted orchid */
-  --color-model-haiku: #cf8ba6; /* dusty rose */
+     (By model bars, daily stack-by-model, By session). Restrained jewel tones, held off the danger/
+     waiting/working state hues AND the teal wire so a model swatch never reads as a state lamp or the
+     brand signal; an unknown model falls to --color-data-1 (white/mono). */
+  --color-model-fable: #8b81dd; /* periwinkle */
+  --color-model-opus: #5e9adf; /* steel-blue */
+  --color-model-sonnet: #b37bd9; /* orchid */
+  --color-model-haiku: #db7fa4; /* rose */
 
   /* Type — Saira Semi Condensed placards/labels, Inter for UI/body, JetBrains Mono for all telemetry
      and identifiers. The "* Variable" names are the bundled @fontsource-variable builds (Inter, mono);
