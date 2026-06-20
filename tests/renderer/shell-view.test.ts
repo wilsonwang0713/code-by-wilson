@@ -7,7 +7,7 @@ import {
 } from "../../src/renderer/src/workspace/panels/shell-view";
 
 describe("shellGlyph", () => {
-  it("running is a teal dot", () => {
+  it("running is a blue dot", () => {
     expect(shellGlyph({ status: "running" })).toEqual({
       char: "●",
       tone: "text-working-bright",
@@ -43,11 +43,17 @@ describe("truncLabel", () => {
 });
 
 describe("ansiClass", () => {
-  it("maps base colors to cbw tokens", () => {
+  it("maps base colors to cbw tokens by hue", () => {
     expect(ansiClass("red")).toBe("text-danger");
     expect(ansiClass("green")).toBe("text-ok");
+    expect(ansiClass("blue")).toBe("text-working");
+    expect(ansiClass("cyan")).toBe("text-primary");
   });
   it("uses the bright token when available", () => {
-    expect(ansiClass("green", true)).toBe("text-working-bright");
+    expect(ansiClass("blue", true)).toBe("text-working-bright");
+    expect(ansiClass("yellow", true)).toBe("text-accent-bright");
+  });
+  it("falls back to the base token when no bright variant exists", () => {
+    expect(ansiClass("green", true)).toBe("text-ok");
   });
 });
