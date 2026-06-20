@@ -198,7 +198,12 @@ describe("parseTranscriptEvents — events", () => {
       }),
     );
     expect(events).toEqual([
-      { kind: "subagent", agentType: "Explore", description: "find usages" },
+      {
+        kind: "subagent",
+        agentType: "Explore",
+        description: "find usages",
+        toolUseId: "t1",
+      },
     ]);
   });
 
@@ -220,7 +225,33 @@ describe("parseTranscriptEvents — events", () => {
       }),
     );
     expect(events).toEqual([
-      { kind: "subagent", agentType: "Plan", description: "design the API" },
+      {
+        kind: "subagent",
+        agentType: "Plan",
+        description: "design the API",
+        toolUseId: "t1",
+      },
+    ]);
+  });
+
+  it("carries an empty toolUseId when the subagent dispatch has no id", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              name: "Task",
+              input: { subagent_type: "Explore", description: "x" },
+            },
+          ],
+        },
+      }),
+    );
+    expect(events).toEqual([
+      { kind: "subagent", agentType: "Explore", description: "x", toolUseId: "" },
     ]);
   });
 

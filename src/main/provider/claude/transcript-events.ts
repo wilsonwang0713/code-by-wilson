@@ -189,6 +189,7 @@ export function parseTranscriptEventsFromRows(
                   : b.name,
               description:
                 typeof input.description === "string" ? input.description : "",
+              toolUseId: typeof b.id === "string" ? b.id : "",
             });
           } else if (DIFF_TOOLS.has(b.name)) {
             events.push({
