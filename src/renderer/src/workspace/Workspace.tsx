@@ -226,6 +226,8 @@ function CenterView({
 }) {
   const top = drill[drill.length - 1];
   // The full subagent path, so the breadcrumb shows Session › A › B … instead of just the top.
+  // Filtering to subagent frames stays safe for the breadcrumb's index-based pop (onNavigate slices the
+  // full stack): a shell crumb only ever appears alone, since every shell and lane drill resets the stack.
   const subagentCrumbs = drill
     .filter(
       (c): c is Extract<DrillCrumb, { kind: "subagent" }> =>
