@@ -15,7 +15,7 @@ export interface StateMeta {
   text: string;
 }
 
-/** Per-state display metadata. Working = teal, Waiting = amber, Idle = slate, Ended = faint. */
+/** Per-state display metadata. Working = blue, Waiting = amber, Idle = slate, Ended = faint. */
 export const STATE_META: Record<SessionState, StateMeta> = {
   working: {
     label: "Working",
@@ -95,16 +95,16 @@ export function ctxColor(pct: number): string {
  * usage chart), cache greys back. CSS var strings so a retone stays in index.css.
  */
 export const KIND_SEGMENT_COLORS = [
-  "var(--color-primary)", // Input — blue
-  "var(--color-violet)", // Output — violet
+  "var(--color-azure)", // Input — muted blue (its own data hue, detached from the brand wire)
+  "var(--color-violet)", // Output — muted violet
   "var(--color-data-3)", // Cache read — grey
   "var(--color-data-4)", // Cache write — grey (dimmest)
 ] as const;
 
 /** Model identity colors (Aurora): one fixed hue per known family, looked up BY family — not cycled by row
  *  index — so a model reads the same color everywhere it appears (By model, daily stack-by-model, By
- *  session). Chosen off the danger/waiting/working state hues so a swatch never reads as a state lamp; the
- *  tokens live in index.css. */
+ *  session). Chosen off the danger/waiting/working state hues and the teal wire so a swatch never reads as
+ *  a state lamp or the brand signal; the tokens live in index.css. */
 export const MODEL_FAMILY_COLORS: Record<Family, string> = {
   fable: "var(--color-model-fable)",
   opus: "var(--color-model-opus)",
@@ -125,7 +125,7 @@ export function modelColorOf(raw: string | null): string {
 }
 
 /** The contributions calendar's intensity ramp (#115), indexed by intensityLevel's 0..4 output: level 0 is
- *  the empty-day track; 1–4 climb an engaged-blue heat (faint → full via color-mix opacity). The Overview's
+ *  the empty-day track; 1–4 climb an engaged-teal heat (faint → full via color-mix opacity). The Overview's
  *  one spot of accent — activity-over-time gets the single splash of color. Tokens stay in index.css. */
 export const CALENDAR_RAMP = [
   "var(--color-ink-850)", // 0 — no activity
