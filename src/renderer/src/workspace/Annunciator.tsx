@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import type { GitInfo, PrInfo } from "@shared/metrics";
 import { formatClock } from "@shared/format";
@@ -69,7 +70,7 @@ export function Annunciator({
                 onClick={() => {
                   void window.api.openExternal(pr.url);
                 }}
-                className="text-accent underline underline-offset-2 hover:text-accent-bright"
+                className="cursor-pointer text-accent underline underline-offset-2 hover:text-accent-bright"
               >
                 #{pr.number}
               </button>
@@ -130,15 +131,23 @@ function Cell({
   title?: string;
   children: ReactNode;
 }) {
-  const [hover, setHover] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<{ left: number; top: number } | null>(null);
+  // The annunciator bar clips its overflow (rounded corners), so an in-flow absolute popover under the
+  // cell would be clipped away. Portal it to the body and fixed-position it just below the cell instead.
+  const showTip = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setTip({ left: r.left, top: r.bottom + 4 });
+  };
   return (
     <div
+      ref={ref}
       title={tooltip ? undefined : title}
-      onMouseEnter={tooltip ? () => setHover(true) : undefined}
-      onMouseLeave={tooltip ? () => setHover(false) : undefined}
+      onMouseEnter={tooltip ? showTip : undefined}
+      onMouseLeave={tooltip ? () => setTip(null) : undefined}
       style={{ flex: grow ?? 1 }}
       className={cx(
-        "relative flex min-w-0 flex-col gap-[3px] border-r border-ink-850 px-3 py-1.5 last:border-r-0",
+        "flex min-w-0 flex-col gap-[3px] border-r border-ink-850 px-3 py-1.5 last:border-r-0",
         seam && "border-l border-ink-800",
       )}
     >
@@ -162,11 +171,17 @@ function Cell({
         )}
         {raw ? children : <span className="min-w-0">{children}</span>}
       </span>
-      {tooltip && hover && (
-        <div className="pointer-events-none absolute left-2 top-full z-20 mt-1 whitespace-nowrap rounded-md border border-ink-800 bg-ink-900 px-2 py-1.5 text-[11px] shadow-lg">
-          {tooltip}
-        </div>
-      )}
+      {tooltip && tip
+        ? createPortal(
+            <div
+              style={{ position: "fixed", left: tip.left, top: tip.top }}
+              className="pointer-events-none z-50 whitespace-nowrap rounded-md border border-ink-800 bg-ink-900 px-2 py-1.5 text-[11px] shadow-lg"
+            >
+              {tooltip}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
