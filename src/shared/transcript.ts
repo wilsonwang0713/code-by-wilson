@@ -44,7 +44,12 @@ export type TranscriptEvent =
   | { kind: "thinking"; text: string }
   | { kind: "tool"; name: string; input: string }
   | { kind: "diff"; tool: string; file: string; hunk: DiffHunk }
-  | { kind: "subagent"; agentType: string; description: string };
+  | {
+      kind: "subagent";
+      agentType: string;
+      description: string;
+      toolUseId: string;
+    };
 
 export interface TranscriptDoc {
   /** The conversation, oldest first. */

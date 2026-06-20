@@ -148,6 +148,7 @@ describe("buildSubagentForest", () => {
         durationMs: 10000,
         toolCount: 0,
         startMs: Date.parse("2026-06-04T03:00:00.000Z"),
+        dispatchId: "tu-1",
       },
       {
         id: "a2",
@@ -158,6 +159,7 @@ describe("buildSubagentForest", () => {
         durationMs: 0,
         toolCount: 0,
         startMs: Date.parse("2026-06-04T03:00:01.000Z"),
+        dispatchId: "tu-2",
       },
     ]);
   });
@@ -206,6 +208,7 @@ describe("buildSubagentForest", () => {
         durationMs: 5000,
         toolCount: 1,
         startMs: Date.parse("2026-06-04T03:00:00.000Z"),
+        dispatchId: "root",
         children: [
           {
             id: "kid",
@@ -216,10 +219,49 @@ describe("buildSubagentForest", () => {
             durationMs: 0,
             toolCount: 0,
             startMs: Date.parse("2026-06-04T03:00:01.000Z"),
+            dispatchId: "child",
           },
         ],
       },
     ]);
+  });
+
+  it("surfaces dispatchId from the meta toolUseId, for a root and a nested child", () => {
+    const forest = buildSubagentForest(main("root", { is_error: false }), [
+      agent("parent", "root", "general-purpose", [
+        {
+          type: "assistant",
+          timestamp: "2026-06-04T03:00:00.000Z",
+          message: {
+            model: SONNET,
+            usage: { input_tokens: 1, output_tokens: 10 },
+            content: [{ type: "tool_use", id: "child", name: "Task" }],
+          },
+        },
+        {
+          type: "user",
+          timestamp: "2026-06-04T03:00:05.000Z",
+          message: {
+            content: [
+              { type: "tool_result", tool_use_id: "child", is_error: false },
+            ],
+          },
+        },
+      ]),
+      agent("kid", "child", "Explore", [
+        {
+          type: "assistant",
+          timestamp: "2026-06-04T03:00:01.000Z",
+          message: {
+            model: HAIKU,
+            usage: { input_tokens: 1, output_tokens: 4 },
+            content: [],
+          },
+        },
+      ]),
+    ]);
+    expect(forest[0].dispatchId).toBe("root");
+    expect(forest[0].children![0].dispatchId).toBe("child");
   });
 
   it("exposes startMs from the agent's first parseable timestamp", () => {
@@ -314,6 +356,7 @@ describe("buildSubagentForest", () => {
         tokens: 0,
         durationMs: 0,
         toolCount: 0,
+        dispatchId: "tu-1",
       },
     ]);
   });

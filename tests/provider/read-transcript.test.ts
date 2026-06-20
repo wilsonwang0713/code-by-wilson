@@ -95,6 +95,7 @@ describe("readTranscript — subagents", () => {
         toolCount: 0,
         durationMs: 4000,
         startMs: Date.parse("2026-06-04T03:00:00.000Z"),
+        dispatchId: "tu-1",
       },
     ]);
     // Echoing the token back yields unchanged.
