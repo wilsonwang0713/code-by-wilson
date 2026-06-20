@@ -268,6 +268,7 @@ export function StatsView() {
                     daily={snap.daily}
                     byModel={snap.byModel}
                     range={range}
+                    includeCache={includeCache}
                   />
                 )}
                 {(snap.byModel.length > 0 || snap.byProject.length > 0) && (
@@ -700,23 +701,26 @@ const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
  * The daily usage time-series (#114): one stacked SVG bar per local calendar day across the active range,
  * with a readable Y axis and a hover tooltip giving that day's exact numbers. The stack-by toggle (in this
  * panel's header, top-right) switches between token kind (default) and model; both stackings ride the same
- * payload, so it never re-fetches. The chart shows the full token composition regardless of the page's
- * "Include cache" pill — cache is its own segment here, not a hidden total.
+ * payload, so it never re-fetches. The by-kind view honors the page's "Include cache" pill: cache folds out
+ * to leave input + output when it's off, matching the rest of the page. The by-model view always shows full
+ * totals, since the daily buckets carry only a per-model total, with no per-model kind split to fold.
  *
  * The store's daily buckets are sparse (only days with turns); we densify the contiguous range so a quiet
  * day reads as a gap. The range's start and end days come from rangeWindow (the same bounds main scopes
- * to): a single-day range renders one column; all-time starts at the earliest bucket. The model series order and colors come from the snapshot's
- * byModel (its store order, tokens desc), so the chart matches the By-model panel in the default cache-on
- * view; with "Include cache" off that panel re-ranks and can recolor, which the chart doesn't follow.
+ * to): a single-day range renders one column; all-time starts at the earliest bucket. The model series order
+ * comes from the snapshot's byModel (store order, tokens desc); each model's hue is its fixed identity color
+ * (modelColorOf), so it matches the By-model panel whether or not cache is included.
  */
 function DailyUsage({
   daily,
   byModel,
   range,
+  includeCache,
 }: {
   daily: DailyBucket[];
   byModel: StatsByModel[];
   range: StatsRange;
+  includeCache: boolean;
 }) {
   const [stackBy, setStackBy] = useState<StackBy>("kind");
 
@@ -729,6 +733,19 @@ function DailyUsage({
   const startDay =
     sinceMs != null ? localDayKey(sinceMs) : (daily[0]?.day ?? endDay);
   const days = densifyDays(daily, startDay, endDay);
+
+  // Token-kind segments for a day, in stack order. Cache folds out when the page's "Include cache" pill is
+  // off, so the by-kind chart shows fresh input + output only (matching the rest of the page) instead of
+  // always rendering the full composition.
+  const kindCount = includeCache ? 4 : 2;
+  const kindSegments = (d: DailyBucket) =>
+    [d.inputTokens, d.outputTokens, d.cacheReadTokens, d.cacheCreationTokens]
+      .slice(0, kindCount)
+      .map((value, idx) => ({
+        label: KIND_LABELS[idx],
+        value,
+        color: OVERVIEW_KIND_COLORS[idx],
+      }));
 
   // Model series: the snapshot's byModel order (tokens desc), each paired by store index to a cycled color,
   // so the hue matches the By-model panel's cache-on assignment. Drop any model that never lands on a
@@ -756,12 +773,10 @@ function DailyUsage({
     stackBy === "kind"
       ? {
           key: d.day,
-          segments: [
-            { value: d.inputTokens, color: OVERVIEW_KIND_COLORS[0] },
-            { value: d.outputTokens, color: OVERVIEW_KIND_COLORS[1] },
-            { value: d.cacheReadTokens, color: OVERVIEW_KIND_COLORS[2] },
-            { value: d.cacheCreationTokens, color: OVERVIEW_KIND_COLORS[3] },
-          ],
+          segments: kindSegments(d).map((s) => ({
+            value: s.value,
+            color: s.color,
+          })),
         }
       : {
           key: d.day,
@@ -783,7 +798,7 @@ function DailyUsage({
 
   const legend =
     stackBy === "kind"
-      ? KIND_LABELS.map((label, i) => ({
+      ? KIND_LABELS.slice(0, kindCount).map((label, i) => ({
           label,
           color: OVERVIEW_KIND_COLORS[i],
         }))
@@ -794,35 +809,9 @@ function DailyUsage({
 
   const renderTooltip = (i: number): ReactNode => {
     const d = days[i];
-    const total =
-      d.inputTokens +
-      d.outputTokens +
-      d.cacheReadTokens +
-      d.cacheCreationTokens;
     const rows =
       stackBy === "kind"
-        ? [
-            {
-              label: "Input",
-              value: d.inputTokens,
-              color: OVERVIEW_KIND_COLORS[0],
-            },
-            {
-              label: "Output",
-              value: d.outputTokens,
-              color: OVERVIEW_KIND_COLORS[1],
-            },
-            {
-              label: "Cache read",
-              value: d.cacheReadTokens,
-              color: OVERVIEW_KIND_COLORS[2],
-            },
-            {
-              label: "Cache write",
-              value: d.cacheCreationTokens,
-              color: OVERVIEW_KIND_COLORS[3],
-            },
-          ].filter((r) => r.value > 0)
+        ? kindSegments(d).filter((r) => r.value > 0)
         : series
             .map((s) => ({
               label: s.modelRaw ?? "Unknown",
@@ -830,6 +819,9 @@ function DailyUsage({
               color: s.color,
             }))
             .filter((r) => r.value > 0);
+    // Sum the shown rows: the kind view drops cache when the pill is off, the model view always totals all
+    // kinds — so the tooltip total tracks exactly what the bar stacks.
+    const total = rows.reduce((sum, r) => sum + r.value, 0);
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
