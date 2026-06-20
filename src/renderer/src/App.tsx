@@ -14,6 +14,8 @@ import { Workspace } from "./workspace/Workspace";
 import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { GlobalHeader } from "./ui/GlobalHeader";
+import { CautionBanner } from "./ui/CautionBanner";
+import { cliStatusView } from "./ui/cli-status-view";
 import { SessionList } from "./SessionList";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
@@ -269,17 +271,26 @@ export function App() {
     }
   }, [ids]);
 
+  const showSystem = (): void => {
+    setSettingsSection("system");
+    setSelectedId(SETTINGS_ID);
+  };
+  // The master-caution strip shows whenever the CLI is non-ok, except while already in Settings (the strip
+  // deep-links there) and during the pre-first-check window (no status to judge yet).
+  const showCaution =
+    cliStatus !== null && !isSettings && cliStatusView(cliStatus).tone !== "ok";
+
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
       <GlobalHeader
         cliStatus={cliStatus}
-        onOpenSystem={() => {
-          setSettingsSection("system");
-          setSelectedId(SETTINGS_ID);
-        }}
+        onOpenSystem={showSystem}
         onOpenSettings={() => setSelectedId(SETTINGS_ID)}
         settingsActive={isSettings}
       />
+      {showCaution && cliStatus && (
+        <CautionBanner status={cliStatus} onOpenSystem={showSystem} />
+      )}
       <div className="flex min-h-0 flex-1">
         <SessionList
           sessions={all}
