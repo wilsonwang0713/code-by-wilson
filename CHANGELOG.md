@@ -6,6 +6,45 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-20
+
+### Added
+
+- A Settings view, reached from a title-bar gear, with System, Account,
+  Appearance, and About sections. System is the new home for the Claude Code CLI
+  status: its detail, version requirement, binary-path override, and per-install
+  remedy commands. A title-bar Sys lamp and a master-caution banner both
+  deep-link into it. Account carries the subscription identity and rate-limit
+  gauges.
+
+### Changed
+
+- Rethemed the whole UI to an "Instrument" glass-cockpit direction: neutral
+  graphite surfaces, a type stack of Saira Semi Condensed for placards, Inter for
+  the UI, and JetBrains Mono for telemetry, with color reserved for live state.
+  Dropped the Space Grotesk and Hanken Grotesk fonts.
+- Flattened the rail's session list and moved the CLI status off it onto a
+  title-bar Sys master-caution lamp.
+- Reworked the session cockpit around an annunciator header (state, link, model
+  and effort, git, and a clock) above a three-panel sidebar: a Context fuel
+  gauge, a merged Tokens panel, and a token-speed sparkline.
+- Ported the Overview to the Instrument palette with selective color. A fixed
+  identity color per known model (Fable, Opus, Sonnet, Haiku) carries across the
+  By-model breakdown, the daily stack, and the session log; input and output are
+  tinted in the kind breakdowns; and the contributions calendar picks up an
+  engaged-blue heat. The by-project breakdown flattened to a monochrome list,
+  dropping the per-branch view.
+
+### Removed
+
+- The standalone CLI status modal, now folded into Settings → System.
+
+### Fixed
+
+- The daily usage by-kind chart now honors the page's "Include cache" toggle,
+  folding cache out to leave input and output when the toggle is off instead of
+  always rendering the full token composition.
+
 ## [0.1.7] - 2026-06-20
 
 ### Added
@@ -173,7 +212,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/luojiahai/code-by-wire/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/luojiahai/code-by-wire/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/luojiahai/code-by-wire/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/luojiahai/code-by-wire/compare/v0.1.4...v0.1.5
