@@ -49,10 +49,13 @@
   --color-ok: #46c57a; /* diff add, cache savings, done */
 
   /* Data / telemetry. `steel` fills the context ring while roomy; `violet` renders ANSI magenta in shell
-     output. The token-kind breakdown's fresh split (Input / Output) borrows the Sonnet / Fable jewel hues
-     instead of its own tokens (see KIND_SEGMENT_COLORS); cache and the cost magnitude ramp grey back below. */
+     output. The token-kind breakdown's fresh split gets dedicated teal tones (Input lighter, Output deeper)
+     so it reads as its own telemetry family — clear of the jewel models and softer than the brand wire;
+     cache and the cost magnitude ramp grey back below. */
   --color-steel: #8a97ac; /* neutral data magnitude — slate-steel (context ring) */
   --color-violet: #907bc9; /* ANSI magenta (shell output) */
+  --color-token-input: #54bcae; /* Input — light teal (fresh-token split) */
+  --color-token-output: #2a8579; /* Output — deep teal (fresh-token split) */
 
   /* Magnitude ramp — a monochrome tonal scale for the cost/token breakdowns. Instrument discipline:
      charts read as data, never affordances, so hue is reserved for live state. Light → deep by token
