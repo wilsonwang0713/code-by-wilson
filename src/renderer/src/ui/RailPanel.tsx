@@ -134,7 +134,7 @@ export const RailPanel = memo(function RailPanel({
               <div className="mt-2.5 flex flex-col gap-2">
                 {view.gauges.map((g) => (
                   <div key={g.label} className="flex items-center gap-2.5">
-                    <span className="w-9 shrink-0 font-display text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-faint">
+                    <span className="w-6 shrink-0 font-display text-[9px] font-semibold uppercase tracking-[0.1em] text-fg-faint">
                       {g.label}
                     </span>
                     <Bar
