@@ -205,9 +205,10 @@ export interface Account {
   /** Upstream provider for `api` billing: a Portkey x-portkey-provider value, or a cloud-provider key
    *  (bedrock/vertex/foundry/mantle/anthropic_aws). Present only when set. */
   apiProvider?: string;
-  /** True only for Anthropic-direct billing: the endpoint host is anthropic.com (or a subdomain) AND no
-   *  upstream provider is set. Drives costDisplay's real-spend framing. Optional and defaults falsy, so a
-   *  gateway or cloud account (local cost is an estimate of the upstream bill) keeps the ~ . */
+  /** True only for Anthropic-direct billing: the endpoint host is anthropic.com (or a subdomain), an auth
+   *  credential was detected, AND no upstream provider is set. Drives costDisplay's real-spend framing.
+   *  Optional and defaults falsy, so a gateway or cloud account (local cost is an estimate of the upstream
+   *  bill), or a bare base URL with no detected credential, keeps the ~ . */
   anthropicDirect?: boolean;
 }
 

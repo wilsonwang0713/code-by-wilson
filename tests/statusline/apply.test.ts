@@ -256,6 +256,7 @@ describe("deriveAccount — api billing", () => {
   it("is not direct when a provider is set even on an anthropic host", () => {
     const acc = deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS, {
       baseUrl: "https://api.anthropic.com",
+      authMethod: "apiKey",
       provider: "portkey-thing",
     });
     expect(acc?.anthropicDirect).toBeUndefined();
@@ -264,6 +265,26 @@ describe("deriveAccount — api billing", () => {
   it("is not direct for a lookalike host (no anthropic.com spoofing)", () => {
     const acc = deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS, {
       baseUrl: "https://evil-anthropic.com",
+      authMethod: "apiKey",
+    });
+    expect(acc?.anthropicDirect).toBeUndefined();
+  });
+
+  it("is direct for an anthropic host with an uppercase scheme", () => {
+    const acc = deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS, {
+      baseUrl: "HTTPS://api.anthropic.com",
+      authMethod: "token",
+    });
+    expect(acc?.anthropicDirect).toBe(true);
+  });
+
+  it("is not direct on an anthropic host when no credential was detected", () => {
+    const acc = deriveAccount([sample({ rateLimits: null })], NOW, STALE_MS, {
+      baseUrl: "https://api.anthropic.com",
+    });
+    expect(acc).toEqual({
+      billingMode: "api",
+      apiBaseUrl: "https://api.anthropic.com",
     });
     expect(acc?.anthropicDirect).toBeUndefined();
   });

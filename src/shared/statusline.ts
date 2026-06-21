@@ -73,7 +73,7 @@ export function freshestBySession(
 function isAnthropicHost(url: string | undefined): boolean {
   if (!url) return false;
   const host = url
-    .replace(/^https?:\/\//, "")
+    .replace(/^https?:\/\//i, "")
     .split(/[/:?#]/)[0]
     .toLowerCase();
   return host === "anthropic.com" || host.endsWith(".anthropic.com");
@@ -157,7 +157,13 @@ export function deriveAccount(
       if (apiConfig.baseUrl) acc.apiBaseUrl = apiConfig.baseUrl;
       if (apiConfig.authMethod) acc.apiAuthMethod = apiConfig.authMethod;
       if (apiConfig.provider) acc.apiProvider = apiConfig.provider;
-      if (isAnthropicHost(apiConfig.baseUrl) && !apiConfig.provider)
+      // Real-spend framing is a strong claim, so assert direct billing only when a credential was actually
+      // detected — a bare anthropic.com base URL with no auth env stays an estimate (keeps the ~).
+      if (
+        isAnthropicHost(apiConfig.baseUrl) &&
+        apiConfig.authMethod &&
+        !apiConfig.provider
+      )
         acc.anthropicDirect = true;
     } else {
       acc = { billingMode: "unknown" };

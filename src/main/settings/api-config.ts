@@ -38,11 +38,14 @@ const CLOUD_PROVIDER_FLAGS: ReadonlyArray<readonly [string, string]> = [
   ["CLAUDE_CODE_USE_ANTHROPIC_AWS", "anthropic_aws"],
 ];
 
-/** Claude Code treats 1/true/yes/on (any case) as enabling a flag. */
+/** Claude Code treats 1/true/yes/on (any case) as enabling a flag. A JSON boolean or number is coerced
+ *  the same way Claude Code would when it stringifies settings.json env into the process environment. */
 function isTruthyFlag(v: unknown): boolean {
+  if (typeof v === "boolean") return v;
+  const s = typeof v === "number" ? String(v) : v;
   return (
-    typeof v === "string" &&
-    ["1", "true", "yes", "on"].includes(v.trim().toLowerCase())
+    typeof s === "string" &&
+    ["1", "true", "yes", "on"].includes(s.trim().toLowerCase())
   );
 }
 
@@ -78,10 +81,10 @@ export function readApiConfig(claudeDir: string): ApiConfig | null {
         : "";
     const hasToken =
       typeof env.ANTHROPIC_AUTH_TOKEN === "string" &&
-      env.ANTHROPIC_AUTH_TOKEN.length > 0;
+      env.ANTHROPIC_AUTH_TOKEN.trim().length > 0;
     const hasKey =
       typeof env.ANTHROPIC_API_KEY === "string" &&
-      env.ANTHROPIC_API_KEY.length > 0;
+      env.ANTHROPIC_API_KEY.trim().length > 0;
 
     // 2. An explicit endpoint is a gateway (or a hand-set direct URL). Parse auth + upstream provider.
     if (baseUrl.length > 0) {

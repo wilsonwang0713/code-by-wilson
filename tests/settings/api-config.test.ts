@@ -64,6 +64,14 @@ describe("readApiConfig", () => {
     expect(readApiConfig(claudeDir)).toBeNull();
   });
 
+  it.each(["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"])(
+    "ignores a whitespace-only %s (not a real credential)",
+    (key) => {
+      const claudeDir = writeSettings({ env: { [key]: "   " } });
+      expect(readApiConfig(claudeDir)).toBeNull();
+    },
+  );
+
   it.each([
     ["CLAUDE_CODE_USE_BEDROCK", "bedrock"],
     ["CLAUDE_CODE_USE_VERTEX", "vertex"],
@@ -98,6 +106,22 @@ describe("readApiConfig", () => {
       });
     },
   );
+
+  it("coerces a JSON boolean or number flag the way Claude Code would", () => {
+    expect(
+      readApiConfig(writeSettings({ env: { CLAUDE_CODE_USE_BEDROCK: true } })),
+    ).toEqual({ provider: "bedrock" });
+    expect(
+      readApiConfig(writeSettings({ env: { CLAUDE_CODE_USE_VERTEX: 1 } })),
+    ).toEqual({ provider: "vertex" });
+    // A JSON `false`/`0` is disabled and, with nothing else, yields null.
+    expect(
+      readApiConfig(writeSettings({ env: { CLAUDE_CODE_USE_BEDROCK: false } })),
+    ).toBeNull();
+    expect(
+      readApiConfig(writeSettings({ env: { CLAUDE_CODE_USE_BEDROCK: 0 } })),
+    ).toBeNull();
+  });
 
   it("lets a cloud flag win over an also-present base URL", () => {
     const claudeDir = writeSettings({

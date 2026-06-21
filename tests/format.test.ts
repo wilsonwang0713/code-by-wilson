@@ -84,6 +84,18 @@ describe("costDisplay", () => {
     ).toEqual({ text: "~$0.50", equivalent: true });
   });
 
+  // The real production value for a gateway/cloud account is an absent anthropicDirect, not false —
+  // deriveAccount only ever sets it to true. The strict `=== true` gate must treat undefined as not-direct.
+  it("keeps the tilde for a live api account with anthropicDirect omitted", () => {
+    expect(
+      costDisplay({
+        liveCostUsd: 0.5,
+        equivApiValueUsd: 9,
+        billingMode: "api",
+      }),
+    ).toEqual({ text: "~$0.50", equivalent: true });
+  });
+
   it("keeps the tilde for a direct account before its live cost arrives", () => {
     expect(
       costDisplay({

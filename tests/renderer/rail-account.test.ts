@@ -141,6 +141,7 @@ describe("railAccountModel — api", () => {
     expect(label("http://localhost:8080")).toBe("localhost:8080");
     expect(label("https://gw.example.com/v1/")).toBe("gw.example.com/v1");
     expect(label("api.direct.example")).toBe("api.direct.example");
+    expect(label("HTTPS://api.portkey.ai")).toBe("api.portkey.ai");
   });
 });
 

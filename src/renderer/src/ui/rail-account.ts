@@ -69,7 +69,7 @@ function gauge(label: string, limit: RateLimit, now: number): RailGauge {
 /** The base URL as a bare host for display: a leading http(s):// scheme and a single trailing slash
  *  stripped, host/port/path preserved. A value with no recognizable scheme is shown verbatim. */
 function bareHost(url: string): string {
-  return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return url.replace(/^https?:\/\//i, "").replace(/\/$/, "");
 }
 
 /**
