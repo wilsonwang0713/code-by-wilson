@@ -951,26 +951,25 @@ const TOP_BREAKDOWN_ROWS = 7;
 
 /** The shared ranked-breakdown panel behind By model and By project (#111/#112): a titled table of entities,
  *  biggest first, each a row of name + Tokens + Equivalent API value with a full-width bar beneath. The two
- *  callers differ only in props: model rows carry a per-model swatch (`showSwatch`); project rows cap to the
- *  top `cap` with a "+N more {capNoun}s" note. Bars size against the largest DISPLAYED row, so a cap changes
- *  the denominator; an all-zero window yields empty bars rather than a divide-by-zero. The bar is built inline
- *  (not the `Bar` atom) because its color is a dynamic CSS value, not a Tailwind class. */
+ *  callers differ only in props: model rows carry a per-model swatch (`showSwatch`); both cap to `cap.n` rows
+ *  with a "+N more {cap.noun}s" note. The count and its noun ride in one object so a cap can't be set without
+ *  the note that discloses it. Bars size against the largest DISPLAYED row, so a cap changes the denominator;
+ *  an all-zero window yields empty bars rather than a divide-by-zero. The bar is built inline (not the `Bar`
+ *  atom) because its color is a dynamic CSS value, not a Tailwind class. */
 function Breakdown({
   title,
   nameLabel,
   rows,
   showSwatch = false,
   cap,
-  capNoun,
 }: {
   title: string;
   nameLabel: string;
   rows: BreakdownRow[];
   showSwatch?: boolean;
-  cap?: number;
-  capNoun?: string;
+  cap: { n: number; noun: string };
 }) {
-  const shown = cap == null ? rows : rows.slice(0, cap);
+  const shown = rows.slice(0, cap.n);
   const max = Math.max(...shown.map((r) => r.tokens), 0);
   const rest = rows.length - shown.length;
   return (
@@ -1041,9 +1040,9 @@ function Breakdown({
           ))}
         </tbody>
       </table>
-      {rest > 0 && capNoun && (
+      {rest > 0 && (
         <p className="mt-2 text-[11px] text-fg-faint">
-          +{rest} more {rest === 1 ? capNoun : `${capNoun}s`}
+          +{rest} more {rest === 1 ? cap.noun : `${cap.noun}s`}
         </p>
       )}
     </StatsPanel>
@@ -1088,8 +1087,7 @@ function ByModel({
       nameLabel="Model"
       rows={ranked}
       showSwatch
-      cap={TOP_BREAKDOWN_ROWS}
-      capNoun="model"
+      cap={{ n: TOP_BREAKDOWN_ROWS, noun: "model" }}
     />
   );
 }
@@ -1126,8 +1124,7 @@ function ByProject({
       title="By project"
       nameLabel="Project"
       rows={ranked}
-      cap={TOP_BREAKDOWN_ROWS}
-      capNoun="project"
+      cap={{ n: TOP_BREAKDOWN_ROWS, noun: "project" }}
     />
   );
 }
