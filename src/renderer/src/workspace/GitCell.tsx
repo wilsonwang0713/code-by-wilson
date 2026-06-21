@@ -133,7 +133,7 @@ export function GitCell({
                   <button
                     type="button"
                     onClick={() => void window.api.openExternal(remoteUrl)}
-                    className="flex min-w-0 items-center gap-1 text-fg hover:underline"
+                    className="flex min-w-0 cursor-pointer items-center gap-1 text-fg hover:underline"
                   >
                     <span className="min-w-0 truncate">{repo}</span>
                     <Icon
@@ -157,7 +157,7 @@ export function GitCell({
                   <button
                     type="button"
                     onClick={() => void window.api.openExternal(pr.url)}
-                    className="text-accent underline underline-offset-2 hover:text-accent-bright"
+                    className="cursor-pointer text-accent underline underline-offset-2 hover:text-accent-bright"
                   >
                     #{pr.number}
                   </button>
