@@ -29,6 +29,7 @@ export const IPC = {
   setClaudeBinPath: "cli:setBinPath",
   resetAnalytics: "analytics:reset",
   openExternal: "shell:openExternal",
+  openIn: "shell:openIn",
   clipboardWriteText: "clipboard:writeText",
 } as const;
 
@@ -73,6 +74,17 @@ export type ShellOutputRead =
 export type StatsRead =
   | { status: "changed"; token: string; snapshot: StatsSnapshot }
   | { status: "unchanged"; token: string };
+
+/** A target for the header's "Open in" dropdown. The renderer sends one of these plus the session id;
+ *  the main process resolves the folder and opens it. */
+export type OpenInTarget = "vscode" | "finder";
+
+/** The result of an openIn request. The handler never throws to the renderer: every failure (no
+ *  resolvable cwd, path gone, shell error) comes back as `{ ok: false, error }` so the menu can show it. */
+export interface OpenInResult {
+  ok: boolean;
+  error?: string;
+}
 
 export interface IpcApi {
   /** Read-only: the indexed sessions as they stand, no sync — fast initial paint. */
@@ -128,6 +140,9 @@ export interface IpcApi {
   /** Open an http(s) URL in the user's default browser (the Git cell's PR link). Non-http(s) URLs are
    *  ignored by the main handler. */
   openExternal(url: string): Promise<void>;
+  /** Open the session's working directory in `target`. The path is resolved in the main process from the
+   *  session id (registry → transcript), so this works for ended sessions too. Never rejects. */
+  openIn(id: string, target: OpenInTarget): Promise<OpenInResult>;
   /** Copy text to the system clipboard (the Git popover's branch / commit copy buttons). */
   clipboardWriteText(text: string): Promise<void>;
 }
