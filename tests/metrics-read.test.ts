@@ -115,6 +115,27 @@ describe("provider.readMetrics", () => {
     expect(typeof r.mtimeMs).toBe("number");
   });
 
+  it("only asks gh for a PR when the glance found a browsable remote", () => {
+    let calls = 0;
+    _setPrRunner(() => {
+      calls++;
+      return Promise.resolve(null);
+    });
+
+    // No origin: a remote-less repo can't have a PR, so gh is never spawned.
+    const bare = scaffold();
+    createClaudeProvider({ claudeDir: bare.claudeDir }).readMetrics(bare.id);
+    expect(calls).toBe(0);
+
+    // With an origin the glance carries a browsable remoteUrl, so the PR lookup fires.
+    const withRemote = scaffold();
+    git(withRemote.repo, "remote", "add", "origin", "git@github.com:o/r.git");
+    createClaudeProvider({
+      claudeDir: withRemote.claudeDir,
+    }).readMetrics(withRemote.id);
+    expect(calls).toBe(1);
+  });
+
   it("skips the recompute when the change token is unchanged", () => {
     const { claudeDir, id } = scaffold();
     const provider = createClaudeProvider({ claudeDir });

@@ -105,7 +105,10 @@ function readSources(
   const git = cwd ? readGit(cwd) : null;
   return {
     git,
-    pr: cwd ? readPr(cwd, git?.branch ?? null) : null,
+    // Only ask gh for a PR when the glance found a browsable remote. A remote-less repo can't have a PR,
+    // so this skips a guaranteed-failing `gh pr view` spawn on every poll. A non-null remoteUrl means
+    // origin resolved to an http/ssh host where gh might find one (gh auto-detects the host from it).
+    pr: cwd && git && git.remoteUrl ? readPr(cwd, git.branch) : null,
     voice: cwd ? readVoiceEnabled(cwd, claudeDir) : null,
     remote: readRemoteControl(claudeDir, id),
   };
