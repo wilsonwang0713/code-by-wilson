@@ -3,6 +3,7 @@ import { FLOW } from "@shared/terminal";
 import {
   buildClaudeCommand,
   buildResumeCommand,
+  buildForkCommand,
   launchForm,
   type ClaudeCommand,
 } from "./command";
@@ -34,6 +35,18 @@ export interface SpawnRequest {
 
 export interface AdoptSpawn {
   id: string;
+  cwd: string;
+  cols: number;
+  rows: number;
+  bin?: string;
+}
+
+export interface ForkSpawn {
+  /** The pinned NEW id for the fork, minted by the caller, under which the pty registers Managed. */
+  id: string;
+  /** The source session whose conversation is resumed into the fork (read-only — its Transcript is
+   *  untouched; the fork writes its own under `id`). */
+  sourceId: string;
   cwd: string;
   cols: number;
   rows: number;
@@ -73,6 +86,9 @@ export interface TerminalManager {
   spawn(req: SpawnRequest): void;
   /** Resume an Ended session under its own id with `claude --resume <id>` — same pty machinery as spawn. */
   adopt(req: AdoptSpawn): void;
+  /** Fork a session: resume `sourceId`'s conversation into a fresh `id` with `--fork-session`, so the
+   *  source Transcript is left intact and the fork writes its own. Same pty machinery as spawn/adopt. */
+  fork(req: ForkSpawn): void;
   /** Re-key a live pty from its old session id to a new one (a `/clear` rotation), so its output, writes,
    *  and exit all flow under the new id. No-op if `from` isn't live or `to` is already taken. */
   rename(from: string, to: string): void;
@@ -195,6 +211,19 @@ export function createTerminalManager(
     );
   }
 
+  // Fork: resume the source conversation under a NEW id. Like adopt, the argv carries no --model (the
+  // fork restores the source's model); unlike adopt, the id differs from the source, so the fork writes
+  // its own Transcript and the original is left intact.
+  function fork(req: ForkSpawn): void {
+    start(
+      req.id,
+      buildForkCommand({ sourceId: req.sourceId, newId: req.id, bin: req.bin }),
+      req.cwd,
+      req.cols,
+      req.rows,
+    );
+  }
+
   function ack(id: string, charCount: number): void {
     const term = terms.get(id);
     if (!term) return;
@@ -220,6 +249,7 @@ export function createTerminalManager(
   return {
     spawn,
     adopt,
+    fork,
     rename,
     write: (id, data) => terms.get(id)?.pty.write(data),
     resize: (id, cols, rows) => terms.get(id)?.pty.resize(cols, rows),

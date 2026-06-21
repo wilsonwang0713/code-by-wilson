@@ -97,6 +97,13 @@ const REQ = {
   rows: 30,
 };
 const ADOPT_REQ = { id: "sess-1", cwd: "/work/app", cols: 80, rows: 30 };
+const FORK_REQ = {
+  id: "fork-1",
+  sourceId: "sess-1",
+  cwd: "/work/app",
+  cols: 80,
+  rows: 30,
+};
 
 describe("createTerminalManager", () => {
   it("spawns a pty, registers the id as Managed, and passes cwd/env/size through", () => {
@@ -258,6 +265,33 @@ describe("createTerminalManager", () => {
     h.manager.adopt(ADOPT_REQ);
     expect(h.ptys).toHaveLength(1);
     expect(h.spawned).toEqual(["sess-1"]);
+  });
+
+  it("fork: resumes the source under a NEW id with --fork-session, no --model, and registers it Managed under the new id", () => {
+    const h = harness();
+    h.manager.fork(FORK_REQ);
+    expect(h.spawned).toEqual(["fork-1"]); // the new id, not the source id
+    expect(h.ptys).toHaveLength(1);
+    expect(h.ptys[0].state.spawnedWith!.args).toEqual([
+      "--resume",
+      "sess-1",
+      "--session-id",
+      "fork-1",
+      "--fork-session",
+    ]);
+    expect(h.ptys[0].state.spawnedWith).toMatchObject({
+      cwd: "/work/app",
+      cols: 80,
+      rows: 30,
+    });
+  });
+
+  it("fork is idempotent: a second fork under the same new id does nothing", () => {
+    const h = harness();
+    h.manager.fork(FORK_REQ);
+    h.manager.fork(FORK_REQ);
+    expect(h.ptys).toHaveLength(1);
+    expect(h.spawned).toEqual(["fork-1"]);
   });
 
   it("rejects a spawn whose cwd is not a directory: no pty, a readable message, and an exit", () => {
