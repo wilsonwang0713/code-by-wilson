@@ -32,7 +32,7 @@ export interface PrInfo {
 export interface SessionMetrics {
   tokenSpeed: TokenSpeed | null;
   git: GitInfo | null;
-  pr?: PrInfo | null;
+  pr: PrInfo | null;
   voiceEnabled: boolean | null;
   remoteControl: boolean | null;
 }
