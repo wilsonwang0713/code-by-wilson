@@ -94,6 +94,10 @@ export function StatsView() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetError, setResetError] = useState(false);
   const [resetNonce, setResetNonce] = useState(0);
+  // Track what last drove the poll effect, so the snapshot blanks only on a range change or a reset — never
+  // on a calendar-year change, which re-queries just the heatmap and would otherwise flash the whole view.
+  const prevRangeRef = useRef(range);
+  const prevResetRef = useRef(resetNonce);
   // The icon spins / disables while a backfill is in progress — the post-reset rebuild and the first cold run.
   const rebuilding = !!snap && !snap.progress.done;
 
@@ -119,10 +123,16 @@ export function StatsView() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inFlight = false;
     tokenRef.current = undefined; // new range/year: force a full snapshot on the next poll
-    // Range changed: blank the cards back to loading rather than show the prior range's totals under the
-    // newly-pressed button. But NOT when drilling into a day from the calendar — blanking would unmount the
-    // calendar and re-fire its scroll-to-newest effect, flashing away from the clicked cell.
-    if (!isDayRange(range)) setSnap(null);
+    // Blank the cards back to loading rather than show the prior range's totals under the newly-pressed
+    // button — but ONLY when the range changed or the store was reset, never on a calendar-year change. The
+    // year is independent of the page totals (it re-queries just the heatmap), so blanking everything would
+    // flash the whole view for a calendar-only change. Also skip when drilling into a day from the calendar:
+    // blanking would unmount the calendar and re-fire its scroll-to-newest effect, flashing away from the cell.
+    const rangeOrReset =
+      prevRangeRef.current !== range || prevResetRef.current !== resetNonce;
+    prevRangeRef.current = range;
+    prevResetRef.current = resetNonce;
+    if (rangeOrReset && !isDayRange(range)) setSnap(null);
 
     const schedule = (ms: number): void => {
       timer = setTimeout(tick, ms);
@@ -577,7 +587,7 @@ function YearSwitcher({
       onChange={(e) =>
         onChange(e.target.value === "trailing" ? null : Number(e.target.value))
       }
-      className="rounded-md border border-ink-800 bg-ink-900 px-2 py-0.5 text-[11px] text-fg-muted"
+      className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-[11px] text-fg-muted"
     >
       <option value="trailing">Last 12 months</option>
       {years.map((y) => (
@@ -1343,7 +1353,7 @@ function StatsPanel({
 }) {
   return (
     <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
-      <header className="mb-3 flex items-center justify-between gap-2">
+      <header className="mb-4 flex items-center justify-between gap-2">
         <h2 className="font-display text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-faint">
           {title}
         </h2>
