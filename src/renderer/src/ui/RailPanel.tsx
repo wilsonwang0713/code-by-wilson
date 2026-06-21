@@ -8,7 +8,7 @@ import { OVERVIEW_ID } from "../stats/sentinel";
 
 /**
  * The rail's pinned identity panel: an account card that opens Overview (subscription email + plan +
- * 5h/Weekly gauges, an api endpoint host, or — with no account — a bare Overview label). Replaces the old
+ * 5h/7d gauges, an api endpoint host, or — with no account — a bare Overview label). Replaces the old
  * RailAccount block and the separate pinned Overview button. CLI status no longer lives in the rail — it
  * moved to the Sys master-caution lamp in the title bar (GlobalHeader).
  *
