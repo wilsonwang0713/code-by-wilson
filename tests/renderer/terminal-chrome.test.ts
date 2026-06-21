@@ -52,10 +52,18 @@ describe("terminal chrome — borderless, padded, edge scrollbar", () => {
   });
 
   it("lets the terminal fill its wrapper with no outer padding (only the 8px inside it)", () => {
-    const m = /className="([^"]*)"[^>]*>\s*<TerminalView/.exec(workspace);
-    expect(m, "wrapper div around TerminalView in Workspace.tsx").toBeTruthy();
+    // TerminalView is now passed as `terminalSlot={<TerminalView …/>}` into TabbedCenter, which wraps it
+    // in a plain `<div className="h-full">` — no padding classes. Assert both: the slot prop has no
+    // padding/margin wrapper, and the TabbedCenter inner wrapper carries only h-full.
+    const slotM = /terminalSlot=\{<TerminalView/.exec(workspace);
     expect(
-      m![1],
+      slotM,
+      "TerminalView passed as terminalSlot prop (no wrapper div)",
+    ).toBeTruthy();
+    const wrapM = /className="([^"]*)"[^>]*>\{terminalSlot\}/.exec(workspace);
+    expect(wrapM, "TabbedCenter wrapper div around terminalSlot").toBeTruthy();
+    expect(
+      wrapM![1],
       "no outer padding/margin on the terminal wrapper",
     ).not.toMatch(/\b[pm][xytrbl]?-/);
   });

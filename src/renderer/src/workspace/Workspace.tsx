@@ -24,6 +24,7 @@ import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
 import { useTasks } from "./use-tasks";
 import { useMetrics, type MetricsState } from "./use-metrics";
 import { HeaderActions } from "./HeaderActions";
+import { DormantTerminal } from "./DormantTerminal";
 import { Annunciator } from "./Annunciator";
 import { OverlayScroll } from "../ui/OverlayScroll";
 
@@ -70,6 +71,9 @@ export function Workspace({
           account={account}
           now={now}
           metrics={metrics}
+          canSpawn={canSpawn}
+          onAdopt={onAdopt}
+          onFork={onFork}
         />
       </div>
     </div>
@@ -104,11 +108,17 @@ function WorkspaceBody({
   account,
   now,
   metrics,
+  canSpawn,
+  onAdopt,
+  onFork,
 }: {
   session: Session;
   account: Account | null;
   now: number;
   metrics: MetricsState;
+  canSpawn: boolean;
+  onAdopt: (id: string) => Promise<void>;
+  onFork: (session: Session) => Promise<void>;
 }) {
   const doc = useTranscript(s.id);
   const tasks = useTasks(s.id);
@@ -155,6 +165,9 @@ function WorkspaceBody({
             drill={drill}
             onNavigate={(depth) => setDrill((d) => d.slice(0, depth))}
             dispatchDrill={dispatchDrill}
+            canSpawn={canSpawn}
+            onAdopt={onAdopt}
+            onFork={onFork}
           />
         </div>
         <StructureDock
@@ -212,6 +225,9 @@ function CenterView({
   drill,
   onNavigate,
   dispatchDrill,
+  canSpawn,
+  onAdopt,
+  onFork,
 }: {
   session: Session;
   doc: DocState;
@@ -220,11 +236,12 @@ function CenterView({
   drill: DrillCrumb[];
   onNavigate: (depth: number) => void;
   dispatchDrill: DispatchDrill;
+  canSpawn: boolean;
+  onAdopt: (id: string) => Promise<void>;
+  onFork: (session: Session) => Promise<void>;
 }) {
   const top = drill[drill.length - 1];
   // The full subagent path, so the breadcrumb shows Session › A › B … instead of just the top.
-  // Filtering to subagent frames stays safe for the breadcrumb's index-based pop (onNavigate slices the
-  // full stack): a shell crumb only ever appears alone, since every shell and lane drill resets the stack.
   const subagentCrumbs = drill
     .filter(
       (c): c is Extract<DrillCrumb, { kind: "subagent" }> =>
@@ -246,7 +263,38 @@ function CenterView({
         dispatchDrill={dispatchDrill}
       />
     ) : null;
+  const drilled = drill.length > 0;
+  const drilledKey = top
+    ? top.kind === "shell"
+      ? top.shellId
+      : top.agentId
+    : undefined;
 
+  // Ended sessions keep the Terminal tab — now a dark dormant canvas offering Adopt + Fork — but default
+  // to Transcript. Checked BEFORE management so a just-exited Managed session (which re-derives Observed)
+  // also lands here, not in the live-terminal branch with its dead "[process exited]" scrollback.
+  if (s.state === "ended")
+    return (
+      <TabbedCenter
+        session={s}
+        doc={doc}
+        defaultTab="transcript"
+        terminalSlot={
+          <DormantTerminal
+            session={s}
+            canSpawn={canSpawn}
+            onAdopt={onAdopt}
+            onFork={onFork}
+          />
+        }
+        drilledView={drilledView}
+        drilled={drilled}
+        drilledKey={drilledKey}
+        dispatchDrill={dispatchDrill}
+      />
+    );
+
+  // Live Observed: read-only transcript, no tab bar. Fork is still reachable from the header.
   if (s.management === "observed")
     return (
       drilledView ?? (
@@ -257,27 +305,31 @@ function CenterView({
         />
       )
     );
+
+  // Live Managed: the live terminal (default) plus the transcript the CLI is writing.
   return (
-    <ManagedCenter
+    <TabbedCenter
       session={s}
       doc={doc}
+      defaultTab="terminal"
+      terminalSlot={<TerminalView sessionId={s.id} />}
       drilledView={drilledView}
-      drilled={drill.length > 0}
-      drilledKey={
-        top ? (top.kind === "shell" ? top.shellId : top.agentId) : undefined
-      }
+      drilled={drilled}
+      drilledKey={drilledKey}
       dispatchDrill={dispatchDrill}
     />
   );
 }
 
-/** A Managed session has both a live terminal and the transcript the CLI is writing, so it toggles
- *  between them — default Terminal. Toggling away only detaches xterm (the pty keeps buffering), so
- *  toggling back restores full scrollback. Drilling a lane or a shell auto-selects the Transcript tab;
- *  the Terminal stays live, and the user can flip back to it (the drill persists). */
-function ManagedCenter({
+/** A two-tab center (Terminal ⇄ Transcript). `terminalSlot` is whatever the Terminal tab shows — the live
+ *  xterm for a Managed session, or the dark DormantTerminal hero for an Ended one — and `defaultTab` sets
+ *  which tab opens first (Terminal for Managed, Transcript for Ended). Toggling away only detaches the
+ *  terminal slot; toggling back restores it. Drilling a lane or shell auto-selects the Transcript tab. */
+function TabbedCenter({
   session: s,
   doc,
+  defaultTab,
+  terminalSlot,
   drilledView,
   drilled,
   drilledKey,
@@ -285,12 +337,14 @@ function ManagedCenter({
 }: {
   session: Session;
   doc: DocState;
+  defaultTab: CenterTab;
+  terminalSlot: React.ReactNode;
   drilledView: React.ReactNode;
   drilled: boolean;
   drilledKey?: string;
   dispatchDrill: DispatchDrill;
 }) {
-  const [tab, setTab] = useState<CenterTab>("terminal");
+  const [tab, setTab] = useState<CenterTab>(defaultTab);
   useEffect(() => {
     if (drilledKey) setTab("transcript");
   }, [drilledKey]);
@@ -299,9 +353,7 @@ function ManagedCenter({
       <ViewTabs tab={tab} onChange={setTab} />
       <div className="min-h-0 flex-1">
         {tab === "terminal" ? (
-          <div className="h-full">
-            <TerminalView sessionId={s.id} />
-          </div>
+          <div className="h-full">{terminalSlot}</div>
         ) : drilled ? (
           drilledView
         ) : (
