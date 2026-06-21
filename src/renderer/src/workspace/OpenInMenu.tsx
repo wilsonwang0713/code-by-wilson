@@ -36,9 +36,13 @@ export function OpenInMenu({ sessionId }: { sessionId: string }) {
   }, [open]);
 
   async function handleOpen(target: OpenInTarget) {
-    const res = await window.api.openIn(sessionId, target);
-    if (res.ok) setOpen(false);
-    else setError(res.error ?? "Couldn't open.");
+    try {
+      const res = await window.api.openIn(sessionId, target);
+      if (res.ok) setOpen(false);
+      else setError(res.error ?? "Couldn't open.");
+    } catch {
+      setError("Couldn't open.");
+    }
   }
 
   return (
