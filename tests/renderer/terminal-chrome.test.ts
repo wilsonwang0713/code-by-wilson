@@ -60,8 +60,23 @@ describe("terminal chrome — borderless, padded, edge scrollbar", () => {
       slotM,
       "TerminalView passed as terminalSlot prop (no wrapper div)",
     ).toBeTruthy();
-    const wrapM = /className="([^"]*)"[^>]*>\{terminalSlot\}/.exec(workspace);
-    expect(wrapM, "TabbedCenter wrapper div around terminalSlot").toBeTruthy();
+    // Anchor the wrapper check to `<div className="h-full">{terminalSlot}</div>` specifically —
+    // the h-full is load-bearing (FitAddon needs a sized parent) and uniquely identifies the
+    // terminal wrapper. Also assert there is exactly one `>{terminalSlot}` occurrence so no
+    // sibling wrapper can silently shadow this match.
+    const wrapMatches = [...workspace.matchAll(/>(\{terminalSlot\})/g)];
+    expect(
+      wrapMatches,
+      "exactly one element renders {terminalSlot}",
+    ).toHaveLength(1);
+    const wrapM =
+      /className="([^"]*\bh-full\b[^"]*)"[^>]*>\{terminalSlot\}/.exec(
+        workspace,
+      );
+    expect(
+      wrapM,
+      "TabbedCenter terminal wrapper has h-full class",
+    ).toBeTruthy();
     expect(
       wrapM![1],
       "no outer padding/margin on the terminal wrapper",
