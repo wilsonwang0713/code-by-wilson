@@ -12,6 +12,8 @@ import {
   type SpawnRequest,
   type AdoptRequest,
   type AdoptResult,
+  type ForkRequest,
+  type ForkResult,
 } from "@shared/terminal";
 import { hydrate } from "../db/store";
 import { projectFromCwd } from "../project-name";
@@ -119,6 +121,23 @@ export function registerTerminalIpc({
     });
     return { ok: true };
   });
+  // Fork a session: resume its conversation into a NEW id with --fork-session, so the source Transcript
+  // is left untouched. No liveness gate — unlike adopt, a fork writes its own Transcript, so it's safe
+  // even while the source is still running. cwd is resolved in main from the source id, not trusted from
+  // the renderer; the only refusal is an unresolvable source (no registry entry and no Transcript cwd).
+  ipcMain.handle(TERMINAL.fork, (_e, req: ForkRequest): ForkResult => {
+    const target = resolveAdoptTarget(req.sourceId);
+    if (!target) return { ok: false, reason: "unresolvable" };
+    manager.fork({
+      id: req.newId,
+      sourceId: req.sourceId,
+      cwd: target.cwd,
+      cols: req.cols,
+      rows: req.rows,
+      bin: resolveBin?.() ?? undefined,
+    });
+    return { ok: true };
+  });
   const onWrite = (_e: IpcMainEvent, id: string, data: string) =>
     manager.write(id, data);
   const onResize = (_e: IpcMainEvent, id: string, cols: number, rows: number) =>
@@ -156,6 +175,7 @@ export function registerTerminalIpc({
     app.removeListener("before-quit", onBeforeQuit);
     ipcMain.removeHandler(TERMINAL.spawn);
     ipcMain.removeHandler(TERMINAL.adopt);
+    ipcMain.removeHandler(TERMINAL.fork);
     ipcMain.removeHandler(TERMINAL.pickDirectory);
     ipcMain.removeListener(TERMINAL.write, onWrite);
     ipcMain.removeListener(TERMINAL.resize, onResize);

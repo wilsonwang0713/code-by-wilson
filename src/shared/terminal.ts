@@ -10,6 +10,7 @@ export const TERMINAL = {
   ack: "terminal:ack",
   kill: "terminal:kill",
   adopt: "terminal:adopt",
+  fork: "terminal:fork",
   pickDirectory: "terminal:pick-directory",
   data: "terminal:data",
   exit: "terminal:exit",
@@ -79,6 +80,25 @@ export type AdoptResult =
   | { ok: false; reason: "alive" | "unresolvable" };
 
 /**
+ * Fork a session: resume its conversation into a brand-new id with `--fork-session`. The renderer mints
+ * `newId` (so it can stand up the fork's terminal first, like spawn) and names the `sourceId` to resume;
+ * the working directory is resolved in main from the source's registry/Transcript.
+ */
+export interface ForkRequest {
+  sourceId: string;
+  newId: string;
+  cols: number;
+  rows: number;
+}
+
+/**
+ * Result of a Fork attempt. Refused only when no working directory can be resolved for the source.
+ * Unlike Adopt there is no `"alive"` refusal — a fork writes its own Transcript, so it's safe even while
+ * the source is still running.
+ */
+export type ForkResult = { ok: true } | { ok: false; reason: "unresolvable" };
+
+/**
  * The Managed-terminal control + push surface, exposed on `window.api.terminal`. Spawning returns an
  * optimistic Managed draft Session the renderer shows until discovery indexes the real process.
  */
@@ -86,6 +106,8 @@ export interface TerminalApi {
   spawn(req: SpawnRequest): Promise<Session>;
   /** Adopt an Ended session by resuming it under its own id. Refused if it is actually alive. */
   adopt(req: AdoptRequest): Promise<AdoptResult>;
+  /** Fork a session by resuming it into a new id. Refused only if the source's cwd can't be resolved. */
+  fork(req: ForkRequest): Promise<ForkResult>;
   write(id: string, data: string): void;
   resize(id: string, cols: number, rows: number): void;
   ack(id: string, charCount: number): void;
