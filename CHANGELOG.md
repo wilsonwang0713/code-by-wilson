@@ -6,6 +6,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-06-21
+
+### Added
+
+- An "Open in" menu on the session header that opens the working directory in
+  VSCode or the OS file browser (Finder on macOS, Explorer on Windows). It
+  resolves the folder from the registry or the transcript, so it works for ended
+  and observed sessions too, and surfaces a deleted or unresolvable folder as an
+  inline error instead of a dead click.
+- Drilling from a subagent's inline dispatch in a transcript straight into that
+  subagent's own transcript, and on through nested subagents. The breadcrumb
+  grows a level at a time (`Session › A › B`) and pops back the same way, and a
+  dispatch is clickable only when its agent resolves on disk.
+
+### Changed
+
+- Redesigned the Git cell into a minimal branch readout that opens a detail
+  popover. The cell shows the branch name, or the short sha on a detached HEAD,
+  with an amber dot when the tree is dirty; the popover holds the repository
+  link, copyable branch and commit, the pull request link, and sync, changes,
+  and status rows.
+- Widened API-billing detection to cover a bare `ANTHROPIC_API_KEY` or
+  `ANTHROPIC_AUTH_TOKEN` (direct Anthropic) and the cloud-provider flags
+  (Bedrock, Vertex, Foundry, and the rest), not just an explicit base URL. The
+  rail names the gateway provider and gives cloud accounts a friendly name ("AWS
+  Bedrock", "Google Vertex", "Microsoft Foundry"). Cost drops the `~` only for
+  live, direct Anthropic spend; gateways keep the estimate framing.
+- Unified the By model and By project breakdowns in the Overview into one shared
+  panel of full-width bars with a column header, both capped at the top 7 with a
+  "+N more" note.
+- Dropped the Saira display font. Labels now reuse Inter and lean on case,
+  tracking, and weight for hierarchy, and the wordmark takes its own face,
+  uppercase Cascadia Mono, for a stamped terminal-brand feel.
+- Folded the standalone Sys lamp into the Settings gear, which now carries the
+  CLI master-caution as a corner badge that stays dark until the CLI trips.
+- Restyled the selected session card as a raised, teal-bordered card in place of
+  the leading accent bar.
+- The Model cell now shows the raw model id beside the family, like
+  `Opus (claude-opus-4-8[1m])`, truncated with the full id on hover.
+
+### Fixed
+
+- The macOS app icon renders full-size on macOS Tahoe instead of shrinking into
+  a grey rounded frame, by shipping the art full-bleed and letting Tahoe supply
+  the corner mask.
+- Tidied the Overview stats chrome: Y-axis tick labels trim a trailing `.00` and
+  center on their gridlines, the daily chart gains headroom under its title, and
+  the year dropdown aligns without flashing on a year change.
+- The collapsed Structure tally now matches the expanded tab order (Tasks,
+  Subagents, Shells, Turns) and includes the shells count it was missing.
+
 ## [0.1.8] - 2026-06-20
 
 ### Added
@@ -212,7 +263,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/luojiahai/code-by-wire/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/luojiahai/code-by-wire/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/luojiahai/code-by-wire/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/luojiahai/code-by-wire/compare/v0.1.5...v0.1.6
