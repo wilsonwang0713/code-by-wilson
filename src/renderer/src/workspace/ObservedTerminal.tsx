@@ -24,6 +24,9 @@ export function ObservedTerminal({
 }) {
   const ended = s.state === "ended";
   const modelUnknown = s.modelId == null && s.modelRaw == null;
+  // `armed` stays true for both: this panel is keyed by session id (Workspace remounts on a session
+  // switch), so the hooks' transient state resets on remount and never needs the in-place re-arm cleanup
+  // the header relies on (where Adopt can disappear and reappear within one mounted HeaderActions).
   const adopt = useResumeAction({
     run: () => onAdopt(s.id),
     modelUnknown,
