@@ -1,4 +1,11 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import type { GitInfo, PrInfo } from "@shared/metrics";
@@ -10,9 +17,10 @@ const POP_WIDTH = 280;
 
 /** The annunciator's Git cell: a minimal strip readout (the branch, or the short sha on a detached HEAD,
  *  with an amber dot when the tree is dirty) that opens a detail popover. The popover carries the repo
- *  link, the copy-able branch and commit, the PR link, and the sync/diff/status numbers. With no git
- *  (no repo, or metrics still loading) the cell shows a bare em dash and isn't interactive. The popover
- *  is portaled to the body because the annunciator bar clips its overflow. */
+ *  link, the copy-able branch and commit, the PR link, and the sync/diff/status numbers. Before the
+ *  glance lands the cell shows the session's recorded branch as plain text (no popover to fill yet); off
+ *  a repo-less cwd with no recorded branch it's a bare em dash. The popover is portaled to the body
+ *  because the annunciator bar clips its overflow. */
 export function GitCell({
   session: s,
   git,
@@ -37,10 +45,13 @@ export function GitCell({
   const behind = git?.behind ?? null;
   const insertions = git?.insertions ?? 0;
   const deletions = git?.deletions ?? 0;
-  const headLabel = branch ?? sha; // detached HEAD falls back to the short sha
-  const hasGit = headLabel != null;
+  // The strip label: the live branch, the short sha on a detached HEAD, or — before the glance lands or
+  // off a repo-less cwd — the session's recorded branch. The popover only opens when there's a live
+  // glance to fill it, so a pre-glance label renders as plain text rather than a dead trigger.
+  const headLabel = branch ?? sha ?? s.branch ?? null;
+  const interactive = git != null && headLabel != null;
 
-  const place = () => {
+  const place = useCallback(() => {
     const r = triggerRef.current?.getBoundingClientRect();
     if (!r) return;
     const left = Math.max(
@@ -48,7 +59,7 @@ export function GitCell({
       Math.min(r.right - POP_WIDTH, window.innerWidth - POP_WIDTH - 8),
     );
     setPos({ left, top: r.bottom + 4 });
-  };
+  }, []);
 
   const toggle = () => {
     if (open) {
@@ -70,22 +81,24 @@ export function GitCell({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    const onReflow = () => setOpen(false);
+    // Keep the popover glued to its trigger on scroll/resize rather than dismissing it. The annunciator
+    // lives in a non-scrolling header, so an inner pane scrolling (a streaming transcript) must NOT close
+    // the popover — only re-anchor it. Capture phase so a scroll in any descendant re-places it too.
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onReflow, true);
-    window.addEventListener("resize", onReflow);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onReflow, true);
-      window.removeEventListener("resize", onReflow);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
     };
-  }, [open]);
+  }, [open, place]);
 
   return (
     <Cell label="Git" grow={2.4} raw>
-      {hasGit ? (
+      {interactive ? (
         <button
           ref={triggerRef}
           type="button"
@@ -108,6 +121,8 @@ export function GitCell({
             className="shrink-0 text-fg-faint"
           />
         </button>
+      ) : headLabel != null ? (
+        <span className="min-w-0 truncate text-fg">{headLabel}</span>
       ) : (
         <span className="text-fg-muted">—</span>
       )}
