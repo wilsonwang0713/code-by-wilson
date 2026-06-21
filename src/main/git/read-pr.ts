@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import type { PrInfo } from "@shared/metrics";
+import { branchRowKey } from "@shared/stats";
 
 const TTL_MS = 60_000;
 
@@ -63,7 +64,7 @@ export function readPr(
   now: Clock = Date.now,
 ): PrInfo | null {
   if (!cwd || !branch) return null;
-  const key = `${cwd}\u0000${branch}`;
+  const key = branchRowKey(cwd, branch); // the same NUL-joined cwd+branch key the analytics store uses
   const hit = cache.get(key);
   const t = now();
   if (hit && hit.expiry > t) return hit.value; // fresh
