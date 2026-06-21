@@ -87,16 +87,23 @@ export type AdoptResult =
 export interface ForkRequest {
   sourceId: string;
   newId: string;
+  /** The source's model family, so main can hydrate the optimistic draft the way spawn does. The fork
+   *  itself restores the model via --fork-session; this rides along only for the pre-discovery draft. */
+  model: Family;
   cols: number;
   rows: number;
 }
 
 /**
- * Result of a Fork attempt. Refused only when no working directory can be resolved for the source.
- * Unlike Adopt there is no `"alive"` refusal — a fork writes its own Transcript, so it's safe even while
- * the source is still running.
+ * Result of a Fork attempt. On success it carries the optimistic Managed draft, built in main from the
+ * resolved cwd and the source's model exactly like spawn's, so the renderer shows it until discovery
+ * indexes the fork's own Transcript. Refused only when no working directory can be resolved for the
+ * source. Unlike Adopt there is no `"alive"` refusal, since a fork writes its own Transcript and stays
+ * safe even while the source is still running.
  */
-export type ForkResult = { ok: true } | { ok: false; reason: "unresolvable" };
+export type ForkResult =
+  | { ok: true; session: Session }
+  | { ok: false; reason: "unresolvable" };
 
 /**
  * The Managed-terminal control + push surface, exposed on `window.api.terminal`. Spawning returns an

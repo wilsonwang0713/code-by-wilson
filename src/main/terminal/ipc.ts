@@ -136,7 +136,13 @@ export function registerTerminalIpc({
       rows: req.rows,
       bin: resolveBin?.() ?? undefined,
     });
-    return { ok: true };
+    // Echo back a hydrated optimistic draft built the same way spawn's is (zero usage, fresh
+    // timestamps), so a brand-new fork never shows the source's accumulated cost, context, or age. The
+    // model rides in from the renderer only for this draft; --fork-session restores the real one.
+    return {
+      ok: true,
+      session: draftSession(req.newId, target.cwd, req.model),
+    };
   });
   const onWrite = (_e: IpcMainEvent, id: string, data: string) =>
     manager.write(id, data);

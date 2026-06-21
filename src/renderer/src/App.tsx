@@ -236,11 +236,11 @@ export function App() {
   }
 
   // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which
-  // resumes the SAME id, so its row already exists in the list), a fork's id is brand new — so it follows
-  // the spawn path: stand the terminal up first, then add an optimistic Managed draft cloned from the
-  // source so the new session shows + opens immediately, until discovery indexes the fork's own
-  // Transcript and supersedes it. The clone carries the source's display fields (model, project, context)
-  // — a reasonable optimistic stand-in for an inherited conversation; the 3s sync corrects it.
+  // resumes the SAME id, so its row already exists in the list), a fork's id is brand new, so it follows
+  // the spawn path: stand the terminal up first, then show the optimistic Managed draft main echoes back.
+  // That draft is hydrated from zero usage with fresh timestamps (the same builder spawn uses), so the
+  // fork never wears the source's accumulated cost/context/age; discovery then supersedes it with the
+  // fork's own Transcript. The source's model rides in so the draft labels the right model up front.
   async function forkSession(source: Session): Promise<void> {
     const gate = spawnGate(cliStatus);
     if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
@@ -250,14 +250,12 @@ export function App() {
       const result = await window.api.terminal.fork({
         sourceId: source.id,
         newId,
+        model: source.model,
         cols: 80,
         rows: 24,
       });
       if (!result.ok) throw new Error("Could not fork this session.");
-      setDrafts((ds) => [
-        { ...source, id: newId, management: "managed", state: "working" },
-        ...ds,
-      ]);
+      setDrafts((ds) => [result.session, ...ds]);
       setSelectedId(newId);
     } catch (e) {
       terminalStore.dispose(newId); // fork refused or failed → nothing feeds this handle; don't leak it
