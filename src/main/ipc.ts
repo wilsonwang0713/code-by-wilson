@@ -1,5 +1,10 @@
 import { ipcMain, shell, clipboard } from "electron";
-import { IPC, type OverviewData, type StatsRead } from "@shared/ipc";
+import {
+  IPC,
+  type OverviewData,
+  type StatsRead,
+  type OpenInTarget,
+} from "@shared/ipc";
 import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
@@ -51,6 +56,8 @@ import {
 } from "@shared/stats";
 import { syncSessions } from "./sync";
 import { isHttpUrl } from "./open-external";
+import { openInTarget } from "./open-in";
+import { isDirectory } from "./fs-dir";
 
 export interface IpcDeps {
   db: SqliteDb;
@@ -190,6 +197,17 @@ export function registerIpc({
   ipcMain.handle(IPC.openExternal, (_e, url: string) => {
     if (isHttpUrl(url)) void shell.openExternal(url);
   });
+  ipcMain.handle(IPC.openIn, (_e, id: string, target: OpenInTarget) =>
+    openInTarget(
+      {
+        resolveCwd: (sid) => provider.resolveSessionCwd(sid),
+        statDir: isDirectory,
+        shell,
+      },
+      id,
+      target,
+    ),
+  );
   ipcMain.handle(IPC.clipboardWriteText, (_e, text: string) => {
     clipboard.writeText(text);
   });
