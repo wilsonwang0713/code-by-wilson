@@ -220,7 +220,9 @@ export function BarSeries({
   const ticks = axisTicks(axisMax);
 
   return (
-    <div className="flex gap-2">
+    {/* pt-2 reserves headroom for the top Y-axis tick label: it's centered on the top gridline, so it
+        half-overflows the plot's top edge and would otherwise crowd the panel title above it. */}
+    <div className="flex gap-2 pt-2">
       {/* Y-axis labels, bottom-aligned to their tick fraction. */}
       <div className="relative h-40 w-12 shrink-0">
         {ticks.map((t) => (
