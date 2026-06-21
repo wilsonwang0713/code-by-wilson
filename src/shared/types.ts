@@ -208,14 +208,17 @@ export interface Account {
 }
 
 /** API-billing identity read from settings.json env (by the main process), then fed to deriveAccount as the
- *  endpoint to surface when no subscription evidence exists. Present only when a base URL is configured. */
+ *  endpoint/provider to surface when no subscription evidence exists. */
 export interface ApiConfig {
-  /** The configured endpoint, from ANTHROPIC_BASE_URL. The renderer strips the scheme for display. */
-  baseUrl: string;
-  /** How the gateway authenticates — an auth token vs an API key. Omitted when neither env var is set. */
+  /** The configured endpoint: ANTHROPIC_BASE_URL, or a synthesized https://api.anthropic.com for the
+   *  key-only direct case. Absent for a cloud provider (Bedrock/Vertex/etc.), which carries no endpoint.
+   *  The renderer strips the scheme for display. */
+  baseUrl?: string;
+  /** How the endpoint authenticates — an auth token vs an API key. Omitted for cloud providers (their
+   *  credentials live outside ANTHROPIC_* env) and when neither auth var is set. */
   authMethod?: "token" | "apiKey";
-  /** Upstream provider from the x-portkey-provider entry of ANTHROPIC_CUSTOM_HEADERS, '@' stripped.
-   *  Omitted when the header is absent. */
+  /** Upstream provider: a Portkey x-portkey-provider value, or a cloud-provider key
+   *  (bedrock/vertex/foundry/mantle/anthropic_aws). Omitted when none applies. */
   provider?: string;
 }
 
