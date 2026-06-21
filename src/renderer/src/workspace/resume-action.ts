@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface ResumeAction {
   busy: boolean;
@@ -28,6 +28,11 @@ export function useResumeAction(opts: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Synchronous re-entrancy guard. `busy` only disables the button after a re-render, so a fast
+  // double-click (or a double-tap on the confirm) would fire run() twice before the disable lands. For
+  // Fork that means two divergent forks: each mints its own id, so the manager's id-keyed idempotency
+  // can't dedupe them. The ref blocks the second call in the same tick, before any state has settled.
+  const running = useRef(false);
 
   useEffect(() => {
     if (!armed) {
@@ -38,6 +43,8 @@ export function useResumeAction(opts: {
   }, [armed]);
 
   async function go(): Promise<void> {
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -47,6 +54,7 @@ export function useResumeAction(opts: {
     } finally {
       // Clear busy so an in-place failure (button still shown) leaves it usable, not stuck on "…".
       setBusy(false);
+      running.current = false;
     }
   }
 
