@@ -75,3 +75,29 @@ export function buildResumeCommand(opts: {
     args: ["--resume", opts.id],
   };
 }
+
+/**
+ * Argv to Fork a session: `claude --resume <sourceId> --session-id <newId> --fork-session` resumes the
+ * source conversation but writes it under a NEW id, so the original Transcript at
+ * `projects/<cwd-slug>/<sourceId>.jsonl` is left untouched and the fork records its own
+ * `projects/<cwd-slug>/<newId>.jsonl`. The pre-assigned `--session-id` is honored alongside
+ * `--fork-session` (verified), so the app pins the fork's id up front exactly like a fresh spawn. No
+ * `--model`: the fork restores the source's model — the same "inherit" as Adopt. Same bin resolution as
+ * buildClaudeCommand.
+ */
+export function buildForkCommand(opts: {
+  sourceId: string;
+  newId: string;
+  bin?: string;
+}): ClaudeCommand {
+  return {
+    file: opts.bin ?? process.env.CBW_CLAUDE_BIN ?? "claude",
+    args: [
+      "--resume",
+      opts.sourceId,
+      "--session-id",
+      opts.newId,
+      "--fork-session",
+    ],
+  };
+}
