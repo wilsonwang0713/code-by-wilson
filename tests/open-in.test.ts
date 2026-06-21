@@ -15,6 +15,18 @@ describe("vscodeUrl", () => {
       "vscode://file/Users/foo/my%20project",
     );
   });
+
+  it("normalizes a Windows path and keeps the drive letter colon raw", () => {
+    expect(vscodeUrl("C:\\Users\\foo\\my project")).toBe(
+      "vscode://file/C:/Users/foo/my%20project",
+    );
+  });
+
+  it("is independent of host OS for either path style", () => {
+    // pathToFileURL would resolve this drive-less path against the current drive on Windows;
+    // vscodeUrl must not, so the result is the same regardless of where the process runs.
+    expect(vscodeUrl("/Users/foo/proj")).toBe("vscode://file/Users/foo/proj");
+  });
 });
 
 describe("openInTarget", () => {

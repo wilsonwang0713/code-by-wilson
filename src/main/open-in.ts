@@ -1,4 +1,3 @@
-import { pathToFileURL } from "node:url";
 import {
   OPEN_IN_FAILED_MESSAGE,
   type OpenInTarget,
@@ -19,10 +18,19 @@ export interface OpenInDeps {
   shell: OpenInShell;
 }
 
-/** Build VS Code's "open this path" URL. `pathToFileURL` percent-encodes spaces and other unsafe chars;
- *  its pathname is the absolute path, and `vscode://file<absolutePath>` is the scheme VS Code registers. */
+/** Build VS Code's "open this path" URL: `vscode://file<absolutePath>` is the scheme VS Code registers.
+ *  We encode segment by segment (spaces, `#`, `?`, unicode all become safe) and keep `/` literal. We avoid
+ *  `pathToFileURL` on purpose: it resolves a drive-less path against the process's current drive on Windows,
+ *  so the same input would yield a different URL depending on the host. This keeps `vscodeUrl` a pure
+ *  function of its argument. A leading Windows drive letter's colon is restored — VS Code wants it raw. */
 export function vscodeUrl(cwd: string): string {
-  return `vscode://file${pathToFileURL(cwd).pathname}`;
+  const path = cwd
+    .replace(/\\/g, "/")
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")
+    .replace(/^\/?([A-Za-z])%3A\//, "/$1:/");
+  return `vscode://file${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 /** Resolve the session's folder and open it in `target`. Never throws: every failure is an
