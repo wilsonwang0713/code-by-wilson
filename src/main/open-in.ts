@@ -1,5 +1,9 @@
 import { pathToFileURL } from "node:url";
-import type { OpenInTarget, OpenInResult } from "@shared/ipc";
+import {
+  OPEN_IN_FAILED_MESSAGE,
+  type OpenInTarget,
+  type OpenInResult,
+} from "@shared/ipc";
 
 /** The slice of Electron's `shell` openIn needs. Narrowed to an interface so tests can inject a spy. */
 export interface OpenInShell {
@@ -34,16 +38,27 @@ export async function openInTarget(
   if (!deps.statDir(cwd))
     return { ok: false, error: "Folder no longer exists." };
   try {
-    if (target === "finder") {
-      const err = await deps.shell.openPath(cwd);
-      return err ? { ok: false, error: err } : { ok: true };
+    switch (target) {
+      case "finder": {
+        const err = await deps.shell.openPath(cwd);
+        return err ? { ok: false, error: err } : { ok: true };
+      }
+      case "vscode": {
+        await deps.shell.openExternal(vscodeUrl(cwd));
+        return { ok: true };
+      }
+      default: {
+        // Unreachable for a well-typed OpenInTarget; the `never` assignment makes a new target a compile
+        // error here rather than a silent fall-through to one of the branches. At the IPC boundary, where
+        // a buggy renderer could send anything, this turns a bad value into an honest failure.
+        const unknown: never = target;
+        return { ok: false, error: `Unknown target: ${String(unknown)}` };
+      }
     }
-    await deps.shell.openExternal(vscodeUrl(cwd));
-    return { ok: true };
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : "Couldn't open.",
+      error: e instanceof Error ? e.message : OPEN_IN_FAILED_MESSAGE,
     };
   }
 }

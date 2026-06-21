@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import type { OpenInTarget } from "@shared/ipc";
+import { OPEN_IN_FAILED_MESSAGE, type OpenInTarget } from "@shared/ipc";
 import { Icon } from "../ui/icons";
 import { OPEN_IN_ITEMS } from "./open-in-items";
 
@@ -10,6 +10,7 @@ import { OPEN_IN_ITEMS } from "./open-in-items";
 export function OpenInMenu({ sessionId }: { sessionId: string }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
@@ -36,12 +37,17 @@ export function OpenInMenu({ sessionId }: { sessionId: string }) {
   }, [open]);
 
   async function handleOpen(target: OpenInTarget) {
+    if (busy) return; // one open at a time; a double-click can't fire two shell opens
+    setBusy(true);
+    setError(null); // clear any prior failure so a stale message never shows under the in-flight attempt
     try {
       const res = await window.api.openIn(sessionId, target);
       if (res.ok) setOpen(false);
-      else setError(res.error ?? "Couldn't open.");
+      else setError(res.error);
     } catch {
-      setError("Couldn't open.");
+      setError(OPEN_IN_FAILED_MESSAGE);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -70,14 +76,17 @@ export function OpenInMenu({ sessionId }: { sessionId: string }) {
               type="button"
               role="menuitem"
               onClick={() => void handleOpen(item.key)}
-              className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-none focus-visible:bg-ink-800"
+              disabled={busy}
+              className="flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-[12px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-none focus-visible:bg-ink-800 disabled:opacity-50"
             >
               <Icon name={item.icon} size={13} />
               {item.label}
             </button>
           ))}
           {error && (
-            <p className="mt-1 px-2 py-1 text-[11px] text-danger">{error}</p>
+            <p role="alert" className="mt-1 px-2 py-1 text-[11px] text-danger">
+              {error}
+            </p>
           )}
         </div>
       )}

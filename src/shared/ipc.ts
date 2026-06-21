@@ -80,11 +80,13 @@ export type StatsRead =
 export type OpenInTarget = "vscode" | "finder";
 
 /** The result of an openIn request. The handler never throws to the renderer: every failure (no
- *  resolvable cwd, path gone, shell error) comes back as `{ ok: false, error }` so the menu can show it. */
-export interface OpenInResult {
-  ok: boolean;
-  error?: string;
-}
+ *  resolvable cwd, path gone, shell error) comes back as `{ ok: false, error }` so the menu can show it.
+ *  A discriminated union, so a successful result can't carry an error and a failure must name one. */
+export type OpenInResult = { ok: true } | { ok: false; error: string };
+
+/** The message both the main handler and the renderer fall back to when an open fails without a more
+ *  specific reason. Defined once here, the only module both layers import, so the two can't drift. */
+export const OPEN_IN_FAILED_MESSAGE = "Couldn't open.";
 
 export interface IpcApi {
   /** Read-only: the indexed sessions as they stand, no sync — fast initial paint. */

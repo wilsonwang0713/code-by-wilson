@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { openInTarget, vscodeUrl } from "../src/main/open-in";
+import type { OpenInTarget } from "../src/shared/ipc";
 
 function makeShell() {
   return {
@@ -90,5 +91,28 @@ describe("openInTarget", () => {
       "finder",
     );
     expect(res).toEqual({ ok: false, error: "Failed to open path" });
+  });
+
+  it("fails for an unknown target without opening anything", async () => {
+    const shell = makeShell();
+    const res = await openInTarget(
+      { resolveCwd: resolveOk, statDir: isDir, shell },
+      "s1",
+      "explorer" as unknown as OpenInTarget,
+    );
+    expect(shell.openPath).not.toHaveBeenCalled();
+    expect(shell.openExternal).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+  });
+
+  it("surfaces a thrown shell error as a failure (vscode target)", async () => {
+    const shell = makeShell();
+    shell.openExternal = vi.fn(() => Promise.reject(new Error("no handler")));
+    const res = await openInTarget(
+      { resolveCwd: resolveOk, statDir: isDir, shell },
+      "s1",
+      "vscode",
+    );
+    expect(res).toEqual({ ok: false, error: "no handler" });
   });
 });
