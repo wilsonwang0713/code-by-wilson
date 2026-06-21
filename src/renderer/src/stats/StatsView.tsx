@@ -29,6 +29,7 @@ import {
 } from "@shared/stats";
 import {
   formatTokensShort,
+  formatTokensAxis,
   formatUsd,
   formatDuration,
   formatRelativeTime,
@@ -866,7 +867,7 @@ function DailyUsage({
     >
       <BarSeries
         columns={columns}
-        formatTick={formatTokensShort}
+        formatTick={formatTokensAxis}
         xLabels={xLabels}
         renderTooltip={renderTooltip}
       />
