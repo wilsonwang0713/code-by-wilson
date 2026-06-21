@@ -1,4 +1,3 @@
-import { statSync } from "node:fs";
 import type { Family } from "@shared/models";
 import { FLOW } from "@shared/terminal";
 import {
@@ -8,6 +7,7 @@ import {
   type ClaudeCommand,
 } from "./command";
 import { createDataBufferer, type DataBufferer } from "./data-bufferer";
+import { isDirectory } from "../fs-dir";
 // Type-only: importing pty-process for VALUES would pull node-pty (a native addon) into the test
 // graph and break `pnpm test`. The real factory is injected at the composition root (the IPC layer).
 import type { PtyProcess, SpawnOptions } from "./pty-process";
@@ -98,15 +98,7 @@ export function createTerminalManager(
   const createPty = deps.createPty;
   const createBufferer = deps.createBufferer ?? createDataBufferer;
   const platform = deps.platform ?? process.platform;
-  const statDir =
-    deps.statDir ??
-    ((cwd: string) => {
-      try {
-        return statSync(cwd).isDirectory();
-      } catch {
-        return false;
-      }
-    });
+  const statDir = deps.statDir ?? isDirectory;
   const terms = new Map<string, Term>();
 
   // Stand up one pty for `id` running `command` in `cwd`. The body is identical for a fresh spawn and an

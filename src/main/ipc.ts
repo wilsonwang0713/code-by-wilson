@@ -1,5 +1,4 @@
 import { ipcMain, shell, clipboard } from "electron";
-import { statSync } from "node:fs";
 import {
   IPC,
   type OverviewData,
@@ -58,6 +57,7 @@ import {
 import { syncSessions } from "./sync";
 import { isHttpUrl } from "./open-external";
 import { openInTarget } from "./open-in";
+import { isDirectory } from "./fs-dir";
 
 export interface IpcDeps {
   db: SqliteDb;
@@ -201,13 +201,7 @@ export function registerIpc({
     openInTarget(
       {
         resolveCwd: (sid) => provider.resolveAdoptTarget(sid)?.cwd ?? null,
-        statDir: (p) => {
-          try {
-            return statSync(p).isDirectory();
-          } catch {
-            return false;
-          }
-        },
+        statDir: isDirectory,
         shell,
       },
       id,
