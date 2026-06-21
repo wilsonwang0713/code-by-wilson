@@ -235,6 +235,36 @@ export function App() {
     }
   }
 
+  // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which
+  // resumes the SAME id, so its row already exists in the list), a fork's id is brand new — so it follows
+  // the spawn path: stand the terminal up first, then add an optimistic Managed draft cloned from the
+  // source so the new session shows + opens immediately, until discovery indexes the fork's own
+  // Transcript and supersedes it. The clone carries the source's display fields (model, project, context)
+  // — a reasonable optimistic stand-in for an inherited conversation; the 3s sync corrects it.
+  async function forkSession(source: Session): Promise<void> {
+    const gate = spawnGate(cliStatus);
+    if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
+    const newId = newSessionId();
+    terminalStore.create(newId);
+    try {
+      const result = await window.api.terminal.fork({
+        sourceId: source.id,
+        newId,
+        cols: 80,
+        rows: 24,
+      });
+      if (!result.ok) throw new Error("Could not fork this session.");
+      setDrafts((ds) => [
+        { ...source, id: newId, management: "managed", state: "working" },
+        ...ds,
+      ]);
+      setSelectedId(newId);
+    } catch (e) {
+      terminalStore.dispose(newId); // fork refused or failed → nothing feeds this handle; don't leak it
+      throw e;
+    }
+  }
+
   const all = useMemo(
     () => applyAdopting(mergeManaged(sessions, drafts), adopting),
     [sessions, drafts, adopting],
@@ -319,6 +349,7 @@ export function App() {
               account={account}
               canSpawn={spawnGate(cliStatus).canSpawn}
               onAdopt={adoptSession}
+              onFork={forkSession}
             />
           ) : (
             <EmptyDetail empty={all.length === 0} loading={loading} />

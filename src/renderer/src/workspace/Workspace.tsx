@@ -32,12 +32,14 @@ export function Workspace({
   account,
   canSpawn,
   onAdopt,
+  onFork,
 }: {
   session: Session;
   account: Account | null;
-  /** Whether the Claude Code CLI is usable; gates Adopt (resume spawns the CLI), mirroring the rail's New. */
+  /** Whether the Claude Code CLI is usable; gates Adopt and Fork (both spawn the CLI). */
   canSpawn: boolean;
   onAdopt: (id: string) => Promise<void>;
+  onFork: (session: Session) => Promise<void>;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
@@ -52,7 +54,12 @@ export function Workspace({
             </span>
             <SessionIdChip id={s.id} />
           </div>
-          <HeaderActions session={s} canSpawn={canSpawn} onAdopt={onAdopt} />
+          <HeaderActions
+            session={s}
+            canSpawn={canSpawn}
+            onAdopt={onAdopt}
+            onFork={onFork}
+          />
         </div>
         <Annunciator session={s} git={metrics?.git} pr={metrics?.pr} />
       </header>
