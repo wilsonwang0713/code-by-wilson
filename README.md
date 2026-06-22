@@ -1,3 +1,5 @@
+![Code-by-wire — the cockpit for local Claude Code](docs/assets/cbw-hero.png)
+
 # Code-by-wire
 
 English | [简体中文](README.zh-CN.md)
@@ -6,8 +8,6 @@ English | [简体中文](README.zh-CN.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/luojiahai/code-by-wire?style=flat-square)](https://github.com/luojiahai/code-by-wire/releases)
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?style=flat-square&logo=github&logoColor=white)](https://github.com/sponsors/luojiahai)
-
-**The cockpit for local Claude Code.**
 
 Claude Code writes a rich trail to the `.claude` directory as it works: every
 turn, every token, every tool call, the running cost, the context window. The
