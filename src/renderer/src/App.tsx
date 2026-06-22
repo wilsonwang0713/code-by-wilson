@@ -15,6 +15,7 @@ import {
 } from "@shared/managed";
 import { newSessionId } from "@shared/terminal";
 import { orderedSessions } from "@shared/overview";
+import { applyTitleOverrides } from "@shared/title-override";
 import { Workspace } from "./workspace/Workspace";
 import { NewSessionDialog } from "./terminal/NewSessionDialog";
 import { terminalStore } from "./terminal/terminal-store-instance";
@@ -46,6 +47,14 @@ export function App() {
   // Ended immediately — the header swaps End for Adopt and the workspace flips to the Transcript — until the
   // next sync confirms it.
   const [ending, setEnding] = useState<Set<string>>(new Set());
+  // Display-name overrides for sessions renamed this run, keyed by id. Overlaid onto the not-yet-indexed
+  // drafts the main process can't title (a draft has no SQLite row, so applyTitleOverrides in overviewNow
+  // never sees it). Set adds the name, clear deletes it — so clearing a draft's rename reverts to its
+  // derived title without the renderer ever having to know that title. Indexed rows are titled by main; this
+  // only bridges the gap before discovery indexes the row.
+  const [titleOverrides, setTitleOverrides] = useState<Record<string, string>>(
+    {},
+  );
   // Source ids with a fork in flight. The re-entrancy guard in useResumeAction is per-button-instance,
   // so it can't stop the two Fork buttons (header + terminal hero) — or a hero remounted by a tab
   // toggle — from each firing a fork of the same source before the awaits settle. Every fork mints its
@@ -272,20 +281,21 @@ export function App() {
   }
 
   // Persist a display-name override for a session and apply the fresh overview the main process returns.
-  // Returning the whole overview (not an optimistic local patch) means set AND clear converge at once —
-  // the renderer never has to know the underlying derived title, which matters on clear.
+  // Mirror the change into the draft overlay first so a not-yet-indexed draft (which main can't title)
+  // reflects the rename — or the clear — immediately; indexed rows reconcile from the overview the IPC
+  // returns. Set and clear both converge: the overlay carries the derived title for drafts, the overview
+  // carries it for indexed rows, so the renderer never has to know the derived title itself.
   async function renameSession(
     id: string,
     title: string | null,
   ): Promise<void> {
-    const o = await window.api.renameSession(id, title);
-    applyOverview(o);
-    // A not-yet-indexed draft isn't in the returned overview (it lives in `drafts`, not the index that
-    // applyTitleOverrides maps over), so the rename wouldn't show until discovery indexed the row. Patch
-    // the draft's title locally so a just-spawned session renames immediately. On clear (null) we don't
-    // have the draft's derived title here, so we leave it for the next sync to reconcile from the store.
-    if (title && !o.sessions.some((s) => s.id === id))
-      setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, title } : d)));
+    setTitleOverrides((prev) => {
+      const next = { ...prev };
+      if (title) next[id] = title;
+      else delete next[id];
+      return next;
+    });
+    applyOverview(await window.api.renameSession(id, title));
   }
 
   // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which
@@ -323,10 +333,16 @@ export function App() {
   const all = useMemo(
     () =>
       applyEnding(
-        applyAdopting(mergeManaged(sessions, drafts), adopting),
+        applyAdopting(
+          // Title the drafts here, not the merged list: a real indexed row already carries its override
+          // from main, and re-overlaying it would re-expose a stale title on clear (main's row updates a
+          // sync later than this map). Drafts are the only rows main can't reach.
+          mergeManaged(sessions, applyTitleOverrides(drafts, titleOverrides)),
+          adopting,
+        ),
         ending,
       ),
-    [sessions, drafts, adopting, ending],
+    [sessions, drafts, adopting, ending, titleOverrides],
   );
   const isOverview = selectedId === OVERVIEW_ID;
   const isSettings = selectedId === SETTINGS_ID;
