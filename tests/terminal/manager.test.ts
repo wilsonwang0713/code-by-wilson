@@ -63,14 +63,16 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
   const exited: Array<[string, number]> = [];
   const spawned: string[] = [];
   const spawnedPids: number[] = [];
+  const spawnedModels: Array<string | undefined> = [];
   const closed: string[] = [];
   let nextPid = 1000;
   const manager = createTerminalManager({
     send: (id, data) => sent.push([id, data]),
     notifyExit: (id, code) => exited.push([id, code]),
-    onSpawned: (id, pid) => {
+    onSpawned: (id, pid, model) => {
       spawned.push(id);
       spawnedPids.push(pid);
+      spawnedModels.push(model);
     },
     onClosed: (id) => closed.push(id),
     createPty: (o) => {
@@ -86,7 +88,16 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
     // launch shim when the test runs on a Windows host; the win32 launch form is covered in spawn-bin.
     platform: "linux",
   });
-  return { manager, ptys, sent, exited, spawned, spawnedPids, closed };
+  return {
+    manager,
+    ptys,
+    sent,
+    exited,
+    spawned,
+    spawnedPids,
+    spawnedModels,
+    closed,
+  };
 }
 
 const REQ = {
@@ -100,6 +111,7 @@ const ADOPT_REQ = { id: "sess-1", cwd: "/work/app", cols: 80, rows: 30 };
 const FORK_REQ = {
   id: "fork-1",
   sourceId: "sess-1",
+  model: "sonnet" as const,
   cwd: "/work/app",
   cols: 80,
   rows: 30,
@@ -267,7 +279,7 @@ describe("createTerminalManager", () => {
     expect(h.spawned).toEqual(["sess-1"]);
   });
 
-  it("fork: resumes the source under a NEW id with --fork-session, no --model, and registers it Managed under the new id", () => {
+  it("fork: resumes the source under a NEW id with --fork-session (no --model in argv), and registers it Managed under the new id with the source model as its picked alias", () => {
     const h = harness();
     h.manager.fork(FORK_REQ);
     expect(h.spawned).toEqual(["fork-1"]); // the new id, not the source id
@@ -284,6 +296,10 @@ describe("createTerminalManager", () => {
       cols: 80,
       rows: 30,
     });
+    // The argv carries no --model (the fork restores the source's model itself), but the source model is
+    // still recorded as the registry's picked alias, exactly like spawn — so the provider fronts the
+    // right model before the fork's first turn lands, instead of the default fallback.
+    expect(h.spawnedModels).toEqual(["sonnet"]);
   });
 
   it("fork is idempotent: a second fork under the same new id does nothing", () => {

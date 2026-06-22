@@ -47,6 +47,11 @@ export interface ForkSpawn {
   /** The source session whose conversation is resumed into the fork (read-only — its Transcript is
    *  untouched; the fork writes its own under `id`). */
   sourceId: string;
+  /** The source's model family, recorded as the fork's picked alias (like spawn's `model`) so the
+   *  provider can front the right model until the fork records its first assistant turn. The
+   *  --fork-session argv carries no --model — the fork restores the real model itself — but without the
+   *  picked alias the pre-first-turn fork would display the default fallback instead of the source's. */
+  model: Family;
   cwd: string;
   cols: number;
   rows: number;
@@ -213,7 +218,9 @@ export function createTerminalManager(
 
   // Fork: resume the source conversation under a NEW id. Like adopt, the argv carries no --model (the
   // fork restores the source's model); unlike adopt, the id differs from the source, so the fork writes
-  // its own Transcript and the original is left intact.
+  // its own Transcript and the original is left intact. We still pass the source model as the picked
+  // alias (spawn's 6th arg) so the provider fronts it until the fork's first turn lands a real model —
+  // otherwise a fork of, say, a Sonnet session would flash the default fallback before settling.
   function fork(req: ForkSpawn): void {
     start(
       req.id,
@@ -221,6 +228,7 @@ export function createTerminalManager(
       req.cwd,
       req.cols,
       req.rows,
+      req.model,
     );
   }
 

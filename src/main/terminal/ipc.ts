@@ -131,6 +131,7 @@ export function registerTerminalIpc({
     manager.fork({
       id: req.newId,
       sourceId: req.sourceId,
+      model: req.model,
       cwd: target.cwd,
       cols: req.cols,
       rows: req.rows,
