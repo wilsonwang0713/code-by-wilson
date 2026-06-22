@@ -24,6 +24,7 @@ import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
 import { useTasks } from "./use-tasks";
 import { useMetrics, type MetricsState } from "./use-metrics";
 import { HeaderActions } from "./HeaderActions";
+import { SessionTitle } from "./SessionTitle";
 import { ObservedTerminal } from "./ObservedTerminal";
 import { Annunciator } from "./Annunciator";
 import { OverlayScroll } from "../ui/OverlayScroll";
@@ -35,6 +36,7 @@ export function Workspace({
   onAdopt,
   onFork,
   onEnd,
+  onRename,
 }: {
   session: Session;
   account: Account | null;
@@ -44,18 +46,18 @@ export function Workspace({
   onFork: (session: Session) => Promise<void>;
   /** End the running Managed session (header-only; never offered in the observed-terminal panel). */
   onEnd: (id: string) => void;
+  /** Persist a display-name override for this session (null/empty clears it). Applies to any session. */
+  onRename: (id: string, title: string | null) => void;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
   const metrics = useMetrics(s.id);
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-950 text-fg">
-      <header className="shrink-0 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
+      <header className="group/header shrink-0 border-b border-ink-800 bg-ink-925 px-4 py-2.5">
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="min-w-0 truncate text-sm font-semibold text-fg">
-              {s.title}
-            </span>
+            <SessionTitle session={s} onRename={onRename} />
             <SessionIdChip id={s.id} />
           </div>
           <HeaderActions

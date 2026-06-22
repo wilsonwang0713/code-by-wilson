@@ -271,6 +271,16 @@ export function App() {
     window.api.terminal.kill(id);
   }
 
+  // Persist a display-name override for a session and apply the fresh overview the main process returns.
+  // Returning the whole overview (not an optimistic local patch) means set AND clear converge at once —
+  // the renderer never has to know the underlying derived title, which matters on clear.
+  async function renameSession(
+    id: string,
+    title: string | null,
+  ): Promise<void> {
+    applyOverview(await window.api.renameSession(id, title));
+  }
+
   // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which
   // resumes the SAME id, so its row already exists in the list), a fork's id is brand new, so it follows
   // the spawn path: stand the terminal up first, then show the optimistic Managed draft main echoes back.
@@ -393,6 +403,7 @@ export function App() {
               onAdopt={adoptSession}
               onFork={forkSession}
               onEnd={endSession}
+              onRename={(id, title) => void renameSession(id, title)}
             />
           ) : (
             <EmptyDetail empty={all.length === 0} loading={loading} />
