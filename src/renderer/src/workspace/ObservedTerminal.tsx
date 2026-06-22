@@ -7,9 +7,10 @@ import { useResumeAction } from "./resume-action";
  * The Terminal tab for a session cbw has no live in-app pty for — an Observed session (running in another
  * terminal) or any Ended one (including a just-exited Managed session that re-derives Observed). A dark
  * canvas offering the ways to take it in-app: Fork (branch the conversation into a new id) is always
- * available; Adopt (resume this exact id) shows only once the session has Ended, since you can't take the
- * wheel of a process that's still running. Transcript stays the default tab. Both buttons reuse the
- * header's resume state machine (busy / inline error / no-model confirm).
+ * available; Adopt (resume this exact id) shows only for an Observed session that has Ended — matching the
+ * header's gate, since you can't take the wheel of a process that's still running, and a just-exited
+ * Managed session still reads Managed until the next sync re-derives it Observed. Transcript stays the
+ * default tab. Both buttons reuse the header's resume state machine (busy / inline error / no-model confirm).
  */
 export function ObservedTerminal({
   session: s,
@@ -23,6 +24,10 @@ export function ObservedTerminal({
   onFork: (session: Session) => Promise<void>;
 }) {
   const ended = s.state === "ended";
+  // Adopt resumes this exact id, so it's offered only for an Observed session that has Ended — the same
+  // gate the header uses. A still-Managed session that has merely exited re-derives Observed on the next
+  // sync; until then Fork is the only resume offered here, exactly as in the header.
+  const canAdopt = s.management === "observed" && ended;
   const modelUnknown = s.modelId == null && s.modelRaw == null;
   // `armed` stays true for both: this panel is keyed by session id (Workspace remounts on a session
   // switch), so the hooks' transient state resets on remount and never needs the in-place re-arm cleanup
@@ -63,7 +68,7 @@ export function ObservedTerminal({
             : "This session is running in another terminal — read-only here."}
         </p>
         <div className="flex items-center gap-3">
-          {ended && (
+          {canAdopt && (
             <button
               type="button"
               onClick={adopt.request}
@@ -95,7 +100,7 @@ export function ObservedTerminal({
           <span className="text-[11px] text-danger">{fork.error}</span>
         )}
         <span className="text-[11px] text-fg-faint">
-          {ended
+          {canAdopt
             ? "Adopt = take the wheel · Fork = explore a new branch"
             : "Fork it to branch off into your own session."}
         </span>
