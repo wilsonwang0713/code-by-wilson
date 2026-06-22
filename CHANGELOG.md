@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-06-23
+
+### Changed
+
+- Redesigned the app icon as a `>_` prompt mark — a chevron and an underscore
+  cursor — on a teal tile, replacing the dark wire-mark tile.
+
+### Fixed
+
+- The annunciator model readout no longer shows a stale family beside a fresh id.
+  After a mid-session `/model` switch the live id updates immediately while the
+  transcript-derived family lags, so switching Sonnet to Opus briefly read
+  "Sonnet (claude-opus-4-8)". The label now takes its family from the live id.
+
 ## [0.1.10] - 2026-06-22
 
 ### Added
@@ -295,7 +309,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/luojiahai/code-by-wire/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/luojiahai/code-by-wire/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/luojiahai/code-by-wire/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/luojiahai/code-by-wire/compare/v0.1.7...v0.1.8
