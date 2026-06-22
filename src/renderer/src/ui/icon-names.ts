@@ -29,6 +29,7 @@ export type IconName =
   | "monitor"
   | "palette"
   | "pause"
+  | "pencil"
   | "plus"
   | "rotate-ccw"
   | "settings"

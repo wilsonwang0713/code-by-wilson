@@ -18,6 +18,8 @@ import {
   freshestBySession,
   CAPTURE_STALE_MS,
 } from "@shared/statusline";
+import { applyTitleOverrides } from "@shared/title-override";
+import type { SessionTitleStore } from "./session-titles";
 import { getOverview } from "./db/store";
 import {
   readTotals,
@@ -81,6 +83,9 @@ export interface IpcDeps {
   claudeDir?: string;
   /** The cached CLI-status controller. Defaults to a no-op that always returns null. */
   cliStatus?: CliStatusController;
+  /** Durable user-chosen title overrides, applied over the live overlay so a rename wins over the
+   *  derived title and Claude's live session_name. Defaults to no overrides. */
+  sessionTitles?: SessionTitleStore;
 }
 
 export function attachCliStatus<T extends object>(
@@ -101,6 +106,7 @@ export function registerIpc({
   analyticsDb,
   claudeDir,
   cliStatus,
+  sessionTitles,
 }: IpcDeps): { sync: () => void } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
@@ -149,10 +155,11 @@ export function registerIpc({
       const email = readEmail();
       if (email) account.email = email;
     }
-    return attachCliStatus(
-      { sessions: overlaySessions(base.sessions, byId), account },
-      () => cli.get(),
-    );
+    // Apply user renames AFTER the statusLine overlay so a cbw rename wins over the derived title and
+    // Claude's live session_name. Read fresh each call so a just-persisted rename shows immediately.
+    const overlaid = overlaySessions(base.sessions, byId);
+    const named = applyTitleOverrides(overlaid, sessionTitles?.read() ?? {});
+    return attachCliStatus({ sessions: named, account }, () => cli.get());
   };
 
   ipcMain.handle(IPC.overview, () => overviewNow());
@@ -164,6 +171,10 @@ export function registerIpc({
       // drop the list. Serve the last-known rows and let the next Refresh retry, like launch does.
       console.error("refresh sync failed; serving last-known rows", err);
     }
+    return overviewNow();
+  });
+  ipcMain.handle(IPC.renameSession, (_e, id: string, title: string | null) => {
+    sessionTitles?.set(id, title);
     return overviewNow();
   });
   ipcMain.handle(IPC.capabilities, () => provider.capabilities);

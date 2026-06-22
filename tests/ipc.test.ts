@@ -337,3 +337,75 @@ describe("registerIpc overview — api billing", () => {
     });
   });
 });
+
+describe("registerIpc renameSession", () => {
+  // A tiny in-memory stand-in for the durable store, with the same trim/clear semantics.
+  const fakeStore = (titles: Record<string, string>) => ({
+    read: () => titles,
+    set: (id: string, title: string | null) => {
+      const trimmed = title?.trim();
+      if (trimmed) titles[id] = trimmed;
+      else delete titles[id];
+    },
+  });
+
+  it("persists the override via the store and applies it to the overview", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [seed]); // title 'Seeded'
+    const titles: Record<string, string> = {};
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      sessionTitles: fakeStore(titles),
+    });
+
+    const o = handlers.get(IPC.renameSession)!(
+      {},
+      "seed",
+      "  My Name  ",
+    ) as OverviewData;
+    expect(titles).toEqual({ seed: "My Name" });
+    expect(o.sessions.find((s) => s.id === "seed")!.title).toBe("My Name");
+  });
+
+  it("a rename wins over Claude's live session_name", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [seed]);
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      statusLine: reader([
+        lineSample({ sessionId: "seed", sessionName: "ClaudeName" }),
+      ]),
+      sessionTitles: fakeStore({ seed: "MyName" }),
+    });
+    const o = handlers.get(IPC.overview)!() as OverviewData;
+    expect(o.sessions.find((s) => s.id === "seed")!.title).toBe("MyName");
+  });
+
+  it("clears the override on an empty title, reverting to the derived title", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [seed]); // title 'Seeded'
+    const titles: Record<string, string> = { seed: "MyName" };
+    registerIpc({
+      db,
+      provider: provider(() => []),
+      sessionTitles: fakeStore(titles),
+    });
+    const o = handlers.get(IPC.renameSession)!({}, "seed", "") as OverviewData;
+    expect(titles).toEqual({});
+    expect(o.sessions.find((s) => s.id === "seed")!.title).toBe("Seeded");
+  });
+
+  it("applies no overrides when no sessionTitles dep is provided", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [seed]);
+    registerIpc({ db, provider: provider(() => []) });
+    const o = handlers.get(IPC.overview)!() as OverviewData;
+    expect(o.sessions.find((s) => s.id === "seed")!.title).toBe("Seeded");
+  });
+});

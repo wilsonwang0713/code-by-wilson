@@ -21,6 +21,8 @@ const api: AppApi = {
   openIn: (id, target) => ipcRenderer.invoke(IPC.openIn, id, target),
   clipboardWriteText: (text) =>
     ipcRenderer.invoke(IPC.clipboardWriteText, text),
+  renameSession: (id, title) =>
+    ipcRenderer.invoke(IPC.renameSession, id, title),
   readTranscript: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readTranscript, id, sinceMtimeMs),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
