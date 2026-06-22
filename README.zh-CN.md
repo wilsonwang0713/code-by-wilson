@@ -1,6 +1,6 @@
 ![Code-by-wire — 本地 Claude Code 的驾驶舱](docs/assets/cbw-hero.png)
 
-<h1><img src="docs/assets/logo.svg" alt="" height="64" align="middle">&nbsp;Code-by-wire</h1>
+# <img src="docs/assets/logo.svg" alt="" height="64" align="center"> Code-by-wire
 
 [English](README.md) | 简体中文
 
