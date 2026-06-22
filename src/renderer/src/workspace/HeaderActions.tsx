@@ -41,8 +41,15 @@ export function HeaderActions({
   const cliTitle = canSpawn
     ? undefined
     : "Claude Code CLI isn't usable — see Sys status in the title bar.";
-  // Fork resumes this session's transcript into a new id; a brand-new session hasn't written one yet, so
-  // forking it would die on the CLI's "No conversation found". Block it until it has a saved conversation.
+  // Both Adopt (`claude --resume`) and Fork (`--fork-session`) read this session's transcript; a session
+  // that never wrote one (a spawn that died before its first turn) would die on the CLI's "No conversation
+  // found". Block both until it has a saved conversation. Two wordings because Adopt shows only on an
+  // Ended session, where "send a message first" wouldn't apply, while Fork shows on live sessions too.
+  const adoptTitle = !canSpawn
+    ? cliTitle
+    : s.resumable
+      ? undefined
+      : "Nothing to adopt — this session never saved a conversation.";
   const forkTitle = !canSpawn
     ? cliTitle
     : s.resumable
@@ -59,8 +66,8 @@ export function HeaderActions({
           <button
             type="button"
             onClick={adopt.request}
-            disabled={adopt.busy || !canSpawn}
-            title={cliTitle}
+            disabled={adopt.busy || !canSpawn || !s.resumable}
+            title={adoptTitle}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[12px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
           >
             <Icon name="git-pull-request-arrow" size={13} />
