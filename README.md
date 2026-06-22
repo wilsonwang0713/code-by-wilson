@@ -20,8 +20,8 @@ One pane instead of a dozen terminal windows.
 
 ![Code-by-wire](docs/assets/cbw-demo.gif)
 
-**[Download for macOS (Apple Silicon)](https://github.com/luojiahai/code-by-wire/releases/latest)**\
-**[Download for Windows (x64)](https://github.com/luojiahai/code-by-wire/releases/latest)**
+**[Download for macOS (Apple Silicon or Intel)](https://github.com/luojiahai/code-by-wire/releases/latest)**\
+**[Download for Windows (x64 or ARM64)](https://github.com/luojiahai/code-by-wire/releases/latest)**
 
 ## What you get
 
@@ -149,12 +149,12 @@ Download the prebuilt app, or build it yourself.
 
 ### Download
 
-1. [Download the latest `.dmg`](https://github.com/luojiahai/code-by-wire/releases/latest).
+1. [Download the latest `.dmg`](https://github.com/luojiahai/code-by-wire/releases/latest) for your Mac (Apple Silicon or Intel).
 2. Open it and drag Code-by-wire to Applications.
 3. Launch it. The app is signed and notarized by Apple, so it opens straight
    away, no Gatekeeper warning and no quarantine workaround.
 
-On Windows, download the `.exe` and run it. It's unsigned for now, so Windows
+On Windows, download the `.exe` for your CPU (x64 or ARM64) and run it. It's unsigned for now, so Windows
 SmartScreen may warn — click **More info → Run anyway**. Build from source with
 `pnpm dist:win` (see CONTRIBUTING).
 
@@ -182,7 +182,7 @@ warn — click **More info → Run anyway**.
 
 ## Requirements
 
-- macOS (Apple Silicon) or Windows (x64)
+- macOS (Apple Silicon or Intel) or Windows (x64 or ARM64)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
   locally, so there are sessions to observe and control
 
