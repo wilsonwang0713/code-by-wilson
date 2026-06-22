@@ -39,6 +39,11 @@ win:
   target:
     - target: nsis
 nsis:
+  # x64 and arm64 build in separate electron-builder invocations (one per runner), so neither
+  # sees the other and both fall back to the default ...-Setup-${version}.exe — identical names
+  # that clobber each other on upload and collide in latest.yml (electron-updater can't tell the
+  # arches apart). Force the arch into the filename so the two installers stay distinct.
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
