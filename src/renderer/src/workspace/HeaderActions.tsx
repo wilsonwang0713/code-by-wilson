@@ -35,6 +35,7 @@ export function HeaderActions({
   // End is for the live session we own: Managed and not yet Ended. Adopt takes the slot once it ends; an
   // Observed-alive session (running elsewhere) shows neither — we don't own that pty.
   const live = s.management === "managed" && s.state !== "ended";
+  const midTurn = s.state === "working";
   const canAdopt = canAdoptSession(s);
   const modelUnknown = isModelUnknown(s);
 
@@ -49,10 +50,13 @@ export function HeaderActions({
     armed: true, // Fork shows on every session; Workspace is keyed by id, so a switch remounts and resets
   });
   // Confirm only mid-turn: ending an idle/waiting session is immediate, but a turn in flight gets a confirm
-  // since the kill cuts it. The conversation is durable, so it's recoverable via Adopt either way.
+  // since the kill cuts it. The conversation is durable, so it's recoverable via Adopt either way. `armed`
+  // (live and still mid-turn) resets a stale open confirm if the row leaves that state under it — a sync
+  // ending it, or its turn finishing — so the dialog can't outlive its premise or reappear after a re-adopt.
   const end = useEndAction({
     run: () => onEnd(s.id),
-    midTurn: s.state === "working",
+    midTurn,
+    armed: live && midTurn,
   });
 
   // The gate + tooltip + no-model confirm live in ResumeButton, single-sourced so the two surfaces can't
