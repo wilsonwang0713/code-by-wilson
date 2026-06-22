@@ -27,8 +27,8 @@ One pane instead of a dozen terminal windows.
 
 - **Every session in one rail.** Active sessions in one live list, each card
   flagging its own state; ended ones fold into a zone below.
-- **Drive or just watch.** Spawn a managed session in an embedded terminal, or
-  observe any other session read-only.
+- **Drive, fork, or just watch.** Spawn a managed session in an embedded
+  terminal, fork or adopt any other, or observe one read-only.
 - **The full transcript.** Every message, tool call, and result, reconstructed
   from disk and rendered cleanly.
 - **The telemetry the CLI hides.** Live cost, context window, token throughput,
@@ -50,7 +50,11 @@ list, newest first, each card carrying a small state icon for working, waiting,
 or idle. A filter box narrows it as you type. Ended sessions collapse into their
 own zone below, the archive, not the live work.
 
-### 🕹️ Drive or watch any session
+### 🕹️ Start, drive, or watch any session
+
+**Start one in a click.** New session picks a directory and a model, then spawns
+Claude Code in an embedded terminal. Fork any session to branch a fresh copy from
+where it left off, or end a running one right from its header.
 
 **Observe safely, adopt later.** A session you started elsewhere shows up
 read-only, because two processes writing one transcript would corrupt it. Once
@@ -60,6 +64,9 @@ button appears only when the original process is gone, the only time it's safe.
 **Terminal or transcript.** A managed session toggles between its live terminal
 and the rendered transcript. Switching away only detaches the view. The terminal
 keeps buffering, so you never lose scrollback.
+
+**Label it, open it.** Rename any session inline to whatever you'll recognize it
+by. Open its working directory straight in your editor or file browser.
 
 ### 📜 Read exactly what the agent did
 
@@ -96,9 +103,10 @@ A right-hand rail of live panels:
 
 ### 📈 The whole story across every session
 
-**Overview is where the app opens.** Pinned to the top of the rail, an app-level
-view that totals every Claude Code session on your machine, not just the one
-you're watching. Pick a range: Today, 7d, 30d, 90d, or All.
+**Overview is where the app opens.** Reached from the account card pinned to the
+top of the rail, it's an app-level view that totals every Claude Code session on
+your machine, not just the one you're watching. Pick a range: Today, 7d, 30d,
+90d, or All.
 
 **Headline numbers.** Sessions, turns, tokens, and equivalent API value for the
 range, with a stacked bar of where the tokens went.
@@ -119,15 +127,21 @@ else.
 
 ### 💳 Know your account
 
-The rail header reads your account straight from the `.claude` directory. On a
-subscription (Pro or Max) it shows your plan and rate-limit gauges with live
+The rail's top card reads your account straight from the `.claude` directory. On
+a subscription (Pro or Max) it shows your plan and rate-limit gauges with live
 reset countdowns, so you can see how close you are to a wall. On an API account
 it shows the endpoint host and plan. The account email is masked by default, one
-click to reveal, so you can screen-share without leaking it.
+click to reveal, so you can screen-share without leaking it. The same card opens
+Overview.
 
-**Is the CLI ready?** A status band under the account checks your local Claude
-Code: whether it's found, current, and logged in, and points you at the fix when
-it isn't.
+### ⚙️ Settings and CLI health
+
+A gear in the title bar opens Settings. **System** checks your local Claude Code,
+whether it's found, current, and logged in, and hands you the exact fix when
+something's off, plus a field to point the app at a non-standard binary.
+**Account** expands your plan and limits; **Appearance** and **About** round it
+out. The gear wears a caution badge that lights amber or red the moment the CLI
+needs attention, so a broken or logged-out install never slips by.
 
 ## Install
 
