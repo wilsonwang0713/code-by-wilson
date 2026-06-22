@@ -174,7 +174,17 @@ export function registerIpc({
     return overviewNow();
   });
   ipcMain.handle(IPC.renameSession, (_e, id: string, title: string | null) => {
-    sessionTitles?.set(id, title);
+    try {
+      sessionTitles?.set(id, title);
+    } catch (err) {
+      // A failed write (e.g. userData unwritable) must not reject to the renderer, which fires this
+      // fire-and-forget; log it and serve the unchanged overview so the next rename retries — the same
+      // resilience the refresh handler gives a failed sync.
+      console.error(
+        "renameSession persist failed; serving unchanged rows",
+        err,
+      );
+    }
     return overviewNow();
   });
   ipcMain.handle(IPC.capabilities, () => provider.capabilities);
