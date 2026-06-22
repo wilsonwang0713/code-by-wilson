@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildClaudeCommand,
   buildResumeCommand,
+  buildForkCommand,
 } from "../../src/main/terminal/command";
 import { newSessionId } from "../../src/shared/terminal";
 
@@ -65,6 +66,36 @@ describe("buildResumeCommand", () => {
     const cmd = buildResumeCommand({ id: "x", bin: "/opt/bin/claude" });
     expect(cmd.file).toBe("/opt/bin/claude");
     expect(cmd.args).toEqual(["--resume", "x"]);
+  });
+});
+
+describe("buildForkCommand", () => {
+  it("resumes the source under a new pre-assigned id and forks, with no --model", () => {
+    expect(buildForkCommand({ sourceId: "src-1", newId: "new-1" })).toEqual({
+      file: "claude",
+      args: ["--resume", "src-1", "--session-id", "new-1", "--fork-session"],
+    });
+  });
+
+  it("uses the resolved absolute bin when given (the executable, not the args)", () => {
+    const c = buildForkCommand({
+      sourceId: "a",
+      newId: "b",
+      bin: "/real/claude",
+    });
+    expect(c.file).toBe("/real/claude");
+    expect(c.args).toEqual([
+      "--resume",
+      "a",
+      "--session-id",
+      "b",
+      "--fork-session",
+    ]);
+  });
+
+  it("falls back to the bare name when no bin is given", () => {
+    delete process.env.CBW_CLAUDE_BIN;
+    expect(buildForkCommand({ sourceId: "a", newId: "b" }).file).toBe("claude");
   });
 });
 

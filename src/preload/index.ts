@@ -44,6 +44,7 @@ const api: AppApi = {
   terminal: {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),
     adopt: (req) => ipcRenderer.invoke(TERMINAL.adopt, req),
+    fork: (req) => ipcRenderer.invoke(TERMINAL.fork, req),
     write: (id, data) => ipcRenderer.send(TERMINAL.write, id, data),
     resize: (id, cols, rows) =>
       ipcRenderer.send(TERMINAL.resize, id, cols, rows),

@@ -5,6 +5,7 @@ import {
   normalizeModelId,
 } from "@shared/models";
 import type { IndexOverview } from "@shared/ipc";
+import { isResumable } from "@shared/resumable";
 import { transaction, type SqliteDb } from "./driver";
 
 /** Bump when the schema changes; `migrate` rebuilds the index (a disposable cache) to match. */
@@ -113,6 +114,7 @@ export function hydrate(p: PersistedSession): Session {
     branch: p.branch,
     state: p.state,
     management: p.management,
+    resumable: isResumable(p.transcriptMtimeMs),
     model: p.model,
     modelRaw: p.modelRaw,
     contextPct: pctOfWindow(p.contextTokens, contextWindow),

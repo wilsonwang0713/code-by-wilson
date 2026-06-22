@@ -10,6 +10,7 @@ export const TERMINAL = {
   ack: "terminal:ack",
   kill: "terminal:kill",
   adopt: "terminal:adopt",
+  fork: "terminal:fork",
   pickDirectory: "terminal:pick-directory",
   data: "terminal:data",
   exit: "terminal:exit",
@@ -79,6 +80,32 @@ export type AdoptResult =
   | { ok: false; reason: "alive" | "unresolvable" };
 
 /**
+ * Fork a session: resume its conversation into a brand-new id with `--fork-session`. The renderer mints
+ * `newId` (so it can stand up the fork's terminal first, like spawn) and names the `sourceId` to resume;
+ * the working directory is resolved in main from the source's registry/Transcript.
+ */
+export interface ForkRequest {
+  sourceId: string;
+  newId: string;
+  /** The source's model family, so main can hydrate the optimistic draft the way spawn does. The fork
+   *  itself restores the model via --fork-session; this rides along only for the pre-discovery draft. */
+  model: Family;
+  cols: number;
+  rows: number;
+}
+
+/**
+ * Result of a Fork attempt. On success it carries the optimistic Managed draft, built in main from the
+ * resolved cwd and the source's model exactly like spawn's, so the renderer shows it until discovery
+ * indexes the fork's own Transcript. Refused only when no working directory can be resolved for the
+ * source. Unlike Adopt there is no `"alive"` refusal, since a fork writes its own Transcript and stays
+ * safe even while the source is still running.
+ */
+export type ForkResult =
+  | { ok: true; session: Session }
+  | { ok: false; reason: "unresolvable" };
+
+/**
  * The Managed-terminal control + push surface, exposed on `window.api.terminal`. Spawning returns an
  * optimistic Managed draft Session the renderer shows until discovery indexes the real process.
  */
@@ -86,6 +113,8 @@ export interface TerminalApi {
   spawn(req: SpawnRequest): Promise<Session>;
   /** Adopt an Ended session by resuming it under its own id. Refused if it is actually alive. */
   adopt(req: AdoptRequest): Promise<AdoptResult>;
+  /** Fork a session by resuming it into a new id. Refused only if the source's cwd can't be resolved. */
+  fork(req: ForkRequest): Promise<ForkResult>;
   write(id: string, data: string): void;
   resize(id: string, cols: number, rows: number): void;
   ack(id: string, charCount: number): void;

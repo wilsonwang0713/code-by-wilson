@@ -52,10 +52,38 @@ describe("terminal chrome — borderless, padded, edge scrollbar", () => {
   });
 
   it("lets the terminal fill its wrapper with no outer padding (only the 8px inside it)", () => {
-    const m = /className="([^"]*)"[^>]*>\s*<TerminalView/.exec(workspace);
-    expect(m, "wrapper div around TerminalView in Workspace.tsx").toBeTruthy();
+    // TerminalView is passed as the `terminalSlot` of TabbedCenter (inside a ternary that picks it for a
+    // live Managed session, else the ObservedTerminal panel). TabbedCenter wraps the slot in a plain
+    // `<div className="h-full">` — no padding classes. Assert both: no padded wrapper sits between the
+    // `terminalSlot=` prop and `<TerminalView`, and the TabbedCenter inner wrapper carries only h-full.
+    const slotRegion = /terminalSlot=\{([\s\S]*?)<TerminalView/.exec(workspace);
     expect(
-      m![1],
+      slotRegion,
+      "TerminalView rendered inside the terminalSlot prop",
+    ).toBeTruthy();
+    expect(
+      slotRegion![1],
+      "no padded wrapper between terminalSlot and TerminalView",
+    ).not.toMatch(/className="[^"]*\b[pm][xytrbl]?-/);
+    // Anchor the wrapper check to `<div className="h-full">{terminalSlot}</div>` specifically —
+    // the h-full is load-bearing (FitAddon needs a sized parent) and uniquely identifies the
+    // terminal wrapper. Also assert there is exactly one `>{terminalSlot}` occurrence so no
+    // sibling wrapper can silently shadow this match.
+    const wrapMatches = [...workspace.matchAll(/>(\{terminalSlot\})/g)];
+    expect(
+      wrapMatches,
+      "exactly one element renders {terminalSlot}",
+    ).toHaveLength(1);
+    const wrapM =
+      /className="([^"]*\bh-full\b[^"]*)"[^>]*>\{terminalSlot\}/.exec(
+        workspace,
+      );
+    expect(
+      wrapM,
+      "TabbedCenter terminal wrapper has h-full class",
+    ).toBeTruthy();
+    expect(
+      wrapM![1],
       "no outer padding/margin on the terminal wrapper",
     ).not.toMatch(/\b[pm][xytrbl]?-/);
   });

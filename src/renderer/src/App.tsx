@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, Family, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
@@ -37,6 +37,12 @@ export function App() {
   // Ids adopted this run that discovery has not yet relabeled Managed. Overlaid by applyAdopting so the
   // adopted row reads Managed/Working immediately, until the next sync confirms it (or its pty exits).
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
+  // Source ids with a fork in flight. The re-entrancy guard in useResumeAction is per-button-instance,
+  // so it can't stop the two Fork buttons (header + terminal hero) — or a hero remounted by a tab
+  // toggle — from each firing a fork of the same source before the awaits settle. Every fork mints its
+  // own new id, which the manager's id-keyed idempotency can't dedupe, so without this a double-fire
+  // spawns two divergent forks. Keyed by source id; cleared when the attempt settles.
+  const forkingRef = useRef<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
@@ -235,6 +241,38 @@ export function App() {
     }
   }
 
+  // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which
+  // resumes the SAME id, so its row already exists in the list), a fork's id is brand new, so it follows
+  // the spawn path: stand the terminal up first, then show the optimistic Managed draft main echoes back.
+  // That draft is hydrated from zero usage with fresh timestamps (the same builder spawn uses), so the
+  // fork never wears the source's accumulated cost/context/age; discovery then supersedes it with the
+  // fork's own Transcript. The source's model rides in so the draft labels the right model up front.
+  async function forkSession(source: Session): Promise<void> {
+    const gate = spawnGate(cliStatus);
+    if (!gate.canSpawn) throw new Error(gate.reason ?? "CLI unavailable");
+    if (forkingRef.current.has(source.id)) return; // a fork of this source is already in flight
+    forkingRef.current.add(source.id);
+    const newId = newSessionId();
+    terminalStore.create(newId);
+    try {
+      const result = await window.api.terminal.fork({
+        sourceId: source.id,
+        newId,
+        model: source.model,
+        cols: 80,
+        rows: 24,
+      });
+      if (!result.ok) throw new Error("Could not fork this session.");
+      setDrafts((ds) => [result.session, ...ds]);
+      setSelectedId(newId);
+    } catch (e) {
+      terminalStore.dispose(newId); // fork refused or failed → nothing feeds this handle; don't leak it
+      throw e;
+    } finally {
+      forkingRef.current.delete(source.id);
+    }
+  }
+
   const all = useMemo(
     () => applyAdopting(mergeManaged(sessions, drafts), adopting),
     [sessions, drafts, adopting],
@@ -319,6 +357,7 @@ export function App() {
               account={account}
               canSpawn={spawnGate(cliStatus).canSpawn}
               onAdopt={adoptSession}
+              onFork={forkSession}
             />
           ) : (
             <EmptyDetail empty={all.length === 0} loading={loading} />
