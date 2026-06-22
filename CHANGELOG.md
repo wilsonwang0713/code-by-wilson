@@ -6,6 +6,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-06-22
+
+### Added
+
+- Fork — `claude --resume <id> --session-id <new> --fork-session` — branches a
+  conversation into a brand-new session, inheriting the source history while
+  leaving the original transcript untouched. A labeled Fork button rides every
+  session in the header; Adopt (resume under the same id) joins it once the
+  session has ended. So Fork branches this conversation into a fresh session,
+  Adopt takes the wheel of this exact one.
+- A Terminal tab on every session: the live xterm for a running managed session,
+  otherwise a dark observed-terminal hero that offers Fork always and Adopt only
+  once the session has ended. The Transcript stays the default tab for
+  non-managed sessions.
+- An End session button in the header that terminates a running, app-owned
+  session. Ending an idle or waiting session is immediate; a session mid-turn
+  routes through a danger-toned confirm, since the kill cuts the turn. The
+  conversation is durable, so it stays recoverable via Adopt either way.
+- Inline rename of the session title from the header. Hover to reveal a pencil,
+  click the pencil or the title to edit in place; Enter or blur saves, Esc
+  cancels, and an empty value clears the override to revert to the derived name.
+  The override lives in its own durable store, so a deliberate rename wins over
+  both the re-derived title and Claude's live `session_name` and survives the 3s
+  re-derive, a cache rebuild, and app restart.
+
+### Fixed
+
+- The Adopt button no longer flickers across the resume sync race. Adopting an
+  ended session now holds Working through the `--resume` boot instead of bouncing
+  ended → working → ended → idle, and a just-exited session shows Adopt disabled
+  with a tooltip instead of dropping it for a beat until the next sync lands.
+
 ## [0.1.9] - 2026-06-21
 
 ### Added
@@ -263,7 +295,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/luojiahai/code-by-wire/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/luojiahai/code-by-wire/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/luojiahai/code-by-wire/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/luojiahai/code-by-wire/compare/v0.1.6...v0.1.7
