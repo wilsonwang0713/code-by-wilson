@@ -1,4 +1,4 @@
-# Code-by-wire (CBW)
+# Code-by-wire
 
 [English](README.md) | 简体中文
 
