@@ -112,9 +112,12 @@ export function Bar({
 
 export function Wordmark() {
   return (
-    <span className="inline-flex shrink-0 items-baseline gap-2">
-      <span className="font-brand text-xs font-semibold uppercase text-fg">
-        Code-by-<span className="text-primary">wire</span>
+    <span className="inline-flex shrink-0 items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 font-brand text-xs font-semibold uppercase text-fg">
+        <Icon name="terminal" size={15} />
+        <span>
+          Code-by-<span className="text-primary">wire</span>
+        </span>
       </span>
       {/* A quiet build badge: mono, faint, a notch smaller — it rides the brand, never competes. */}
       <span className="font-mono text-[11px] font-medium text-fg-faint">

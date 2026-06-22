@@ -19,6 +19,6 @@
   </g>
   <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#5ee6d3" stroke-opacity="0.22" stroke-width="3"/>
 
-  <path d="M310 372 L483 512 L310 652" fill="none" stroke="#06564e" stroke-width="82" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="549" y="611" width="206" height="82" rx="41" fill="#ffffff"/>
+  <path d="M304 330 L460 486 L304 642" fill="none" stroke="#06564e" stroke-width="82" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="471" y="653" width="290" height="82" rx="41" fill="#ffffff"/>
 </svg>
