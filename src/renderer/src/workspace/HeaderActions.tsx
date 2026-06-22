@@ -41,6 +41,13 @@ export function HeaderActions({
   const cliTitle = canSpawn
     ? undefined
     : "Claude Code CLI isn't usable — see Sys status in the title bar.";
+  // Fork resumes this session's transcript into a new id; a brand-new session hasn't written one yet, so
+  // forking it would die on the CLI's "No conversation found". Block it until it has a saved conversation.
+  const forkTitle = !canSpawn
+    ? cliTitle
+    : s.resumable
+      ? undefined
+      : "Nothing to fork yet — send a message in this session first.";
 
   return (
     <div className="flex shrink-0 items-center gap-2">
@@ -77,8 +84,8 @@ export function HeaderActions({
       <button
         type="button"
         onClick={fork.request}
-        disabled={fork.busy || !canSpawn}
-        title={cliTitle}
+        disabled={fork.busy || !canSpawn || !s.resumable}
+        title={forkTitle}
         className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors enabled:hover:border-ink-700 enabled:hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-40"
       >
         <Icon name="git-branch" size={13} />

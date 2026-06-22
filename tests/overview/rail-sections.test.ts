@@ -13,6 +13,7 @@ function s(
     project: "code-by-wire",
     state,
     management: "managed",
+    resumable: true,
     model: "sonnet",
     contextPct: 10,
     contextWindow: 200000,

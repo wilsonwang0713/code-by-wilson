@@ -40,6 +40,15 @@ export function ObservedTerminal({
   const cliTitle = canSpawn
     ? undefined
     : "Claude Code CLI isn't usable — see Sys status in the title bar.";
+  // Both Adopt (`claude --resume`) and Fork (`--fork-session`) read this session's transcript. A session
+  // that never wrote one — a spawn/fork that died before its first turn — has nothing to resume, so the
+  // CLI would die on "No conversation found". Block both until it has a saved conversation.
+  const resumeTitle = (verb: string): string | undefined =>
+    !canSpawn
+      ? cliTitle
+      : s.resumable
+        ? undefined
+        : `Nothing to ${verb} — this session never saved a conversation.`;
 
   return (
     <div className="relative flex h-full items-center justify-center bg-ink-950">
@@ -58,8 +67,8 @@ export function ObservedTerminal({
             <button
               type="button"
               onClick={adopt.request}
-              disabled={adopt.busy || !canSpawn}
-              title={cliTitle}
+              disabled={adopt.busy || !canSpawn || !s.resumable}
+              title={resumeTitle("adopt")}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-ink-950 ring-1 ring-primary/40 transition-colors enabled:hover:bg-primary-bright disabled:opacity-40"
             >
               <Icon name="git-pull-request-arrow" size={15} />
@@ -69,8 +78,8 @@ export function ObservedTerminal({
           <button
             type="button"
             onClick={fork.request}
-            disabled={fork.busy || !canSpawn}
-            title={cliTitle}
+            disabled={fork.busy || !canSpawn || !s.resumable}
+            title={resumeTitle("fork")}
             className="inline-flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-4 py-2 text-[13px] font-semibold text-fg-muted transition-colors enabled:hover:border-ink-600 enabled:hover:text-fg disabled:opacity-40"
           >
             <Icon name="git-branch" size={15} />
