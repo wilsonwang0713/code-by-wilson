@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-06-23
+
+### Added
+
+- Apple Intel (macOS x64) and Windows ARM64 builds, bringing each release to four
+  download targets. The Intel Mac dmg cross-compiles on the Apple Silicon runner
+  instead of waiting on a scarce `macos-13` runner, and every artifact now carries
+  an explicit arch in its filename so the legs no longer clobber on upload or
+  collide in the auto-update manifests.
+
+### Changed
+
+- Replaced the in-app wire-mark logo with the terminal `>_` glyph, so the header
+  wordmark and the Settings About section now match the `>_` app icon. Regenerated
+  the bundle icons from the SVG.
+
 ## [0.1.11] - 2026-06-23
 
 ### Changed
@@ -309,7 +325,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.12...HEAD
+[0.1.12]: https://github.com/luojiahai/code-by-wire/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/luojiahai/code-by-wire/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/luojiahai/code-by-wire/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/luojiahai/code-by-wire/compare/v0.1.8...v0.1.9
