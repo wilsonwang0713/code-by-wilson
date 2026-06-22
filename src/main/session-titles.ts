@@ -5,7 +5,7 @@ import { MAX_SESSION_TITLE_LEN } from "@shared/title-override";
 
 /**
  * User-chosen display-name overrides for sessions, keyed by session id. Stored under Electron's
- * userData, separate from the disposable SQLite index (ADR-0002) and from app-settings: durable user
+ * userData, separate from the disposable SQLite index and from app-settings: durable user
  * data that must survive the cache rebuild AND the per-sync title re-derive. A missing key means "no
  * override" — fall back to the derived/live title.
  */

@@ -15,7 +15,7 @@ const SCRIPT_TAIL = 'rm -f "$raw" 2>/dev/null\nexit 0\n';
  * Claude Code's JSON (piped on stdin) to a per-Session side-channel file, then calls through to the
  * user's original statusLine so their prompt still renders. It can never block or fail the prompt:
  * every capture step is best-effort (`2>/dev/null`) and `exit 0` swallows a faulty wrapped command's
- * status (ADR-0001 — a blank statusLine is the worst case, never a stalled session).
+ * status (a blank statusLine is the worst case, never a stalled session).
  *
  * The capture dir is located relative to the script itself (`${0%/*}/statusline`) rather than baked in,
  * so a Claude dir containing a `$`, backtick, quote, or backslash can't corrupt the script. stdin is

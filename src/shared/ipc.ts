@@ -35,7 +35,7 @@ export const IPC = {
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
- *  live statusLine data (ADR-0002), so the account is added later — this is what the store returns,
+ *  live statusLine data, so the account is added later — this is what the store returns,
  *  before the overlay. */
 export interface IndexOverview {
   sessions: Session[];

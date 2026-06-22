@@ -17,7 +17,7 @@ function userVersion(db: SqliteDb): number {
 }
 
 /**
- * Bring the index up to the current schema. The SQLite file is a rebuildable cache (ADR-0002: the
+ * Bring the index up to the current schema. The SQLite file is a rebuildable cache (the
  * raw JSONL is the source of truth), so a version bump just drops and recreates — the next sync
  * repopulates from disk. Keyed on PRAGMA user_version so every launch past the first is a no-op.
  */
@@ -207,11 +207,11 @@ export function getSessions(db: SqliteDb): Session[] {
 
 /**
  * The indexed session list from a single index read, so the list the Overview renders reflects one
- * snapshot in one IPC round trip. `getPersisted` reads the SQLite rows, never a transcript (ADR-0002).
+ * snapshot in one IPC round trip. `getPersisted` reads the SQLite rows, never a transcript.
  */
 export function getOverview(db: SqliteDb): IndexOverview {
   const persisted = getPersisted(db);
-  // No account here: the SQLite index holds no live statusLine data (ADR-0002). ipc.ts overlays the
+  // No account here: the SQLite index holds no live statusLine data. ipc.ts overlays the
   // freshest captures and derives the account before serving the renderer (the IndexOverview → OverviewData
   // seam), so the store never ships a half-built account that some other caller could read as real.
   return { sessions: persisted.map(hydrate) };

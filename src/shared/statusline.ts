@@ -92,7 +92,7 @@ function liveWindow(
  * The app-wide Account from the live statusLine captures within `staleMs` of `now`, plus the configured
  * `apiConfig` (read from settings.json by the main process). Billing mode is decided here, in one place:
  *
- * - subscription: rate-limit presence is the signal (ADR-0001). A capture carrying rate_limits is a
+ * - subscription: rate-limit presence is the signal. A capture carrying rate_limits is a
  *   subscription; the account takes its windows from the freshest capture that HAS them. To avoid flapping
  *   (a subscription session before its first API response, or an API-key session running alongside, carries
  *   no rate_limits) a newer no-limits capture can't override an older with-limits one. Each window is dropped
@@ -178,7 +178,7 @@ export function deriveAccount(
  * Overlay live statusLine numbers onto each Session that has a sample: cost, lines, context split,
  * context %/window, model identity, and the title (a deliberately-named session_name wins over the
  * transcript-derived title). A Session with no sample passes through untouched, still showing its
- * transcript-computed values (graceful degradation, ADR-0001). A sample that omitted a field falls back
+ * transcript-computed values (graceful degradation). A sample that omitted a field falls back
  * to the Session's computed value for that field.
  */
 export function overlaySessions(

@@ -45,7 +45,7 @@ describe("wrapperScriptWin (pure source)", () => {
   });
 
   it("ends with an explicit exit 0 so a faulty wrapped command can never fail the prompt", () => {
-    // ADR-0001: a blank statusLine is the worst case, never a stalled/failed prompt. The POSIX wrapper
+    // A blank statusLine is the worst case, never a stalled/failed prompt. The POSIX wrapper
     // enforces this with `exit 0`; the Windows port must too, so the guarantee doesn't rely on the
     // `powershell -File` invocation happening not to propagate $LASTEXITCODE.
     expect(wrapperScriptWin({ wrappedCommand: "my-prompt" }).trimEnd()).toMatch(

@@ -213,8 +213,8 @@ app
           })
         : null,
     };
-    // Wrap the user's statusLine so live cost/context and account rate limits flow to the app
-    // (ADR-0001). Idempotent and reversible; a failure must never cost the user a window.
+    // Wrap the user's statusLine so live cost/context and account rate limits flow to the app.
+    // Idempotent and reversible; a failure must never cost the user a window.
     try {
       const result = createSettingsManager({ claudeDir }).install();
       if (result.healed) {
