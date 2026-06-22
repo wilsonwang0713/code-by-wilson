@@ -5,8 +5,11 @@ import type { OverviewData } from "@shared/ipc";
 import {
   mergeManaged,
   applyAdopting,
+  applyEnding,
   pruneAdopting,
+  pruneEnding,
   dropAdopting,
+  dropEnding,
   renameManaged,
   renameAdopting,
 } from "@shared/managed";
@@ -39,6 +42,10 @@ export function App() {
   // Ids adopted this run that discovery has not yet relabeled Managed. Overlaid by applyAdopting so the
   // adopted row reads Managed/Working immediately, until the next sync confirms it (or its pty exits).
   const [adopting, setAdopting] = useState<Set<string>>(new Set());
+  // Ids ended this run that discovery has not yet relabeled. Overlaid by applyEnding so the row reads
+  // Ended immediately — the header swaps End for Adopt and the workspace flips to the Transcript — until the
+  // next sync confirms it.
+  const [ending, setEnding] = useState<Set<string>>(new Set());
   // Source ids with a fork in flight. The re-entrancy guard in useResumeAction is per-button-instance,
   // so it can't stop the two Fork buttons (header + terminal hero) — or a hero remounted by a tab
   // toggle — from each firing a fork of the same source before the awaits settle. Every fork mints its
@@ -148,6 +155,13 @@ export function App() {
     setAdopting((prev) => pruneAdopting(prev, sessions));
   }, [sessions]);
 
+  // Drop an ending override once discovery reports the row Ended (the killed pty's exit dropped its
+  // managed-registry entry, so the next sync re-derives it Ended/Observed). Holding it until then bridges
+  // the tick where the just-killed pid still reads alive; see pruneEnding.
+  useEffect(() => {
+    setEnding((prev) => pruneEnding(prev, sessions));
+  }, [sessions]);
+
   // Follow a /clear rotation: the live pty kept running but Claude rotated its session id from `from` to
   // `to`. Migrate the terminal handle and re-point the open workspace onto `to`. Rename the row wherever it
   // lives — the discovered list once a sync has indexed it, OR the optimistic drafts when /clear lands
@@ -232,12 +246,29 @@ export function App() {
             : "Could not resume this session.",
         );
       }
+      // A racing End click during this in-flight adopt may have added id to `ending`. The End button reads
+      // `live` off the adopting overlay, so it shows before the pty exists — that kill no-oped, and the
+      // revived row now reads alive, which pruneEnding never clears (it only drops on Ended). Drop the stale
+      // override here, or it would pin this now-live session to a phantom Ended for the rest of the run.
+      setEnding((prev) => dropEnding(prev, id));
       setSelectedId(id);
     } catch (e) {
       terminalStore.dispose(id); // adopt refused or failed → nothing will feed this handle; don't leak it
       setAdopting((prev) => dropAdopting(prev, id)); // and drop the optimistic override we set above
       throw e;
     }
+  }
+
+  // End a running Managed session: mark it ending (the optimistic overlay flips it to Ended at once) and
+  // fire the existing fire-and-forget kill. No await and no result to handle — kill is best-effort on the
+  // pty we own; the overlay plus the next sync reconcile the row to its real Ended/Observed state. Unlike
+  // adopting, onExit does NOT clear the override: a killed row reads Ended anyway, so a stale id is inert,
+  // and pruneEnding drops it once discovery indexes the row Ended. The one override that isn't inert is one
+  // left on an id a racing Adopt then revives (its kill no-oped on a pty that didn't exist yet); adoptSession
+  // clears that via dropEnding.
+  function endSession(id: string): void {
+    setEnding((prev) => new Set(prev).add(id));
+    window.api.terminal.kill(id);
   }
 
   // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which
@@ -273,8 +304,12 @@ export function App() {
   }
 
   const all = useMemo(
-    () => applyAdopting(mergeManaged(sessions, drafts), adopting),
-    [sessions, drafts, adopting],
+    () =>
+      applyEnding(
+        applyAdopting(mergeManaged(sessions, drafts), adopting),
+        ending,
+      ),
+    [sessions, drafts, adopting, ending],
   );
   const isOverview = selectedId === OVERVIEW_ID;
   const isSettings = selectedId === SETTINGS_ID;
@@ -357,6 +392,7 @@ export function App() {
               canSpawn={spawnGate(cliStatus).canSpawn}
               onAdopt={adoptSession}
               onFork={forkSession}
+              onEnd={endSession}
             />
           ) : (
             <EmptyDetail empty={all.length === 0} loading={loading} />
