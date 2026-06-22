@@ -34,6 +34,7 @@ export function Workspace({
   canSpawn,
   onAdopt,
   onFork,
+  onEnd,
 }: {
   session: Session;
   account: Account | null;
@@ -41,6 +42,8 @@ export function Workspace({
   canSpawn: boolean;
   onAdopt: (id: string) => Promise<void>;
   onFork: (session: Session) => Promise<void>;
+  /** End the running Managed session (header-only; never offered in the observed-terminal panel). */
+  onEnd: (id: string) => void;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
@@ -60,6 +63,7 @@ export function Workspace({
             canSpawn={canSpawn}
             onAdopt={onAdopt}
             onFork={onFork}
+            onEnd={onEnd}
           />
         </div>
         <Annunciator session={s} git={metrics?.git} pr={metrics?.pr} />
