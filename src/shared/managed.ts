@@ -120,7 +120,8 @@ export function applyAdopting(
  * forced to Ended so the header swaps the End button out for Adopt and the workspace flips to the read-only
  * Transcript in the same beat. Management is left as-is: the row reads Managed + Ended briefly (exactly like
  * a just-exited Adopt), which keeps Adopt disabled until the next sync re-derives it Observed. App clears the
- * id once discovery reports it Ended (see pruneEnding). Returns the same array reference when nothing is ending.
+ * id once discovery reports it Ended (pruneEnding), or when a racing Adopt revives it (dropEnding). Returns
+ * the same array reference when nothing is ending.
  */
 export function applyEnding(
   sessions: Session[],
@@ -144,4 +145,19 @@ export function pruneEnding(
   const next = new Set(ending);
   for (const s of sessions) if (s.state === "ended") next.delete(s.id);
   return next.size === ending.size ? ending : next;
+}
+
+/**
+ * Drop a single End override by id — used when an Adopt revives an id that a racing End click left in the
+ * set. The End button reads `live` off the optimistic adopting overlay, so it can be clicked during an
+ * in-flight Adopt, before the pty this run owns exists; that kill no-ops, and pruneEnding would never clear
+ * the override (the revived row reads alive, never Ended). Dropping it on adopt-success unpins the now-live
+ * row. The same immutable-edit idiom as dropAdopting, single-sourced so the same-reference-when-unchanged
+ * contract (lets React skip the update) can't drift. Returns the same Set reference when `id` wasn't ending.
+ */
+export function dropEnding(ending: Set<string>, id: string): Set<string> {
+  if (!ending.has(id)) return ending;
+  const next = new Set(ending);
+  next.delete(id);
+  return next;
 }

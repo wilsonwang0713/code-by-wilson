@@ -9,6 +9,7 @@ import {
   pruneAdopting,
   pruneEnding,
   dropAdopting,
+  dropEnding,
   renameManaged,
   renameAdopting,
 } from "@shared/managed";
@@ -245,6 +246,11 @@ export function App() {
             : "Could not resume this session.",
         );
       }
+      // A racing End click during this in-flight adopt may have added id to `ending`. The End button reads
+      // `live` off the adopting overlay, so it shows before the pty exists — that kill no-oped, and the
+      // revived row now reads alive, which pruneEnding never clears (it only drops on Ended). Drop the stale
+      // override here, or it would pin this now-live session to a phantom Ended for the rest of the run.
+      setEnding((prev) => dropEnding(prev, id));
       setSelectedId(id);
     } catch (e) {
       terminalStore.dispose(id); // adopt refused or failed → nothing will feed this handle; don't leak it
@@ -256,8 +262,10 @@ export function App() {
   // End a running Managed session: mark it ending (the optimistic overlay flips it to Ended at once) and
   // fire the existing fire-and-forget kill. No await and no result to handle — kill is best-effort on the
   // pty we own; the overlay plus the next sync reconcile the row to its real Ended/Observed state. Unlike
-  // adopting, onExit does NOT clear the override (no dropEnding): a killed row reads Ended anyway, so a stale
-  // id is inert; pruneEnding drops it once discovery indexes the row.
+  // adopting, onExit does NOT clear the override: a killed row reads Ended anyway, so a stale id is inert,
+  // and pruneEnding drops it once discovery indexes the row Ended. The one override that isn't inert is one
+  // left on an id a racing Adopt then revives (its kill no-oped on a pty that didn't exist yet); adoptSession
+  // clears that via dropEnding.
   function endSession(id: string): void {
     setEnding((prev) => new Set(prev).add(id));
     window.api.terminal.kill(id);

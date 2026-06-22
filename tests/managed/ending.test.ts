@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Session } from "../../src/shared/types";
-import { applyEnding, pruneEnding } from "../../src/shared/managed";
+import { applyEnding, pruneEnding, dropEnding } from "../../src/shared/managed";
 
 const s = (id: string, over: Partial<Session> = {}): Session => ({
   id,
@@ -83,5 +83,22 @@ describe("pruneEnding", () => {
   it("returns the same Set reference when nothing is ending", () => {
     const ending = new Set<string>();
     expect(pruneEnding(ending, [s("a", { state: "ended" })])).toBe(ending);
+  });
+});
+
+describe("dropEnding", () => {
+  it("drops the id a racing Adopt revived (so pruneEnding can't strand a now-live row)", () => {
+    // The strand: End is clicked during an in-flight Adopt, its kill no-ops on a pty that doesn't exist
+    // yet, the Adopt then revives the row to a stable live-Managed state, and pruneEnding never sees it
+    // Ended. dropEnding (called on adopt-success) is the escape hatch. Mirror pruneEnding's lag test: the
+    // revived row reads managed/working, which pruneEnding deliberately HOLDS — only dropEnding clears it.
+    const next = dropEnding(new Set(["a", "b"]), "a");
+    expect(next.has("a")).toBe(false);
+    expect(next.has("b")).toBe(true);
+  });
+
+  it("returns the same Set reference when the id wasn't ending", () => {
+    const ending = new Set(["a"]);
+    expect(dropEnding(ending, "b")).toBe(ending);
   });
 });
