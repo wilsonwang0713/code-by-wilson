@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSessionTitleStore } from "../src/main/session-titles";
+import { MAX_SESSION_TITLE_LEN } from "@shared/title-override";
 
 describe("createSessionTitleStore", () => {
   const dirs: string[] = [];
@@ -59,5 +60,22 @@ describe("createSessionTitleStore", () => {
     const dir = tmp();
     writeFileSync(join(dir, "session-titles.json"), "{ not json");
     expect(createSessionTitleStore({ dir }).read()).toEqual({});
+  });
+  it("clamps an over-long title to the max length on set", () => {
+    const dir = tmp();
+    createSessionTitleStore({ dir }).set("abc", "x".repeat(500));
+    expect(createSessionTitleStore({ dir }).read().abc).toBe(
+      "x".repeat(MAX_SESSION_TITLE_LEN),
+    );
+  });
+  it("clamps an over-long title from a hand-edited file on read", () => {
+    const dir = tmp();
+    writeFileSync(
+      join(dir, "session-titles.json"),
+      JSON.stringify({ abc: "y".repeat(500) }),
+    );
+    expect(createSessionTitleStore({ dir }).read().abc).toBe(
+      "y".repeat(MAX_SESSION_TITLE_LEN),
+    );
   });
 });

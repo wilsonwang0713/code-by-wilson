@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "@shared/types";
+import { MAX_SESSION_TITLE_LEN } from "@shared/title-override";
 import { Icon } from "../ui/icons";
-
-const MAX_TITLE_LEN = 200;
 
 /**
  * The header session title with inline rename. Display mode shows the truncated title and a pencil that
@@ -54,7 +53,7 @@ export function SessionTitle({
       <input
         ref={inputRef}
         value={draft}
-        maxLength={MAX_TITLE_LEN}
+        maxLength={MAX_SESSION_TITLE_LEN}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {

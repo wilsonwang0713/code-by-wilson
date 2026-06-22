@@ -278,7 +278,14 @@ export function App() {
     id: string,
     title: string | null,
   ): Promise<void> {
-    applyOverview(await window.api.renameSession(id, title));
+    const o = await window.api.renameSession(id, title);
+    applyOverview(o);
+    // A not-yet-indexed draft isn't in the returned overview (it lives in `drafts`, not the index that
+    // applyTitleOverrides maps over), so the rename wouldn't show until discovery indexed the row. Patch
+    // the draft's title locally so a just-spawned session renames immediately. On clear (null) we don't
+    // have the draft's derived title here, so we leave it for the next sync to reconcile from the store.
+    if (title && !o.sessions.some((s) => s.id === id))
+      setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, title } : d)));
   }
 
   // Fork a session: resume its conversation into a fresh id under `--fork-session`. Unlike Adopt (which

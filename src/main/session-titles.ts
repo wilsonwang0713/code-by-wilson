@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
+import { MAX_SESSION_TITLE_LEN } from "@shared/title-override";
 
 /**
  * User-chosen display-name overrides for sessions, keyed by session id. Stored under Electron's
@@ -34,7 +35,8 @@ export function createSessionTitleStore(
       // Keep only string values, so a hand-edited file can't inject a non-string into the title slot.
       const out: Record<string, string> = {};
       for (const [k, val] of Object.entries(v))
-        if (typeof val === "string") out[k] = val;
+        if (typeof val === "string")
+          out[k] = val.slice(0, MAX_SESSION_TITLE_LEN);
       return out;
     } catch {
       return {}; // a corrupt file reads as "no overrides" rather than crashing the app
@@ -50,7 +52,7 @@ export function createSessionTitleStore(
     read,
     set(id, title) {
       const next = read();
-      const trimmed = title?.trim();
+      const trimmed = title?.trim().slice(0, MAX_SESSION_TITLE_LEN);
       if (trimmed) next[id] = trimmed;
       else delete next[id];
       write(next);
