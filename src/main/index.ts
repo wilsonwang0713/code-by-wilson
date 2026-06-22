@@ -21,6 +21,7 @@ import { readModelDefaults } from "./settings/model-defaults";
 import type { ModelDefaults } from "@shared/models";
 import { resolveClaudeDir } from "./claude-config";
 import { createAppSettingsStore } from "./app-settings";
+import { createSessionTitleStore } from "./session-titles";
 import { createCliStatusController } from "./cli-check";
 import {
   probeShellEnv,
@@ -233,6 +234,9 @@ app
     const appSettings = createAppSettingsStore({
       dir: app.getPath("userData"),
     });
+    const sessionTitles = createSessionTitleStore({
+      dir: app.getPath("userData"),
+    });
     const cliStatus = createCliStatusController({
       settings: appSettings,
       activeConfigDir: claudeDir,
@@ -288,6 +292,7 @@ app
       analyticsDb,
       claudeDir,
       cliStatus,
+      sessionTitles,
     });
 
     try {

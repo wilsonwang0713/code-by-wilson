@@ -31,6 +31,7 @@ export const IPC = {
   openExternal: "shell:openExternal",
   openIn: "shell:openIn",
   clipboardWriteText: "clipboard:writeText",
+  renameSession: "session:rename",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -147,6 +148,10 @@ export interface IpcApi {
   openIn(id: string, target: OpenInTarget): Promise<OpenInResult>;
   /** Copy text to the system clipboard (the Git popover's branch / commit copy buttons). */
   clipboardWriteText(text: string): Promise<void>;
+  /** Persist a display-name override for a session id (null or a value that trims to empty clears it,
+   *  reverting to the derived/live name), then return the fresh overview with the override applied.
+   *  Both overview() and refresh() also carry the override, since it is applied in overviewNow(). */
+  renameSession(id: string, title: string | null): Promise<OverviewData>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
