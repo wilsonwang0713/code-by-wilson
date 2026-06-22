@@ -109,7 +109,7 @@ export function priceFor(model: Family): ModelPricing {
 
 /**
  * Equivalent API value (USD) for a session's summed token usage at the model's API rates. On a
- * subscription account this is a reference figure, not money owed (see CONTEXT.md). Rates are per
+ * subscription account this is a reference figure, not money owed. Rates are per
  * million tokens, so divide the weighted sum by 1e6.
  */
 export function equivApiValue(usage: Usage, model: Family): number {
@@ -141,7 +141,7 @@ export interface CostBreakdown {
 /**
  * Split a session's summed token usage into per-kind USD at the model's API rates, plus cache-hit
  * savings. The four parts sum to equivApiValue(usage, model) (same rates, same /1e6). On a subscription
- * this is all Equivalent API value, not money owed (see CONTEXT.md); on an API account it's real spend.
+ * this is all Equivalent API value, not money owed; on an API account it's real spend.
  */
 export function costBreakdown(usage: Usage, model: Family): CostBreakdown {
   const p = priceFor(model);

@@ -20,7 +20,7 @@ import { transaction, type SqliteDb } from "./driver";
 
 /**
  * Bump when the turn schema changes. The analytics store is durable: a full disk scan is expensive to
- * redo, so migrate never DROPs a table and a live-index bump (ADR-0002) can't touch this separate file.
+ * redo, so migrate never DROPs a table and a live-index bump can't touch this separate file.
  *
  * v2 adds `processed_files` (the incremental high-water marks) and does a ONE-TIME `DELETE FROM turns`.
  * That delete is the single exception to "never lose history on a bump": slice 2 re-keys an id-less

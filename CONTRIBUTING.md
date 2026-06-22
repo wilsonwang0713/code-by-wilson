@@ -65,10 +65,5 @@ Build an unsigned installer locally with `pnpm dist:win` (writes the `.exe` to
 
 ## How the project is organized
 
-This repo is built by Claude Code agents working GitHub issues. The domain
-language and locked decisions are documented and worth reading:
-
-- `CONTEXT.md`: the glossary. Use its vocabulary in code and issues.
-- `docs/adr/`: the architectural decisions that are settled.
-- `docs/agents/`: how issues, triage labels, and domain docs are managed.
-- `docs/RELEASING.md`: how to cut a versioned `.dmg` / `.exe` release.
+This repo is built by Claude Code agents working GitHub issues. Releases are cut
+with the `release` skill (`.claude/skills/release/SKILL.md`).

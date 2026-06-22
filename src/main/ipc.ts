@@ -150,7 +150,7 @@ export function registerIpc({
       readApi(),
     );
     if (account?.billingMode === "subscription") {
-      // Subscription identity: the oauthAccount email (ADR-0001). Attached only here, only for a
+      // Subscription identity: the oauthAccount email. Attached only here, only for a
       // subscription — beside gateway billing it would mislabel, so a non-subscription account never gets it.
       const email = readEmail();
       if (email) account.email = email;

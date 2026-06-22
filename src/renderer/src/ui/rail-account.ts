@@ -92,7 +92,7 @@ export function maskEmail(email: string): string {
  * Resolve what the rail's account block should show. Two mutually exclusive modes:
  *
  * - subscription: the 5h and weekly windows (each with a reset countdown) and the login email. Returns null when there's neither an email nor a window
- *   (ADR-0001 graceful degradation).
+ *   (graceful degradation).
  * - api: the endpoint as a bare host, or a friendly cloud-provider name when there's no host. Requires a
  *   base URL or a provider; an api account with neither has nothing to surface. A gateway that names its
  *   upstream provider gets a "via {provider}" plan line.

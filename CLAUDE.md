@@ -21,19 +21,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Releasing
 
 Releases run in two phases ("bump version", then "release it"). Run the
-**`release` skill** (`.claude/skills/release/SKILL.md`); full mechanics are in
-`docs/RELEASING.md`.
-
-## Agent skills
-
-### Issue tracker
-
-Issues and PRDs live as GitHub issues, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Five canonical triage roles, each mapped to its default label string. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+**`release` skill** (`.claude/skills/release/SKILL.md`).

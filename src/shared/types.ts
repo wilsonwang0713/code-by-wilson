@@ -187,7 +187,7 @@ export interface RateLimit {
 }
 
 /** The app-wide account, derived from the freshest statusLine capture plus the configured ApiConfig.
- *  Billing mode is decided in deriveAccount (ADR-0001): a capture carrying rate_limits is a subscription;
+ *  Billing mode is decided in deriveAccount: a capture carrying rate_limits is a subscription;
  *  with no such evidence, a configured API endpoint or cloud provider resolves to `api`; otherwise
  *  `unknown`. */
 export interface Account {

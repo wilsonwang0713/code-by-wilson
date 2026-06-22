@@ -148,8 +148,8 @@ describe("railAccountModel — api", () => {
 describe("railAccountModel — suppression", () => {
   it("returns null for an unknown account even with a stale email and windows", () => {
     // The Portkey/gateway case: billing inferred 'unknown' (no rate_limits captured), but a prior
-    // subscription login left an oauthAccount email. Identity and windows are both subscription-only
-    // (ADR-0001), so the block disappears rather than mislabel gateway billing.
+    // subscription login left an oauthAccount email. Identity and windows are both subscription-only,
+    // so the block disappears rather than mislabel gateway billing.
     const acc: Account = {
       billingMode: "unknown",
       email: "a@b.com",

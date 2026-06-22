@@ -16,8 +16,8 @@ asked and the repo state; never run both at once.
 - **Phase 2 — "release it"**: the bump PR has merged to `main`; now tag and ship.
 
 `package.json` `version` is the source of truth; the tag is `v` + that exact
-string. Full mechanics and recovery steps are in `docs/RELEASING.md` — read it
-when you need CI internals or to recover a botched release.
+string. CI internals, the botched-release runbook, and platform/signing notes
+live at the end of this skill.
 
 ## Orient first
 
@@ -174,3 +174,44 @@ The tag is the trigger; CI builds the dmg into a draft release.
    installs pick up the version on their next check — worth saying out loud when
    you confirm it's live. If the tag was created via the web UI (already
    published, no draft), just verify the assets landed on that release.
+
+## Why CI uploads assets by hand
+
+Don't "simplify" the release job back to `electron-builder --publish always`. Its
+GitHub publisher uploads files in parallel, and a draft release can't be looked up
+by tag, so each upload races to create its own draft. v0.1.0's first run produced
+**two** draft releases with the dmg, blockmap, and `latest-mac.yml` scattered
+across them, and the job still went green looking like a clean release.
+
+So the job builds with `--publish never` and uploads through `gh` instead: it
+creates the draft once (or reuses it on a re-run) and uploads with `--clobber`,
+which is deterministic and idempotent.
+
+## Recovering a botched release
+
+If a release ends up wrong (empty, or assets split across duplicate drafts from an
+old `--publish always` run):
+
+1. The dmg may already be on GitHub, just attached to the wrong/duplicate draft.
+   Download each asset by id:
+   `GH_HOST=github.com gh api repos/luojiahai/code-by-wire/releases/assets/<id> -H "Accept: application/octet-stream" > <name>`.
+2. Delete the bad release(s), keeping the git tag:
+   `GH_HOST=github.com gh api -X DELETE repos/luojiahai/code-by-wire/releases/<release_id>`.
+3. Assemble one clean release from the downloaded files:
+   `GH_HOST=github.com gh release create vX.Y.Z -R luojiahai/code-by-wire --latest --title "code-by-wire vX.Y.Z" --notes "..." <files>`.
+
+   Or, to rebuild from scratch, re-push the tag
+   (`git push origin :refs/tags/vX.Y.Z && git push origin vX.Y.Z`) and let CI
+   produce a fresh draft.
+
+## Platforms & signing
+
+macOS releases are Apple Silicon (`arm64`) only, signed with a Developer ID
+certificate and notarized by Apple (the `CSC_*` and `APPLE_*` secrets in CI), so
+the downloaded `.dmg` opens without a Gatekeeper warning. The Intel (`x64`) leg
+was dropped because `macos-13` runners queue 10-30+ min and are on the way out,
+and the user base is Apple Silicon.
+
+Windows releases are `x64` and unsigned. On first launch SmartScreen shows an
+"unknown publisher" warning; users click **More info → Run anyway**. Windows
+code-signing isn't set up yet.

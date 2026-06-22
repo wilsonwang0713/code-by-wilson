@@ -11,12 +11,12 @@ const HEREDOC_OPEN = "$cbwCmd = @'\n";
 const HEREDOC_CLOSE = "\n'@\n";
 
 /** The fixed script tail emitted after the (optional) call-through. The explicit `exit 0` mirrors the
- *  POSIX wrapper (ADR-0001): a faulty wrapped command can never fail the prompt, regardless of whether the
+ *  POSIX wrapper: a faulty wrapped command can never fail the prompt, regardless of whether the
  *  `powershell -File` invocation propagates $LASTEXITCODE. */
 const SCRIPT_TAIL = "# CBW_END\nexit 0\n";
 
 /**
- * PowerShell statusLine wrapper (ADR-0001) for Windows. Captures Claude Code's stdin JSON to a
+ * PowerShell statusLine wrapper for Windows. Captures Claude Code's stdin JSON to a
  * per-session side-channel file under the capture dir next to this script, then calls through to
  * the user's original command so their prompt still renders. Best-effort throughout; never fails
  * the prompt. The wrapped command is baked verbatim into a single-quoted here-string so

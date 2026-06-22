@@ -22,7 +22,7 @@ describe("wrapperScript (pure source)", () => {
     expect(src).toContain('cat "$src" | my-prompt --color'); // byte-faithful call-through (no $(cat) strip)
   });
 
-  it("omits the call-through when there was no original statusLine (renders blank, ADR-0001)", () => {
+  it("omits the call-through when there was no original statusLine (renders blank)", () => {
     const src = wrapperScript({ wrappedCommand: null });
     expect(src).not.toContain("| my-prompt");
     expect(src).not.toContain('cat "$src" |');
