@@ -52,6 +52,20 @@ export function parseJsonlRows(jsonl: string): any[] {
   return rows;
 }
 
+/** A tool_result block's content as flat text: a plain string passes through; an array keeps its text
+ *  parts joined on newline; anything else (an object, a number, undefined) is "". Shared by the render
+ *  parser (for the output line-count) and the on-demand tool-result extractor. */
+export function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b) => b?.type === "text" && typeof b?.text === "string")
+      .map((b) => b.text)
+      .join("\n");
+  }
+  return "";
+}
+
 /**
  * Parse JSONL into rows tagged with their absolute 0-based line number, skipping blank and unparseable
  * lines (their line numbers are still consumed, so a blank line never shifts the numbers after it).

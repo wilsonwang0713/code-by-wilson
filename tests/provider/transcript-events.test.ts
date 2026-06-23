@@ -85,7 +85,14 @@ describe("parseTranscriptEvents — events", () => {
       }),
     );
     expect(events).toEqual([
-      { kind: "tool", name: "Bash", input: "pnpm test" },
+      {
+        kind: "tool",
+        name: "Bash",
+        input: "pnpm test",
+        toolUseId: "t1",
+        status: "pending",
+        outputLines: 0,
+      },
     ]);
   });
 
@@ -272,7 +279,16 @@ describe("parseTranscriptEvents — events", () => {
         },
       }),
     );
-    expect(events).toEqual([{ kind: "tool", name: "Bash", input: "ls" }]);
+    expect(events).toEqual([
+      {
+        kind: "tool",
+        name: "Bash",
+        input: "ls",
+        toolUseId: "",
+        status: "pending",
+        outputLines: 0,
+      },
+    ]);
   });
 
   it("skips meta user turns and tool_result-only user turns", () => {
@@ -308,6 +324,125 @@ describe("parseTranscriptEvents — events", () => {
       '{"type":"user","isMeta":false,"message":{"role":"user","content":"hi"}}\n{ broken',
     );
     expect(events).toEqual([{ kind: "user", text: "hi" }]);
+  });
+
+  it("back-patches a tool to ok with an output line count when its result lands", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "Bash",
+                input: { command: "ls" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "t1", content: "a\nb\nc\n" },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events).toEqual([
+      {
+        kind: "tool",
+        name: "Bash",
+        input: "ls",
+        toolUseId: "t1",
+        status: "ok",
+        outputLines: 3,
+      },
+    ]);
+  });
+
+  it("marks a tool error when its result carries is_error", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "Bash",
+                input: { command: "false" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "t1",
+                is_error: true,
+                content: "boom",
+              },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events[0]).toMatchObject({ status: "error", outputLines: 1 });
+  });
+
+  it("patches each tool independently and leaves unmatched results alone", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "Bash",
+                input: { command: "one" },
+              },
+              {
+                type: "tool_use",
+                id: "t2",
+                name: "Bash",
+                input: { command: "two" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "t2", content: "done" },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events.map((e) => e.kind === "tool" && e.status)).toEqual([
+      "pending",
+      "ok",
+    ]);
   });
 });
 

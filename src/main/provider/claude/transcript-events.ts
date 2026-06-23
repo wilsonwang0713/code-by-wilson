@@ -9,7 +9,7 @@ import {
   promptLabel,
   stripCommandEnvelope,
 } from "./command-envelope";
-import { parseJsonlRows, userText } from "./transcript-row";
+import { parseJsonlRows, userText, toolResultText } from "./transcript-row";
 import { createTailTracker } from "./transcript-tail";
 
 /** Tools whose edit we render as a diff rather than a generic tool call. */
@@ -74,6 +74,12 @@ export function parseTranscriptEventsFromRows(
   const { includeSidechain = false } = opts;
   const events: TranscriptEvent[] = [];
   const tail = createTailTracker();
+  // Generic tool events keyed by tool_use id, so the matching tool_result (a later user row) can set
+  // their status and output line count. Diff/subagent tools take other branches and aren't tracked here.
+  const toolById = new Map<
+    string,
+    Extract<TranscriptEvent, { kind: "tool" }>
+  >();
 
   // Timeline accumulators. `open` is the turn being built (a user prompt and the assistant work up to
   // the next prompt); finalized into `turns` on the next prompt and at EOF.
@@ -120,8 +126,17 @@ export function parseTranscriptEventsFromRows(
     if (row.type === "user") {
       if (Array.isArray(content)) {
         for (const b of content) {
-          if (b?.type === "tool_result" && typeof b.tool_use_id === "string")
+          if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
             tail.resolveToolResult(b.tool_use_id);
+            const ev = toolById.get(b.tool_use_id);
+            if (ev) {
+              ev.status = b.is_error === true ? "error" : "ok";
+              const text = toolResultText(b.content);
+              ev.outputLines = text
+                ? text.replace(/\n$/, "").split("\n").length
+                : 0;
+            }
+          }
         }
       }
       if (row.isMeta) {
@@ -199,11 +214,17 @@ export function parseTranscriptEventsFromRows(
               hunk: diffHunk(b.name, input),
             });
           } else {
-            events.push({
+            const toolUseId = typeof b.id === "string" ? b.id : "";
+            const toolEvent: Extract<TranscriptEvent, { kind: "tool" }> = {
               kind: "tool",
               name: b.name,
               input: summarizeInput(input),
-            });
+              toolUseId,
+              status: "pending",
+              outputLines: 0,
+            };
+            events.push(toolEvent);
+            if (toolUseId) toolById.set(toolUseId, toolEvent);
           }
           if (typeof b.id === "string") tail.noteToolUse(b.id, b.name, input);
         }

@@ -42,7 +42,19 @@ export type TranscriptEvent =
   | { kind: "user"; text: string }
   | { kind: "assistant"; text: string }
   | { kind: "thinking"; text: string }
-  | { kind: "tool"; name: string; input: string }
+  | {
+      kind: "tool";
+      /** The tool name, e.g. "Bash". */
+      name: string;
+      /** One-line summary of the input for the row (the command / path / pattern, truncated by the UI). */
+      input: string;
+      /** The tool_use id, used to fetch the full command + output on demand. "" when the row had no id. */
+      toolUseId: string;
+      /** Resolved from the tool_result's error flag: "ok" passed, "error" failed, "pending" no result yet. */
+      status: "ok" | "error" | "pending";
+      /** Exact line count of the captured output, 0 when empty or still pending. */
+      outputLines: number;
+    }
   | { kind: "diff"; tool: string; file: string; hunk: DiffHunk }
   | {
       kind: "subagent";
@@ -50,6 +62,9 @@ export type TranscriptEvent =
       description: string;
       toolUseId: string;
     };
+
+/** The tool-call event variant, named for reuse across the renderer (the row, the feed, the modal). */
+export type ToolEvent = Extract<TranscriptEvent, { kind: "tool" }>;
 
 export interface TranscriptDoc {
   /** The conversation, oldest first. */
