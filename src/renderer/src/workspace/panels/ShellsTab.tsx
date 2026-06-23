@@ -20,8 +20,9 @@ function MetaCell({
   );
 }
 
-/** One background shell as a compact, clickable one-line row: status glyph, command, exit/duration, and
- *  a source-agnostic relative start. Clicking drills into the full log in the center pane. */
+/** One background shell as a compact, clickable one-line row: status glyph, command, duration, and a
+ *  source-agnostic relative start. The exit code lives on the drill-in; the glyph carries pass/fail here.
+ *  Clicking drills into the full log in the center pane. */
 function ShellRow({
   shell,
   active,
@@ -74,11 +75,6 @@ function ShellRow({
           <span className="text-fg">{shell.command}</span>
         )}
       </span>
-      {shell.status === "completed" && shell.exitCode !== undefined && (
-        <MetaCell tone={shell.exitCode === 0 ? "text-fg-faint" : "text-danger"}>
-          exit {shell.exitCode}
-        </MetaCell>
-      )}
       <MetaCell tone="text-fg-muted">{formatDuration(elapsed)}</MetaCell>
       {shell.startMs !== undefined && (
         <MetaCell>{formatRelativeTime(shell.startMs, now)}</MetaCell>
