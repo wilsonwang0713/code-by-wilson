@@ -58,10 +58,21 @@ function ShellRow({
         {glyph.char}
       </span>
       <span
-        className="min-w-0 flex-1 truncate font-mono text-[12px] text-fg"
-        title={shell.command}
+        className="min-w-0 flex-1 truncate font-mono text-[12px]"
+        title={
+          shell.description
+            ? `${shell.description}  ${shell.command}`
+            : shell.command
+        }
       >
-        {shell.command}
+        {shell.description ? (
+          <>
+            <span className="text-fg">{shell.description}</span>{" "}
+            <span className="text-fg-faint">{shell.command}</span>
+          </>
+        ) : (
+          <span className="text-fg">{shell.command}</span>
+        )}
       </span>
       {shell.status === "completed" && shell.exitCode !== undefined && (
         <MetaCell tone={shell.exitCode === 0 ? "text-fg-faint" : "text-danger"}>
