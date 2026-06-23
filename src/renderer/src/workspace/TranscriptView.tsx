@@ -1,8 +1,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { SessionState } from "@shared/types";
-import type { ToolEvent, TranscriptEvent } from "@shared/transcript";
+import type { TranscriptEvent } from "@shared/transcript";
 import type { DocState } from "./use-transcript";
-import { EventItem } from "./events";
+import { EventItem, type OpenDetail } from "./events";
 import type { DispatchDrill } from "./drill-index";
 
 /**
@@ -15,12 +15,12 @@ export function TranscriptFeed({
   events,
   footer,
   dispatchDrill,
-  onOpenTool,
+  onOpen,
 }: {
   events: TranscriptEvent[];
   footer?: ReactNode;
   dispatchDrill?: DispatchDrill;
-  onOpenTool?: (tool: ToolEvent) => void;
+  onOpen?: (detail: OpenDetail) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const countRef = useRef(0);
@@ -36,7 +36,7 @@ export function TranscriptFeed({
           key={i}
           event={e}
           dispatchDrill={dispatchDrill}
-          onOpenTool={onOpenTool}
+          onOpen={onOpen}
         />
       ))}
       {footer}
@@ -56,13 +56,13 @@ export function TranscriptView({
   state,
   readOnly,
   dispatchDrill,
-  onOpenTool,
+  onOpen,
 }: {
   doc: DocState;
   state: SessionState;
   readOnly: boolean;
   dispatchDrill?: DispatchDrill;
-  onOpenTool?: (tool: ToolEvent) => void;
+  onOpen?: (detail: OpenDetail) => void;
 }) {
   if (doc === null) {
     return (
@@ -79,7 +79,7 @@ export function TranscriptView({
       <TranscriptFeed
         events={doc?.events ?? []}
         dispatchDrill={dispatchDrill}
-        onOpenTool={onOpenTool}
+        onOpen={onOpen}
         footer={
           state === "waiting" ? (
             <div className="rounded-lg border border-accent/40 bg-accent/[0.08] p-3">

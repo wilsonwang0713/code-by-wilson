@@ -8,9 +8,10 @@ import type {
 import { Icon } from "../ui/icons";
 import { useCopyFlash } from "../ui/use-copy-flash";
 import { Tabs } from "../ui/Tabs";
-import type { ToolEvent } from "@shared/transcript";
+import type { OpenDetail } from "./events";
 import { TranscriptView } from "./TranscriptView";
 import { ToolResultModal } from "./ToolResultModal";
+import { DiffModal } from "./DiffModal";
 import { TerminalView } from "../terminal/TerminalView";
 import { useTranscript, type DocState } from "./use-transcript";
 import { ContextPanel } from "./panels/ContextPanel";
@@ -374,7 +375,7 @@ function RenderedTranscript({
   dispatchDrill?: DispatchDrill;
 }) {
   const readOnly = s.management === "observed";
-  const [openTool, setOpenTool] = useState<ToolEvent | null>(null);
+  const [open, setOpen] = useState<OpenDetail | null>(null);
   return (
     <OverlayScroll className="h-full">
       <TranscriptView
@@ -382,14 +383,17 @@ function RenderedTranscript({
         state={s.state}
         readOnly={readOnly}
         dispatchDrill={dispatchDrill}
-        onOpenTool={setOpenTool}
+        onOpen={setOpen}
       />
-      {openTool && (
+      {open?.kind === "tool" && (
         <ToolResultModal
           sessionId={s.id}
-          tool={openTool}
-          onClose={() => setOpenTool(null)}
+          tool={open.tool}
+          onClose={() => setOpen(null)}
         />
+      )}
+      {open?.kind === "diff" && (
+        <DiffModal diff={open.diff} onClose={() => setOpen(null)} />
       )}
     </OverlayScroll>
   );

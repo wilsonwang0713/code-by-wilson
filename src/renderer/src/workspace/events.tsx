@@ -1,19 +1,25 @@
 import type { ReactNode } from "react";
-import type { DiffHunk, ToolEvent, TranscriptEvent } from "@shared/transcript";
+import type { DiffEvent, ToolEvent, TranscriptEvent } from "@shared/transcript";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { toolIcon } from "./tool-icon";
 import type { DispatchDrill } from "./drill-index";
 
+/** A request to open a detail modal for one transcript event. Threaded from the feed up to the view that
+ *  owns the modal state. A discriminated union so the view renders the right modal. */
+export type OpenDetail =
+  | { kind: "tool"; tool: ToolEvent }
+  | { kind: "diff"; diff: DiffEvent };
+
 /** Render one transcript event. The switch is exhaustive over TranscriptEvent's kinds. */
 export function EventItem({
   event,
   dispatchDrill,
-  onOpenTool,
+  onOpen,
 }: {
   event: TranscriptEvent;
   dispatchDrill?: DispatchDrill;
-  onOpenTool?: (tool: ToolEvent) => void;
+  onOpen?: (detail: OpenDetail) => void;
 }) {
   switch (event.kind) {
     case "user":
@@ -26,11 +32,20 @@ export function EventItem({
       return (
         <ToolCall
           tool={event}
-          onOpen={onOpenTool ? () => onOpenTool(event) : undefined}
+          onOpen={
+            onOpen ? () => onOpen({ kind: "tool", tool: event }) : undefined
+          }
         />
       );
     case "diff":
-      return <Diff tool={event.tool} file={event.file} hunk={event.hunk} />;
+      return (
+        <DiffRow
+          diff={event}
+          onOpen={
+            onOpen ? () => onOpen({ kind: "diff", diff: event }) : undefined
+          }
+        />
+      );
     case "subagent": {
       // Local const so the membership check narrows dispatchDrill into the click closure (no `!`).
       const dd = dispatchDrill;
@@ -148,34 +163,43 @@ function ToolCall({ tool, onOpen }: { tool: ToolEvent; onOpen?: () => void }) {
   );
 }
 
-function Diff({
-  tool,
-  file,
-  hunk,
-}: {
-  tool: string;
-  file: string;
-  hunk: DiffHunk;
-}) {
+/** A one-line edit turn: a pencil glyph, the tool name, the file, then the +added / −removed counts.
+ *  When `onOpen` is given the whole row is a button (with a drill chevron) that opens the diff modal;
+ *  without it the row is a plain, non-interactive line (the subagent drill view). */
+function DiffRow({ diff, onOpen }: { diff: DiffEvent; onOpen?: () => void }) {
+  const base =
+    "ml-8 flex items-center gap-2 rounded-lg border border-ink-800 bg-well px-3 py-1.5 font-mono text-[11px]";
+  const body = (
+    <>
+      <Icon
+        name={toolIcon(diff.tool)}
+        size={13}
+        className="shrink-0 text-primary-bright"
+      />
+      <span className="shrink-0 text-primary-bright">{diff.tool}</span>
+      <span className="truncate text-fg-faint">{diff.file}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        <span className="text-ok">+{diff.hunk.added.length}</span>
+        <span className="text-danger">−{diff.hunk.removed.length}</span>
+        {onOpen && (
+          <Icon name="chevron-right" size={13} className="text-ink-600" />
+        )}
+      </span>
+    </>
+  );
+  if (!onOpen) return <div className={base}>{body}</div>;
   return (
-    <div className="ml-8 overflow-hidden rounded-lg border border-ink-800 bg-well font-mono text-[11px]">
-      <div className="border-b border-ink-800 px-3 py-1.5 text-fg-faint">
-        ⏵ {tool}
-        {file && ` · ${file}`}
-      </div>
-      <div className="overflow-x-auto px-3 py-1.5">
-        {hunk.removed.map((l, i) => (
-          <div key={`r${i}`} className="whitespace-pre text-danger">
-            - {l}
-          </div>
-        ))}
-        {hunk.added.map((l, i) => (
-          <div key={`a${i}`} className="whitespace-pre text-ok">
-            + {l}
-          </div>
-        ))}
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`View ${diff.tool} diff for ${diff.file}`}
+      className={cx(
+        base,
+        "w-full text-left transition-colors hover:border-ink-700",
+      )}
+    >
+      {body}
+    </button>
   );
 }
 

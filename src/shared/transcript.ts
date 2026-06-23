@@ -66,6 +66,10 @@ export type TranscriptEvent =
 /** The tool-call event variant, named for reuse across the renderer (the row, the feed, the modal). */
 export type ToolEvent = Extract<TranscriptEvent, { kind: "tool" }>;
 
+/** The edit-event variant (Edit / Write / MultiEdit), named for reuse across the renderer's diff row and
+ *  diff modal. */
+export type DiffEvent = Extract<TranscriptEvent, { kind: "diff" }>;
+
 export interface TranscriptDoc {
   /** The conversation, oldest first. */
   events: TranscriptEvent[];

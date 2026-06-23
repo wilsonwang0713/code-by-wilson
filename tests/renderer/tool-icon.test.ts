@@ -8,6 +8,11 @@ describe("toolIcon", () => {
     expect(toolIcon("Grep")).toBe("search");
     expect(toolIcon("WebFetch")).toBe("globe");
   });
+  it("maps edit tools to the pencil glyph", () => {
+    expect(toolIcon("Edit")).toBe("pencil");
+    expect(toolIcon("Write")).toBe("pencil");
+    expect(toolIcon("MultiEdit")).toBe("pencil");
+  });
   it("falls back to terminal for an unknown tool", () => {
     expect(toolIcon("Frobnicate")).toBe("terminal");
   });
