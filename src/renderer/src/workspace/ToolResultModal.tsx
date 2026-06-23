@@ -98,9 +98,10 @@ export function ToolResultModal({
         </pre>
         <button
           type="button"
+          disabled={state.phase !== "ready"}
           onClick={cmd.copy}
           className={cx(
-            "shrink-0 rounded border px-2 py-0.5 text-[10px] transition-colors",
+            "shrink-0 rounded border px-2 py-0.5 text-[10px] transition-colors disabled:opacity-40",
             cmd.copied
               ? "border-ink-600 text-fg"
               : "border-ink-700 text-fg-muted hover:border-ink-600 hover:text-fg",
@@ -138,7 +139,7 @@ export function ToolResultModal({
       <div className="mt-3 flex items-center gap-2 text-[10px] text-fg-faint">
         <button
           type="button"
-          disabled={state.phase !== "ready"}
+          disabled={state.phase !== "ready" || state.detail.output === ""}
           onClick={out.copy}
           className={cx(
             "rounded border px-2 py-0.5 transition-colors disabled:opacity-40",
