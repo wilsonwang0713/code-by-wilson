@@ -112,8 +112,8 @@ function SubagentLane({
   return (
     <li
       className={cx(
-        "relative flex min-h-[23px] items-center overflow-hidden rounded-sm bg-ink-900",
-        active && "ring-1 ring-inset ring-accent",
+        "relative flex min-h-[23px] items-center overflow-hidden rounded-sm",
+        active ? "bg-ink-850" : "bg-ink-900",
       )}
     >
       <div
@@ -425,7 +425,7 @@ export function SubagentsTab({
         stats={stats}
         batchCount={groups.filter((g) => g.kind === "batch").length}
       />
-      <div className="space-y-3 px-4 py-3">
+      <div className="space-y-3 py-1">
         {groups.map((group) => {
           const { collapsed, isDefault } = resolveCollapse(
             group,
