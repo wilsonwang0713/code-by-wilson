@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
-import type { DiffHunk, TranscriptEvent } from "@shared/transcript";
+import type { DiffHunk, ToolEvent, TranscriptEvent } from "@shared/transcript";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
+import { toolIcon } from "./tool-icon";
 import type { DispatchDrill } from "./drill-index";
 
 /** Render one transcript event. The switch is exhaustive over TranscriptEvent's kinds. */
 export function EventItem({
   event,
   dispatchDrill,
+  onOpenTool,
 }: {
   event: TranscriptEvent;
   dispatchDrill?: DispatchDrill;
+  onOpenTool?: (tool: ToolEvent) => void;
 }) {
   switch (event.kind) {
     case "user":
@@ -20,7 +23,12 @@ export function EventItem({
     case "thinking":
       return <Thinking text={event.text} />;
     case "tool":
-      return <ToolCall name={event.name} input={event.input} />;
+      return (
+        <ToolCall
+          tool={event}
+          onOpen={onOpenTool ? () => onOpenTool(event) : undefined}
+        />
+      );
     case "diff":
       return <Diff tool={event.tool} file={event.file} hunk={event.hunk} />;
     case "subagent": {
@@ -86,17 +94,57 @@ function Thinking({ text }: { text: string }) {
   );
 }
 
-function ToolCall({ name, input }: { name: string; input: string }) {
-  return (
-    <div className="ml-8 flex items-center gap-2 rounded-lg border border-ink-800 bg-well px-3 py-1.5 font-mono text-[11px]">
+const TOOL_STATUS: Record<ToolEvent["status"], { char: string; tone: string }> =
+  {
+    ok: { char: "✓", tone: "text-ok" },
+    error: { char: "✕", tone: "text-danger" },
+    pending: { char: "●", tone: "text-working-bright" },
+  };
+
+/** A one-line tool turn: a per-tool glyph, the tool name, the summarized input, then a status shape and
+ *  the output size. When `onOpen` is given the whole row is a button (with a drill chevron) that opens
+ *  the detail modal; without it the row is a plain, non-interactive line (the subagent drill view). */
+function ToolCall({ tool, onOpen }: { tool: ToolEvent; onOpen?: () => void }) {
+  const st = TOOL_STATUS[tool.status];
+  const size =
+    tool.status === "pending"
+      ? "running…"
+      : tool.outputLines === 0
+        ? "no output"
+        : `${tool.outputLines} line${tool.outputLines === 1 ? "" : "s"}`;
+  const base =
+    "ml-8 flex items-center gap-2 rounded-lg border border-ink-800 bg-well px-3 py-1.5 font-mono text-[11px]";
+  const body = (
+    <>
       <Icon
-        name="terminal"
+        name={toolIcon(tool.name)}
         size={13}
         className="shrink-0 text-primary-bright"
       />
-      <span className="shrink-0 text-primary-bright">{name}</span>
-      <span className="truncate text-fg-faint">{input}</span>
-    </div>
+      <span className="shrink-0 text-primary-bright">{tool.name}</span>
+      <span className="truncate text-fg-faint">{tool.input}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-fg-faint">
+        <span className={st.tone}>{st.char}</span>
+        <span>{size}</span>
+        {onOpen && (
+          <Icon name="chevron-right" size={13} className="text-ink-600" />
+        )}
+      </span>
+    </>
+  );
+  if (!onOpen) return <div className={base}>{body}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`View ${tool.name} output`}
+      className={cx(
+        base,
+        "w-full text-left transition-colors hover:border-ink-700",
+      )}
+    >
+      {body}
+    </button>
   );
 }
 
