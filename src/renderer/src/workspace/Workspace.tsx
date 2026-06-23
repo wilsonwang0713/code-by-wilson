@@ -371,13 +371,13 @@ function RenderedTranscript({
   doc: DocState;
   dispatchDrill?: DispatchDrill;
 }) {
+  const readOnly = s.management === "observed";
   return (
     <OverlayScroll className="h-full">
       <TranscriptView
         doc={doc}
-        project={s.project}
         state={s.state}
-        readOnly={s.management === "observed"}
+        readOnly={readOnly}
         dispatchDrill={dispatchDrill}
       />
     </OverlayScroll>

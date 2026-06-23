@@ -12,7 +12,7 @@ export type DrillCrumb =
   | { kind: "shell"; shellId: string; label: string };
 
 /**
- * The drilled-in Subagent surface: a breadcrumb (Session › … › <type>, read-only marked) above the
+ * The drilled-in Subagent surface: a breadcrumb (Session › … › <type>) above the
  * shared event feed. A pure renderer of the `doc` it's handed — the subagent poll is lifted to
  * WorkspaceBody so it survives the Managed tab toggle. Always read-only — a Subagent is never drivable,
  * even drilled from a Managed Session. The feed is keyed on the current agent id so re-drilling remounts
@@ -49,7 +49,7 @@ export function SubagentDrill({
 }
 
 /** The drill path: a clickable "Session" root that pops back to the Session transcript, then each
- *  subagent crumb (intermediate crumbs clickable, the current one not), with a read-only marker. */
+ *  subagent crumb (intermediate crumbs clickable, the current one not). */
 function Breadcrumb({
   crumbs,
   onNavigate,
@@ -85,9 +85,6 @@ function Breadcrumb({
           </span>
         );
       })}
-      <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-accent/40 px-2 py-0.5 text-[9px] uppercase tracking-wider text-accent-bright">
-        ● Read-only subagent
-      </span>
     </div>
   );
 }

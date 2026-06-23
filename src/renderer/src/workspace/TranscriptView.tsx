@@ -8,7 +8,7 @@ import type { DispatchDrill } from "./drill-index";
 /**
  * The shared event feed: a bottom-sticky list of rendered transcript events. Both the Session
  * TranscriptView and the drilled Subagent view render it. The optional `footer` slot carries the
- * Session's Waiting banner (the Subagent view passes none — its breadcrumb owns the read-only signal).
+ * Session's Waiting banner (the Subagent view passes none).
  * Sticks to the bottom when new events arrive — a live, read-only feed.
  */
 export function TranscriptFeed({
@@ -39,19 +39,18 @@ export function TranscriptFeed({
 }
 
 /**
- * A session's rendered transcript: the shared event feed plus the Session-specific chrome — a read-only
- * banner for an Observed session and a prominent Waiting banner. The polling lives in useTranscript
- * (lifted so the context panel and dock share one doc); this is a pure renderer of the doc it's handed.
+ * A session's rendered transcript: the shared event feed plus the Session-specific chrome — a
+ * prominent Waiting banner. The polling lives in useTranscript (lifted so the context panel and dock
+ * share one doc); this is a pure renderer of the doc it's handed. An Observed (read-only) session
+ * carries no persistent on-screen marker; `readOnly` only varies the empty-state copy.
  */
 export function TranscriptView({
   doc,
-  project,
   state,
   readOnly,
   dispatchDrill,
 }: {
   doc: DocState;
-  project: string;
   state: SessionState;
   readOnly: boolean;
   dispatchDrill?: DispatchDrill;
@@ -68,12 +67,6 @@ export function TranscriptView({
 
   return (
     <div>
-      {readOnly && (
-        <div className="sticky top-0 z-10 border-b border-ink-800 bg-ink-925/90 px-5 py-2 text-center text-[10px] uppercase tracking-wider text-fg-faint backdrop-blur">
-          ● Read-only — live transcript from {project}. You can't type into an
-          Observed session.
-        </div>
-      )}
       <TranscriptFeed
         events={doc?.events ?? []}
         dispatchDrill={dispatchDrill}
