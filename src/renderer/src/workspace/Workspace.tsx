@@ -373,22 +373,14 @@ function RenderedTranscript({
 }) {
   const readOnly = s.management === "observed";
   return (
-    <div className="relative h-full">
-      {readOnly && (
-        <span className="absolute left-4 top-3 z-10 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-faint">
-          <span className="h-1.5 w-1.5 rounded-full bg-ink-600" />
-          Read-only
-        </span>
-      )}
-      <OverlayScroll className="h-full">
-        <TranscriptView
-          doc={doc}
-          state={s.state}
-          readOnly={readOnly}
-          dispatchDrill={dispatchDrill}
-        />
-      </OverlayScroll>
-    </div>
+    <OverlayScroll className="h-full">
+      <TranscriptView
+        doc={doc}
+        state={s.state}
+        readOnly={readOnly}
+        dispatchDrill={dispatchDrill}
+      />
+    </OverlayScroll>
   );
 }
 
