@@ -30,12 +30,12 @@ describe("extractToolResult", () => {
     },
   );
 
-  it("returns the full command, output, and error flag by id", () => {
+  it("returns the full command, output, and status by id", () => {
     expect(extractToolResult(transcript, "t1")).toEqual({
       found: true,
       command: "pnpm test",
       output: "ok\npassed",
-      isError: false,
+      status: "ok",
     });
   });
 
@@ -43,7 +43,7 @@ describe("extractToolResult", () => {
     expect(extractToolResult(transcript, "nope")).toEqual({ found: false });
   });
 
-  it("returns found:true with empty output for a tool that has no result yet", () => {
+  it("returns found:true, status pending, empty output for a tool with no result yet", () => {
     const pending = rows({
       type: "assistant",
       message: {
@@ -62,7 +62,7 @@ describe("extractToolResult", () => {
       found: true,
       command: "sleep 9",
       output: "",
-      isError: false,
+      status: "pending",
     });
   });
 
@@ -101,7 +101,7 @@ describe("extractToolResult", () => {
       found: true,
       command: "false",
       output: "boom",
-      isError: true,
+      status: "error",
     });
   });
 
@@ -123,6 +123,27 @@ describe("extractToolResult", () => {
     expect(extractToolResult(read, "r1")).toMatchObject({
       found: true,
       command: "src/a.ts",
+    });
+  });
+
+  it("uses the query field for a WebSearch (shares the row's telling-field list)", () => {
+    const search = rows({
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "q1",
+            name: "WebSearch",
+            input: { query: "electron native rebuild" },
+          },
+        ],
+      },
+    });
+    expect(extractToolResult(search, "q1")).toMatchObject({
+      found: true,
+      command: "electron native rebuild",
     });
   });
 

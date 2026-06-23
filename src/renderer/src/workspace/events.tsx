@@ -3,6 +3,7 @@ import type { DiffEvent, ToolEvent, TranscriptEvent } from "@shared/transcript";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { toolIcon } from "./tool-icon";
+import { TURN_STATUS } from "./turn-status";
 import type { DispatchDrill } from "./drill-index";
 
 /** A request to open a detail modal for one transcript event. Threaded from the feed up to the view that
@@ -109,18 +110,11 @@ function Thinking({ text }: { text: string }) {
   );
 }
 
-const TOOL_STATUS: Record<ToolEvent["status"], { char: string; tone: string }> =
-  {
-    ok: { char: "✓", tone: "text-ok" },
-    error: { char: "✕", tone: "text-danger" },
-    pending: { char: "●", tone: "text-working-bright" },
-  };
-
 /** A one-line tool turn: a per-tool glyph, the tool name, the summarized input, then a status shape and
  *  the output size. When `onOpen` is given the whole row is a button (with a drill chevron) that opens
  *  the detail modal; without it the row is a plain, non-interactive line (the subagent drill view). */
 function ToolCall({ tool, onOpen }: { tool: ToolEvent; onOpen?: () => void }) {
-  const st = TOOL_STATUS[tool.status];
+  const st = TURN_STATUS[tool.status];
   const size =
     tool.status === "pending"
       ? "running…"
@@ -167,6 +161,7 @@ function ToolCall({ tool, onOpen }: { tool: ToolEvent; onOpen?: () => void }) {
  *  When `onOpen` is given the whole row is a button (with a drill chevron) that opens the diff modal;
  *  without it the row is a plain, non-interactive line (the subagent drill view). */
 function DiffRow({ diff, onOpen }: { diff: DiffEvent; onOpen?: () => void }) {
+  const st = TURN_STATUS[diff.status];
   const base =
     "ml-8 max-w-[85%] flex items-center gap-2 rounded-lg border border-ink-800 bg-well px-3 py-1.5 font-mono text-[11px]";
   const body = (
@@ -179,6 +174,7 @@ function DiffRow({ diff, onOpen }: { diff: DiffEvent; onOpen?: () => void }) {
       <span className="shrink-0 text-primary-bright">{diff.tool}</span>
       <span className="truncate text-fg-faint">{diff.file}</span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
+        <span className={st.tone}>{st.char}</span>
         <span className="text-ok">+{diff.hunk.added.length}</span>
         <span className="text-danger">−{diff.hunk.removed.length}</span>
         {onOpen && (

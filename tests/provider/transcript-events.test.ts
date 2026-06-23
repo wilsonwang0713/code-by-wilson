@@ -123,6 +123,7 @@ describe("parseTranscriptEvents — events", () => {
         tool: "Edit",
         file: "a.ts",
         hunk: { removed: ["a", "b"], added: ["a", "c"] },
+        status: "pending",
       },
     ]);
   });
@@ -150,6 +151,7 @@ describe("parseTranscriptEvents — events", () => {
         tool: "Write",
         file: "new.ts",
         hunk: { removed: [], added: ["x", "y"] },
+        status: "pending",
       },
     ]);
   });
@@ -183,6 +185,7 @@ describe("parseTranscriptEvents — events", () => {
         tool: "MultiEdit",
         file: "m.ts",
         hunk: { removed: ["o1", "o2"], added: ["n1", "n2"] },
+        status: "pending",
       },
     ]);
   });
@@ -443,6 +446,83 @@ describe("parseTranscriptEvents — events", () => {
       "pending",
       "ok",
     ]);
+  });
+
+  it("back-patches an edit to error when its result fails (e.g. no match)", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "e1",
+                name: "Edit",
+                input: { file_path: "a.ts", old_string: "x", new_string: "y" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "e1",
+                is_error: true,
+                content: "String to replace not found in file.",
+              },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events[0]).toMatchObject({
+      kind: "diff",
+      tool: "Edit",
+      status: "error",
+    });
+  });
+
+  it("back-patches an edit to ok when its result lands without error", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "w1",
+                name: "Write",
+                input: { file_path: "new.ts", content: "x" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "w1",
+                content: "File created",
+              },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events[0]).toMatchObject({ kind: "diff", status: "ok" });
   });
 });
 

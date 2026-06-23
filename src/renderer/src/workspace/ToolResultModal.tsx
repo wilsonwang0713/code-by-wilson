@@ -4,8 +4,9 @@ import { ModalShell } from "../ui/ModalShell";
 import { Icon } from "../ui/icons";
 import { cx } from "../ui/atoms";
 import { toolIcon } from "./tool-icon";
-import { ansiToSpans } from "./panels/ansi-to-html";
-import { ansiClass } from "./panels/shell-view";
+import { AnsiLine } from "./panels/AnsiLine";
+import { TURN_STATUS } from "./turn-status";
+import { POLL_MS } from "./use-polled-read";
 
 type Loaded = Extract<ToolResultDetail, { found: true }>;
 type FetchState =
@@ -13,41 +14,10 @@ type FetchState =
   | { phase: "error" }
   | { phase: "ready"; detail: Loaded };
 
-const STATUS_LABEL: Record<
-  ToolEvent["status"],
-  { text: string; tone: string }
-> = {
-  ok: { text: "✓ passed", tone: "text-ok" },
-  error: { text: "✕ failed", tone: "text-danger" },
-  pending: { text: "running", tone: "text-working-bright" },
-};
-
-/** One output line's ANSI spans, mirroring ShellLog's Line so the command's own colors come through. */
-function OutLine({ text }: { text: string }) {
-  const spans = ansiToSpans(text);
-  return (
-    <div className="whitespace-pre-wrap break-words">
-      {spans.length === 0
-        ? " "
-        : spans.map((s, i) => (
-            <span
-              key={i}
-              className={cx(
-                s.fg && ansiClass(s.fg, s.bright),
-                s.bold && "font-semibold",
-                s.dim && "opacity-60",
-              )}
-            >
-              {s.text}
-            </span>
-          ))}
-    </div>
-  );
-}
-
 /** The detail modal for one tool turn: a pinned command bar (with copy) and the complete output rendered
- *  with ANSI color. Header + status render instantly from the row event; the command and output are
- *  fetched on open via getToolResult. No output cap — the body scrolls. */
+ *  with ANSI color. The header renders instantly from the row event; command, output, and the
+ *  authoritative status are fetched on open via getToolResult and re-polled while the call is still
+ *  running, so an open modal fills in when its tool finishes. No output cap — the body scrolls. */
 export function ToolResultModal({
   sessionId,
   agentId,
@@ -63,22 +33,38 @@ export function ToolResultModal({
 
   useEffect(() => {
     let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setState({ phase: "loading" });
-    window.api
-      .getToolResult(sessionId, tool.toolUseId, agentId)
-      .then((r) => {
-        if (!live) return;
-        setState(r.found ? { phase: "ready", detail: r } : { phase: "error" });
-      })
-      .catch(() => {
-        if (live) setState({ phase: "error" });
-      });
+    const tick = () => {
+      window.api
+        .getToolResult(sessionId, tool.toolUseId, agentId)
+        .then((r) => {
+          if (!live) return;
+          if (!r.found) {
+            setState({ phase: "error" });
+            return;
+          }
+          setState({ phase: "ready", detail: r });
+          // The call was still running when we read it; re-poll so its output and final status fill in
+          // while the modal stays open, instead of freezing on the open-time snapshot.
+          if (r.status === "pending") timer = setTimeout(tick, POLL_MS);
+        })
+        .catch(() => {
+          if (live) setState({ phase: "error" });
+        });
+    };
+    tick();
     return () => {
       live = false;
+      if (timer) clearTimeout(timer);
     };
   }, [sessionId, agentId, tool.toolUseId]);
 
-  const status = STATUS_LABEL[tool.status];
+  // Status comes from the fetched result once loaded — it's the on-disk truth and outlives the row
+  // event's status, which is a poll behind. Fall back to the row's status only while the first read is
+  // in flight.
+  const status =
+    TURN_STATUS[state.phase === "ready" ? state.detail.status : tool.status];
   const command = state.phase === "ready" ? state.detail.command : tool.input;
   const copy = (text: string) => void window.api.clipboardWriteText(text);
 
@@ -99,7 +85,9 @@ export function ToolResultModal({
         />
         <span className="font-semibold text-primary-bright">{tool.name}</span>
         <span className="text-ink-700">·</span>
-        <span className={cx("font-mono", status.tone)}>{status.text}</span>
+        <span className={cx("font-mono", status.tone)}>
+          {status.char} {status.label}
+        </span>
       </div>
 
       <div className="flex items-start gap-2 rounded-md border border-ink-800 bg-well px-3 py-2 font-mono text-[11px]">
@@ -128,14 +116,15 @@ export function ToolResultModal({
         {state.phase === "ready" &&
           (state.detail.output === "" ? (
             <span className="text-fg-faint">
-              {tool.status === "pending"
+              {state.detail.status === "pending"
                 ? "Running — no output yet."
                 : "no output"}
             </span>
           ) : (
             state.detail.output
+              .replace(/\n$/, "")
               .split("\n")
-              .map((line, i) => <OutLine key={i} text={line} />)
+              .map((line, i) => <AnsiLine key={i} text={line} />)
           ))}
       </div>
 

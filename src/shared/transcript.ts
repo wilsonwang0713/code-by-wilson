@@ -55,7 +55,15 @@ export type TranscriptEvent =
       /** Exact line count of the captured output, 0 when empty or still pending. */
       outputLines: number;
     }
-  | { kind: "diff"; tool: string; file: string; hunk: DiffHunk }
+  | {
+      kind: "diff";
+      tool: string;
+      file: string;
+      hunk: DiffHunk;
+      /** Resolved from the tool_result's error flag, like the tool variant: "ok" the edit applied,
+       *  "error" it failed (e.g. old_string not found), "pending" no result yet. */
+      status: "ok" | "error" | "pending";
+    }
   | {
       kind: "subagent";
       agentType: string;
@@ -111,7 +119,14 @@ export type TranscriptRead =
   | ReadSettled;
 
 /** The on-demand detail behind a tool row: the full command, the complete captured output, and the
- *  result's error flag. `found: false` when the transcript moved or the id has no tool_use block. */
+ *  status read from the result block ("pending" when the result hasn't landed yet). Read fresh from disk
+ *  on each fetch, so the modal trusts this over the row event's status, which can lag a poll behind.
+ *  `found: false` when the transcript moved or the id has no tool_use block. */
 export type ToolResultDetail =
-  | { found: true; command: string; output: string; isError: boolean }
+  | {
+      found: true;
+      command: string;
+      output: string;
+      status: "ok" | "error" | "pending";
+    }
   | { found: false };

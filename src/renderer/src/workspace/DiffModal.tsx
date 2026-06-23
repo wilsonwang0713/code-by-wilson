@@ -1,7 +1,9 @@
 import type { DiffEvent } from "@shared/transcript";
 import { ModalShell } from "../ui/ModalShell";
 import { Icon } from "../ui/icons";
+import { cx } from "../ui/atoms";
 import { toolIcon } from "./tool-icon";
+import { TURN_STATUS } from "./turn-status";
 
 /** The detail modal for one edit (Edit / Write / MultiEdit): a header with the tool, file, and change
  *  counts, then the full hunk as red removed / green added lines. The hunk is already on the event, so
@@ -14,6 +16,7 @@ export function DiffModal({
   onClose: () => void;
 }) {
   const empty = diff.hunk.removed.length === 0 && diff.hunk.added.length === 0;
+  const st = TURN_STATUS[diff.status];
   const copy = () => {
     const patch = [
       ...diff.hunk.removed.map((l) => `- ${l}`),
@@ -34,6 +37,10 @@ export function DiffModal({
           className="shrink-0 text-primary-bright"
         />
         <span className="font-semibold text-primary-bright">{diff.tool}</span>
+        <span className="text-ink-700">·</span>
+        <span className={cx("font-mono", st.tone)}>
+          {st.char} {st.label}
+        </span>
         <span className="text-ink-700">·</span>
         <span className="truncate font-mono text-fg-muted">{diff.file}</span>
         <span className="ml-auto shrink-0 font-mono text-[11px]">
