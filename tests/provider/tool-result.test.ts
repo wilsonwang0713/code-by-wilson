@@ -125,4 +125,25 @@ describe("extractToolResult", () => {
       command: "src/a.ts",
     });
   });
+
+  it("falls back to pretty JSON for a tool with no telling field", () => {
+    const structured = rows({
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "s1",
+            name: "TodoWrite",
+            input: { todos: [{ content: "ship it", status: "pending" }] },
+          },
+        ],
+      },
+    });
+    const r = extractToolResult(structured, "s1");
+    expect(r.found).toBe(true);
+    expect(r.found && r.command.startsWith("{")).toBe(true);
+    expect(r.found && r.command).toContain("todos");
+  });
 });

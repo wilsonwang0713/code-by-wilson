@@ -1,5 +1,6 @@
 import type {
   DiffHunk,
+  ToolEvent,
   TranscriptDoc,
   TranscriptEvent,
   TurnSummary,
@@ -76,10 +77,7 @@ export function parseTranscriptEventsFromRows(
   const tail = createTailTracker();
   // Generic tool events keyed by tool_use id, so the matching tool_result (a later user row) can set
   // their status and output line count. Diff/subagent tools take other branches and aren't tracked here.
-  const toolById = new Map<
-    string,
-    Extract<TranscriptEvent, { kind: "tool" }>
-  >();
+  const toolById = new Map<string, ToolEvent>();
 
   // Timeline accumulators. `open` is the turn being built (a user prompt and the assistant work up to
   // the next prompt); finalized into `turns` on the next prompt and at EOF.
@@ -215,7 +213,7 @@ export function parseTranscriptEventsFromRows(
             });
           } else {
             const toolUseId = typeof b.id === "string" ? b.id : "";
-            const toolEvent: Extract<TranscriptEvent, { kind: "tool" }> = {
+            const toolEvent: ToolEvent = {
               kind: "tool",
               name: b.name,
               input: summarizeInput(input),
