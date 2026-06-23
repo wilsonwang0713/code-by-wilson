@@ -197,6 +197,11 @@ export function registerIpc({
     provider.readTranscript(id, sinceMtimeMs),
   );
   ipcMain.handle(
+    IPC.getToolResult,
+    (_e, id: string, toolUseId: string, agentId?: string) =>
+      provider.getToolResult(id, toolUseId, agentId),
+  );
+  ipcMain.handle(
     IPC.readSubagentTranscript,
     (_e, id: string, agentId: string, sinceMtimeMs?: number) =>
       provider.readSubagentTranscript(id, agentId, sinceMtimeMs),

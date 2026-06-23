@@ -9,6 +9,29 @@ export function num(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+/** The input fields that name a tool call, most-telling first: a shell command, a file path, a search
+ *  pattern, a URL, a query, a description. One list so the row's input summary and the modal's command
+ *  bar can't disagree on which field identifies a tool. */
+export const TELLING_INPUT_KEYS = [
+  "command",
+  "file_path",
+  "path",
+  "pattern",
+  "url",
+  "query",
+  "description",
+] as const;
+
+/** The first telling input field that holds a non-blank string, or null when none do. Callers layer
+ *  their own fallback (the row truncates compact JSON; the modal pretty-prints the whole object). */
+export function tellingField(input: Record<string, unknown>): string | null {
+  for (const key of TELLING_INPUT_KEYS) {
+    const v = input[key];
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return null;
+}
+
 /** A user turn's text whether stored as a plain string or content blocks (text blocks only). */
 export function userText(content: unknown): string {
   if (typeof content === "string") return content;
@@ -51,6 +74,12 @@ export function parseJsonlRows(jsonl: string): any[] {
   }
   return rows;
 }
+
+/** A tool_result block's content as flat text — same shape as a user turn's content (a plain string, or
+ *  text blocks joined on newline, else ""), so this is {@link userText} under a name that reads right at
+ *  a tool_result call site. Used by the render parser (for the output line-count) and the on-demand
+ *  tool-result extractor. */
+export const toolResultText = userText;
 
 /**
  * Parse JSONL into rows tagged with their absolute 0-based line number, skipping blank and unparseable

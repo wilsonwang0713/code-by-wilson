@@ -1,30 +1,6 @@
 import type { ShellOutput } from "@shared/types";
-import { ansiToSpans } from "./ansi-to-html";
-import { ansiClass, truncLabel } from "./shell-view";
-import { cx } from "../../ui/atoms";
-
-/** Render one log line's ANSI spans. */
-function Line({ text }: { text: string }) {
-  const spans = ansiToSpans(text);
-  return (
-    <div className="whitespace-pre-wrap break-words">
-      {spans.length === 0
-        ? " "
-        : spans.map((s, i) => (
-            <span
-              key={i}
-              className={cx(
-                s.fg && ansiClass(s.fg, s.bright),
-                s.bold && "font-semibold",
-                s.dim && "opacity-60",
-              )}
-            >
-              {s.text}
-            </span>
-          ))}
-    </div>
-  );
-}
+import { truncLabel } from "./shell-view";
+import { AnsiLine } from "./AnsiLine";
 
 /** A shell's full output: a source banner (live vs snapshot), an optional truncation note, then the log
  *  rendered with ANSI color. A pure renderer of the `output` it's handed (the poll lives in the hook). */
@@ -59,7 +35,7 @@ export function ShellLog({
       </div>
       <div className="min-h-0 flex-1 overflow-auto bg-well p-4 font-mono text-[11px] leading-relaxed text-fg-muted">
         {output.text.split("\n").map((line, i) => (
-          <Line key={i} text={line} />
+          <AnsiLine key={i} text={line} />
         ))}
       </div>
     </div>

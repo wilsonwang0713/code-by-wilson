@@ -9,6 +9,7 @@ import { Icon } from "../ui/icons";
 import { useCopyFlash } from "../ui/use-copy-flash";
 import { Tabs } from "../ui/Tabs";
 import { TranscriptView } from "./TranscriptView";
+import { useTranscriptModals } from "./use-transcript-modals";
 import { TerminalView } from "../terminal/TerminalView";
 import { useTranscript, type DocState } from "./use-transcript";
 import { ContextPanel } from "./panels/ContextPanel";
@@ -267,6 +268,7 @@ function CenterView({
         onNavigate={onNavigate}
         doc={subagentDoc}
         dispatchDrill={dispatchDrill}
+        sessionId={s.id}
       />
     ) : null;
   const drilled = drill.length > 0;
@@ -372,6 +374,7 @@ function RenderedTranscript({
   dispatchDrill?: DispatchDrill;
 }) {
   const readOnly = s.management === "observed";
+  const { onOpen, modals } = useTranscriptModals(s.id);
   return (
     <OverlayScroll className="h-full">
       <TranscriptView
@@ -379,7 +382,9 @@ function RenderedTranscript({
         state={s.state}
         readOnly={readOnly}
         dispatchDrill={dispatchDrill}
+        onOpen={onOpen}
       />
+      {modals}
     </OverlayScroll>
   );
 }

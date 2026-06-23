@@ -1,5 +1,7 @@
 import type {
+  DiffEvent,
   DiffHunk,
+  ToolEvent,
   TranscriptDoc,
   TranscriptEvent,
   TurnSummary,
@@ -9,7 +11,12 @@ import {
   promptLabel,
   stripCommandEnvelope,
 } from "./command-envelope";
-import { parseJsonlRows, userText } from "./transcript-row";
+import {
+  parseJsonlRows,
+  userText,
+  toolResultText,
+  tellingField,
+} from "./transcript-row";
 import { createTailTracker } from "./transcript-tail";
 
 /** Tools whose edit we render as a diff rather than a generic tool call. */
@@ -24,18 +31,8 @@ function lines(s: unknown): string[] {
 
 /** A short, human label for a tool call's input: the most telling field, else compact JSON. */
 function summarizeInput(input: Record<string, unknown>): string {
-  for (const key of [
-    "command",
-    "file_path",
-    "path",
-    "pattern",
-    "url",
-    "query",
-    "description",
-  ]) {
-    const v = input[key];
-    if (typeof v === "string" && v.trim()) return v;
-  }
+  const field = tellingField(input);
+  if (field !== null) return field;
   try {
     const json = JSON.stringify(input);
     return json.length > 200 ? json.slice(0, 199) + "…" : json;
@@ -74,6 +71,10 @@ export function parseTranscriptEventsFromRows(
   const { includeSidechain = false } = opts;
   const events: TranscriptEvent[] = [];
   const tail = createTailTracker();
+  // Tool and edit (diff) events keyed by tool_use id, so the matching tool_result (a later user row) can
+  // back-patch their status — and, for tool events, the output line count. Subagent dispatches resolve
+  // their own way and aren't tracked here.
+  const byToolUseId = new Map<string, ToolEvent | DiffEvent>();
 
   // Timeline accumulators. `open` is the turn being built (a user prompt and the assistant work up to
   // the next prompt); finalized into `turns` on the next prompt and at EOF.
@@ -120,8 +121,19 @@ export function parseTranscriptEventsFromRows(
     if (row.type === "user") {
       if (Array.isArray(content)) {
         for (const b of content) {
-          if (b?.type === "tool_result" && typeof b.tool_use_id === "string")
+          if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
             tail.resolveToolResult(b.tool_use_id);
+            const ev = byToolUseId.get(b.tool_use_id);
+            if (ev) {
+              ev.status = b.is_error === true ? "error" : "ok";
+              if (ev.kind === "tool") {
+                const text = toolResultText(b.content);
+                ev.outputLines = text
+                  ? text.replace(/\n$/, "").split("\n").length
+                  : 0;
+              }
+            }
+          }
         }
       }
       if (row.isMeta) {
@@ -192,18 +204,28 @@ export function parseTranscriptEventsFromRows(
               toolUseId: typeof b.id === "string" ? b.id : "",
             });
           } else if (DIFF_TOOLS.has(b.name)) {
-            events.push({
+            const toolUseId = typeof b.id === "string" ? b.id : "";
+            const diffEvent: DiffEvent = {
               kind: "diff",
               tool: b.name,
               file: typeof input.file_path === "string" ? input.file_path : "",
               hunk: diffHunk(b.name, input),
-            });
+              status: "pending",
+            };
+            events.push(diffEvent);
+            if (toolUseId) byToolUseId.set(toolUseId, diffEvent);
           } else {
-            events.push({
+            const toolUseId = typeof b.id === "string" ? b.id : "";
+            const toolEvent: ToolEvent = {
               kind: "tool",
               name: b.name,
               input: summarizeInput(input),
-            });
+              toolUseId,
+              status: "pending",
+              outputLines: 0,
+            };
+            events.push(toolEvent);
+            if (toolUseId) byToolUseId.set(toolUseId, toolEvent);
           }
           if (typeof b.id === "string") tail.noteToolUse(b.id, b.name, input);
         }

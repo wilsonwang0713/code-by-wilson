@@ -85,7 +85,14 @@ describe("parseTranscriptEvents — events", () => {
       }),
     );
     expect(events).toEqual([
-      { kind: "tool", name: "Bash", input: "pnpm test" },
+      {
+        kind: "tool",
+        name: "Bash",
+        input: "pnpm test",
+        toolUseId: "t1",
+        status: "pending",
+        outputLines: 0,
+      },
     ]);
   });
 
@@ -116,6 +123,7 @@ describe("parseTranscriptEvents — events", () => {
         tool: "Edit",
         file: "a.ts",
         hunk: { removed: ["a", "b"], added: ["a", "c"] },
+        status: "pending",
       },
     ]);
   });
@@ -143,6 +151,7 @@ describe("parseTranscriptEvents — events", () => {
         tool: "Write",
         file: "new.ts",
         hunk: { removed: [], added: ["x", "y"] },
+        status: "pending",
       },
     ]);
   });
@@ -176,6 +185,7 @@ describe("parseTranscriptEvents — events", () => {
         tool: "MultiEdit",
         file: "m.ts",
         hunk: { removed: ["o1", "o2"], added: ["n1", "n2"] },
+        status: "pending",
       },
     ]);
   });
@@ -272,7 +282,16 @@ describe("parseTranscriptEvents — events", () => {
         },
       }),
     );
-    expect(events).toEqual([{ kind: "tool", name: "Bash", input: "ls" }]);
+    expect(events).toEqual([
+      {
+        kind: "tool",
+        name: "Bash",
+        input: "ls",
+        toolUseId: "",
+        status: "pending",
+        outputLines: 0,
+      },
+    ]);
   });
 
   it("skips meta user turns and tool_result-only user turns", () => {
@@ -308,6 +327,202 @@ describe("parseTranscriptEvents — events", () => {
       '{"type":"user","isMeta":false,"message":{"role":"user","content":"hi"}}\n{ broken',
     );
     expect(events).toEqual([{ kind: "user", text: "hi" }]);
+  });
+
+  it("back-patches a tool to ok with an output line count when its result lands", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "Bash",
+                input: { command: "ls" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "t1", content: "a\nb\nc\n" },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events).toEqual([
+      {
+        kind: "tool",
+        name: "Bash",
+        input: "ls",
+        toolUseId: "t1",
+        status: "ok",
+        outputLines: 3,
+      },
+    ]);
+  });
+
+  it("marks a tool error when its result carries is_error", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "Bash",
+                input: { command: "false" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "t1",
+                is_error: true,
+                content: "boom",
+              },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events[0]).toMatchObject({ status: "error", outputLines: 1 });
+  });
+
+  it("patches each tool independently and leaves unmatched results alone", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "t1",
+                name: "Bash",
+                input: { command: "one" },
+              },
+              {
+                type: "tool_use",
+                id: "t2",
+                name: "Bash",
+                input: { command: "two" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "t2", content: "done" },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events.map((e) => e.kind === "tool" && e.status)).toEqual([
+      "pending",
+      "ok",
+    ]);
+  });
+
+  it("back-patches an edit to error when its result fails (e.g. no match)", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "e1",
+                name: "Edit",
+                input: { file_path: "a.ts", old_string: "x", new_string: "y" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "e1",
+                is_error: true,
+                content: "String to replace not found in file.",
+              },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events[0]).toMatchObject({
+      kind: "diff",
+      tool: "Edit",
+      status: "error",
+    });
+  });
+
+  it("back-patches an edit to ok when its result lands without error", () => {
+    const { events } = parseTranscriptEvents(
+      jsonl(
+        {
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "w1",
+                name: "Write",
+                input: { file_path: "new.ts", content: "x" },
+              },
+            ],
+          },
+        },
+        {
+          type: "user",
+          isMeta: false,
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "w1",
+                content: "File created",
+              },
+            ],
+          },
+        },
+      ),
+    );
+    expect(events[0]).toMatchObject({ kind: "diff", status: "ok" });
   });
 });
 
