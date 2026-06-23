@@ -7,6 +7,7 @@ import { toolIcon } from "./tool-icon";
 import { AnsiLine } from "./panels/AnsiLine";
 import { TURN_STATUS } from "./turn-status";
 import { POLL_MS } from "./use-polled-read";
+import { useCopyFlash } from "../ui/use-copy-flash";
 
 type Loaded = Extract<ToolResultDetail, { found: true }>;
 type FetchState =
@@ -66,7 +67,8 @@ export function ToolResultModal({
   const status =
     TURN_STATUS[state.phase === "ready" ? state.detail.status : tool.status];
   const command = state.phase === "ready" ? state.detail.command : tool.input;
-  const copy = (text: string) => void window.api.clipboardWriteText(text);
+  const cmd = useCopyFlash(command);
+  const out = useCopyFlash(state.phase === "ready" ? state.detail.output : "");
 
   return (
     <ModalShell
@@ -96,10 +98,15 @@ export function ToolResultModal({
         </pre>
         <button
           type="button"
-          onClick={() => copy(command)}
-          className="shrink-0 rounded border border-ink-700 px-2 py-0.5 text-[10px] text-fg-muted hover:border-ink-600 hover:text-fg"
+          onClick={cmd.copy}
+          className={cx(
+            "shrink-0 rounded border px-2 py-0.5 text-[10px] transition-colors",
+            cmd.copied
+              ? "border-ink-600 text-fg"
+              : "border-ink-700 text-fg-muted hover:border-ink-600 hover:text-fg",
+          )}
         >
-          Copy
+          {cmd.copied ? "Copied" : "Copy"}
         </button>
       </div>
 
@@ -132,10 +139,15 @@ export function ToolResultModal({
         <button
           type="button"
           disabled={state.phase !== "ready"}
-          onClick={() => state.phase === "ready" && copy(state.detail.output)}
-          className="rounded border border-ink-700 px-2 py-0.5 text-fg-muted hover:border-ink-600 hover:text-fg disabled:opacity-40"
+          onClick={out.copy}
+          className={cx(
+            "rounded border px-2 py-0.5 transition-colors disabled:opacity-40",
+            out.copied
+              ? "border-ink-600 text-fg"
+              : "border-ink-700 text-fg-muted hover:border-ink-600 hover:text-fg",
+          )}
         >
-          Copy output
+          {out.copied ? "Copied" : "Copy output"}
         </button>
         <span className="ml-auto">Esc to close</span>
       </div>
