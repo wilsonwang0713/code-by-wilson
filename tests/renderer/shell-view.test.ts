@@ -130,4 +130,12 @@ describe("shellMetaSegments", () => {
       ),
     ).toEqual(["elapsed 18s", "run in background"]);
   });
+  it("a killed shell omits its signal-derived exit code, matching the row", () => {
+    expect(
+      shellMetaSegments(
+        { status: "killed", exitCode: 137, durationMs: 5000, trigger: "user" },
+        1000,
+      ),
+    ).toEqual(["5s", "Ctrl-B"]);
+  });
 });

@@ -17,20 +17,24 @@ export function shellGlyph(
     : { char: "✓", tone: "text-ok" };
 }
 
-/** The status pill for the drilled-in shell header: the row glyph, a one-word status label, and the cbw
- *  tone class. The pill carries the only color in the header, matched to the list-row glyph the user
- *  drilled from. */
+/** The status pill for the drilled-in shell header: the row glyph + tone (reused straight from shellGlyph,
+ *  so the pill can never drift from the list-row glyph the user drilled from) plus a one-word status label.
+ *  The pill carries the only color in the header. */
 export function shellStatusPill(
   shell: Pick<BackgroundShell, "status" | "exitCode">,
 ): { glyph: string; label: string; tone: string } {
-  if (shell.status === "running")
-    return { glyph: "●", label: "running", tone: "text-working-bright" };
-  if (shell.status === "killed")
-    return { glyph: "■", label: "killed", tone: "text-fg-faint" };
-  // completed: a non-zero exit reads failed (0 and undefined both read clean), matching shellGlyph.
-  return shell.exitCode
-    ? { glyph: "✕", label: "failed", tone: "text-danger" }
-    : { glyph: "✓", label: "completed", tone: "text-ok" };
+  const { char, tone } = shellGlyph(shell);
+  // Glyph and tone are shellGlyph's; only the words are the pill's own. completed splits failed/clean on
+  // the exit the same way shellGlyph splits ✕/✓ (0 and undefined both read clean).
+  const label =
+    shell.status === "running"
+      ? "running"
+      : shell.status === "killed"
+        ? "killed"
+        : shell.exitCode
+          ? "failed"
+          : "completed";
+  return { glyph: char, label, tone };
 }
 
 /** The Bash-background trigger in words, for the header meta row. */
@@ -45,9 +49,10 @@ export function triggerLabel(trigger: BackgroundShell["trigger"]): string {
   }
 }
 
-/** The header meta segments, in order: exit code (once known), duration — or `elapsed <n>` while still
- *  running — then the human trigger. Each is dropped when its field is absent, so a running shell with no
- *  duration yields just `elapsed …` + trigger and no dangling separator. The caller joins with " · ". */
+/** The header meta segments, in order: exit code (completed shells only, matching the list row — a killed
+ *  shell reads "killed", never its signal-derived code), duration — or `elapsed <n>` while still running —
+ *  then the human trigger. Each is dropped when its field is absent, so a running shell with no duration
+ *  yields just `elapsed …` + trigger and no dangling separator. The caller joins with " · ". */
 export function shellMetaSegments(
   shell: Pick<
     BackgroundShell,
@@ -56,7 +61,8 @@ export function shellMetaSegments(
   now: number,
 ): string[] {
   const segs: string[] = [];
-  if (shell.exitCode !== undefined) segs.push(`exit ${shell.exitCode}`);
+  if (shell.status === "completed" && shell.exitCode !== undefined)
+    segs.push(`exit ${shell.exitCode}`);
   if (shell.status === "running" && shell.startMs !== undefined)
     segs.push(`elapsed ${formatDuration(now - shell.startMs)}`);
   else if (shell.durationMs !== undefined)
