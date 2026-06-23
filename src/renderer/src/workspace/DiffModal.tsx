@@ -2,7 +2,6 @@ import type { DiffEvent } from "@shared/transcript";
 import { ModalShell } from "../ui/ModalShell";
 import { Icon } from "../ui/icons";
 import { cx } from "../ui/atoms";
-import { CopyButton } from "../ui/CopyButton";
 import { useCopyFlash } from "../ui/use-copy-flash";
 import { toolIcon } from "./tool-icon";
 import { TURN_STATUS } from "./turn-status";
@@ -26,6 +25,7 @@ export function DiffModal({
     ...diff.hunk.added.map((l) => `+ ${l}`),
   ].join("\n");
   const { copied, copy } = useCopyFlash(patch);
+  const pathCopy = useCopyFlash(diff.file);
   return (
     <ModalShell
       labelledBy="diff-title"
@@ -59,7 +59,18 @@ export function DiffModal({
             <span className="text-ok">+{diff.hunk.added.length}</span>{" "}
             <span className="text-danger">−{diff.hunk.removed.length}</span>
           </span>
-          <CopyButton value={diff.file} label="Copy path" />
+          <button
+            type="button"
+            onClick={pathCopy.copy}
+            className={cx(
+              "mt-0.5 shrink-0 rounded border px-2 py-0.5 text-[10px] transition-colors",
+              pathCopy.copied
+                ? "border-ink-600 text-fg"
+                : "border-ink-700 text-fg-muted hover:border-ink-600 hover:text-fg",
+            )}
+          >
+            {pathCopy.copied ? "Copied" : "Copy path"}
+          </button>
         </div>
       </div>
 
