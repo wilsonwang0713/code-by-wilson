@@ -1,7 +1,7 @@
 import { ShellLog } from "./panels/ShellLog";
 import type { ShellOutputState } from "./use-shell-output";
 
-/** The drilled-in background-shell surface: a breadcrumb (Session › <command>, read-only) above the full
+/** The drilled-in background-shell surface: a breadcrumb (Session › <command>) above the full
  *  output log. A pure renderer of the `output` it's handed — the poll is lifted to WorkspaceBody so it
  *  survives the Managed tab toggle. Always read-only; cbw never controls a shell. */
 export function ShellDrill({
@@ -29,9 +29,6 @@ export function ShellDrill({
           title={label}
         >
           {label}
-        </span>
-        <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-accent/40 px-2 py-0.5 text-[9px] uppercase tracking-wider text-accent-bright">
-          ● Read-only shell
         </span>
       </div>
       <div className="min-h-0 flex-1">
