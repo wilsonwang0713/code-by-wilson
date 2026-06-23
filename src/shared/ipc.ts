@@ -6,7 +6,11 @@ import type {
   BackgroundShell,
   ShellOutput,
 } from "./types";
-import type { TranscriptRead, ReadSettled } from "./transcript";
+import type {
+  TranscriptRead,
+  ReadSettled,
+  ToolResultDetail,
+} from "./transcript";
 import type { TerminalApi } from "./terminal";
 import type { MetricsRead } from "./metrics";
 import type { ModelDefaults } from "./models";
@@ -32,6 +36,7 @@ export const IPC = {
   openIn: "shell:openIn",
   clipboardWriteText: "clipboard:writeText",
   renameSession: "session:rename",
+  getToolResult: "toolResult:get",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -152,6 +157,9 @@ export interface IpcApi {
    *  reverting to the derived/live name), then return the fresh overview with the override applied.
    *  Both overview() and refresh() also carry the override, since it is applied in overviewNow(). */
   renameSession(id: string, title: string | null): Promise<OverviewData>;
+  /** Fetch one tool call's full command + output on demand (the tool turn's detail modal). Not polled;
+   *  a one-shot read keyed by the tool_use id. */
+  getToolResult(id: string, toolUseId: string): Promise<ToolResultDetail>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */

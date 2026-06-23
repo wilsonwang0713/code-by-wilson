@@ -3,7 +3,7 @@ import type {
   PersistedSession,
   SessionCandidate,
 } from "@shared/types";
-import type { TranscriptRead } from "@shared/transcript";
+import type { TranscriptRead, ToolResultDetail } from "@shared/transcript";
 import type { TaskRead, ShellsRead, ShellOutputRead } from "@shared/ipc";
 import type { MetricsRead } from "@shared/metrics";
 
@@ -23,6 +23,10 @@ export interface Provider {
    *  workspace view. `sinceMtimeMs` is the change token from the caller's last read; when it still
    *  matches, the result is `unchanged` and no file is read or parsed. */
   readTranscript(id: string, sinceMtimeMs?: number): TranscriptRead;
+  /** Read one tool call's full command + output on demand — the read behind opening a tool turn's
+   *  detail modal. Unkeyed by a change token: a one-shot fetch, not polled. Returns `{ found: false }`
+   *  when the transcript moved or the id has no tool_use block. */
+  getToolResult(id: string, toolUseId: string): ToolResultDetail;
   /** Read one subagent's own transcript (its sidechain file) into render-ready events — the on-demand
    *  read behind drilling into a Subagent lane. `sinceMtimeMs` is the change token (the subagent file's
    *  mtime) from the caller's last read; an unchanged token skips the read. Mirrors readTranscript's

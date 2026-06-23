@@ -105,3 +105,9 @@ export type ReadSettled =
 export type TranscriptRead =
   | { status: "changed"; mtimeMs: number; doc: TranscriptDoc }
   | ReadSettled;
+
+/** The on-demand detail behind a tool row: the full command, the complete captured output, and the
+ *  result's error flag. `found: false` when the transcript moved or the id has no tool_use block. */
+export type ToolResultDetail =
+  | { found: true; command: string; output: string; isError: boolean }
+  | { found: false };

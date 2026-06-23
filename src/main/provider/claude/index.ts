@@ -10,6 +10,7 @@ import {
   restate,
 } from "./discover";
 import { parseTranscriptEventsFromRows } from "./transcript-events";
+import { extractToolResult } from "./tool-result";
 import { parseJsonlRows } from "./transcript-row";
 import {
   buildSubagentForest,
@@ -294,6 +295,19 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         // summarize does: report an error so the view keeps its last doc, rather than rejecting the
         // IPC or masquerading as "no transcript".
         return { status: "error" };
+      }
+    },
+    getToolResult: (id, toolUseId) => {
+      try {
+        const resolved = resolveTranscript(id);
+        if (!resolved) return { found: false };
+        const jsonl = readTextOrNull(resolved.path);
+        if (jsonl === null) return { found: false };
+        return extractToolResult(parseJsonlRows(jsonl), toolUseId);
+      } catch {
+        // A transient read failure (EACCES, EIO) reads as "couldn't load" in the modal, like the other
+        // provider reads degrade rather than reject the IPC.
+        return { found: false };
       }
     },
     readSubagentTranscript: (id, agentId, sinceMtimeMs) => {

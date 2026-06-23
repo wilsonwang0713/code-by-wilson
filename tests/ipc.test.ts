@@ -58,6 +58,7 @@ const provider = (listCandidates: Provider["listCandidates"]): Provider => ({
   readMetrics: () => ({ status: "absent" }),
   resolveAdoptTarget: () => null,
   resolveSessionCwd: () => null,
+  getToolResult: () => ({ found: false }),
 });
 
 describe("registerIpc refresh", () => {

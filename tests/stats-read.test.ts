@@ -61,6 +61,7 @@ const provider: Provider = {
   readMetrics: () => ({ status: "absent" }),
   resolveAdoptTarget: () => null,
   resolveSessionCwd: () => null,
+  getToolResult: () => ({ found: false }),
 };
 
 describe("registerIpc stats:read", () => {
