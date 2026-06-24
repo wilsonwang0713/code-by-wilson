@@ -21,6 +21,7 @@ import {
   type CalendarDay,
   DEFAULT_RANGE,
   emptySnapshot,
+  equivOf,
   tokensOf,
   isDayRange,
   rangeWindow,
@@ -62,6 +63,20 @@ import {
   type SessionSort,
   type SessionSortKey,
 } from "./session-sort";
+
+/** A row's Equivalent API value as a display string under the page cache pill: the formatted USD, or "n/a"
+ *  when the row ran no recognized model (equivOf null). One spelling for every equiv cell — the headline,
+ *  the calendar tooltip, the daily Total, the session table — so the n/a wording can't drift. */
+function equivLabel(
+  row: {
+    equivApiValueUsd: number | null;
+    equivApiValueFreshUsd: number | null;
+  },
+  includeCache: boolean,
+): string {
+  const v = equivOf(row, includeCache);
+  return v == null ? "n/a" : formatUsd(v);
+}
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -452,7 +467,7 @@ function Contributions({
       if (!d) return 0;
       if (metric === "turns") return d.turns;
       if (metric === "tokens") return tokensOf(d, includeCache);
-      return d.equivApiValueUsd ?? 0;
+      return equivOf(d, includeCache) ?? 0;
     },
     [byDay, metric, includeCache],
   );
@@ -495,7 +510,8 @@ function Contributions({
     }
     if (metric === "tokens")
       return `${formatTokensShort(d ? tokensOf(d, includeCache) : 0)} tokens`;
-    return d?.equivApiValueUsd == null ? "n/a" : formatUsd(d.equivApiValueUsd);
+    if (!d) return "n/a";
+    return equivLabel(d, includeCache);
   };
   const renderTooltip = (day: string): ReactNode => (
     <div className="flex flex-col gap-0.5">
@@ -650,7 +666,7 @@ function KpiStrip({
       </KpiCard>
       <KpiCard
         label="Equiv API value"
-        value={formatUsd(totals.equivApiValueUsd)}
+        value={formatUsd(equivOf(totals, includeCache) ?? 0)}
       >
         <div className="mt-2 flex items-center gap-1 text-[10px] text-fg-faint">
           <span>reference, not money owed</span>
@@ -782,11 +798,13 @@ function DailyUsage({
     return m;
   });
 
-  // Per-day model → Equivalent API value, so a tooltip model row can pull its cost in O(1) (null for an
-  // unrecognized model). Mirrors perDayModel, which carries the same models' tokens.
+  // Per-day model → Equivalent API value under the page cache pill (all kinds on, fresh input+output off,
+  // via equivOf), so a tooltip model row pulls its cost in O(1) and the rows sum to the Total under the same
+  // toggle. null for an unrecognized model. Mirrors perDayModel, which carries the same models' tokens.
   const perDayModelCost = days.map((d) => {
     const m = new Map<string, number | null>();
-    for (const e of d.byModel) m.set(modelKey(e.modelRaw), e.equivApiValueUsd);
+    for (const e of d.byModel)
+      m.set(modelKey(e.modelRaw), equivOf(e, includeCache));
     return m;
   });
 
@@ -838,14 +856,14 @@ function DailyUsage({
 
   const renderTooltip = (i: number): ReactNode => {
     const d = days[i];
-    // Cost always prices every token kind over only the recognized models (the DailyBucket contract), so the
-    // tooltip cost ignores the page cache pill and the Total equals the day's equiv value shown in the
-    // calendar/headline. A kind's token count spans every model on the day, but costByKind prices only the
-    // recognized share. So on a day with unrecognized-model tokens a per-kind dollar would underprice its own
-    // row (a full token count beside a partial $). Show per-kind cost only when the day is fully priced;
-    // otherwise n/a. Per-MODEL cost stays honest (a model maps 1:1 to a price), so the model view keeps its
-    // per-row cost. Note: when cache is off the visible kind costs (input + output) won't sum to Total because
-    // Total always prices all four kinds — this matches the existing design where the Total ignores the pill.
+    // Cost follows the page cache pill: all four kinds when on, fresh input + output when off (equivOf),
+    // so the Total matches the day's equiv value shown in the calendar/headline under the same toggle. A
+    // kind's token count spans every model on the day, but costByKind prices only the recognized share. So
+    // on a day with unrecognized-model tokens a per-kind dollar would underprice its own row (a full token
+    // count beside a partial $). Show per-kind cost only when the day is fully priced; otherwise n/a.
+    // Per-MODEL cost is exact (a model maps 1:1 to a price), so the model view always shows a per-row cost,
+    // and it follows the same pill via equivOf — so its rows sum to the Total under either toggle.
+    // With cache off the visible kind costs (input + output) sum to the Total too, since both drop cache.
     const fullyPriced =
       d.costByKind != null &&
       !d.byModel.some((m) => m.totalTokens > 0 && m.equivApiValueUsd == null);
@@ -871,11 +889,11 @@ function DailyUsage({
               cost: perDayModelCost[i].get(modelKey(s.modelRaw)) ?? null,
             }))
             .filter((r) => r.value > 0);
-    // Tokens track exactly what the bar stacks: the kind view folds cache out when the pill is off, the model
-    // view always totals all kinds. Cost is the day's canonical equiv value (all kinds, recognized-only), so
-    // it agrees with every other panel and reads n/a (never blank) on a day that ran no recognized model.
+    // Tokens track exactly what the bar stacks: the kind view folds cache out when the pill is off, the
+    // model view always totals all kinds. Cost is the day's equiv value under the same pill (all kinds on,
+    // fresh off), so it agrees with every other panel and reads n/a (never blank) on a day with no
+    // recognized model.
     const total = rows.reduce((sum, r) => sum + r.value, 0);
-    const totalCost = d.equivApiValueUsd;
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
@@ -901,7 +919,7 @@ function DailyUsage({
             {formatTokensShort(total)}
           </span>
           <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-            {totalCost == null ? "n/a" : formatUsd(totalCost)}
+            {equivLabel(d, includeCache)}
           </span>
         </div>
       </div>
@@ -1137,7 +1155,7 @@ function ByModel({
       key: r.modelRaw ?? "\u0000",
       label: r.modelRaw ?? "Unknown",
       tokens: r.tokens,
-      equivApiValueUsd: r.equivApiValueUsd,
+      equivApiValueUsd: equivOf(r, includeCache),
       color: modelColorOf(r.modelRaw),
     }));
   return (
@@ -1175,7 +1193,7 @@ function ByProject({
       label: r.project,
       title: r.cwd,
       tokens: tokensOf(r, includeCache),
-      equivApiValueUsd: r.equivApiValueUsd,
+      equivApiValueUsd: equivOf(r, includeCache),
       color: "var(--color-data-1)",
     }));
   return (
@@ -1367,9 +1385,7 @@ function BySession({
                 {formatTokensShort(tokensOf(r, includeCache))}
               </td>
               <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {r.equivApiValueUsd == null
-                  ? "n/a"
-                  : formatUsd(r.equivApiValueUsd)}
+                {equivLabel(r, includeCache)}
               </td>
             </tr>
           ))}

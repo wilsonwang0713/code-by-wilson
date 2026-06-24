@@ -220,6 +220,26 @@ describe("analytics store", () => {
     expect(readTotals(db).equivApiValueUsd).toBeCloseTo(5);
   });
 
+  it("computes a fresh Equivalent API value that prices only input + output", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    // opus: input $5/M, output $25/M, cacheRead $0.5/M, cacheWrite $6.25/M.
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 1_000_000,
+        },
+      }),
+    ]);
+    const t = readTotals(db);
+    expect(t.equivApiValueUsd).toBeCloseTo(36.75); // 5 + 25 + 0.5 + 6.25 (all kinds)
+    expect(t.equivApiValueFreshUsd).toBeCloseTo(30); // 5 + 25, cache excluded
+  });
+
   it("scopes totals to turns at or after the since bound (inclusive at the edge)", () => {
     const db = openTestDb();
     migrateAnalytics(db);
@@ -605,6 +625,73 @@ describe("readByModel", () => {
     );
     expect(summed).toBeCloseTo(readTotals(db).equivApiValueUsd); // $5 opus + $3 sonnet = $8
   });
+
+  it("prices a fresh equiv value per model (input + output only) that reconciles with the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "m1",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "m2",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "m3",
+        modelRaw: "gpt-9-ultra",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
+    expect(byRaw.get("claude-opus-4-8")!.equivApiValueFreshUsd).toBeCloseTo(5); // 1M input @ $5/M; the 1M cache-read @ $0.5/M excluded
+    expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueFreshUsd).toBeCloseTo(
+      3,
+    ); // 1M input @ $3/M
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueFreshUsd).toBeNull(); // unrecognized → n/a
+    const summed = readByModel(db).reduce(
+      (acc, r) => acc + (r.equivApiValueFreshUsd ?? 0),
+      0,
+    );
+    expect(summed).toBeCloseTo(readTotals(db).equivApiValueFreshUsd); // $5 + $3
+  });
+
+  it("gives a recognized model whose tokens are all cache a fresh value of 0 (not n/a)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readByModel(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(0.5); // 1M cache-read @ $0.5/M
+    expect(row.equivApiValueFreshUsd).toBe(0); // recognized but no fresh tokens → honest 0, never null
+  });
 });
 
 describe("readByProject", () => {
@@ -870,6 +957,43 @@ describe("readByProject", () => {
     expect(rows[0].inputTokens).toBe(300);
     expect(rows[0].outputTokens).toBe(50);
   });
+
+  it("prices a fresh equiv value per project (input + output only), reconciling with the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "p1",
+        modelRaw: "claude-opus-4-8",
+        cwd: "/work/app",
+        project: "app",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "p2",
+        modelRaw: "claude-sonnet-4-6",
+        cwd: "/work/app",
+        project: "app",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readByProject(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(8.5); // 5 + 0.5 (opus) + 3 (sonnet), all kinds
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(8); // 5 + 3, cache excluded
+    expect(row.equivApiValueFreshUsd!).toBeCloseTo(
+      readTotals(db).equivApiValueFreshUsd,
+    );
+  });
 });
 
 describe("readByBranch", () => {
@@ -1082,6 +1206,32 @@ describe("readByBranch", () => {
     expect(rows[0].inputTokens).toBe(300);
     expect(rows[0].outputTokens).toBe(50);
   });
+
+  it("prices a fresh equiv value per branch (input + output only), reconciling with the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "b1",
+        modelRaw: "claude-opus-4-8",
+        cwd: "/work/app",
+        project: "app",
+        branch: "main",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readByBranch(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(5.5); // 5 + 0.5, all kinds
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(5); // input + output (output is 0 here); cache-read excluded
+    expect(row.equivApiValueFreshUsd!).toBeCloseTo(
+      readTotals(db).equivApiValueFreshUsd,
+    );
+  });
 });
 
 describe("readBySession", () => {
@@ -1282,6 +1432,38 @@ describe("readBySession", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     expect(readBySession(db)).toEqual([]);
+  });
+
+  it("prices a fresh equiv value per session (input + output only) across its models", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "s1",
+        sessionId: "sess-x",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "s2",
+        sessionId: "sess-x",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readBySession(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(8.5); // 5 + 0.5 (opus) + 3 (sonnet), all kinds
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(8); // 5 + 3, cache excluded
   });
 });
 
@@ -1504,11 +1686,14 @@ describe("readDaily", () => {
         modelRaw: "claude-sonnet-4-6",
         totalTokens: 1000,
         equivApiValueUsd: expect.closeTo(0.003, 4),
+        // Input-only day, so the fresh (input+output) value equals the all-kinds value.
+        equivApiValueFreshUsd: expect.closeTo(0.003, 4),
       },
       {
         modelRaw: "claude-opus-4-8",
         totalTokens: 100,
         equivApiValueUsd: expect.closeTo(0.0005, 6),
+        equivApiValueFreshUsd: expect.closeTo(0.0005, 6),
       },
     ]);
   });
@@ -1661,6 +1846,30 @@ describe("readDaily", () => {
     expect(d.equivApiValueUsd).toBeNull();
     expect(d.costByKind).toBeNull();
     expect(d.byModel[0].equivApiValueUsd).toBeNull();
+  });
+
+  it("prices a fresh equiv value per day (input + output only)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-sonnet-4-6",
+        ts: 1_700_000_000_000,
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [d] = readDaily(db);
+    expect(d.equivApiValueUsd).toBeCloseTo(18.3); // 3 + 15 + 0.3 (sonnet, all kinds)
+    expect(d.equivApiValueFreshUsd).toBeCloseTo(18); // 3 + 15, cache-read excluded
+    // Per-model carries the fresh subset too, so a tooltip model row drops cache with the pill and its rows
+    // still sum to the day's fresh Total (the model-stack + cache-off regression this guards).
+    expect(d.byModel[0].equivApiValueUsd).toBeCloseTo(18.3);
+    expect(d.byModel[0].equivApiValueFreshUsd).toBeCloseTo(18);
   });
 });
 
@@ -1865,6 +2074,27 @@ describe("readCalendar", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     expect(readCalendar(db, { sinceMs: since, untilMs: until })).toEqual([]);
+  });
+
+  it("prices a fresh equiv value per calendar day (input + output only)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    const ts = 1_700_000_000_000;
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-opus-4-8",
+        ts,
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [d] = readCalendar(db, { sinceMs: ts, untilMs: ts + 1 });
+    expect(d.equivApiValueUsd).toBeCloseTo(5.5); // 5 + 0.5, all kinds
+    expect(d.equivApiValueFreshUsd).toBeCloseTo(5); // input + output (output is 0 here); cache-read excluded
   });
 });
 

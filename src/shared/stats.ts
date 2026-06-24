@@ -14,6 +14,9 @@ export interface StatsTotals {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   equivApiValueUsd: number;
+  /** Equivalent API value pricing only the fresh tokens (input + output rates), the figure shown when the
+   *  page's "Include cache" pill is off — the cost mirror of the fresh token subset. */
+  equivApiValueFreshUsd: number;
 }
 
 /** All-zero totals. One definition for the three places that need it: the empty store, the
@@ -27,6 +30,7 @@ export function emptyTotals(): StatsTotals {
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     equivApiValueUsd: 0,
+    equivApiValueFreshUsd: 0,
   };
 }
 
@@ -49,6 +53,9 @@ export interface StatsByModel {
   outputTokens: number;
   /** Equivalent API value for this model, or null (n/a) when the raw id matches no known family. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off.
+   *  0 (not null) for a recognized model with no fresh tokens; null only when the id is unrecognized. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /**
@@ -72,6 +79,8 @@ export interface StatsByProject {
   outputTokens: number;
   /** Equivalent API value summed over the project's recognized models, or null (n/a) when it has none. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /**
@@ -91,6 +100,8 @@ export interface StatsByBranch {
   inputTokens: number;
   outputTokens: number;
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /**
@@ -123,6 +134,8 @@ export interface StatsBySession {
   outputTokens: number;
   /** Equivalent API value summed over the session's recognized models, or null (n/a) when it has none. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
   /** Human-readable session name from the index (derived title or a user rename), merged in at the IPC
    *  handler. Null when the index has no row for this session (reaped / predates the index — the renderer
    *  then falls back to the project basename). */
@@ -166,6 +179,23 @@ export function tokensOf(
   includeCache: boolean,
 ): number {
   return includeCache ? row.totalTokens : row.inputTokens + row.outputTokens;
+}
+
+/**
+ * The Equivalent API value shown for a row, governed by the page's "Include cache" pill: the all-kinds
+ * value (input + output + both cache kinds) when cache is included, or the fresh value (input + output
+ * rates only) when it's off. The mirror of `tokensOf`, so the Tokens figure and the equiv figure on the
+ * same card always agree on whether cache counts. Both fields are null when the row ran no recognized
+ * model (n/a, never a guessed $0); null passes through either way.
+ */
+export function equivOf(
+  row: {
+    equivApiValueUsd: number | null;
+    equivApiValueFreshUsd: number | null;
+  },
+  includeCache: boolean,
+): number | null {
+  return includeCache ? row.equivApiValueUsd : row.equivApiValueFreshUsd;
 }
 
 /**
@@ -383,6 +413,9 @@ export interface DailyBucket {
   /** The day's Equivalent API value summed over its recognized models, or null (n/a) when none of its
    *  turns ran a known model — never a guessed $0. Prices every kind, unaffected by the cache pill. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off.
+   *  Equals costByKind.input + costByKind.output, or null on a day with no recognized model. */
+  equivApiValueFreshUsd: number | null;
   /** The day's Equivalent API value split by token kind (the four sum to equivApiValueUsd), or null when
    *  the day has no recognized model. Carried because the renderer holds per-kind tokens but not the
    *  per-model prices a day spanning models needs. */
@@ -393,12 +426,15 @@ export interface DailyBucket {
     cacheWrite: number;
   } | null;
   /** Total tokens (all four kinds) per raw model id active this day, ordered by tokens descending then
-   *  raw id, each with its Equivalent API value (null for an unrecognized id). A turn that recorded no
-   *  model uses modelRaw null. Empty on a zero-fill day. */
+   *  raw id, each with its Equivalent API value — the all-kinds figure and the fresh input+output subset,
+   *  so a tooltip row can honor the page cache pill via equivOf and sum to the day's Total under either
+   *  toggle (both null for an unrecognized id). A turn that recorded no model uses modelRaw null. Empty on a
+   *  zero-fill day. */
   byModel: {
     modelRaw: string | null;
     totalTokens: number;
     equivApiValueUsd: number | null;
+    equivApiValueFreshUsd: number | null;
   }[];
 }
 
@@ -418,6 +454,9 @@ export interface CalendarDay {
   inputTokens: number;
   outputTokens: number;
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): the calendar's Equiv metric uses it
+   *  when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /** A zero-usage day bucket: the gap-fill the renderer inserts for a calendar day with no turns, and the
@@ -430,6 +469,7 @@ export function emptyDay(day: string): DailyBucket {
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     equivApiValueUsd: null,
+    equivApiValueFreshUsd: null,
     costByKind: null,
     byModel: [],
   };
