@@ -169,6 +169,23 @@ export function tokensOf(
 }
 
 /**
+ * The Equivalent API value shown for a row, governed by the page's "Include cache" pill: the all-kinds
+ * value (input + output + both cache kinds) when cache is included, or the fresh value (input + output
+ * rates only) when it's off. The mirror of `tokensOf`, so the Tokens figure and the equiv figure on the
+ * same card always agree on whether cache counts. Both fields are null when the row ran no recognized
+ * model (n/a, never a guessed $0); null passes through either way.
+ */
+export function equivOf(
+  row: {
+    equivApiValueUsd: number | null;
+    equivApiValueFreshUsd: number | null;
+  },
+  includeCache: boolean,
+): number | null {
+  return includeCache ? row.equivApiValueUsd : row.equivApiValueFreshUsd;
+}
+
+/**
  * The stable, collision-free key for a per-branch row: the full `cwd` joined to the branch with a NUL.
  * Neither a path nor a git ref can contain one, so the null-branch sentinel (a turn that recorded no
  * ref) can never collide with a real branch. The store folds branch turns on this key and the renderer
