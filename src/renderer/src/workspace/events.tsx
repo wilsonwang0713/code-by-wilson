@@ -76,6 +76,8 @@ function Bubble({
   return (
     <div className={cx("flex gap-2.5", user && "flex-row-reverse")}>
       <div
+        role="img"
+        aria-label={user ? "You" : "Claude"}
         title={user ? "You" : "Claude"}
         className={cx(
           "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
