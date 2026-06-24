@@ -30,7 +30,7 @@ export function RunResult({ run }: { run: WorkflowRun }) {
         return pending ? (
           <p className="mt-2 flex items-center gap-2 text-[11px] text-fg-muted">
             <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-fg-muted" />
-            Run in progress — result pending.
+            Run in progress. Result pending.
           </p>
         ) : (
           <ResultBody result={run.result} />
