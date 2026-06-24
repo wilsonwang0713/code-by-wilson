@@ -6,7 +6,8 @@ import { cx } from "../../ui/atoms";
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <span className="font-mono text-[11px] tabular-nums text-fg-faint">
-      <span className="text-fg-muted">{value}</span> {label}
+      <span className="text-fg-muted">{value}</span>
+      {label ? ` ${label}` : ""}
     </span>
   );
 }
