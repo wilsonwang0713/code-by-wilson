@@ -781,6 +781,14 @@ function DailyUsage({
     return m;
   });
 
+  // Per-day model → Equivalent API value, so a tooltip model row can pull its cost in O(1) (null for an
+  // unrecognized model). Mirrors perDayModel, which carries the same models' tokens.
+  const perDayModelCost = days.map((d) => {
+    const m = new Map<string, number | null>();
+    for (const e of d.byModel) m.set(modelKey(e.modelRaw), e.equivApiValueUsd);
+    return m;
+  });
+
   const columns: DayColumn[] = days.map((d, i) =>
     stackBy === "kind"
       ? {
@@ -819,21 +827,42 @@ function DailyUsage({
           color: s.color,
         }));
 
+  // Index-aligned with KIND_LABELS / KIND_SEGMENT_COLORS, so a kind segment maps to its costByKind field.
+  const KIND_COST_KEYS = [
+    "input",
+    "output",
+    "cacheRead",
+    "cacheWrite",
+  ] as const;
+
   const renderTooltip = (i: number): ReactNode => {
     const d = days[i];
     const rows =
       stackBy === "kind"
-        ? kindSegments(d).filter((r) => r.value > 0)
+        ? kindSegments(d)
+            .map((r, idx) => ({
+              label: r.label,
+              value: r.value,
+              color: r.color,
+              cost: d.costByKind ? d.costByKind[KIND_COST_KEYS[idx]] : null,
+            }))
+            .filter((r) => r.value > 0)
         : series
             .map((s) => ({
               label: s.modelRaw ?? "Unknown",
               value: perDayModel[i].get(modelKey(s.modelRaw)) ?? 0,
               color: s.color,
+              cost: perDayModelCost[i].get(modelKey(s.modelRaw)) ?? null,
             }))
             .filter((r) => r.value > 0);
-    // Sum the shown rows: the kind view drops cache when the pill is off, the model view always totals all
-    // kinds — so the tooltip total tracks exactly what the bar stacks.
+    // Sum the shown rows so the total tracks exactly what the bar stacks: the kind view drops cache when the
+    // pill is off, the model view always totals all kinds.
     const total = rows.reduce((sum, r) => sum + r.value, 0);
+    // Equiv totals only the priced rows; an all-unrecognized day (every cost null) shows tokens with no $.
+    const costRows = rows.filter((r) => r.cost != null);
+    const totalCost = costRows.length
+      ? costRows.reduce((sum, r) => sum + (r.cost ?? 0), 0)
+      : null;
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
@@ -847,6 +876,9 @@ function DailyUsage({
               <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
                 {formatTokensShort(r.value)}
               </span>
+              <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+                {r.cost == null ? "n/a" : `~${formatUsd(r.cost)}`}
+              </span>
             </div>
           ))
         )}
@@ -854,6 +886,9 @@ function DailyUsage({
           <span className="text-fg-muted">Total</span>
           <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
             {formatTokensShort(total)}
+          </span>
+          <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+            {totalCost == null ? "" : formatUsd(totalCost)}
           </span>
         </div>
       </div>
