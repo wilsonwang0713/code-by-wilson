@@ -2,6 +2,7 @@ import type { WorkflowAgent } from "@shared/types";
 import { TranscriptFeed } from "../TranscriptView";
 import type { DocState } from "../use-transcript";
 import { cx } from "../../ui/atoms";
+import { OverlayScroll } from "../../ui/OverlayScroll";
 
 /** One pill in the agent detail header. */
 function Pill({ children, tone }: { children: string; tone?: string }) {
@@ -55,13 +56,15 @@ export function AgentDetail({
           ) : null}
         </div>
       </div>
-      {doc === null ? (
-        <div className="p-3 text-[12px] text-fg-faint">
-          No transcript on disk for this agent yet.
-        </div>
-      ) : (
-        <TranscriptFeed key={agent.id} events={doc?.events ?? []} />
-      )}
+      <OverlayScroll className="min-h-0 flex-1">
+        {doc === null ? (
+          <div className="p-3 text-[12px] text-fg-faint">
+            No transcript on disk for this agent yet.
+          </div>
+        ) : (
+          <TranscriptFeed key={agent.id} events={doc?.events ?? []} />
+        )}
+      </OverlayScroll>
     </div>
   );
 }
