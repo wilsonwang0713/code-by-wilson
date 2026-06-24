@@ -1,6 +1,7 @@
 import type { WorkflowRun } from "@shared/types";
 import { cx, focusRing } from "../ui/atoms";
 import { OverlayScroll } from "../ui/OverlayScroll";
+import { PhaseStrip } from "./workflow/PhaseStrip";
 import { WorkflowHeader } from "./workflow/WorkflowHeader";
 import { RunResult } from "./workflow/RunResult";
 
@@ -53,6 +54,7 @@ export function WorkflowDrill({
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <WorkflowHeader run={run} />
+          <PhaseStrip phases={run.phases} />
           <OverlayScroll className="min-h-0 flex-1 border-t border-ink-850">
             <RunResult run={run} />
           </OverlayScroll>
