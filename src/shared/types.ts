@@ -245,7 +245,7 @@ export interface WorkflowRunSummary {
   runId: string;
   workflowName: string;
   /** Passthrough of the record's status; "completed" | "running" | "failed" in practice. */
-  status: "running" | "completed" | "failed" | string;
+  status: string;
   /** The args string the run was invoked with (e.g. "xhigh"), when present. */
   args?: string;
   agentCount: number;
@@ -282,7 +282,7 @@ export interface WorkflowAgent {
   /** Normalized model family; absent until the agent reports one. */
   model?: Family;
   /** Passthrough state; "queued" | "running" | "done" | "failed" in practice. */
-  state: "queued" | "running" | "done" | "failed" | string;
+  state: string;
   /** epoch ms; absent when the record carried none. */
   queuedMs?: number;
   startMs?: number;

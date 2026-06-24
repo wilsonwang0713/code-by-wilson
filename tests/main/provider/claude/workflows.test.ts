@@ -128,7 +128,7 @@ describe("derivePhaseStatuses", () => {
       agent({ phaseIndex: 2, state: "done", startMs: 2 }),
       agent({ phaseIndex: 2, state: "queued", startMs: undefined }),
     ];
-    const out = derivePhaseStatuses(phases, agents as never, "running");
+    const out = derivePhaseStatuses(phases, agents, "running");
     expect(out.map((p) => p.status)).toEqual(["done", "running", "pending"]);
   });
 
@@ -138,7 +138,7 @@ describe("derivePhaseStatuses", () => {
       agent({ phaseIndex: 1, state: "done", startMs: 1 }),
       agent({ phaseIndex: 2, state: "done", startMs: 2 }),
     ];
-    const out = derivePhaseStatuses(phases, agents as never, "running");
+    const out = derivePhaseStatuses(phases, agents, "running");
     expect(out[1].status).toBe("running");
   });
 
@@ -147,7 +147,7 @@ describe("derivePhaseStatuses", () => {
       agent({ phaseIndex: 1, state: "done", startMs: 1 }),
       agent({ phaseIndex: 2, state: "done", startMs: 2 }),
     ];
-    const out = derivePhaseStatuses(phases, agents as never, "completed");
+    const out = derivePhaseStatuses(phases, agents, "completed");
     expect(out.map((p) => p.status)).toEqual(["done", "done", "pending"]);
   });
 });
