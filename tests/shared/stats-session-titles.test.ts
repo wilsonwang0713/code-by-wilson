@@ -13,6 +13,7 @@ const row = (over: Partial<StatsBySession> = {}): StatsBySession => ({
   inputTokens: 0,
   outputTokens: 0,
   equivApiValueUsd: 0,
+  equivApiValueFreshUsd: 0,
   title: null,
   ...over,
 });

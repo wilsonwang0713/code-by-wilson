@@ -646,6 +646,7 @@ interface SessionAgg {
   inputTokens: number;
   outputTokens: number;
   knownCost: number;
+  freshCost: number;
   hasKnownCost: boolean;
   topModel: string | null;
   topModelTokens: number;
@@ -676,6 +677,7 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
         inputTokens: 0,
         outputTokens: 0,
         knownCost: 0,
+        freshCost: 0,
         hasKnownCost: false,
         topModel: null,
         topModelTokens: -1,
@@ -696,9 +698,10 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
     a.totalTokens += groupTokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const cost = modelRowCost(r);
-    if (cost != null) {
-      a.knownCost += cost;
+    const b = modelRowCostBreakdown(r);
+    if (b != null) {
+      a.knownCost += b.total;
+      a.freshCost += b.input + b.output;
       a.hasKnownCost = true;
     }
     // Dominant model by tokens; on an exact token tie pick the lexicographically smaller raw id so the
@@ -727,6 +730,7 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+        equivApiValueFreshUsd: a.hasKnownCost ? a.freshCost : null,
         title: null,
       }),
     )

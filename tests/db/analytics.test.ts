@@ -1433,6 +1433,38 @@ describe("readBySession", () => {
     migrateAnalytics(db);
     expect(readBySession(db)).toEqual([]);
   });
+
+  it("prices a fresh equiv value per session (input + output only) across its models", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "s1",
+        sessionId: "sess-x",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "s2",
+        sessionId: "sess-x",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readBySession(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(8.5); // 5 + 0.5 (opus) + 3 (sonnet), all kinds
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(8); // 5 + 3, cache excluded
+  });
 });
 
 describe("readBreakdowns", () => {

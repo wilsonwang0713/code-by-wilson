@@ -134,6 +134,8 @@ export interface StatsBySession {
   outputTokens: number;
   /** Equivalent API value summed over the session's recognized models, or null (n/a) when it has none. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
   /** Human-readable session name from the index (derived title or a user rename), merged in at the IPC
    *  handler. Null when the index has no row for this session (reaped / predates the index — the renderer
    *  then falls back to the project basename). */
