@@ -73,6 +73,9 @@ describe("parseWorkflowScript", () => {
       "Analyze",
     ]);
     expect(plan!.declaredAgents[2].label).toBe("analyze-s1:${item}"); // template kept as static text
+    expect(plan!.declaredAgents[3].label).toBe("analyze-s1:${item}");
+    expect(plan!.declaredAgents[4].label).toBe("analyze-s2:${item}");
+    expect(plan!.declaredAgents[5].label).toBe("analyze-s2:${item}");
     expect(plan!.declaredAgents[8]).toEqual({
       label: "synthesize",
       phaseTitle: "Synthesize",

@@ -132,6 +132,7 @@ function extractPhases(program: Node): WorkflowPlan["phases"] {
   });
 }
 
+// Scans only top-level declarations on purpose — persisted workflow scripts are flat; a nested const array reads as non-resolvable and falls back.
 /** Top-level `const <id> = [ … ]` → id → element count, so `pipeline(items, …)` can resolve `items`. */
 function constArrayLengths(program: Node): Map<string, number> {
   const out = new Map<string, number>();
@@ -172,7 +173,9 @@ function collectDeclaredAgents(program: Node): {
     n.type === "CallExpression" &&
     n.callee?.type === "MemberExpression" &&
     (n.callee.property?.name === "map" ||
-      n.callee.property?.name === "flatMap");
+      n.callee.property?.name === "flatMap" ||
+      n.callee.property?.value === "map" ||
+      n.callee.property?.value === "flatMap");
   walk(program, (n, stack) => {
     if (
       isCallTo(n, "agent") ||
@@ -227,7 +230,7 @@ function collectDeclaredAgents(program: Node): {
         const opts = inner.length
           ? agentOpts(inner[0])
           : { label: "", phaseTitle: "" };
-        for (let i = 0; i < len; i++) declaredAgents.push(opts);
+        for (let i = 0; i < len; i++) declaredAgents.push({ ...opts });
       }
     } else {
       // bare agent()
