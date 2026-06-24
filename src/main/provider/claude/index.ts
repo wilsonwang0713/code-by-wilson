@@ -22,10 +22,16 @@ import {
 import { readTasksForSession, tasksNewestMtime } from "./tasks";
 import {
   workflowsDirFor,
+  workflowScriptsDirFor,
+  workflowAgentsRootFor,
   workflowRunFileFor,
   workflowAgentFileFor,
   workflowsNewestMtime,
+  liveWorkflowsNewestMtime,
+  liveRunNewestMtime,
   listWorkflowRuns,
+  listLiveRunSummaries,
+  readLiveWorkflowRun,
   toWorkflowRun,
 } from "./workflows";
 import {
@@ -485,10 +491,28 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         const path = pathById.get(id) ?? resolveTranscript(id)?.path;
         if (path === undefined) return { status: "absent" };
         const dir = workflowsDirFor(path);
-        const mtimeMs = workflowsNewestMtime(dir);
+        const scriptsDir = workflowScriptsDirFor(path);
+        const agentsRoot = workflowAgentsRootFor(path);
+        // The change token folds terminal records and live evidence (scripts + journals + agent
+        // transcripts) so a running workflow's growth re-triggers the poll, not just a finished record.
+        const mtimeMs = Math.max(
+          workflowsNewestMtime(dir),
+          liveWorkflowsNewestMtime(scriptsDir, agentsRoot),
+        );
         if (mtimeMs === 0) return { status: "absent" }; // no workflows dir / no runs
         if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
-        return { status: "changed", mtimeMs, runs: listWorkflowRuns(dir) };
+        // Terminal records first; then in-progress runs (script, no record yet), de-duped by runId so a
+        // run that finishes mid-session flips from live to terminal without ever doubling.
+        const terminal = listWorkflowRuns(dir);
+        const live = listLiveRunSummaries(
+          scriptsDir,
+          agentsRoot,
+          new Set(terminal.map((r) => r.runId)),
+        );
+        const runs = [...terminal, ...live].sort(
+          (a, b) => b.startMs - a.startMs,
+        );
+        return { status: "changed", mtimeMs, runs };
       } catch {
         return { status: "error" };
       }
@@ -505,8 +529,20 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         try {
           mtimeMs = statSync(file).mtimeMs;
         } catch (err) {
-          if ((err as NodeJS.ErrnoException)?.code === "ENOENT")
-            return { status: "absent" };
+          // No terminal record: reconstruct the run live from its script + journal + agent transcripts,
+          // keyed on the live evidence's own mtime so journal growth re-triggers the poll. Absent only
+          // when no script names this runId.
+          if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
+            const scriptsDir = workflowScriptsDirFor(path);
+            const agentsRoot = workflowAgentsRootFor(path);
+            const liveMtime = liveRunNewestMtime(scriptsDir, agentsRoot, runId);
+            if (liveMtime === 0) return { status: "absent" };
+            if (liveMtime === sinceMtimeMs)
+              return { status: "unchanged", mtimeMs: liveMtime };
+            const run = readLiveWorkflowRun(scriptsDir, agentsRoot, runId);
+            if (run === null) return { status: "absent" };
+            return { status: "changed", mtimeMs: liveMtime, run };
+          }
           throw err;
         }
         if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
