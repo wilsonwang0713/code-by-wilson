@@ -426,12 +426,15 @@ export interface DailyBucket {
     cacheWrite: number;
   } | null;
   /** Total tokens (all four kinds) per raw model id active this day, ordered by tokens descending then
-   *  raw id, each with its Equivalent API value (null for an unrecognized id). A turn that recorded no
-   *  model uses modelRaw null. Empty on a zero-fill day. */
+   *  raw id, each with its Equivalent API value — the all-kinds figure and the fresh input+output subset,
+   *  so a tooltip row can honor the page cache pill via equivOf and sum to the day's Total under either
+   *  toggle (both null for an unrecognized id). A turn that recorded no model uses modelRaw null. Empty on a
+   *  zero-fill day. */
   byModel: {
     modelRaw: string | null;
     totalTokens: number;
     equivApiValueUsd: number | null;
+    equivApiValueFreshUsd: number | null;
   }[];
 }
 

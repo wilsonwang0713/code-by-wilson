@@ -1686,11 +1686,14 @@ describe("readDaily", () => {
         modelRaw: "claude-sonnet-4-6",
         totalTokens: 1000,
         equivApiValueUsd: expect.closeTo(0.003, 4),
+        // Input-only day, so the fresh (input+output) value equals the all-kinds value.
+        equivApiValueFreshUsd: expect.closeTo(0.003, 4),
       },
       {
         modelRaw: "claude-opus-4-8",
         totalTokens: 100,
         equivApiValueUsd: expect.closeTo(0.0005, 6),
+        equivApiValueFreshUsd: expect.closeTo(0.0005, 6),
       },
     ]);
   });
@@ -1863,6 +1866,10 @@ describe("readDaily", () => {
     const [d] = readDaily(db);
     expect(d.equivApiValueUsd).toBeCloseTo(18.3); // 3 + 15 + 0.3 (sonnet, all kinds)
     expect(d.equivApiValueFreshUsd).toBeCloseTo(18); // 3 + 15, cache-read excluded
+    // Per-model carries the fresh subset too, so a tooltip model row drops cache with the pill and its rows
+    // still sum to the day's fresh Total (the model-stack + cache-off regression this guards).
+    expect(d.byModel[0].equivApiValueUsd).toBeCloseTo(18.3);
+    expect(d.byModel[0].equivApiValueFreshUsd).toBeCloseTo(18);
   });
 });
 

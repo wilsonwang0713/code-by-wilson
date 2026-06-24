@@ -608,6 +608,8 @@ describe("registerIpc stats:read", () => {
         modelRaw: "claude-opus-4-8",
         totalTokens: 1_000_000,
         equivApiValueUsd: expect.closeTo(5, 2),
+        // Input-only day, so the fresh value matches the all-kinds value.
+        equivApiValueFreshUsd: expect.closeTo(5, 2),
       },
     ]);
   });

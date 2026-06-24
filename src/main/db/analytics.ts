@@ -809,7 +809,7 @@ interface DayAgg {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   models: Map<string | null, number>;
-  modelCost: Map<string | null, number | null>;
+  modelCost: Map<string | null, { total: number; fresh: number } | null>;
   kindInputUsd: number;
   kindOutputUsd: number;
   kindCacheReadUsd: number;
@@ -836,7 +836,10 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
         models: new Map<string | null, number>(),
-        modelCost: new Map<string | null, number | null>(),
+        modelCost: new Map<
+          string | null,
+          { total: number; fresh: number } | null
+        >(),
         kindInputUsd: 0,
         kindOutputUsd: 0,
         kindCacheReadUsd: 0,
@@ -857,10 +860,14 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
       r.cache_creation_tokens;
     a.models.set(r.model_raw, (a.models.get(r.model_raw) ?? 0) + modelTotal);
     // Price this (day × model) slice once: a recognized model feeds the per-kind split, the per-model
-    // cost, and the day total; an unrecognized one adds tokens above but null cost (n/a). groupByDayAndModel
-    // groups by (day, model_raw), so each model lands once per day — set, not accumulate, the per-model cost.
+    // cost (all-kinds total and the fresh input+output subset, so a tooltip row honors the cache pill), and
+    // the day total; an unrecognized one adds tokens above but null cost (n/a). groupByDayAndModel groups by
+    // (day, model_raw), so each model lands once per day — set, not accumulate, the per-model cost.
     const b = modelRowCostBreakdown(r);
-    a.modelCost.set(r.model_raw, b == null ? null : b.total);
+    a.modelCost.set(
+      r.model_raw,
+      b == null ? null : { total: b.total, fresh: b.input + b.output },
+    );
     if (b != null) {
       a.kindInputUsd += b.input;
       a.kindOutputUsd += b.output;
@@ -891,11 +898,15 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
             }
           : null,
         byModel: [...a.models.entries()]
-          .map(([modelRaw, totalTokens]) => ({
-            modelRaw,
-            totalTokens,
-            equivApiValueUsd: a.modelCost.get(modelRaw) ?? null,
-          }))
+          .map(([modelRaw, totalTokens]) => {
+            const cost = a.modelCost.get(modelRaw) ?? null;
+            return {
+              modelRaw,
+              totalTokens,
+              equivApiValueUsd: cost?.total ?? null,
+              equivApiValueFreshUsd: cost?.fresh ?? null,
+            };
+          })
           .sort(
             (x, y) =>
               y.totalTokens - x.totalTokens ||

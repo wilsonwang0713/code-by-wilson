@@ -787,11 +787,13 @@ function DailyUsage({
     return m;
   });
 
-  // Per-day model → Equivalent API value, so a tooltip model row can pull its cost in O(1) (null for an
-  // unrecognized model). Mirrors perDayModel, which carries the same models' tokens.
+  // Per-day model → Equivalent API value under the page cache pill (all kinds on, fresh input+output off,
+  // via equivOf), so a tooltip model row pulls its cost in O(1) and the rows sum to the Total under the same
+  // toggle. null for an unrecognized model. Mirrors perDayModel, which carries the same models' tokens.
   const perDayModelCost = days.map((d) => {
     const m = new Map<string, number | null>();
-    for (const e of d.byModel) m.set(modelKey(e.modelRaw), e.equivApiValueUsd);
+    for (const e of d.byModel)
+      m.set(modelKey(e.modelRaw), equivOf(e, includeCache));
     return m;
   });
 
@@ -848,8 +850,9 @@ function DailyUsage({
     // kind's token count spans every model on the day, but costByKind prices only the recognized share. So
     // on a day with unrecognized-model tokens a per-kind dollar would underprice its own row (a full token
     // count beside a partial $). Show per-kind cost only when the day is fully priced; otherwise n/a.
-    // Per-MODEL cost stays honest (a model maps 1:1 to a price), so the model view keeps its per-row cost.
-    // With cache off the visible kind costs (input + output) sum to the Total, since both drop cache.
+    // Per-MODEL cost is exact (a model maps 1:1 to a price), so the model view always shows a per-row cost,
+    // and it follows the same pill via equivOf — so its rows sum to the Total under either toggle.
+    // With cache off the visible kind costs (input + output) sum to the Total too, since both drop cache.
     const fullyPriced =
       d.costByKind != null &&
       !d.byModel.some((m) => m.totalTokens > 0 && m.equivApiValueUsd == null);
