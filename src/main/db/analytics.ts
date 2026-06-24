@@ -245,8 +245,8 @@ function groupByModel(db: SqliteDb, win: StatsWindow): ModelRow[] {
 }
 
 /** A grouped row's per-kind Equivalent API value, or null (n/a) when its raw id matches no known family.
- *  The single cost-split mapping the daily fold reads; modelRowCost is just its total, so the two can't
- *  drift. Pricing flows through costBreakdown (the per-session Cost panel's formula too). */
+ *  The single cost-split mapping the daily fold reads. Pricing flows through costBreakdown (the per-session
+ *  Cost panel's formula too). */
 function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
   const raw = m.model_raw ?? undefined;
   if (!isKnownModelString(raw)) return null; // n/a cost: the tokens still count toward the token totals
@@ -261,17 +261,10 @@ function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
   );
 }
 
-/** A grouped row's Equivalent API value, or null (n/a) when its raw id matches no known family. The single
- *  cost mapping the totals and the breakdown share, so a breakdown row's cost is exactly its contribution
- *  to the grand total. */
-function modelRowCost(m: ModelRow): number | null {
-  return modelRowCostBreakdown(m)?.total ?? null;
-}
-
 /**
  * Grand totals from a SQL aggregate, plus the Equivalent API value. The value is summed per raw model id
  * (so each family is priced at its own rates) over only the recognized models, sharing the groupByModel /
- * modelRowCost mapping the per-model breakdown uses so the two can't drift; an unrecognized id still
+ * modelRowCostBreakdown mapping the per-model breakdown uses so the two can't drift; an unrecognized id still
  * contributes its tokens to the token totals above but n/a cost here. Pricing is single-sourced through
  * equivApiValue (the same formula the per-session Cost panel uses).
  */
@@ -342,7 +335,7 @@ export function hasAnyTurns(db: SqliteDb): boolean {
  * The per-model breakdown (#111): one row per raw model id, scoped to the same range bound the totals use.
  * `totalTokens` sums all four kinds (the table's Tokens column); `inputTokens`/`outputTokens` ride along so
  * the donut can size on fresh tokens alone, since cache-read volume would otherwise swamp it. Cost flows
- * through modelRowCost — the same mapping readTotals sums — so an unrecognized id gets null cost (n/a) while
+ * through modelRowCostBreakdown — the same mapping readTotals sums — so an unrecognized id gets null cost (n/a) while
  * its tokens still count, and the rows reconcile with the grand total. Rows order by total tokens
  * descending, then by raw id so ties stay stable across polls (SQLite's GROUP BY order is otherwise
  * unspecified, which would flicker the donut colors).
@@ -359,7 +352,7 @@ export function readByModel(
  * or a finer dimension×model scan (readBreakdowns) — either way we re-group by raw id, summing the four token
  * kinds, so the result is identical. The map keys on `model_raw` directly (so a null "Unknown" model and an
  * empty-string id stay distinct buckets, matching SQLite's GROUP BY); cost prices each summed row through
- * modelRowCost (n/a for an unrecognized id). Rows order by total tokens descending, then by raw id so ties
+ * modelRowCostBreakdown (n/a for an unrecognized id). Rows order by total tokens descending, then by raw id so ties
  * stay stable across polls.
  */
 function foldModels(rows: ModelRow[]): StatsByModel[] {
@@ -406,7 +399,7 @@ function foldModels(rows: ModelRow[]): StatsByModel[] {
 
 /**
  * A (dimension × model) aggregate row: the per-model token sums (so each model slice can be priced through
- * modelRowCost) carrying the cwd/project — and, for the branch grouping, the branch — they were grouped
+ * modelRowCostBreakdown) carrying the cwd/project — and, for the branch grouping, the branch — they were grouped
  * under. `branch` is present only when the GROUP BY included it (the per-project read omits it). The grouping
  * key is always the full cwd, never the basename, so same-basename repos stay distinct.
  */
@@ -418,7 +411,7 @@ interface DimModelRow extends ModelRow {
 
 /**
  * Group turns by a dimension column list PLUS model_raw, range-scoped exactly like groupByModel. The caller
- * folds away the model dimension (summing tokens, pricing each model slice through modelRowCost) to land one
+ * folds away the model dimension (summing tokens, pricing each model slice through modelRowCostBreakdown) to land one
  * row per dimension tuple. `cols` is an internal constant SQL fragment ("cwd, project" / "cwd, project,
  * branch"), never user input — the same trusted-interpolation shape as the `where` bound here and the
  * schema-version exec elsewhere in this file.
@@ -459,7 +452,7 @@ interface DimAgg {
 
 /**
  * Fold (dimension × model) rows into one DimAgg per dimension tuple, `keyOf` picking the tuple. Tokens sum
- * across every model; cost sums modelRowCost over only the recognized ones (an unrecognized model adds its
+ * across every model; cost sums modelRowCostBreakdown over only the recognized ones (an unrecognized model adds its
  * tokens but no cost). This sums the exact same per-model costs readTotals does, just partitioned by
  * dimension — so a breakdown reconciles with the grand total by construction (equivApiValue is linear in
  * tokens, so splitting a model's tokens across groups and summing back is lossless).
@@ -524,7 +517,7 @@ const FINEST_DIMS = "cwd, project, branch";
  * cwd so two repos that share a basename stay distinct (`project` is the basename, for display only). The fold
  * works at any grain finer than cwd — readByProject scans "cwd, project", readBreakdowns hands it the finest
  * scan — because folding by cwd collapses the extra columns. Tokens sum across the project's models; cost
- * folds each model slice through modelRowCost and reconciles with the grand total. Rows order by total tokens
+ * folds each model slice through modelRowCostBreakdown and reconciles with the grand total. Rows order by total tokens
  * descending, then by cwd so ties (and same-basename projects) stay stable across polls.
  */
 function foldProjects(rows: DimModelRow[]): StatsByProject[] {
@@ -590,7 +583,7 @@ export function readByBranch(
 
 /**
  * A (session × model) aggregate row: per-model token sums (so each model slice can be priced through
- * modelRowCost) plus the session-scoped scalars the per-Session table needs — the earliest KNOWN-time turn
+ * modelRowCostBreakdown) plus the session-scoped scalars the per-Session table needs — the earliest KNOWN-time turn
  * (`MIN(NULLIF(ts,0))`, null when the session has no known-time turn), the latest turn (`MAX(ts)`), and the
  * turn count. `project`/`cwd` are constant within a session (the app models a session as one working dir),
  * so the value SQLite picks for these bare columns is well-defined enough.
@@ -655,7 +648,7 @@ interface SessionAgg {
 /**
  * Fold (session × model) rows into the per-Session breakdown: one row per session. Tokens and turns sum
  * across the session's models; the span is the min of the per-model earliest-known timestamps to the max of
- * the latests (a session with no known-time turn gets durationMs 0); cost sums modelRowCost over only the
+ * the latests (a session with no known-time turn gets durationMs 0); cost sums modelRowCostBreakdown over only the
  * recognized models, reconciling with the grand total since equivApiValue is linear in tokens. The displayed
  * model is the one with the most total tokens, ties broken by raw id so the pick is deterministic across
  * polls. Rows order by last activity descending, then session id for a stable tie order — the table's
@@ -936,12 +929,13 @@ interface CalAgg {
   inputTokens: number;
   outputTokens: number;
   knownCost: number;
+  freshCost: number;
   hasKnownCost: boolean;
 }
 
 /**
  * Fold (day × model) rows into one CalendarDay per local day (#115): the day's turn count and total tokens
- * sum across its models; its Equivalent API value sums modelRowCost over only the recognized ones (an
+ * sum across its models; its Equivalent API value sums modelRowCostBreakdown over only the recognized ones (an
  * unrecognized model adds its tokens but no cost, and a day with no recognized model is honest n/a). The
  * same per-model cost mapping readTotals/readByModel use, so the calendar reconciles with them. Days emit
  * ascending (string compare on 'YYYY-MM-DD').
@@ -958,6 +952,7 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
         inputTokens: 0,
         outputTokens: 0,
         knownCost: 0,
+        freshCost: 0,
         hasKnownCost: false,
       };
       map.set(r.day, a);
@@ -970,9 +965,10 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
       r.cache_creation_tokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const cost = modelRowCost(r);
-    if (cost != null) {
-      a.knownCost += cost;
+    const b = modelRowCostBreakdown(r);
+    if (b != null) {
+      a.knownCost += b.total;
+      a.freshCost += b.input + b.output;
       a.hasKnownCost = true;
     }
   }
@@ -985,6 +981,7 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+        equivApiValueFreshUsd: a.hasKnownCost ? a.freshCost : null,
       }),
     )
     .sort((a, b) => a.day.localeCompare(b.day));

@@ -2068,6 +2068,27 @@ describe("readCalendar", () => {
     migrateAnalytics(db);
     expect(readCalendar(db, { sinceMs: since, untilMs: until })).toEqual([]);
   });
+
+  it("prices a fresh equiv value per calendar day (input + output only)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    const ts = 1_700_000_000_000;
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-opus-4-8",
+        ts,
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [d] = readCalendar(db, { sinceMs: ts, untilMs: ts + 1 });
+    expect(d.equivApiValueUsd).toBeCloseTo(5.5); // 5 + 0.5, all kinds
+    expect(d.equivApiValueFreshUsd).toBeCloseTo(5); // input only
+  });
 });
 
 describe("readCalendarYears", () => {

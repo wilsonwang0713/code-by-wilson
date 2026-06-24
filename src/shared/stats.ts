@@ -451,6 +451,9 @@ export interface CalendarDay {
   inputTokens: number;
   outputTokens: number;
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): the calendar's Equiv metric uses it
+   *  when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /** A zero-usage day bucket: the gap-fill the renderer inserts for a calendar day with no turns, and the
