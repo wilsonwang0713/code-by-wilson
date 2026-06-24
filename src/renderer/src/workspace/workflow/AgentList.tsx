@@ -31,9 +31,12 @@ function AgentRow({
 }) {
   const span = bounds.end - bounds.start;
   const s = agent.startMs ?? agent.queuedMs;
-  const leftPct = s !== undefined ? ((s - bounds.start) / span) * 100 : 0;
+  const leftPct =
+    s !== undefined ? Math.max(0, ((s - bounds.start) / span) * 100) : 0;
   const widthPct =
-    s !== undefined ? Math.max(2, (agent.durationMs / span) * 100) : 0;
+    s !== undefined
+      ? Math.min(100 - leftPct, Math.max(2, (agent.durationMs / span) * 100))
+      : 0;
   const running = agent.state === "running";
   const dotTone = running
     ? "bg-fg animate-pulse-soft"
@@ -60,7 +63,7 @@ function AgentRow({
       >
         {agent.label}
       </span>
-      <span className="relative h-1.5 flex-1 rounded-full bg-ink-900">
+      <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-ink-900">
         {s !== undefined && (
           <span
             className={cx(

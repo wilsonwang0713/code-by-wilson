@@ -30,9 +30,9 @@ function WorkflowCrumb({ name, onBack }: { name: string; onBack: () => void }) {
 }
 
 /**
- * The dedicated workflow-run surface, drilled into the center pane. Renders the run header and (for now)
- * the run result. The phase strip, agent list, and selected-agent transcript are layered on in later
- * tasks. Pure renderer of the run it's handed.
+ * The dedicated workflow-run surface, drilled into the center pane. Renders the run header, phase strip,
+ * and a master/detail split of the agent list and the run result. The selected-agent transcript is layered
+ * on in a later task. Pure renderer of the run it's handed.
  */
 export function WorkflowDrill({
   run,
