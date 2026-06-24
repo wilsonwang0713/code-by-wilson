@@ -47,7 +47,7 @@ export function AgentDetail({
           </span>
         </div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
-          <Pill>{agent.phaseTitle}</Pill>
+          {agent.phaseTitle ? <Pill>{agent.phaseTitle}</Pill> : null}
           {agent.model ? <Pill>{agent.model}</Pill> : null}
           <Pill>{`${Math.round(agent.tokens / 1000)}k tok`}</Pill>
           <Pill>{`${agent.toolCalls} tools`}</Pill>

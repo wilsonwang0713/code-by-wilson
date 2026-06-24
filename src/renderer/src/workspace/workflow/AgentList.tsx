@@ -1,4 +1,4 @@
-import type { WorkflowRun, WorkflowAgent, WorkflowPhase } from "@shared/types";
+import type { WorkflowRun, WorkflowAgent } from "@shared/types";
 import { cx, focusRingInset } from "../../ui/atoms";
 
 /** The run's time bounds for the shared micro-timeline axis: earliest start to latest end among agents. */
@@ -87,15 +87,18 @@ function AgentRow({
   );
 }
 
-/** A collapsible-looking phase group header with its agent tally. */
-function PhaseGroup({
-  phase,
+/** A group header with its agent tally, over the group's agent rows. The phase title labels a declared
+ *  phase; live runs (no agent→phase map on disk) fall back to a plain "Agents" group. */
+function AgentGroup({
+  title,
+  total,
   agents,
   bounds,
   selectedAgentId,
   onSelectAgent,
 }: {
-  phase: WorkflowPhase;
+  title: string;
+  total: number;
   agents: WorkflowAgent[];
   bounds: { start: number; end: number };
   selectedAgentId?: string;
@@ -104,9 +107,9 @@ function PhaseGroup({
   return (
     <div>
       <div className="flex items-center gap-1.5 border-t border-ink-850 px-3 py-1">
-        <span className="text-[11px] font-semibold text-fg">{phase.title}</span>
+        <span className="text-[11px] font-semibold text-fg">{title}</span>
         <span className="font-mono text-[10px] tabular-nums text-fg-faint">
-          {phase.agentsTotal}
+          {total}
         </span>
       </div>
       {agents.map((a) => (
@@ -135,6 +138,10 @@ export function AgentList({
   onSelectAgent: (id: string | undefined) => void;
 }) {
   const bounds = runBounds(run.agents);
+  const phaseIndexes = new Set(run.phases.map((p) => p.index));
+  // Agents whose phaseIndex matches no declared phase — every agent on a live run, where the phase map
+  // isn't on disk yet. Rendered in a trailing "Agents" group so they never silently drop from the list.
+  const ungrouped = run.agents.filter((a) => !phaseIndexes.has(a.phaseIndex));
   return (
     <div className="py-1">
       <button
@@ -154,9 +161,10 @@ export function AgentList({
         const agents = run.agents.filter((a) => a.phaseIndex === p.index);
         if (agents.length === 0) return null;
         return (
-          <PhaseGroup
+          <AgentGroup
             key={p.index}
-            phase={p}
+            title={p.title}
+            total={p.agentsTotal}
             agents={agents}
             bounds={bounds}
             selectedAgentId={selectedAgentId}
@@ -164,6 +172,16 @@ export function AgentList({
           />
         );
       })}
+      {ungrouped.length > 0 && (
+        <AgentGroup
+          title="Agents"
+          total={ungrouped.length}
+          agents={ungrouped}
+          bounds={bounds}
+          selectedAgentId={selectedAgentId}
+          onSelectAgent={onSelectAgent}
+        />
+      )}
     </div>
   );
 }
