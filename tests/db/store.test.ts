@@ -7,6 +7,7 @@ import {
   getSessions,
   hydrate,
   pruneSessions,
+  readSessionTitles,
 } from "../../src/main/db/store";
 import { openTestDb } from "../helpers/sqlite";
 
@@ -199,5 +200,18 @@ describe("store", () => {
     ).toEqual(["a", "c"]);
     pruneSessions(db, []);
     expect(getPersisted(db)).toEqual([]);
+  });
+
+  it("readSessionTitles maps id → title for every indexed session", () => {
+    const db = openTestDb();
+    migrate(db);
+    upsertSessions(db, [
+      snap({ id: "a", title: "Fix the parser" }),
+      snap({ id: "b", title: "Bump version 0.4.0" }),
+    ]);
+    expect(readSessionTitles(db)).toEqual({
+      a: "Fix the parser",
+      b: "Bump version 0.4.0",
+    });
   });
 });

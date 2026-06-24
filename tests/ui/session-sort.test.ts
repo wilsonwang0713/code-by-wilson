@@ -18,6 +18,7 @@ const row = (over: Partial<StatsBySession> = {}): StatsBySession => ({
   inputTokens: 0,
   outputTokens: 0,
   equivApiValueUsd: 0,
+  title: null,
   ...over,
 });
 
@@ -147,22 +148,22 @@ describe("sortSessions", () => {
     ).toEqual(["b", "c", "a"]);
   });
 
-  it("sorts text columns by locale order (lowercase before uppercase)", () => {
+  it("sorts the Session column by the effective name (title, else project)", () => {
     const rows = [
-      row({ sessionId: "1", project: "Zebra" }),
-      row({ sessionId: "2", project: "apple" }),
+      row({ sessionId: "1", title: "Zebra task", project: "z-proj" }),
+      row({ sessionId: "2", title: null, project: "apple" }), // falls back to project
     ];
     expect(
-      sortSessions(rows, { key: "project", dir: "asc" }, true).map(
-        (r) => r.project,
+      sortSessions(rows, { key: "session", dir: "asc" }, true).map(
+        (r) => r.sessionId,
       ),
-    ).toEqual(["apple", "Zebra"]);
+    ).toEqual(["2", "1"]); // "apple" < "Zebra task"
   });
 });
 
 describe("defaultDirFor", () => {
   it("starts text columns ascending and numeric/time columns descending", () => {
-    expect(defaultDirFor("project")).toBe("asc");
+    expect(defaultDirFor("session")).toBe("asc");
     expect(defaultDirFor("model")).toBe("asc");
     expect(defaultDirFor("lastActivity")).toBe("desc");
     expect(defaultDirFor("duration")).toBe("desc");

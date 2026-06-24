@@ -53,6 +53,7 @@ import {
   monthLabelCols,
 } from "../ui/contributions-geom";
 import { Swatch } from "../ui/atoms";
+import { CopyButton } from "../ui/CopyButton";
 import { InfoButton } from "../ui/InfoButton";
 import {
   sortSessions,
@@ -781,6 +782,14 @@ function DailyUsage({
     return m;
   });
 
+  // Per-day model → Equivalent API value, so a tooltip model row can pull its cost in O(1) (null for an
+  // unrecognized model). Mirrors perDayModel, which carries the same models' tokens.
+  const perDayModelCost = days.map((d) => {
+    const m = new Map<string, number | null>();
+    for (const e of d.byModel) m.set(modelKey(e.modelRaw), e.equivApiValueUsd);
+    return m;
+  });
+
   const columns: DayColumn[] = days.map((d, i) =>
     stackBy === "kind"
       ? {
@@ -819,21 +828,53 @@ function DailyUsage({
           color: s.color,
         }));
 
+  // Index-aligned with KIND_LABELS / KIND_SEGMENT_COLORS, so a kind segment maps to its costByKind field.
+  const KIND_COST_KEYS = [
+    "input",
+    "output",
+    "cacheRead",
+    "cacheWrite",
+  ] as const;
+
   const renderTooltip = (i: number): ReactNode => {
     const d = days[i];
+    // Cost always prices every token kind over only the recognized models (the DailyBucket contract), so the
+    // tooltip cost ignores the page cache pill and the Total equals the day's equiv value shown in the
+    // calendar/headline. A kind's token count spans every model on the day, but costByKind prices only the
+    // recognized share. So on a day with unrecognized-model tokens a per-kind dollar would underprice its own
+    // row (a full token count beside a partial $). Show per-kind cost only when the day is fully priced AND
+    // cache is included (folded-out cache kinds can't sum to the all-kind total); otherwise n/a. Per-MODEL
+    // cost stays honest (a model maps 1:1 to a price), so the model view keeps its per-row cost.
+    const fullyPriced =
+      d.costByKind != null &&
+      !d.byModel.some((m) => m.totalTokens > 0 && m.equivApiValueUsd == null);
+    const showKindCost = includeCache && fullyPriced;
     const rows =
       stackBy === "kind"
-        ? kindSegments(d).filter((r) => r.value > 0)
+        ? kindSegments(d)
+            .map((r, idx) => ({
+              label: r.label,
+              value: r.value,
+              color: r.color,
+              cost:
+                showKindCost && d.costByKind
+                  ? d.costByKind[KIND_COST_KEYS[idx]]
+                  : null,
+            }))
+            .filter((r) => r.value > 0)
         : series
             .map((s) => ({
               label: s.modelRaw ?? "Unknown",
               value: perDayModel[i].get(modelKey(s.modelRaw)) ?? 0,
               color: s.color,
+              cost: perDayModelCost[i].get(modelKey(s.modelRaw)) ?? null,
             }))
             .filter((r) => r.value > 0);
-    // Sum the shown rows: the kind view drops cache when the pill is off, the model view always totals all
-    // kinds — so the tooltip total tracks exactly what the bar stacks.
+    // Tokens track exactly what the bar stacks: the kind view folds cache out when the pill is off, the model
+    // view always totals all kinds. Cost is the day's canonical equiv value (all kinds, recognized-only), so
+    // it agrees with every other panel and reads n/a (never blank) on a day that ran no recognized model.
     const total = rows.reduce((sum, r) => sum + r.value, 0);
+    const totalCost = d.equivApiValueUsd;
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
@@ -847,6 +888,9 @@ function DailyUsage({
               <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
                 {formatTokensShort(r.value)}
               </span>
+              <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+                {r.cost == null ? "n/a" : `~${formatUsd(r.cost)}`}
+              </span>
             </div>
           ))
         )}
@@ -854,6 +898,9 @@ function DailyUsage({
           <span className="text-fg-muted">Total</span>
           <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
             {formatTokensShort(total)}
+          </span>
+          <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
+            {totalCost == null ? "n/a" : formatUsd(totalCost)}
           </span>
         </div>
       </div>
@@ -1224,19 +1271,19 @@ function BySession({
     <StatsPanel title="By session">
       <table className="w-full table-fixed text-[12px]">
         <colgroup>
-          <col className="w-[24%]" />
-          <col className="w-[15%]" />
+          <col className="w-[28%]" />
           <col className="w-[14%]" />
+          <col className="w-[13%]" />
           <col className="w-[11%]" />
           <col className="w-[10%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
+          <col className="w-[12%]" />
+          <col className="w-[12%]" />
         </colgroup>
         <thead>
           <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
             <SortHeader
-              label="Project"
-              column="project"
+              label="Session"
+              column="session"
               sort={sort}
               onSort={onSort}
               align="left"
@@ -1286,7 +1333,12 @@ function BySession({
             <tr key={r.sessionId} className="border-t border-ink-850">
               <td className="py-1 pr-3">
                 <span className="block truncate text-fg" title={r.cwd}>
-                  {r.project}
+                  {r.title ?? r.project}
+                </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-faint">
+                  <span className="truncate">{r.project}</span>
+                  <span className="font-mono">{r.sessionId.slice(0, 8)}</span>
+                  <CopyButton value={r.sessionId} label="Copy session id" />
                 </span>
               </td>
               <td className="py-1 pr-3">
