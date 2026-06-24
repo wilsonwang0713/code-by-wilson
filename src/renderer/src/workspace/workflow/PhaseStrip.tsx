@@ -1,8 +1,8 @@
 import type { WorkflowPhase } from "@shared/types";
 import { cx } from "../../ui/atoms";
 
-/** One phase segment. State by tone, not color: done is bright, running pulses with a fill proportional
- *  to its agents finished, pending is dim. */
+/** One phase segment. Done is a muted bar; the running phase fills in the brand teal and pulses, the
+ *  fill proportional to its agents finished; pending is dim. Teal marks the live state only. */
 function Segment({ phase }: { phase: WorkflowPhase }) {
   const { status, agentsDone, agentsTotal } = phase;
   const fillPct =
@@ -20,7 +20,7 @@ function Segment({ phase }: { phase: WorkflowPhase }) {
     >
       {status === "running" && (
         <div
-          className="absolute inset-y-0 left-0 animate-pulse-soft rounded-full bg-fg-muted"
+          className="absolute inset-y-0 left-0 animate-pulse-soft rounded-full bg-primary"
           style={{ width: `${fillPct}%` }}
         />
       )}
@@ -34,7 +34,7 @@ function Label({ phase }: { phase: WorkflowPhase }) {
     phase.status === "done"
       ? "text-fg-muted"
       : phase.status === "running"
-        ? "text-fg"
+        ? "text-primary"
         : "text-fg-faint";
   return (
     <span className={cx("flex-1 truncate text-center text-[10px]", tone)}>

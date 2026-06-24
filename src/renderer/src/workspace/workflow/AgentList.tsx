@@ -39,7 +39,7 @@ function AgentRow({
       : 0;
   const running = agent.state === "running";
   const dotTone = running
-    ? "bg-fg animate-pulse-soft"
+    ? "bg-primary animate-pulse-soft"
     : agent.state === "queued"
       ? "bg-ink-600"
       : "bg-fg-muted";
@@ -67,8 +67,8 @@ function AgentRow({
         {s !== undefined && (
           <span
             className={cx(
-              "absolute inset-y-0 rounded-full bg-fg-muted",
-              running && "animate-pulse-soft",
+              "absolute inset-y-0 rounded-full",
+              running ? "bg-primary animate-pulse-soft" : "bg-fg-muted",
             )}
             style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
           />
