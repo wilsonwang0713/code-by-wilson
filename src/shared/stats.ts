@@ -130,17 +130,26 @@ export interface StatsBySession {
 }
 
 /**
- * Overlay human-readable names onto the per-Session rows: a user rename wins, else the index's derived
- * title, else null (the renderer falls back to the project basename). Pure, so the IPC handler stays thin
- * and this stays unit-testable. A row whose title is unchanged is returned by reference (cheap no-op).
+ * Overlay human-readable names onto the per-Session rows, mirroring the overview path's precedence
+ * (overlaySessions then applyTitleOverrides) so the By-session table shows the same name as the
+ * header/rail: a cbw rename wins, then Claude's live session_name, then the index's derived title, else
+ * null (the renderer falls back to the project basename). `||`, not `??`, so an empty-string title falls
+ * through to the next source instead of blanking the row, matching applyTitleOverrides' truthy check.
+ * Pure, so the IPC handler stays thin and this stays unit-testable. A row whose title is unchanged is
+ * returned by reference (cheap no-op).
  */
 export function withSessionTitles(
   rows: StatsBySession[],
   titleById: Record<string, string>,
   overrides: Record<string, string>,
+  liveNames: Record<string, string> = {},
 ): StatsBySession[] {
   return rows.map((r) => {
-    const title = overrides[r.sessionId] ?? titleById[r.sessionId] ?? null;
+    const title =
+      overrides[r.sessionId] ||
+      liveNames[r.sessionId] ||
+      titleById[r.sessionId] ||
+      null;
     return title === r.title ? r : { ...r, title };
   });
 }

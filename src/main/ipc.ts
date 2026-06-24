@@ -290,6 +290,20 @@ export function registerIpc({
       return {};
     }
   };
+  // The live session_name from the freshest statusLine capture per session, so the By-session table shows the
+  // same name the overview/header/rail show (overlaySessions) instead of lagging the index title until the
+  // next sync. Failure-tolerant like the other safe* reads: a bad capture read just drops the live overlay.
+  const safeLiveNames = (): Record<string, string> => {
+    try {
+      const out: Record<string, string> = {};
+      for (const [id, s] of freshestBySession(reader.read()))
+        if (s.sessionName) out[id] = s.sessionName;
+      return out;
+    } catch (err) {
+      console.error("stats live-name read failed; using index titles", err);
+      return {};
+    }
+  };
   // The daily time-series, range-scoped; on a read error serve an empty series so a bad row never sinks
   // the snapshot (matching safeTotals/safeBreakdowns' "serve a safe default" posture).
   const safeDaily = (adb: SqliteDb, win: StatsWindow): DailyBucket[] => {
@@ -435,6 +449,7 @@ export function registerIpc({
             breakdowns.bySession,
             safeSessionTitles(),
             sessionTitles?.read() ?? {},
+            safeLiveNames(),
           ),
           calendar: safeCalendar(analyticsDb, cal),
           calendarStart: cal.startDay,

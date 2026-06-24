@@ -46,4 +46,38 @@ describe("withSessionTitles", () => {
     const out = withSessionTitles([r], { a: "Same" }, {});
     expect(out[0]).toBe(r);
   });
+
+  it("takes Claude's live session_name over the index title", () => {
+    const out = withSessionTitles(
+      [row({ sessionId: "a" })],
+      { a: "Indexed" },
+      {},
+      { a: "LiveName" },
+    );
+    expect(out[0].title).toBe("LiveName");
+  });
+
+  it("lets a user rename win over the live session_name", () => {
+    const out = withSessionTitles(
+      [row({ sessionId: "a" })],
+      { a: "Indexed" },
+      { a: "Renamed" },
+      { a: "LiveName" },
+    );
+    expect(out[0].title).toBe("Renamed");
+  });
+
+  it("falls through an empty-string override to the next source instead of blanking", () => {
+    const out = withSessionTitles(
+      [row({ sessionId: "a" })],
+      { a: "Indexed" },
+      { a: "" },
+    );
+    expect(out[0].title).toBe("Indexed");
+  });
+
+  it("falls through an empty-string index title to null", () => {
+    const out = withSessionTitles([row({ sessionId: "a" })], { a: "" }, {});
+    expect(out[0].title).toBeNull();
+  });
 });

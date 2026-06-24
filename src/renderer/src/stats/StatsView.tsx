@@ -838,6 +838,17 @@ function DailyUsage({
 
   const renderTooltip = (i: number): ReactNode => {
     const d = days[i];
+    // Cost always prices every token kind over only the recognized models (the DailyBucket contract), so the
+    // tooltip cost ignores the page cache pill and the Total equals the day's equiv value shown in the
+    // calendar/headline. A kind's token count spans every model on the day, but costByKind prices only the
+    // recognized share. So on a day with unrecognized-model tokens a per-kind dollar would underprice its own
+    // row (a full token count beside a partial $). Show per-kind cost only when the day is fully priced AND
+    // cache is included (folded-out cache kinds can't sum to the all-kind total); otherwise n/a. Per-MODEL
+    // cost stays honest (a model maps 1:1 to a price), so the model view keeps its per-row cost.
+    const fullyPriced =
+      d.costByKind != null &&
+      !d.byModel.some((m) => m.totalTokens > 0 && m.equivApiValueUsd == null);
+    const showKindCost = includeCache && fullyPriced;
     const rows =
       stackBy === "kind"
         ? kindSegments(d)
@@ -845,7 +856,10 @@ function DailyUsage({
               label: r.label,
               value: r.value,
               color: r.color,
-              cost: d.costByKind ? d.costByKind[KIND_COST_KEYS[idx]] : null,
+              cost:
+                showKindCost && d.costByKind
+                  ? d.costByKind[KIND_COST_KEYS[idx]]
+                  : null,
             }))
             .filter((r) => r.value > 0)
         : series
@@ -856,14 +870,11 @@ function DailyUsage({
               cost: perDayModelCost[i].get(modelKey(s.modelRaw)) ?? null,
             }))
             .filter((r) => r.value > 0);
-    // Sum the shown rows so the total tracks exactly what the bar stacks: the kind view drops cache when the
-    // pill is off, the model view always totals all kinds.
+    // Tokens track exactly what the bar stacks: the kind view folds cache out when the pill is off, the model
+    // view always totals all kinds. Cost is the day's canonical equiv value (all kinds, recognized-only), so
+    // it agrees with every other panel and reads n/a (never blank) on a day that ran no recognized model.
     const total = rows.reduce((sum, r) => sum + r.value, 0);
-    // Equiv totals only the priced rows; an all-unrecognized day (every cost null) shows tokens with no $.
-    const costRows = rows.filter((r) => r.cost != null);
-    const totalCost = costRows.length
-      ? costRows.reduce((sum, r) => sum + (r.cost ?? 0), 0)
-      : null;
+    const totalCost = d.equivApiValueUsd;
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
@@ -889,7 +900,7 @@ function DailyUsage({
             {formatTokensShort(total)}
           </span>
           <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-            {totalCost == null ? "" : formatUsd(totalCost)}
+            {totalCost == null ? "n/a" : formatUsd(totalCost)}
           </span>
         </div>
       </div>
