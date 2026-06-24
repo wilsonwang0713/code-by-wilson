@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import type { Subagent, Task, BackgroundShell } from "@shared/types";
+import type {
+  Subagent,
+  Task,
+  BackgroundShell,
+  WorkflowRunSummary,
+} from "@shared/types";
 import { Icon } from "../../ui/icons";
 import { Tabs } from "../../ui/Tabs";
 import type { DocState } from "../use-transcript";
@@ -7,6 +12,7 @@ import { DockTasks } from "./DockTasks";
 import { TurnsTab } from "./TurnsTab";
 import { SubagentsTab } from "./SubagentsTab";
 import { ShellsTab } from "./ShellsTab";
+import { WorkflowsTab } from "./WorkflowsTab";
 import { OverlayScroll } from "../../ui/OverlayScroll";
 import {
   type DockTab,
@@ -25,20 +31,26 @@ export function StructureDock({
   tasks,
   doc,
   shells,
+  workflows,
   now,
   activeAgentId,
   activeShellId,
+  activeWorkflowId,
   onDrill,
   onDrillShell,
+  onDrillWorkflow,
 }: {
   tasks: Task[];
   doc: DocState;
   shells: BackgroundShell[];
+  workflows: WorkflowRunSummary[];
   now: number;
   activeAgentId?: string;
   activeShellId?: string;
+  activeWorkflowId?: string;
   onDrill: (agent: Subagent) => void;
   onDrillShell: (shell: BackgroundShell) => void;
+  onDrillWorkflow: (run: WorkflowRunSummary) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const subagents = doc?.subagents ?? [];
@@ -60,11 +72,13 @@ export function StructureDock({
   const tab =
     pick && pick.alive === alive
       ? pick.tab
-      : activeShellId
-        ? "shells"
-        : activeAgentId
-          ? "subagents"
-          : defaultDockTab(stats, tasks.length);
+      : activeWorkflowId
+        ? "workflows"
+        : activeShellId
+          ? "shells"
+          : activeAgentId
+            ? "subagents"
+            : defaultDockTab(stats, tasks.length);
 
   if (collapsed)
     return (
@@ -72,6 +86,7 @@ export function StructureDock({
         tasks={tasks}
         stats={stats}
         shellCount={shells.length}
+        workflowCount={workflows.length}
         turnCount={turns.length}
         onExpand={() => setCollapsed(false)}
       />
@@ -86,6 +101,7 @@ export function StructureDock({
         turnCount={turns.length}
         subagentCount={stats.total}
         shellCount={shells.length}
+        workflowCount={workflows.length}
         onCollapse={() => setCollapsed(true)}
       />
       <OverlayScroll className="min-h-0 flex-1">
@@ -106,6 +122,13 @@ export function StructureDock({
             activeShellId={activeShellId}
             onDrill={onDrillShell}
           />
+        ) : tab === "workflows" ? (
+          <WorkflowsTab
+            workflows={workflows}
+            now={now}
+            activeWorkflowId={activeWorkflowId}
+            onDrill={onDrillWorkflow}
+          />
         ) : (
           <TurnsTab turns={turns} now={now} />
         )}
@@ -123,6 +146,7 @@ function DockTabBar({
   turnCount,
   subagentCount,
   shellCount,
+  workflowCount,
   onCollapse,
 }: {
   tab: DockTab;
@@ -131,6 +155,7 @@ function DockTabBar({
   turnCount: number;
   subagentCount: number;
   shellCount: number;
+  workflowCount: number;
   onCollapse: () => void;
 }) {
   return (
@@ -140,6 +165,7 @@ function DockTabBar({
           { id: "tasks", label: "Tasks", count: taskCount },
           { id: "subagents", label: "Subagents", count: subagentCount },
           { id: "shells", label: "Shells", count: shellCount },
+          { id: "workflows", label: "Workflows", count: workflowCount },
           { id: "turns", label: "Turns", count: turnCount },
         ]}
         value={tab}
@@ -165,12 +191,14 @@ function DockTally({
   tasks,
   stats,
   shellCount,
+  workflowCount,
   turnCount,
   onExpand,
 }: {
   tasks: Task[];
   stats: SubagentStats;
   shellCount: number;
+  workflowCount: number;
   turnCount: number;
   onExpand: () => void;
 }) {
@@ -196,6 +224,7 @@ function DockTally({
           {stats.working > 0 ? ` · ${stats.working} working` : ""}
         </span>
         <span>{shellCount} shells</span>
+        <span>{workflowCount} workflows</span>
         <span>{turnCount} turns</span>
       </span>
     </button>

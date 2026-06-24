@@ -15,7 +15,8 @@ export type SubagentCrumb = {
 /** One level of the drill path. A subagent crumb drills its transcript; a shell crumb drills its log. */
 export type DrillCrumb =
   | { kind: "subagent"; agentId: string; type: string; description?: string }
-  | { kind: "shell"; shellId: string; label: string };
+  | { kind: "shell"; shellId: string; label: string }
+  | { kind: "workflow"; runId: string; name: string };
 
 /** The current crumb's label: "Subagent (<type>): <description>", or just "Subagent (<type>)" when the
  *  dispatch carried no description. Ancestor crumbs stay terse (the bare type) so the path reads compact. */

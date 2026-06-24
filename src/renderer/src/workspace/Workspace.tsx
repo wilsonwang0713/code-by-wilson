@@ -20,6 +20,10 @@ import { ShellDrill } from "./ShellDrill";
 import { useSubagentTranscript } from "./use-subagent-transcript";
 import { useShells } from "./use-shells";
 import { useShellOutput, type ShellOutputState } from "./use-shell-output";
+import { useWorkflows } from "./use-workflows";
+import { useWorkflowRun, type WorkflowRunState } from "./use-workflow-run";
+import { WorkflowDrill } from "./WorkflowDrill";
+import type { WorkflowRunSummary } from "@shared/types";
 import { TokensPanel } from "./panels/TokensPanel";
 import { TokenSpeedPanel } from "./panels/TokenSpeedPanel";
 import { useTasks } from "./use-tasks";
@@ -135,10 +139,13 @@ function WorkspaceBody({
   const top = drill[drill.length - 1];
   const activeAgentId = top?.kind === "subagent" ? top.agentId : undefined;
   const activeShellId = top?.kind === "shell" ? top.shellId : undefined;
-  // Both polls lifted here (always mounted) and gated on their active id, so they survive the Managed
+  const activeWorkflowId = top?.kind === "workflow" ? top.runId : undefined;
+  // Polls lifted here (always mounted) and gated on their active id, so they survive the Managed
   // Terminal ⇄ Transcript toggle. Each is a no-op until something of its kind is drilled.
   const subagentDoc = useSubagentTranscript(s.id, activeAgentId);
   const shellOutput = useShellOutput(s.id, activeShellId);
+  const workflows = useWorkflows(s.id);
+  const workflowRun = useWorkflowRun(s.id, activeWorkflowId);
   // The live BackgroundShell behind the drilled id, re-resolved each poll so the header's status/exit/
   // duration stay fresh while drilled (a running shell flips to completed on its own). undefined when
   // nothing is drilled, or when the shell was reaped from the list.
@@ -181,6 +188,7 @@ function WorkspaceBody({
             subagentDoc={subagentDoc}
             shellOutput={shellOutput}
             shell={activeShell}
+            workflowRun={workflowRun}
             now={now}
             drill={drill}
             onNavigate={(depth) => setDrill((d) => d.slice(0, depth))}
@@ -194,9 +202,11 @@ function WorkspaceBody({
           tasks={tasks ?? []}
           doc={doc}
           shells={shells ?? []}
+          workflows={workflows ?? []}
           now={now}
           activeAgentId={activeAgentId}
           activeShellId={activeShellId}
+          activeWorkflowId={activeWorkflowId}
           onDrill={(agent: Subagent) =>
             setDrill([
               {
@@ -210,6 +220,11 @@ function WorkspaceBody({
           onDrillShell={(shell: BackgroundShell) =>
             setDrill([
               { kind: "shell", shellId: shell.id, label: shell.command },
+            ])
+          }
+          onDrillWorkflow={(run: WorkflowRunSummary) =>
+            setDrill([
+              { kind: "workflow", runId: run.runId, name: run.workflowName },
             ])
           }
         />
@@ -248,6 +263,7 @@ function CenterView({
   subagentDoc,
   shellOutput,
   shell,
+  workflowRun,
   now,
   drill,
   onNavigate,
@@ -261,6 +277,7 @@ function CenterView({
   subagentDoc: DocState;
   shellOutput: ShellOutputState;
   shell: BackgroundShell | undefined;
+  workflowRun: WorkflowRunState;
   now: number;
   drill: DrillCrumb[];
   onNavigate: (depth: number) => void;
@@ -282,7 +299,14 @@ function CenterView({
       description: c.description,
     }));
   const drilledView =
-    top?.kind === "shell" ? (
+    top?.kind === "workflow" ? (
+      <WorkflowDrill
+        key={top.runId}
+        run={workflowRun}
+        name={top.name}
+        onBack={() => onNavigate(0)}
+      />
+    ) : top?.kind === "shell" ? (
       // Keyed by shell id so switching shells remounts the drill: CommandBlock's expand state and the
       // log scroll reset instead of bleeding from the previous shell.
       <ShellDrill
@@ -306,7 +330,9 @@ function CenterView({
   const drilledKey = top
     ? top.kind === "shell"
       ? top.shellId
-      : top.agentId
+      : top.kind === "workflow"
+        ? top.runId
+        : top.agentId
     : undefined;
 
   // Every session gets the Terminal ⇄ Transcript tabs. The Terminal slot is the live in-app xterm only for
