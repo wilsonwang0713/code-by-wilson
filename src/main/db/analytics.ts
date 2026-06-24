@@ -382,8 +382,9 @@ function foldModels(rows: ModelRow[]): StatsByModel[] {
     m.cache_creation_tokens += r.cache_creation_tokens;
   }
   return [...map.values()]
-    .map(
-      (m): StatsByModel => ({
+    .map((m): StatsByModel => {
+      const cb = modelRowCostBreakdown(m);
+      return {
         modelRaw: m.model_raw,
         totalTokens:
           m.input_tokens +
@@ -392,9 +393,10 @@ function foldModels(rows: ModelRow[]): StatsByModel[] {
           m.cache_creation_tokens,
         inputTokens: m.input_tokens,
         outputTokens: m.output_tokens,
-        equivApiValueUsd: modelRowCost(m),
-      }),
-    )
+        equivApiValueUsd: cb?.total ?? null,
+        equivApiValueFreshUsd: cb ? cb.input + cb.output : null,
+      };
+    })
     .sort(
       (a, b) =>
         b.totalTokens - a.totalTokens ||

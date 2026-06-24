@@ -625,6 +625,73 @@ describe("readByModel", () => {
     );
     expect(summed).toBeCloseTo(readTotals(db).equivApiValueUsd); // $5 opus + $3 sonnet = $8
   });
+
+  it("prices a fresh equiv value per model (input + output only) that reconciles with the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "m1",
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "m2",
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "m3",
+        modelRaw: "gpt-9-ultra",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
+    expect(byRaw.get("claude-opus-4-8")!.equivApiValueFreshUsd).toBeCloseTo(5); // 1M input @ $5/M; the 1M cache-read @ $0.5/M excluded
+    expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueFreshUsd).toBeCloseTo(
+      3,
+    ); // 1M input @ $3/M
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueFreshUsd).toBeNull(); // unrecognized → n/a
+    const summed = readByModel(db).reduce(
+      (acc, r) => acc + (r.equivApiValueFreshUsd ?? 0),
+      0,
+    );
+    expect(summed).toBeCloseTo(readTotals(db).equivApiValueFreshUsd); // $5 + $3
+  });
+
+  it("gives a recognized model whose tokens are all cache a fresh value of 0 (not n/a)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readByModel(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(0.5); // 1M cache-read @ $0.5/M
+    expect(row.equivApiValueFreshUsd).toBe(0); // recognized but no fresh tokens → honest 0, never null
+  });
 });
 
 describe("readByProject", () => {

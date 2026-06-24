@@ -53,6 +53,9 @@ export interface StatsByModel {
   outputTokens: number;
   /** Equivalent API value for this model, or null (n/a) when the raw id matches no known family. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off.
+   *  0 (not null) for a recognized model with no fresh tokens; null only when the id is unrecognized. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /**
