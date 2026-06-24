@@ -33,8 +33,8 @@ function WorkflowCrumb({ name, onBack }: { name: string; onBack: () => void }) {
 
 /**
  * The dedicated workflow-run surface, drilled into the center pane. Renders the run header, phase strip,
- * and a master/detail split of the agent list and the run result. The selected-agent transcript is layered
- * on in a later task. Pure renderer of the run it's handed.
+ * and a master/detail split: the agent list on the left, and either the selected agent's transcript or
+ * the run result on the right. When no agents exist yet, renders the run result full-width.
  */
 export function WorkflowDrill({
   run,
@@ -64,30 +64,36 @@ export function WorkflowDrill({
         <div className="flex min-h-0 flex-1 flex-col">
           <WorkflowHeader run={run} />
           <PhaseStrip phases={run.phases} />
-          <div className="flex min-h-0 flex-1 border-t border-ink-850">
-            <OverlayScroll className="min-h-0 w-80 shrink-0 border-r border-ink-850">
-              <AgentList
-                run={run}
-                selectedAgentId={selectedAgentId}
-                onSelectAgent={onSelectAgent}
-              />
+          {run.agents.length === 0 ? (
+            <OverlayScroll className="min-h-0 flex-1 border-t border-ink-850">
+              <RunResult run={run} />
             </OverlayScroll>
-            <div className="min-h-0 flex-1">
-              {(() => {
-                const selected =
-                  selectedAgentId !== undefined
-                    ? run.agents.find((a) => a.id === selectedAgentId)
-                    : undefined;
-                return selected ? (
-                  <AgentDetail agent={selected} doc={agentDoc} />
-                ) : (
-                  <OverlayScroll className="h-full">
-                    <RunResult run={run} />
-                  </OverlayScroll>
-                );
-              })()}
+          ) : (
+            <div className="flex min-h-0 flex-1 border-t border-ink-850">
+              <OverlayScroll className="min-h-0 w-80 shrink-0 border-r border-ink-850">
+                <AgentList
+                  run={run}
+                  selectedAgentId={selectedAgentId}
+                  onSelectAgent={onSelectAgent}
+                />
+              </OverlayScroll>
+              <div className="min-h-0 flex-1">
+                {(() => {
+                  const selected =
+                    selectedAgentId !== undefined
+                      ? run.agents.find((a) => a.id === selectedAgentId)
+                      : undefined;
+                  return selected ? (
+                    <AgentDetail agent={selected} doc={agentDoc} />
+                  ) : (
+                    <OverlayScroll className="h-full">
+                      <RunResult run={run} />
+                    </OverlayScroll>
+                  );
+                })()}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

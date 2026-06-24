@@ -23,7 +23,19 @@ export function RunResult({ run }: { run: WorkflowRun }) {
           {run.summary}
         </p>
       ) : null}
-      <ResultBody result={run.result} />
+      {(() => {
+        const pending =
+          run.status === "running" &&
+          (run.result === undefined || run.result === null);
+        return pending ? (
+          <p className="mt-2 flex items-center gap-2 text-[11px] text-fg-muted">
+            <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-fg-muted" />
+            Run in progress — result pending.
+          </p>
+        ) : (
+          <ResultBody result={run.result} />
+        );
+      })()}
       {run.logs.length > 0 && (
         <div className="mt-3 border-t border-ink-850 pt-2">
           <div className="text-[10px] uppercase tracking-wide text-fg-faint">
