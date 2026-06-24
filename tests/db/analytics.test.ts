@@ -1844,6 +1844,26 @@ describe("readDaily", () => {
     expect(d.costByKind).toBeNull();
     expect(d.byModel[0].equivApiValueUsd).toBeNull();
   });
+
+  it("prices a fresh equiv value per day (input + output only)", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        modelRaw: "claude-sonnet-4-6",
+        ts: 1_700_000_000_000,
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [d] = readDaily(db);
+    expect(d.equivApiValueUsd).toBeCloseTo(18.3); // 3 + 15 + 0.3 (sonnet, all kinds)
+    expect(d.equivApiValueFreshUsd).toBeCloseTo(18); // 3 + 15, cache-read excluded
+  });
 });
 
 // helper: a usage object with all-equal input tokens (hoisted; used by the upper-bound describe below).

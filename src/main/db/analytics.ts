@@ -886,6 +886,9 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         cacheReadTokens: a.cacheReadTokens,
         cacheCreationTokens: a.cacheCreationTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+        equivApiValueFreshUsd: a.hasKnownCost
+          ? a.kindInputUsd + a.kindOutputUsd
+          : null,
         costByKind: a.hasKnownCost
           ? {
               input: a.kindInputUsd,
