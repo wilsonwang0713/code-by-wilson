@@ -94,7 +94,6 @@ export function StructureDock({
         ) : tab === "subagents" ? (
           <SubagentsTab
             subagents={subagents}
-            stats={stats}
             now={now}
             activeAgentId={activeAgentId}
             onDrill={onDrill}
