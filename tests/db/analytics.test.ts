@@ -957,6 +957,43 @@ describe("readByProject", () => {
     expect(rows[0].inputTokens).toBe(300);
     expect(rows[0].outputTokens).toBe(50);
   });
+
+  it("prices a fresh equiv value per project (input + output only), reconciling with the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "p1",
+        modelRaw: "claude-opus-4-8",
+        cwd: "/work/app",
+        project: "app",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+      turn({
+        messageId: "p2",
+        modelRaw: "claude-sonnet-4-6",
+        cwd: "/work/app",
+        project: "app",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readByProject(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(8.5); // 5 + 0.5 (opus) + 3 (sonnet), all kinds
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(8); // 5 + 3, cache excluded
+    expect(row.equivApiValueFreshUsd!).toBeCloseTo(
+      readTotals(db).equivApiValueFreshUsd,
+    );
+  });
 });
 
 describe("readByBranch", () => {
@@ -1168,6 +1205,32 @@ describe("readByBranch", () => {
     expect(rows[0].totalTokens).toBe(3365);
     expect(rows[0].inputTokens).toBe(300);
     expect(rows[0].outputTokens).toBe(50);
+  });
+
+  it("prices a fresh equiv value per branch (input + output only), reconciling with the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "b1",
+        modelRaw: "claude-opus-4-8",
+        cwd: "/work/app",
+        project: "app",
+        branch: "main",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [row] = readByBranch(db);
+    expect(row.equivApiValueUsd).toBeCloseTo(5.5); // 5 + 0.5, all kinds
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(5); // input only
+    expect(row.equivApiValueFreshUsd!).toBeCloseTo(
+      readTotals(db).equivApiValueFreshUsd,
+    );
   });
 });
 

@@ -453,6 +453,7 @@ interface DimAgg {
   inputTokens: number;
   outputTokens: number;
   knownCost: number;
+  freshCost: number;
   hasKnownCost: boolean;
 }
 
@@ -480,6 +481,7 @@ function foldByDim(
         inputTokens: 0,
         outputTokens: 0,
         knownCost: 0,
+        freshCost: 0,
         hasKnownCost: false,
       };
       map.set(key, a);
@@ -491,9 +493,10 @@ function foldByDim(
       r.cache_creation_tokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const cost = modelRowCost(r);
-    if (cost != null) {
-      a.knownCost += cost;
+    const b = modelRowCostBreakdown(r);
+    if (b != null) {
+      a.knownCost += b.total;
+      a.freshCost += b.input + b.output;
       a.hasKnownCost = true;
     }
   }
@@ -504,6 +507,12 @@ function foldByDim(
  *  of its turns ran a recognized model — an honest n/a, never a guessed $0 (matching a per-model row). */
 function dimCost(a: DimAgg): number | null {
   return a.hasKnownCost ? a.knownCost : null;
+}
+
+/** A folded group's fresh Equivalent API value (input + output rates only): shown when the page cache
+ *  pill is off. Null (n/a) when the group ran no recognized model, mirroring dimCost. */
+function dimFreshCost(a: DimAgg): number | null {
+  return a.hasKnownCost ? a.freshCost : null;
 }
 
 /** The finest dimension grain: one row per (cwd × project × branch × model). readBreakdowns scans at this
@@ -528,6 +537,7 @@ function foldProjects(rows: DimModelRow[]): StatsByProject[] {
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         equivApiValueUsd: dimCost(a),
+        equivApiValueFreshUsd: dimFreshCost(a),
       }),
     )
     .sort(
@@ -553,6 +563,7 @@ function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         equivApiValueUsd: dimCost(a),
+        equivApiValueFreshUsd: dimFreshCost(a),
       }),
     )
     .sort(

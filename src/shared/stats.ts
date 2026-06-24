@@ -79,6 +79,8 @@ export interface StatsByProject {
   outputTokens: number;
   /** Equivalent API value summed over the project's recognized models, or null (n/a) when it has none. */
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /**
@@ -98,6 +100,8 @@ export interface StatsByBranch {
   inputTokens: number;
   outputTokens: number;
   equivApiValueUsd: number | null;
+  /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off. */
+  equivApiValueFreshUsd: number | null;
 }
 
 /**
