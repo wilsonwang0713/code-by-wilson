@@ -20,7 +20,7 @@ import {
 } from "@shared/statusline";
 import { applyTitleOverrides } from "@shared/title-override";
 import type { SessionTitleStore } from "./session-titles";
-import { getOverview } from "./db/store";
+import { getOverview, readSessionTitles } from "./db/store";
 import {
   readTotals,
   readBreakdowns,
@@ -55,6 +55,7 @@ import {
   rangeWindow,
   calendarWindow,
   localDayKey,
+  withSessionTitles,
 } from "@shared/stats";
 import { syncSessions } from "./sync";
 import { isHttpUrl } from "./open-external";
@@ -276,6 +277,19 @@ export function registerIpc({
       return emptyBreakdowns();
     }
   };
+  // The index's id→title map for the By-session table, failure-tolerant: a bad index read just means the
+  // table falls back to project basenames (same "serve a safe default" posture as the other safe* reads).
+  const safeSessionTitles = (): Record<string, string> => {
+    try {
+      return readSessionTitles(db);
+    } catch (err) {
+      console.error(
+        "stats session-title read failed; using project names",
+        err,
+      );
+      return {};
+    }
+  };
   // The daily time-series, range-scoped; on a read error serve an empty series so a bad row never sinks
   // the snapshot (matching safeTotals/safeBreakdowns' "serve a safe default" posture).
   const safeDaily = (adb: SqliteDb, win: StatsWindow): DailyBucket[] => {
@@ -407,6 +421,7 @@ export function registerIpc({
       if (since === token && token !== "" && progress.done && !wrote)
         return { status: "unchanged", token };
 
+      const breakdowns = safeBreakdowns(analyticsDb, win);
       return {
         status: "changed",
         token,
@@ -415,7 +430,12 @@ export function registerIpc({
           progress,
           hasAnyTurns: safeHasAnyTurns(analyticsDb),
           daily: safeDaily(analyticsDb, win),
-          ...safeBreakdowns(analyticsDb, win),
+          ...breakdowns,
+          bySession: withSessionTitles(
+            breakdowns.bySession,
+            safeSessionTitles(),
+            sessionTitles?.read() ?? {},
+          ),
           calendar: safeCalendar(analyticsDb, cal),
           calendarStart: cal.startDay,
           calendarEnd: cal.endDay,

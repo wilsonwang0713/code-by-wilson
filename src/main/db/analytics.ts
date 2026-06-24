@@ -707,6 +707,7 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+        title: null,
       }),
     )
     .sort(

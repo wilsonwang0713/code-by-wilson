@@ -18,8 +18,9 @@ vi.mock("electron", () => ({
 }));
 
 import { registerIpc } from "../src/main/ipc";
-import { migrate } from "../src/main/db/store";
+import { migrate, upsertSessions } from "../src/main/db/store";
 import { migrateAnalytics, upsertTurns } from "../src/main/db/analytics";
+import type { PersistedSession } from "@shared/types";
 import { openTestDb } from "./helpers/sqlite";
 import { tempHomes } from "./helpers/temp-home";
 
@@ -727,5 +728,78 @@ describe("registerIpc stats:read", () => {
     expect(snap.totals.inputTokens).toBe(1_000_000);
     expect(snap.progress.done).toBe(true);
     expect(snap.hasAnyTurns).toBe(true); // the seeded turn is present
+  });
+
+  const persisted = (
+    over: Partial<PersistedSession> = {},
+  ): PersistedSession => ({
+    id: "id-1",
+    title: "Title",
+    project: "proj",
+    branch: "main",
+    state: "idle",
+    management: "observed",
+    model: "opus",
+    lastActivityMs: 1000,
+    createdMs: 2000,
+    awaitingUser: false,
+    transcriptMtimeMs: 500,
+    usage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+    },
+    contextTokens: 0,
+    ...over,
+  });
+
+  it("labels By-session rows with the index title, and leaves null when the index has no row", () => {
+    const db = openTestDb();
+    migrate(db);
+    const analyticsDb = openTestDb();
+    migrateAnalytics(analyticsDb);
+    upsertTurns(analyticsDb, [
+      {
+        messageId: "m1",
+        sessionId: "sess-known",
+        ts: 1000,
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/work/proj",
+        project: "proj",
+        branch: "main",
+      },
+      {
+        messageId: "m2",
+        sessionId: "sess-ghost",
+        ts: 2000,
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+        cwd: "/work/proj",
+        project: "proj",
+        branch: "main",
+      },
+    ]);
+    upsertSessions(db, [
+      persisted({ id: "sess-known", title: "Fix the parser" }),
+    ]);
+    registerIpc({ db, provider, analyticsDb });
+
+    const snap = readChanged();
+    const known = snap.bySession.find((r) => r.sessionId === "sess-known")!;
+    const ghost = snap.bySession.find((r) => r.sessionId === "sess-ghost")!;
+    expect(known.title).toBe("Fix the parser");
+    expect(ghost.title).toBeNull(); // not in the index → renderer falls back to project
   });
 });

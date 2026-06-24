@@ -123,6 +123,26 @@ export interface StatsBySession {
   outputTokens: number;
   /** Equivalent API value summed over the session's recognized models, or null (n/a) when it has none. */
   equivApiValueUsd: number | null;
+  /** Human-readable session name from the index (derived title or a user rename), merged in at the IPC
+   *  handler. Null when the index has no row for this session (reaped / predates the index — the renderer
+   *  then falls back to the project basename). */
+  title: string | null;
+}
+
+/**
+ * Overlay human-readable names onto the per-Session rows: a user rename wins, else the index's derived
+ * title, else null (the renderer falls back to the project basename). Pure, so the IPC handler stays thin
+ * and this stays unit-testable. A row whose title is unchanged is returned by reference (cheap no-op).
+ */
+export function withSessionTitles(
+  rows: StatsBySession[],
+  titleById: Record<string, string>,
+  overrides: Record<string, string>,
+): StatsBySession[] {
+  return rows.map((r) => {
+    const title = overrides[r.sessionId] ?? titleById[r.sessionId] ?? null;
+    return title === r.title ? r : { ...r, title };
+  });
 }
 
 /**

@@ -217,6 +217,18 @@ export function getOverview(db: SqliteDb): IndexOverview {
   return { sessions: persisted.map(hydrate) };
 }
 
+/** A map of session id → stored title, for the stats By-session table to name rows the index knows. Reads
+ *  only the two columns the merge needs, so it stays cheap on a large index. */
+export function readSessionTitles(db: SqliteDb): Record<string, string> {
+  const rows = db.prepare("SELECT id, title FROM sessions").all() as {
+    id: string;
+    title: string;
+  }[];
+  const out: Record<string, string> = {};
+  for (const r of rows) out[r.id] = r.title;
+  return out;
+}
+
 /** Drop every row whose id isn't in `keepIds` — sessions that aged out of the window and aren't live.
  *  An empty keep-set clears the table. */
 export function pruneSessions(db: SqliteDb, keepIds: string[]): void {
