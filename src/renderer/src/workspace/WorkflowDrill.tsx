@@ -5,6 +5,8 @@ import { AgentList } from "./workflow/AgentList";
 import { PhaseStrip } from "./workflow/PhaseStrip";
 import { WorkflowHeader } from "./workflow/WorkflowHeader";
 import { RunResult } from "./workflow/RunResult";
+import { AgentDetail } from "./workflow/AgentDetail";
+import type { DocState } from "./use-transcript";
 
 /** Tri-state run, from useWorkflowRun: undefined = loading, null = absent, a run once read. */
 type RunState = WorkflowRun | null | undefined;
@@ -40,12 +42,14 @@ export function WorkflowDrill({
   onBack,
   selectedAgentId,
   onSelectAgent,
+  agentDoc,
 }: {
   run: RunState;
   name: string;
   onBack: () => void;
   selectedAgentId?: string;
   onSelectAgent: (id: string) => void;
+  agentDoc: DocState;
 }) {
   return (
     <div className="flex h-full flex-col">
@@ -68,9 +72,21 @@ export function WorkflowDrill({
                 onSelectAgent={onSelectAgent}
               />
             </OverlayScroll>
-            <OverlayScroll className="min-h-0 flex-1">
-              <RunResult run={run} />
-            </OverlayScroll>
+            <div className="min-h-0 flex-1">
+              {(() => {
+                const selected =
+                  selectedAgentId !== undefined
+                    ? run.agents.find((a) => a.id === selectedAgentId)
+                    : undefined;
+                return selected ? (
+                  <AgentDetail agent={selected} doc={agentDoc} />
+                ) : (
+                  <OverlayScroll className="h-full">
+                    <RunResult run={run} />
+                  </OverlayScroll>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

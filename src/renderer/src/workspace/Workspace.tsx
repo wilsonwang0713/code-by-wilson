@@ -22,6 +22,7 @@ import { useShells } from "./use-shells";
 import { useShellOutput, type ShellOutputState } from "./use-shell-output";
 import { useWorkflows } from "./use-workflows";
 import { useWorkflowRun, type WorkflowRunState } from "./use-workflow-run";
+import { useWorkflowAgentTranscript } from "./use-workflow-agent-transcript";
 import { WorkflowDrill } from "./WorkflowDrill";
 import type { WorkflowRunSummary } from "@shared/types";
 import { TokensPanel } from "./panels/TokensPanel";
@@ -146,6 +147,16 @@ function WorkspaceBody({
   const shellOutput = useShellOutput(s.id, activeShellId);
   const workflows = useWorkflows(s.id);
   const workflowRun = useWorkflowRun(s.id, activeWorkflowId);
+  const [selectedWorkflowAgentId, setSelectedWorkflowAgentId] = useState<
+    string | undefined
+  >(undefined);
+  // Reset the selected agent whenever the drilled run changes (or the drill closes).
+  useEffect(() => setSelectedWorkflowAgentId(undefined), [activeWorkflowId]);
+  const workflowAgentDoc = useWorkflowAgentTranscript(
+    s.id,
+    activeWorkflowId,
+    selectedWorkflowAgentId,
+  );
   // The live BackgroundShell behind the drilled id, re-resolved each poll so the header's status/exit/
   // duration stay fresh while drilled (a running shell flips to completed on its own). undefined when
   // nothing is drilled, or when the shell was reaped from the list.
@@ -189,6 +200,9 @@ function WorkspaceBody({
             shellOutput={shellOutput}
             shell={activeShell}
             workflowRun={workflowRun}
+            selectedWorkflowAgentId={selectedWorkflowAgentId}
+            onSelectWorkflowAgent={setSelectedWorkflowAgentId}
+            workflowAgentDoc={workflowAgentDoc}
             now={now}
             drill={drill}
             onNavigate={(depth) => setDrill((d) => d.slice(0, depth))}
@@ -264,6 +278,9 @@ function CenterView({
   shellOutput,
   shell,
   workflowRun,
+  selectedWorkflowAgentId,
+  onSelectWorkflowAgent,
+  workflowAgentDoc,
   now,
   drill,
   onNavigate,
@@ -278,6 +295,9 @@ function CenterView({
   shellOutput: ShellOutputState;
   shell: BackgroundShell | undefined;
   workflowRun: WorkflowRunState;
+  selectedWorkflowAgentId: string | undefined;
+  onSelectWorkflowAgent: (id: string) => void;
+  workflowAgentDoc: DocState;
   now: number;
   drill: DrillCrumb[];
   onNavigate: (depth: number) => void;
@@ -305,8 +325,9 @@ function CenterView({
         run={workflowRun}
         name={top.name}
         onBack={() => onNavigate(0)}
-        selectedAgentId={undefined}
-        onSelectAgent={() => {}}
+        selectedAgentId={selectedWorkflowAgentId}
+        onSelectAgent={onSelectWorkflowAgent}
+        agentDoc={workflowAgentDoc}
       />
     ) : top?.kind === "shell" ? (
       // Keyed by shell id so switching shells remounts the drill: CommandBlock's expand state and the
