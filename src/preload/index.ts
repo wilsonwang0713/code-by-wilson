@@ -35,6 +35,18 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.readShells, id, sinceMtimeMs),
   readShellOutput: (id, shellId, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readShellOutput, id, shellId, sinceMtimeMs),
+  readWorkflows: (id, sinceMtimeMs) =>
+    ipcRenderer.invoke(IPC.readWorkflows, id, sinceMtimeMs),
+  readWorkflowRun: (id, runId, sinceMtimeMs) =>
+    ipcRenderer.invoke(IPC.readWorkflowRun, id, runId, sinceMtimeMs),
+  readWorkflowAgentTranscript: (id, runId, agentId, sinceMtimeMs) =>
+    ipcRenderer.invoke(
+      IPC.readWorkflowAgentTranscript,
+      id,
+      runId,
+      agentId,
+      sinceMtimeMs,
+    ),
   readMetrics: (id, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readMetrics, id, sinceMtimeMs),
   platform: process.platform,

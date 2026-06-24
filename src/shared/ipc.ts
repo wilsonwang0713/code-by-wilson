@@ -139,6 +139,23 @@ export interface IpcApi {
     shellId: string,
     sinceMtimeMs?: number,
   ): Promise<ShellOutputRead>;
+  /** List one session's workflow runs (compact summaries for the Workflows tab). `sinceMtimeMs` is the
+   *  change token; an unchanged workflows dir skips the read. */
+  readWorkflows(id: string, sinceMtimeMs?: number): Promise<WorkflowsRead>;
+  /** Read one full workflow run (the drill surface). `sinceMtimeMs` is the change token (run-record mtime). */
+  readWorkflowRun(
+    id: string,
+    runId: string,
+    sinceMtimeMs?: number,
+  ): Promise<WorkflowRunRead>;
+  /** Read one workflow agent's own transcript — the read behind selecting an agent on the surface.
+   *  `sinceMtimeMs` is the change token (the agent file's mtime). */
+  readWorkflowAgentTranscript(
+    id: string,
+    runId: string,
+    agentId: string,
+    sinceMtimeMs?: number,
+  ): Promise<TranscriptRead>;
   /** Read one session's lazy metrics (token speed, git, voice, remote). `sinceMtimeMs` is the change
    *  token from the last read; an unchanged token skips the recompute. */
   readMetrics(id: string, sinceMtimeMs?: number): Promise<MetricsRead>;

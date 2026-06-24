@@ -217,6 +217,19 @@ export function registerIpc({
     (_e, id: string, shellId: string, sinceMtimeMs?: number) =>
       provider.readShellOutput(id, shellId, sinceMtimeMs),
   );
+  ipcMain.handle(IPC.readWorkflows, (_e, id: string, sinceMtimeMs?: number) =>
+    provider.readWorkflows(id, sinceMtimeMs),
+  );
+  ipcMain.handle(
+    IPC.readWorkflowRun,
+    (_e, id: string, runId: string, sinceMtimeMs?: number) =>
+      provider.readWorkflowRun(id, runId, sinceMtimeMs),
+  );
+  ipcMain.handle(
+    IPC.readWorkflowAgentTranscript,
+    (_e, id: string, runId: string, agentId: string, sinceMtimeMs?: number) =>
+      provider.readWorkflowAgentTranscript(id, runId, agentId, sinceMtimeMs),
+  );
   ipcMain.handle(IPC.readMetrics, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readMetrics(id, sinceMtimeMs),
   );
