@@ -9,7 +9,15 @@ import {
   listWorkflowRuns,
   workflowsDirFor,
   workflowAgentFileFor,
+  workflowScriptsDirFor,
+  workflowAgentsRootFor,
+  parseScriptName,
+  buildLiveRun,
+  listLiveRunSummaries,
+  readLiveWorkflowRun,
+  liveRunNewestMtime,
 } from "../../../../src/main/provider/claude/workflows";
+import { parseWorkflowScript } from "../../../../src/main/provider/claude/workflow-script";
 
 const RECORD = {
   runId: "wf_test",
@@ -178,5 +186,215 @@ describe("path helpers", () => {
     expect(workflowAgentFileFor(t, "wf_1", "a9")).toBe(
       "/c/projects/p/sid/subagents/workflows/wf_1/agent-a9.jsonl",
     );
+  });
+
+  it("derives the live-run scripts dir and agents root from a transcript path", () => {
+    const t = "/c/projects/p/sid.jsonl";
+    expect(workflowScriptsDirFor(t)).toBe(
+      "/c/projects/p/sid/workflows/scripts",
+    );
+    expect(workflowAgentsRootFor(t)).toBe(
+      "/c/projects/p/sid/subagents/workflows",
+    );
+  });
+});
+
+describe("parseScriptName", () => {
+  it("splits a hyphenated workflow name from its wf_ run id", () => {
+    expect(parseScriptName("code-review-wf_1d3f16ba-b82.js")).toEqual({
+      workflowName: "code-review",
+      runId: "wf_1d3f16ba-b82",
+    });
+  });
+
+  it("returns null for a non-script name", () => {
+    expect(parseScriptName("journal.jsonl")).toBeNull();
+    expect(parseScriptName("scripts")).toBeNull();
+  });
+});
+
+describe("buildLiveRun", () => {
+  const a1Rows = [
+    {
+      type: "user",
+      timestamp: "2024-01-01T00:00:00.000Z",
+      message: { content: "scope the diff" },
+    },
+    {
+      type: "assistant",
+      timestamp: "2024-01-01T00:00:01.000Z",
+      message: {
+        id: "m1",
+        model: "claude-opus-4-8[1m]",
+        usage: { input_tokens: 10, output_tokens: 5 },
+        content: [{ type: "tool_use", id: "t1", name: "Grep" }],
+      },
+    },
+  ];
+  const a2Rows = [
+    {
+      type: "user",
+      timestamp: "2024-01-01T00:00:02.000Z",
+      message: { content: "find bugs" },
+    },
+    {
+      type: "assistant",
+      timestamp: "2024-01-01T00:00:05.000Z",
+      message: { id: "m2", usage: { input_tokens: 20, output_tokens: 0 } },
+    },
+  ];
+  const journal = [
+    JSON.stringify({ type: "started", agentId: "a1" }),
+    JSON.stringify({ type: "started", agentId: "a2" }),
+    JSON.stringify({ type: "result", agentId: "a1", result: { ok: true } }),
+  ].join("\n");
+  const rowsOf = new Map<string, any[]>([
+    ["a1", a1Rows],
+    ["a2", a2Rows],
+  ]);
+
+  it("reconstructs an in-progress run from the journal + agent rows", () => {
+    const run = buildLiveRun("wf_x", "code-review", journal, rowsOf, 999, null);
+    expect(run.status).toBe("running");
+    expect(run.runId).toBe("wf_x");
+    expect(run.workflowName).toBe("code-review");
+    expect(run.phases).toEqual([]);
+    expect(run.phaseCount).toBe(0);
+    expect(run.agentCount).toBe(2);
+    expect(run.totalTokens).toBe(35);
+    expect(run.totalToolCalls).toBe(1);
+    expect(run.startMs).toBe(Date.parse("2024-01-01T00:00:00.000Z"));
+    expect(run.durationMs).toBe(5000);
+  });
+
+  it("derives per-agent state, tokens, model, and a phase-less label", () => {
+    const run = buildLiveRun("wf_x", "code-review", journal, rowsOf, 999, null);
+    const [a1, a2] = run.agents;
+    expect(a1.id).toBe("a1");
+    expect(a1.state).toBe("done"); // has a journal result
+    expect(a1.label).toBe("agent 1");
+    expect(a1.phaseIndex).toBe(0);
+    expect(a1.tokens).toBe(15);
+    expect(a1.toolCalls).toBe(1);
+    expect(a1.lastToolName).toBe("Grep");
+    expect(a1.model).toBe("opus");
+    expect(a1.resultPreview).toContain("ok");
+    expect(a2.state).toBe("running"); // started, no result
+    expect(a2.tokens).toBe(20);
+  });
+
+  it("falls back to the script mtime and zero agents before anything starts", () => {
+    const run = buildLiveRun("wf_y", "w", "", new Map(), 12345, null);
+    expect(run.agents).toEqual([]);
+    expect(run.agentCount).toBe(0);
+    expect(run.startMs).toBe(12345);
+    expect(run.durationMs).toBe(0);
+    expect(run.status).toBe("running");
+  });
+});
+
+describe("live run IO", () => {
+  function fixture() {
+    const root = mkdtempSync(join(tmpdir(), "wf-live-"));
+    const scriptsDir = join(root, "workflows", "scripts");
+    const agentsRoot = join(root, "subagents", "workflows");
+    mkdirSync(scriptsDir, { recursive: true });
+    writeFileSync(
+      join(scriptsDir, "code-review-wf_live.js"),
+      "export const meta = {}",
+    );
+    const runDir = join(agentsRoot, "wf_live");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, "journal.jsonl"),
+      JSON.stringify({ type: "started", agentId: "a1" }),
+    );
+    writeFileSync(
+      join(runDir, "agent-a1.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2024-01-01T00:00:01.000Z",
+        message: { id: "m1", usage: { input_tokens: 3, output_tokens: 2 } },
+      }),
+    );
+    return { scriptsDir, agentsRoot };
+  }
+
+  it("reconstructs a run that has a script but no terminal record", () => {
+    const { scriptsDir, agentsRoot } = fixture();
+    const run = readLiveWorkflowRun(scriptsDir, agentsRoot, "wf_live");
+    expect(run?.status).toBe("running");
+    expect(run?.workflowName).toBe("code-review");
+    expect(run?.agents.map((a) => a.id)).toEqual(["a1"]);
+    expect(run?.agents[0].state).toBe("running");
+    expect(run?.totalTokens).toBe(5);
+    expect(
+      liveRunNewestMtime(scriptsDir, agentsRoot, "wf_live"),
+    ).toBeGreaterThan(0);
+  });
+
+  it("lists live summaries and lets a terminal record win", () => {
+    const { scriptsDir, agentsRoot } = fixture();
+    expect(
+      listLiveRunSummaries(scriptsDir, agentsRoot, new Set()).map(
+        (r) => r.runId,
+      ),
+    ).toEqual(["wf_live"]);
+    // Once the terminal record exists, the live summary is suppressed.
+    expect(
+      listLiveRunSummaries(scriptsDir, agentsRoot, new Set(["wf_live"])),
+    ).toEqual([]);
+  });
+
+  it("returns null for a run id no script names", () => {
+    const { scriptsDir, agentsRoot } = fixture();
+    expect(readLiveWorkflowRun(scriptsDir, agentsRoot, "wf_absent")).toBeNull();
+    expect(liveRunNewestMtime(scriptsDir, agentsRoot, "wf_absent")).toBe(0);
+  });
+});
+
+describe("buildLiveRun with a plan", () => {
+  const SCRIPT = `export const meta = { name: 'demo', phases: [ { title: 'Scan' }, { title: 'Verify' } ] }
+const s = (await parallel([
+  () => agent('a', { label: 'scout:alpha', phase: 'Scan' }),
+  () => agent('b', { label: 'scout:beta', phase: 'Scan' }),
+])).filter(Boolean)
+const v = await agent('c', { label: 'verify:a', phase: 'Verify' })
+return { s }
+`;
+  const journal = [
+    JSON.stringify({ type: "started", agentId: "a1" }),
+    JSON.stringify({ type: "started", agentId: "a2" }),
+    JSON.stringify({ type: "result", agentId: "a1", result: "alpha" }),
+  ].join("\n");
+  const rows = (ts: string) => [
+    {
+      type: "assistant",
+      timestamp: ts,
+      message: { id: "m", usage: { input_tokens: 1, output_tokens: 1 } },
+    },
+  ];
+  const rowsOf = new Map<string, any[]>([
+    ["a1", rows("2024-01-01T00:00:00.000Z")],
+    ["a2", rows("2024-01-01T00:00:01.000Z")],
+  ]);
+
+  it("binds agents to declared phases/labels and derives phase status", () => {
+    const plan = parseWorkflowScript(SCRIPT);
+    const run = buildLiveRun("wf_x", "demo", journal, rowsOf, 0, plan);
+    expect(run.phases.map((p) => p.title)).toEqual(["Scan", "Verify"]);
+    expect(run.agents.map((a) => [a.label, a.phaseIndex])).toEqual([
+      ["scout:alpha", 1],
+      ["scout:beta", 1],
+    ]);
+    // Scan has 2 of 2 started, a1 done; with a later phase not yet started and run live, Scan reads running.
+    expect(run.phases[0].agentsTotal).toBe(2);
+    expect(run.phases[1].status).toBe("pending");
+  });
+
+  it("falls back to empty phases and generic labels when plan is null", () => {
+    const run = buildLiveRun("wf_x", "demo", journal, rowsOf, 0, null);
+    expect(run.phases).toEqual([]);
+    expect(run.agents[0].label).toBe("agent 1");
   });
 });
