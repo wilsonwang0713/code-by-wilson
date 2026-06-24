@@ -1500,8 +1500,16 @@ describe("readDaily", () => {
     const days = readDaily(db);
     expect(days).toHaveLength(1);
     expect(days[0].byModel).toEqual([
-      { modelRaw: "claude-sonnet-4-6", totalTokens: 1000 },
-      { modelRaw: "claude-opus-4-8", totalTokens: 100 },
+      {
+        modelRaw: "claude-sonnet-4-6",
+        totalTokens: 1000,
+        equivApiValueUsd: expect.closeTo(0.003, 4),
+      },
+      {
+        modelRaw: "claude-opus-4-8",
+        totalTokens: 100,
+        equivApiValueUsd: expect.closeTo(0.0005, 6),
+      },
     ]);
   });
 
@@ -1575,6 +1583,84 @@ describe("readDaily", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     expect(readDaily(db)).toEqual([]);
+  });
+
+  it("prices each day: total, per-kind split, and per-model cost, with unrecognized models n/a", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      // 1M fresh input @ opus ($5/M input) = $5.00
+      turn({
+        messageId: "opus",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      // 1M output @ sonnet ($15/M output) = $15.00, same day
+      turn({
+        messageId: "sonnet",
+        ts: noon(2026, 6, 14),
+        modelRaw: "claude-sonnet-4-6",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+      // unrecognized model: tokens count, cost does not
+      turn({
+        messageId: "unknown",
+        ts: noon(2026, 6, 14),
+        modelRaw: "gpt-9-ultra",
+        usage: {
+          inputTokens: 500,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [d] = readDaily(db);
+    expect(d.equivApiValueUsd).toBeCloseTo(20); // $5 opus + $15 sonnet; unknown adds nothing
+    expect(d.costByKind!.input).toBeCloseTo(5);
+    expect(d.costByKind!.output).toBeCloseTo(15);
+    expect(d.costByKind!.cacheRead).toBeCloseTo(0);
+    expect(d.costByKind!.cacheWrite).toBeCloseTo(0);
+    const byRaw = new Map(
+      d.byModel.map((m) => [m.modelRaw, m.equivApiValueUsd]),
+    );
+    expect(byRaw.get("claude-opus-4-8")).toBeCloseTo(5);
+    expect(byRaw.get("claude-sonnet-4-6")).toBeCloseTo(15);
+    expect(byRaw.get("gpt-9-ultra")).toBeNull(); // unrecognized → n/a
+  });
+
+  it("prices an all-unrecognized day as n/a, not $0, while still counting its tokens", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        messageId: "u",
+        ts: noon(2026, 6, 14),
+        modelRaw: "gpt-9-ultra",
+        usage: {
+          inputTokens: 1000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        },
+      }),
+    ]);
+    const [d] = readDaily(db);
+    expect(d.inputTokens).toBe(1000);
+    expect(d.equivApiValueUsd).toBeNull();
+    expect(d.costByKind).toBeNull();
+    expect(d.byModel[0].equivApiValueUsd).toBeNull();
   });
 });
 

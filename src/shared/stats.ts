@@ -351,9 +351,26 @@ export interface DailyBucket {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  /** The day's Equivalent API value summed over its recognized models, or null (n/a) when none of its
+   *  turns ran a known model — never a guessed $0. Prices every kind, unaffected by the cache pill. */
+  equivApiValueUsd: number | null;
+  /** The day's Equivalent API value split by token kind (the four sum to equivApiValueUsd), or null when
+   *  the day has no recognized model. Carried because the renderer holds per-kind tokens but not the
+   *  per-model prices a day spanning models needs. */
+  costByKind: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  } | null;
   /** Total tokens (all four kinds) per raw model id active this day, ordered by tokens descending then
-   *  raw id. A turn that recorded no model uses modelRaw null. Empty on a zero-fill day. */
-  byModel: { modelRaw: string | null; totalTokens: number }[];
+   *  raw id, each with its Equivalent API value (null for an unrecognized id). A turn that recorded no
+   *  model uses modelRaw null. Empty on a zero-fill day. */
+  byModel: {
+    modelRaw: string | null;
+    totalTokens: number;
+    equivApiValueUsd: number | null;
+  }[];
 }
 
 /**
@@ -383,6 +400,8 @@ export function emptyDay(day: string): DailyBucket {
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    equivApiValueUsd: null,
+    costByKind: null,
     byModel: [],
   };
 }

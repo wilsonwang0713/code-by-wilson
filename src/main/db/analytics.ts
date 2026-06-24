@@ -12,7 +12,8 @@ import type {
 } from "@shared/stats";
 import { branchRowKey, ALL_TIME } from "@shared/stats";
 import {
-  equivApiValue,
+  costBreakdown,
+  type CostBreakdown,
   isKnownModelString,
   normalizeModelId,
 } from "@shared/models";
@@ -243,14 +244,13 @@ function groupByModel(db: SqliteDb, win: StatsWindow): ModelRow[] {
     .all(...bind) as ModelRow[];
 }
 
-/** A grouped row's Equivalent API value, or null (n/a) when its raw id matches no known family. The single
- *  cost mapping the totals and the breakdown share, so a breakdown row's cost is exactly its contribution
- *  to the grand total. Pricing flows through equivApiValue (the per-session Cost panel's formula too), so
- *  the three can't drift. */
-function modelRowCost(m: ModelRow): number | null {
+/** A grouped row's per-kind Equivalent API value, or null (n/a) when its raw id matches no known family.
+ *  The single cost-split mapping the daily fold reads; modelRowCost is just its total, so the two can't
+ *  drift. Pricing flows through costBreakdown (the per-session Cost panel's formula too). */
+function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
   const raw = m.model_raw ?? undefined;
   if (!isKnownModelString(raw)) return null; // n/a cost: the tokens still count toward the token totals
-  return equivApiValue(
+  return costBreakdown(
     {
       inputTokens: m.input_tokens,
       outputTokens: m.output_tokens,
@@ -259,6 +259,13 @@ function modelRowCost(m: ModelRow): number | null {
     },
     normalizeModelId(raw),
   );
+}
+
+/** A grouped row's Equivalent API value, or null (n/a) when its raw id matches no known family. The single
+ *  cost mapping the totals and the breakdown share, so a breakdown row's cost is exactly its contribution
+ *  to the grand total. */
+function modelRowCost(m: ModelRow): number | null {
+  return modelRowCostBreakdown(m)?.total ?? null;
 }
 
 /**
@@ -774,8 +781,9 @@ function groupByDayAndModel(db: SqliteDb, win: StatsWindow): DayModelRow[] {
     .all(...bind) as DayModelRow[];
 }
 
-/** A day mid-fold: the four kind sums, plus a model → total-tokens map so the bucket can carry the
- *  per-model breakdown the by-model stacking needs. */
+/** A day mid-fold: the four kind sums, a model→total-tokens map for the by-model stacking, plus the day's
+ *  cost split — per-kind USD and per-model USD — accumulated over only its recognized models (hasKnownCost
+ *  so an all-unrecognized day prices to n/a, not $0). */
 interface DayAgg {
   day: string;
   inputTokens: number;
@@ -783,6 +791,13 @@ interface DayAgg {
   cacheReadTokens: number;
   cacheCreationTokens: number;
   models: Map<string | null, number>;
+  modelCost: Map<string | null, number | null>;
+  kindInputUsd: number;
+  kindOutputUsd: number;
+  kindCacheReadUsd: number;
+  kindCacheWriteUsd: number;
+  knownCost: number;
+  hasKnownCost: boolean;
 }
 
 /**
@@ -803,6 +818,13 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
         models: new Map<string | null, number>(),
+        modelCost: new Map<string | null, number | null>(),
+        kindInputUsd: 0,
+        kindOutputUsd: 0,
+        kindCacheReadUsd: 0,
+        kindCacheWriteUsd: 0,
+        knownCost: 0,
+        hasKnownCost: false,
       };
       map.set(r.day, a);
     }
@@ -816,6 +838,19 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
       r.cache_read_tokens +
       r.cache_creation_tokens;
     a.models.set(r.model_raw, (a.models.get(r.model_raw) ?? 0) + modelTotal);
+    // Price this (day × model) slice once: a recognized model feeds the per-kind split, the per-model
+    // cost, and the day total; an unrecognized one adds tokens above but null cost (n/a). groupByDayAndModel
+    // groups by (day, model_raw), so each model lands once per day — set, not accumulate, the per-model cost.
+    const b = modelRowCostBreakdown(r);
+    a.modelCost.set(r.model_raw, b == null ? null : b.total);
+    if (b != null) {
+      a.kindInputUsd += b.input;
+      a.kindOutputUsd += b.output;
+      a.kindCacheReadUsd += b.cacheRead;
+      a.kindCacheWriteUsd += b.cacheWrite;
+      a.knownCost += b.total;
+      a.hasKnownCost = true;
+    }
   }
   return [...map.values()]
     .map(
@@ -825,8 +860,21 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         outputTokens: a.outputTokens,
         cacheReadTokens: a.cacheReadTokens,
         cacheCreationTokens: a.cacheCreationTokens,
+        equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
+        costByKind: a.hasKnownCost
+          ? {
+              input: a.kindInputUsd,
+              output: a.kindOutputUsd,
+              cacheRead: a.kindCacheReadUsd,
+              cacheWrite: a.kindCacheWriteUsd,
+            }
+          : null,
         byModel: [...a.models.entries()]
-          .map(([modelRaw, totalTokens]) => ({ modelRaw, totalTokens }))
+          .map(([modelRaw, totalTokens]) => ({
+            modelRaw,
+            totalTokens,
+            equivApiValueUsd: a.modelCost.get(modelRaw) ?? null,
+          }))
           .sort(
             (x, y) =>
               y.totalTokens - x.totalTokens ||

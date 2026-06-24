@@ -602,7 +602,11 @@ describe("registerIpc stats:read", () => {
     expect(all.map((d) => d.day)).toEqual(["2026-01-01", "2026-06-14"]);
     expect(all[1].inputTokens).toBe(1_000_000);
     expect(all[1].byModel).toEqual([
-      { modelRaw: "claude-opus-4-8", totalTokens: 1_000_000 },
+      {
+        modelRaw: "claude-opus-4-8",
+        totalTokens: 1_000_000,
+        equivApiValueUsd: expect.closeTo(5, 2),
+      },
     ]);
   });
 
