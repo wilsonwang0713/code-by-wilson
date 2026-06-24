@@ -53,6 +53,7 @@ import {
   monthLabelCols,
 } from "../ui/contributions-geom";
 import { Swatch } from "../ui/atoms";
+import { CopyButton } from "../ui/CopyButton";
 import { InfoButton } from "../ui/InfoButton";
 import {
   sortSessions,
@@ -1259,19 +1260,19 @@ function BySession({
     <StatsPanel title="By session">
       <table className="w-full table-fixed text-[12px]">
         <colgroup>
-          <col className="w-[24%]" />
-          <col className="w-[15%]" />
+          <col className="w-[28%]" />
           <col className="w-[14%]" />
+          <col className="w-[13%]" />
           <col className="w-[11%]" />
           <col className="w-[10%]" />
-          <col className="w-[13%]" />
-          <col className="w-[13%]" />
+          <col className="w-[12%]" />
+          <col className="w-[12%]" />
         </colgroup>
         <thead>
           <tr className="text-[10px] uppercase tracking-wide text-fg-faint">
             <SortHeader
-              label="Project"
-              column="project"
+              label="Session"
+              column="session"
               sort={sort}
               onSort={onSort}
               align="left"
@@ -1321,7 +1322,12 @@ function BySession({
             <tr key={r.sessionId} className="border-t border-ink-850">
               <td className="py-1 pr-3">
                 <span className="block truncate text-fg" title={r.cwd}>
-                  {r.project}
+                  {r.title ?? r.project}
+                </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-faint">
+                  <span className="truncate">{r.project}</span>
+                  <span className="font-mono">{r.sessionId.slice(0, 8)}</span>
+                  <CopyButton value={r.sessionId} label="Copy session id" />
                 </span>
               </td>
               <td className="py-1 pr-3">

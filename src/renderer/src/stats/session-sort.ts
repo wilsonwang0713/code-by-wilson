@@ -3,7 +3,7 @@ import { tokensOf, type StatsBySession } from "@shared/stats";
 /** The per-Session table's sortable columns. `tokens` follows the page's cache toggle; `cost` is the
  *  Equivalent API value column (n/a rows sort below every real figure). */
 export type SessionSortKey =
-  | "project"
+  | "session"
   | "model"
   | "lastActivity"
   | "duration"
@@ -27,7 +27,7 @@ export const DEFAULT_SESSION_SORT: SessionSort = {
 /** The direction a column sorts when first clicked: text ascending (A→Z reads naturally), everything else
  *  descending (biggest / most-recent on top, the figure you usually want surfaced). */
 export function defaultDirFor(key: SessionSortKey): SortDir {
-  return key === "project" || key === "model" ? "asc" : "desc";
+  return key === "session" || key === "model" ? "asc" : "desc";
 }
 
 /**
@@ -47,8 +47,10 @@ export function sortSessions(
     // Exhaustive over SessionSortKey with no default branch on purpose: adding a column without a case
     // here is a compile error (noImplicitReturns), not a silent fall-through to 0.
     switch (sort.key) {
-      case "project":
-        return a.project.localeCompare(b.project);
+      case "session":
+        // The first column shows the session name (title, else the project basename) — sort on that same
+        // effective string so the order matches what's on screen.
+        return (a.title ?? a.project).localeCompare(b.title ?? b.project);
       case "model":
         return (a.modelRaw ?? "").localeCompare(b.modelRaw ?? "");
       case "lastActivity":
