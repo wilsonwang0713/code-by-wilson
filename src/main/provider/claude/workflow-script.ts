@@ -1,4 +1,5 @@
 import { parse } from "acorn";
+import type { WorkflowAgent } from "@shared/types";
 
 /** One declared agent from a script's `agent(prompt, { label, phase })` call site. */
 export interface DeclaredAgent {
@@ -238,6 +239,30 @@ function collectDeclaredAgents(program: Node): {
     }
   }
   return { declaredAgents, enumerable };
+}
+
+/** Fill live agents (in spawn order) into the plan: declared label, phase title, and phase index per
+ *  agent. Returns null — caller falls back to generic agents — when the plan is absent, non-enumerable,
+ *  or there are more live agents than the plan declared (the static count was wrong: dynamic fan-out).
+ *  An agent whose declared phase isn't in `meta.phases` stays unbound rather than breaking the rest. */
+export function bindLiveAgents(
+  plan: WorkflowPlan | null,
+  liveAgents: WorkflowAgent[],
+): WorkflowAgent[] | null {
+  if (!plan || !plan.enumerable) return null;
+  if (liveAgents.length > plan.declaredAgents.length) return null;
+  const indexByTitle = new Map(plan.phases.map((p) => [p.title, p.index]));
+  return liveAgents.map((a, i) => {
+    const d = plan.declaredAgents[i];
+    const phaseIndex = indexByTitle.get(d.phaseTitle);
+    if (phaseIndex === undefined) return a; // declared phase not in meta.phases → leave unbound
+    return {
+      ...a,
+      label: d.label || a.label,
+      phaseTitle: d.phaseTitle,
+      phaseIndex,
+    };
+  });
 }
 
 /** Parse a persisted workflow script into its plan, or null when acorn can't parse it. The persisted

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseWorkflowScript } from "../../../../src/main/provider/claude/workflow-script";
+import {
+  parseWorkflowScript,
+  bindLiveAgents,
+  type WorkflowPlan,
+} from "../../../../src/main/provider/claude/workflow-script";
+import type { WorkflowAgent } from "@shared/types";
 
 // Mirrors the real demo-orchestration script: ESM export + top-level await + return,
 // a parallel fan-out, a pipeline over a const literal array, and a final single agent.
@@ -91,5 +96,66 @@ describe("parseWorkflowScript", () => {
 
   it("returns null on an unparseable script", () => {
     expect(parseWorkflowScript("this is { not valid")).toBeNull();
+  });
+});
+
+const liveAgent = (id: string): WorkflowAgent => ({
+  id,
+  index: 0,
+  label: `agent ${id}`,
+  phaseIndex: 0,
+  phaseTitle: "",
+  state: "running",
+  durationMs: 0,
+  tokens: 0,
+  toolCalls: 0,
+});
+
+const PLAN: WorkflowPlan = {
+  phases: [
+    { index: 1, title: "Scan" },
+    { index: 2, title: "Analyze" },
+  ],
+  declaredAgents: [
+    { label: "scout:alpha", phaseTitle: "Scan" },
+    { label: "scout:beta", phaseTitle: "Scan" },
+    { label: "a1", phaseTitle: "Analyze" },
+    { label: "a2", phaseTitle: "Analyze" },
+  ],
+  enumerable: true,
+};
+
+describe("bindLiveAgents", () => {
+  it("fills live agents into the plan in spawn order, by phase", () => {
+    const bound = bindLiveAgents(PLAN, [
+      liveAgent("x"),
+      liveAgent("y"),
+      liveAgent("z"),
+    ]);
+    expect(bound).not.toBeNull();
+    expect(bound!.map((a) => [a.label, a.phaseIndex, a.phaseTitle])).toEqual([
+      ["scout:alpha", 1, "Scan"],
+      ["scout:beta", 1, "Scan"],
+      ["a1", 2, "Analyze"],
+    ]);
+  });
+
+  it("falls back (null) when the plan is non-enumerable, absent, or overflowed", () => {
+    expect(
+      bindLiveAgents({ ...PLAN, enumerable: false }, [liveAgent("x")]),
+    ).toBeNull();
+    expect(bindLiveAgents(null, [liveAgent("x")])).toBeNull();
+    const five = [1, 2, 3, 4, 5].map((n) => liveAgent(String(n)));
+    expect(bindLiveAgents(PLAN, five)).toBeNull(); // 5 live > 4 declared
+  });
+
+  it("leaves an agent unbound when its declared phase isn't in meta.phases", () => {
+    const plan: WorkflowPlan = {
+      ...PLAN,
+      declaredAgents: [{ label: "ghost", phaseTitle: "Nope" }],
+    };
+    const bound = bindLiveAgents(plan, [liveAgent("x")]);
+    expect(bound![0].phaseIndex).toBe(0);
+    expect(bound![0].label).toBe("agent x");
   });
 });
