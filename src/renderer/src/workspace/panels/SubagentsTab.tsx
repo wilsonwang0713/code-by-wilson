@@ -1,9 +1,9 @@
-import { type ComponentPropsWithoutRef, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Subagent } from "@shared/types";
 import {
   formatDuration,
   formatRelativeTime,
-  formatTokens,
+  formatTokensShort,
 } from "@shared/format";
 import { spanPct } from "../../ui/charts-geom";
 import { cx, focusRingInset } from "../../ui/atoms";
@@ -12,12 +12,12 @@ import { FAMILY_LABEL } from "../../ui/meta";
 import { EmptyState } from "./chrome";
 import {
   type LaneWindow,
-  type SubagentStats,
   flattenSubagents,
   laneBand,
   laneInterval,
   laneWindow,
 } from "./dock-tabs";
+import { DOCK_GUTTER, DockRow, MetricCell, MetricRack } from "./dock-row";
 import {
   type CollapseOverride,
   type SubagentGroup,
@@ -56,33 +56,11 @@ const LANE_META: Record<
   },
 };
 
-/** A fixed-width, right-aligned mono metric in the lane's metadata row (model, tokens, tool count,
- *  duration). `tone` picks the tint; extra props (e.g. aria-label) pass through to the span. */
-function LaneCell({
-  tone = "text-fg-faint",
-  className,
-  children,
-  ...rest
-}: ComponentPropsWithoutRef<"span"> & { tone?: string }) {
-  return (
-    <span
-      className={cx(
-        "shrink-0 text-right font-mono text-[10px] tabular-nums",
-        tone,
-        className,
-      )}
-      {...rest}
-    >
-      {children}
-    </span>
-  );
-}
-
-/** One Subagent as a Gantt lane: a single row with the task description as its label, a fill positioned by
- *  the agent's start and span within its group's time window, and a right-aligned metric cluster (model,
- *  tokens, tool count, duration). A batch lane drops its type (the band header carries the uniform type);
- *  the Individual pool keeps a small type tag (`showTypeTag`) since its header has none. A working lane's
- *  bar runs to `now` and its duration ticks live; a finished lane is frozen at its measured span. */
+/** One Subagent as a Gantt lane: a transparent divider row whose background carries a full-bleed fill
+ *  positioned by the agent's start and span within its group's window, plus a right-aligned metric rack
+ *  (model, tokens, tool count, duration). A batch lane drops its type (the band header carries it); the
+ *  Individual pool keeps a small type tag. A working lane's bar runs to `now` and its duration ticks live;
+ *  a finished lane is frozen at its measured span. */
 function SubagentLane({
   agent,
   win,
@@ -105,120 +83,70 @@ function SubagentLane({
     agent.status === "working" && agent.startMs !== undefined
       ? now - agent.startMs
       : agent.durationMs;
-  // Description is the label; fall back to the type when there's no description. The type tag only appears
-  // when the description owns the label AND the band header isn't already showing the type.
+  // Description is the label; fall back to the type. The type tag only appears when the description owns
+  // the label AND the band header isn't already showing the type.
   const primary = agent.description ?? agent.type;
   const tag = showTypeTag && agent.description ? agent.type : null;
   return (
-    <li
-      className={cx(
-        "relative flex min-h-[23px] items-center overflow-hidden rounded-sm",
-        active ? "bg-ink-850" : "bg-ink-900",
-      )}
-    >
-      <div
-        className={cx(
-          "absolute inset-y-0 border-l-2 transition-[left,width] duration-700 ease-out",
-          meta.fill,
-          meta.cap,
-          agent.status === "working" && "animate-pulse-soft",
-        )}
-        style={{ left: `${band.left}%`, width: `${band.width}%` }}
-      />
-      <button
-        type="button"
-        onClick={() => onDrill(agent)}
-        aria-label={`Drill into ${agent.type} subagent`}
-        className={cx(
-          "relative flex w-full items-center gap-2 px-2 py-1 text-left",
-          focusRingInset,
-        )}
-      >
+    <DockRow
+      active={active}
+      onClick={() => onDrill(agent)}
+      aria-label={`Drill into ${agent.type} subagent`}
+      fill={
+        <div
+          className={cx(
+            "absolute inset-y-0 border-l-2 transition-[left,width] duration-700 ease-out",
+            meta.fill,
+            meta.cap,
+            agent.status === "working" && "animate-pulse-soft",
+          )}
+          style={{ left: `${band.left}%`, width: `${band.width}%` }}
+        />
+      }
+      leading={
         <span
           className={cx(
-            "w-4 shrink-0 text-center font-mono text-[11px]",
+            DOCK_GUTTER,
+            "shrink-0 text-center font-mono text-[11px]",
             meta.tone,
           )}
         >
           {meta.char}
         </span>
-        {tag && (
-          <span className="shrink-0 rounded bg-ink-800 px-1 py-px font-mono text-[9px] text-fg-faint">
-            {tag}
-          </span>
-        )}
-        <span
-          className="min-w-0 flex-1 truncate text-[12px] text-fg"
-          title={primary}
-        >
-          {primary}
-        </span>
-        <span className="flex shrink-0 items-center gap-2 font-mono text-[10px] tabular-nums">
-          <LaneCell className="w-10">
+      }
+      trailing={
+        <MetricRack>
+          <MetricCell width="w-10">
             {agent.model ? FAMILY_LABEL[agent.model] : "—"}
-          </LaneCell>
-          <LaneCell className="w-8" tone="text-fg-muted">
-            {formatTokens(agent.tokens)}
-          </LaneCell>
-          <LaneCell
-            className="w-8"
+          </MetricCell>
+          <MetricCell width="w-16" tone="text-fg-muted" unit="tok">
+            {formatTokensShort(agent.tokens)}
+          </MetricCell>
+          <MetricCell
+            width="w-14"
+            unit={agent.toolCount === 1 ? "tool" : "tools"}
             aria-label={`${agent.toolCount} tool ${agent.toolCount === 1 ? "call" : "calls"}`}
           >
             {agent.toolCount}
-            <span aria-hidden className="ml-0.5">
-              ⚒
-            </span>
-          </LaneCell>
-          <LaneCell className="w-9">{formatDuration(elapsed)}</LaneCell>
+          </MetricCell>
+          <MetricCell width="w-12" tone="text-fg-muted">
+            {formatDuration(elapsed)}
+          </MetricCell>
+        </MetricRack>
+      }
+    >
+      {tag && (
+        <span className="shrink-0 rounded bg-ink-800 px-1 py-px font-mono text-[9px] text-fg-faint">
+          {tag}
         </span>
-      </button>
-    </li>
-  );
-}
-
-/** One term of the tally, dimmed to faint when its count is zero so an all-done fan-out reads calm. */
-function TallyTerm({
-  n,
-  label,
-  tone,
-}: {
-  n: number;
-  label: string;
-  tone: string;
-}) {
-  return (
-    <span className={n > 0 ? tone : "text-fg-faint"}>
-      {n} {label}
-    </span>
-  );
-}
-
-/** The running / done / failed tally with the batch count on the right, pinned above the bands so the
- *  fan-out's state reads at a glance. */
-function SubagentTally({
-  stats,
-  batchCount,
-}: {
-  stats: SubagentStats;
-  batchCount: number;
-}) {
-  return (
-    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-800 bg-ink-925 px-4 py-2 font-mono text-[10px] font-semibold tabular-nums">
-      <div className="flex items-center gap-2">
-        <TallyTerm
-          n={stats.working}
-          label="running"
-          tone="text-working-bright"
-        />
-        <span className="text-ink-800">·</span>
-        <TallyTerm n={stats.done} label="done" tone="text-ok" />
-        <span className="text-ink-800">·</span>
-        <TallyTerm n={stats.failed} label="failed" tone="text-danger" />
-      </div>
-      <span className="font-normal text-fg-faint">
-        {batchCount} {batchCount === 1 ? "batch" : "batches"}
+      )}
+      <span
+        className="min-w-0 flex-1 truncate text-[12px] text-fg"
+        title={primary}
+      >
+        {primary}
       </span>
-    </div>
+    </DockRow>
   );
 }
 
@@ -268,7 +196,7 @@ function GroupHeader({
       onClick={onToggle}
       aria-expanded={!collapsed}
       className={cx(
-        "flex w-full items-center gap-2 rounded-sm border-b border-ink-850 py-1 pl-2 pr-1.5 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900",
+        "flex w-full items-center gap-2 border-b border-ink-850 py-1 pl-2 pr-1.5 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900",
         focusRingInset,
       )}
     >
@@ -331,7 +259,7 @@ function SubagentGroupLanes({
           style={{ left: `${nowPct}%` }}
         />
       )}
-      <ul className="space-y-1">
+      <div role="list">
         {group.agents.map((a) => (
           <SubagentLane
             key={a.id}
@@ -343,7 +271,7 @@ function SubagentGroupLanes({
             onDrill={onDrill}
           />
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -368,7 +296,7 @@ function SubagentGroupBand({
   onDrill: (agent: Subagent) => void;
 }) {
   return (
-    <div>
+    <div className="border-t border-ink-850 first:border-t-0">
       <GroupHeader
         group={group}
         now={now}
@@ -393,25 +321,19 @@ function SubagentGroupBand({
  * assistant turn is its own band on its own time window, coloured by status; lone serial dispatches pool
  * into a trailing "Individual" band on a shared axis. A band auto-collapses once it finishes with no
  * failures; a live band or one with a failure stays open. Clicking a header overrides that until the band
- * flips live to done. A running / done / failed tally and a group count sit above. Shows an empty state
- * until the session spawns a subagent.
+ * flips live to done. Shows an empty state until the session spawns a subagent.
  */
 export function SubagentsTab({
   subagents,
-  stats,
   now,
   activeAgentId,
   onDrill,
 }: {
   subagents: Subagent[];
-  stats: SubagentStats;
   now: number;
   activeAgentId?: string;
   onDrill: (agent: Subagent) => void;
 }) {
-  // `lanes` and `groups` memoize on the subagents identity (stable between polls): the flatten and the
-  // partition only re-run when the forest changes. Each band's window tracks `now` (fresh every render),
-  // so it is computed inline inside the band. `stats` is the parent's already-memoized walk.
   const lanes = useMemo(() => flattenSubagents(subagents), [subagents]);
   const groups = useMemo(() => groupSubagents(lanes), [lanes]);
   const [overrides, setOverrides] = useState<Map<string, CollapseOverride>>(
@@ -426,31 +348,25 @@ export function SubagentsTab({
       return next;
     });
   return (
-    <div>
-      <SubagentTally
-        stats={stats}
-        batchCount={groups.filter((g) => g.kind === "batch").length}
-      />
-      <div className="space-y-3 py-1">
-        {groups.map((group) => {
-          const { collapsed, isDefault } = resolveCollapse(
-            group,
-            overrides.get(group.id),
-          );
-          return (
-            <SubagentGroupBand
-              key={group.id}
-              group={group}
-              now={now}
-              collapsed={collapsed}
-              autoCollapsed={collapsed && isDefault}
-              onToggle={() => toggle(group)}
-              activeAgentId={activeAgentId}
-              onDrill={onDrill}
-            />
-          );
-        })}
-      </div>
+    <div className="py-1">
+      {groups.map((group) => {
+        const { collapsed, isDefault } = resolveCollapse(
+          group,
+          overrides.get(group.id),
+        );
+        return (
+          <SubagentGroupBand
+            key={group.id}
+            group={group}
+            now={now}
+            collapsed={collapsed}
+            autoCollapsed={collapsed && isDefault}
+            onToggle={() => toggle(group)}
+            activeAgentId={activeAgentId}
+            onDrill={onDrill}
+          />
+        );
+      })}
     </div>
   );
 }
