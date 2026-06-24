@@ -4,16 +4,18 @@ import { cx, focusRingInset } from "../../ui/atoms";
 import { EmptyState } from "./chrome";
 import { RunStats } from "../workflow/RunStats";
 
-/** A run's status glyph + tone. Running pulses; failed and completed are tone-only (state by tone, not color). */
+/** A run's status glyph + tone, on the app's status palette (matching the shell list): running blue and
+ *  pulsing, completed green, failed red. */
 function runGlyph(status: string): {
   char: string;
   tone: string;
   pulse: boolean;
 } {
-  if (status === "running") return { char: "◐", tone: "text-fg", pulse: true };
+  if (status === "running")
+    return { char: "◐", tone: "text-working-bright", pulse: true };
   if (status === "failed")
-    return { char: "✗", tone: "text-fg-muted", pulse: false };
-  return { char: "✓", tone: "text-fg-muted", pulse: false };
+    return { char: "✗", tone: "text-danger", pulse: false };
+  return { char: "✓", tone: "text-ok", pulse: false };
 }
 
 /** One workflow run as a compact, clickable row: status glyph, name, the run stats (agents/tokens/

@@ -4,7 +4,6 @@ import { RunStats } from "./RunStats";
 
 /** The workflow run's header row: name, status badge, args, and the headline stats. */
 export function WorkflowHeader({ run }: { run: WorkflowRun }) {
-  const running = run.status === "running";
   return (
     <div className="flex items-center gap-2.5 px-3 py-2">
       <span className="text-[13px] font-semibold text-fg">
@@ -14,11 +13,12 @@ export function WorkflowHeader({ run }: { run: WorkflowRun }) {
         className={cx(
           "rounded border px-1.5 py-0.5 text-[10px]",
           run.status === "running"
-            ? "border-primary text-primary"
+            ? "animate-pulse-soft border-working text-working-bright"
             : run.status === "completed"
-              ? "border-primary-deep text-primary"
-              : "border-ink-700 text-fg-muted",
-          running && "animate-pulse-soft",
+              ? "border-ok text-ok"
+              : run.status === "failed"
+                ? "border-danger text-danger"
+                : "border-ink-700 text-fg-muted",
         )}
       >
         {run.status}
