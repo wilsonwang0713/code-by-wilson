@@ -21,6 +21,14 @@ import {
 } from "./subagents";
 import { readTasksForSession, tasksNewestMtime } from "./tasks";
 import {
+  workflowsDirFor,
+  workflowRunFileFor,
+  workflowAgentFileFor,
+  workflowsNewestMtime,
+  listWorkflowRuns,
+  toWorkflowRun,
+} from "./workflows";
+import {
   reconstructShells,
   tailOutput,
   stitchSnapshots,
@@ -40,7 +48,12 @@ import type {
   SessionMetrics,
   TokenSpeed,
 } from "@shared/metrics";
-import type { ShellsRead, ShellOutputRead } from "@shared/ipc";
+import type {
+  ShellsRead,
+  ShellOutputRead,
+  WorkflowsRead,
+  WorkflowRunRead,
+} from "@shared/ipc";
 
 export interface ClaudeProviderDeps {
   claudeDir?: string;
@@ -467,6 +480,93 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
         return { status: "error" };
       }
     },
+    readWorkflows: (id, sinceMtimeMs): WorkflowsRead => {
+      try {
+        const path = pathById.get(id) ?? resolveTranscript(id)?.path;
+        if (path === undefined) return { status: "absent" };
+        const dir = workflowsDirFor(path);
+        const mtimeMs = workflowsNewestMtime(dir);
+        if (mtimeMs === 0) return { status: "absent" }; // no workflows dir / no runs
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        return { status: "changed", mtimeMs, runs: listWorkflowRuns(dir) };
+      } catch {
+        return { status: "error" };
+      }
+    },
+
+    readWorkflowRun: (id, runId, sinceMtimeMs): WorkflowRunRead => {
+      try {
+        const path = pathById.get(id) ?? resolveTranscript(id)?.path;
+        if (path === undefined) return { status: "absent" };
+        // runId crosses IPC; reject a path separator rather than let `${runId}.json` escape the dir.
+        if (/[/\\]/.test(runId)) return { status: "absent" };
+        const file = workflowRunFileFor(path, runId);
+        let mtimeMs: number;
+        try {
+          mtimeMs = statSync(file).mtimeMs;
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException)?.code === "ENOENT")
+            return { status: "absent" };
+          throw err;
+        }
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        const json = readTextOrNull(file);
+        if (json === null) return { status: "absent" };
+        // A parse failure (a record caught mid-write) throws to the outer catch → error, so the caller
+        // holds its last value and retries on the next poll.
+        return {
+          status: "changed",
+          mtimeMs,
+          run: toWorkflowRun(JSON.parse(json)),
+        };
+      } catch {
+        return { status: "error" };
+      }
+    },
+
+    readWorkflowAgentTranscript: (id, runId, agentId, sinceMtimeMs) => {
+      try {
+        const path = pathById.get(id) ?? resolveTranscript(id)?.path;
+        if (path === undefined) return { status: "absent" };
+        // Both ids cross IPC; reject a path separator to keep the join inside the agents dir.
+        if (/[/\\]/.test(runId) || /[/\\]/.test(agentId))
+          return { status: "absent" };
+        const file = workflowAgentFileFor(path, runId, agentId);
+        let mtimeMs: number;
+        try {
+          mtimeMs = statSync(file).mtimeMs;
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException)?.code === "ENOENT")
+            return { status: "absent" };
+          throw err;
+        }
+        if (mtimeMs === sinceMtimeMs) return { status: "unchanged", mtimeMs };
+        const jsonl = readTextOrNull(file);
+        if (jsonl === null) return { status: "absent" };
+        // The agent's file is all-sidechain; render it with the option on and leave the session-shaped
+        // fields honestly empty (mirrors readSubagentTranscript).
+        const { events } = parseTranscriptEventsFromRows(
+          parseJsonlRows(jsonl),
+          {
+            includeSidechain: true,
+          },
+        );
+        return {
+          status: "changed",
+          mtimeMs,
+          doc: {
+            events,
+            waitingReason: null,
+            turns: [],
+            context: null,
+            subagents: [],
+          },
+        };
+      } catch {
+        return { status: "error" };
+      }
+    },
+
     readMetrics: (id, sinceMtimeMs): MetricsRead => {
       try {
         const resolved = resolveTranscript(id);

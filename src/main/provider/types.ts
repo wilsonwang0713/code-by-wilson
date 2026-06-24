@@ -4,7 +4,13 @@ import type {
   SessionCandidate,
 } from "@shared/types";
 import type { TranscriptRead, ToolResultDetail } from "@shared/transcript";
-import type { TaskRead, ShellsRead, ShellOutputRead } from "@shared/ipc";
+import type {
+  TaskRead,
+  ShellsRead,
+  ShellOutputRead,
+  WorkflowsRead,
+  WorkflowRunRead,
+} from "@shared/ipc";
 import type { MetricsRead } from "@shared/metrics";
 
 export interface Provider {
@@ -55,6 +61,25 @@ export interface Provider {
     shellId: string,
     sinceMtimeMs?: number,
   ): ShellOutputRead;
+  /** List one session's workflow runs (header summaries) — the read behind the Workflows tab. `sinceMtimeMs`
+   *  is the change token (newest run-record mtime); an unchanged dir skips the read. */
+  readWorkflows(id: string, sinceMtimeMs?: number): WorkflowsRead;
+  /** Read one full workflow run (phases, agents, result) — the read behind the workflow drill surface.
+   *  `sinceMtimeMs` is the change token (the run record's mtime). */
+  readWorkflowRun(
+    id: string,
+    runId: string,
+    sinceMtimeMs?: number,
+  ): WorkflowRunRead;
+  /** Read one workflow agent's own transcript (its sidechain file under subagents/workflows/<runId>/) into
+   *  render-ready events — the read behind selecting an agent on the workflow surface. `sinceMtimeMs` is
+   *  the change token (the agent file's mtime). Mirrors readSubagentTranscript's contract. */
+  readWorkflowAgentTranscript(
+    id: string,
+    runId: string,
+    agentId: string,
+    sinceMtimeMs?: number,
+  ): TranscriptRead;
   /** Read one session's lazy metrics (token speed, git, voice, remote). Mirrors readTranscript's path
    *  resolution + change token; skips the recompute when `sinceMtimeMs` still matches. */
   readMetrics(id: string, sinceMtimeMs?: number): MetricsRead;
