@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-06-25
+
+### Fixed
+
+- The Overview's equivalent API value now honors the Include cache toggle everywhere it appears. Totals, per-model, per-project, per-branch, per-session, and per-calendar-day all recompute when the cache pill flips, instead of holding a stale cache-inclusive figure.
+- The by-session cost sort follows the cache toggle, so the table reorders to match the values shown.
+- Daily-usage tooltip model rows honor the cache toggle, and per-kind cost appears in the tooltip when the cache pill is off.
+
 ## [0.1.13] - 2026-06-24
 
 ### Added
@@ -354,7 +362,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.13...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/luojiahai/code-by-wire/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/luojiahai/code-by-wire/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/luojiahai/code-by-wire/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/luojiahai/code-by-wire/compare/v0.1.10...v0.1.11
