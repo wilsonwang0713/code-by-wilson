@@ -321,6 +321,7 @@ describe("registerIpc stats:read", () => {
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
         equivApiValueUsd: 0,
+        equivApiValueFreshUsd: 0,
       },
       progress: { filesTotal: 0, filesDone: 0, done: true },
       hasAnyTurns: false,
