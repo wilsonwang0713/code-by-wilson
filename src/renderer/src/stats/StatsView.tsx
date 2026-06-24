@@ -842,13 +842,14 @@ function DailyUsage({
     // tooltip cost ignores the page cache pill and the Total equals the day's equiv value shown in the
     // calendar/headline. A kind's token count spans every model on the day, but costByKind prices only the
     // recognized share. So on a day with unrecognized-model tokens a per-kind dollar would underprice its own
-    // row (a full token count beside a partial $). Show per-kind cost only when the day is fully priced AND
-    // cache is included (folded-out cache kinds can't sum to the all-kind total); otherwise n/a. Per-MODEL
-    // cost stays honest (a model maps 1:1 to a price), so the model view keeps its per-row cost.
+    // row (a full token count beside a partial $). Show per-kind cost only when the day is fully priced;
+    // otherwise n/a. Per-MODEL cost stays honest (a model maps 1:1 to a price), so the model view keeps its
+    // per-row cost. Note: when cache is off the visible kind costs (input + output) won't sum to Total because
+    // Total always prices all four kinds — this matches the existing design where the Total ignores the pill.
     const fullyPriced =
       d.costByKind != null &&
       !d.byModel.some((m) => m.totalTokens > 0 && m.equivApiValueUsd == null);
-    const showKindCost = includeCache && fullyPriced;
+    const showKindCost = fullyPriced;
     const rows =
       stackBy === "kind"
         ? kindSegments(d)
