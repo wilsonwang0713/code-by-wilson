@@ -1227,7 +1227,7 @@ describe("readByBranch", () => {
     ]);
     const [row] = readByBranch(db);
     expect(row.equivApiValueUsd).toBeCloseTo(5.5); // 5 + 0.5, all kinds
-    expect(row.equivApiValueFreshUsd).toBeCloseTo(5); // input only
+    expect(row.equivApiValueFreshUsd).toBeCloseTo(5); // input + output (output is 0 here); cache-read excluded
     expect(row.equivApiValueFreshUsd!).toBeCloseTo(
       readTotals(db).equivApiValueFreshUsd,
     );
@@ -2087,7 +2087,7 @@ describe("readCalendar", () => {
     ]);
     const [d] = readCalendar(db, { sinceMs: ts, untilMs: ts + 1 });
     expect(d.equivApiValueUsd).toBeCloseTo(5.5); // 5 + 0.5, all kinds
-    expect(d.equivApiValueFreshUsd).toBeCloseTo(5); // input only
+    expect(d.equivApiValueFreshUsd).toBeCloseTo(5); // input + output (output is 0 here); cache-read excluded
   });
 });
 
