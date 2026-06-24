@@ -64,6 +64,20 @@ import {
   type SessionSortKey,
 } from "./session-sort";
 
+/** A row's Equivalent API value as a display string under the page cache pill: the formatted USD, or "n/a"
+ *  when the row ran no recognized model (equivOf null). One spelling for every equiv cell — the headline,
+ *  the calendar tooltip, the daily Total, the session table — so the n/a wording can't drift. */
+function equivLabel(
+  row: {
+    equivApiValueUsd: number | null;
+    equivApiValueFreshUsd: number | null;
+  },
+  includeCache: boolean,
+): string {
+  const v = equivOf(row, includeCache);
+  return v == null ? "n/a" : formatUsd(v);
+}
+
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
 const BACKFILL_POLL_MS = 40;
@@ -497,8 +511,7 @@ function Contributions({
     if (metric === "tokens")
       return `${formatTokensShort(d ? tokensOf(d, includeCache) : 0)} tokens`;
     if (!d) return "n/a";
-    const v = equivOf(d, includeCache);
-    return v == null ? "n/a" : formatUsd(v);
+    return equivLabel(d, includeCache);
   };
   const renderTooltip = (day: string): ReactNode => (
     <div className="flex flex-col gap-0.5">
@@ -653,9 +666,7 @@ function KpiStrip({
       </KpiCard>
       <KpiCard
         label="Equiv API value"
-        value={formatUsd(
-          includeCache ? totals.equivApiValueUsd : totals.equivApiValueFreshUsd,
-        )}
+        value={formatUsd(equivOf(totals, includeCache) ?? 0)}
       >
         <div className="mt-2 flex items-center gap-1 text-[10px] text-fg-faint">
           <span>reference, not money owed</span>
@@ -883,7 +894,6 @@ function DailyUsage({
     // fresh off), so it agrees with every other panel and reads n/a (never blank) on a day with no
     // recognized model.
     const total = rows.reduce((sum, r) => sum + r.value, 0);
-    const totalCost = equivOf(d, includeCache);
     return (
       <div className="flex flex-col gap-1">
         <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
@@ -909,7 +919,7 @@ function DailyUsage({
             {formatTokensShort(total)}
           </span>
           <span className="w-12 pl-2 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-            {totalCost == null ? "n/a" : formatUsd(totalCost)}
+            {equivLabel(d, includeCache)}
           </span>
         </div>
       </div>
@@ -1375,10 +1385,7 @@ function BySession({
                 {formatTokensShort(tokensOf(r, includeCache))}
               </td>
               <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {(() => {
-                  const v = equivOf(r, includeCache);
-                  return v == null ? "n/a" : formatUsd(v);
-                })()}
+                {equivLabel(r, includeCache)}
               </td>
             </tr>
           ))}
