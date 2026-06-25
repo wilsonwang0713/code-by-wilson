@@ -46,7 +46,14 @@ import {
   StackedBar,
   type DayColumn,
 } from "../ui/charts";
-import { KIND_SEGMENT_COLORS, modelColorOf, CALENDAR_RAMP } from "../ui/meta";
+import {
+  KIND_SEGMENT_COLORS,
+  KIND_SEGMENT_LABELS,
+  modelColorOf,
+  CALENDAR_RAMP,
+} from "../ui/meta";
+import { TOKEN_KINDS } from "../ui/token-kinds";
+import { MetricTip } from "../ui/MetricTip";
 import {
   calendarGrid,
   intensityThresholds,
@@ -639,7 +646,8 @@ function KpiStrip({
         { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
         { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
         { value: totals.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
-        { value: totals.cacheCreationTokens, color: KIND_SEGMENT_COLORS[3] },
+        { value: totals.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
+        { value: totals.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
       ]
     : [
         { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
@@ -661,10 +669,15 @@ function KpiStrip({
       <KpiCard label="Tokens" value={formatTokensShort(tokenTotal)}>
         <StackedBar segments={kindSegments} height={6} className="mt-3" />
         <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] text-fg-faint">
-          {KIND_LABELS.slice(0, kindSegments.length).map((label, i) => (
-            <span key={label} className="flex items-center gap-1">
+          {KIND_SEGMENT_LABELS.slice(0, kindSegments.length).map((label, i) => (
+            <span key={label} className="relative flex items-center gap-1">
               <Swatch color={KIND_SEGMENT_COLORS[i]} />
-              {label}
+              <MetricTip
+                label={label}
+                popoverClassName="left-0 top-full z-20 mt-1 w-52 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg"
+              >
+                {TOKEN_KINDS[i].description}
+              </MetricTip>
             </span>
           ))}
         </div>
@@ -721,10 +734,6 @@ type StackBy = "kind" | "model";
 const STACK_LABELS: Record<StackBy, string> = { kind: "Kind", model: "Model" };
 const STACK_OPTS = Object.entries(STACK_LABELS) as [StackBy, string][];
 
-/** The by-kind segment labels, paired by index with KIND_SEGMENT_COLORS (input/output/cache-read/
- *  cache-write). One source for the legend, the tooltip, and the stack order. */
-const KIND_LABELS = ["Input", "Output", "Cache read", "Cache write"] as const;
-
 /** An in-module sentinel for the null ("Unknown") model, so the per-day lookup map keys it distinctly from
  *  any real raw id (a single space can't be a real model id). Used only as a Map key here, never as a React
  *  key, so it needn't be the NUL the ByModel table uses for its null-model React key. */
@@ -771,12 +780,18 @@ function DailyUsage({
   // Token-kind segments for a day, in stack order. Cache folds out when the page's "Include cache" pill is
   // off, so the by-kind chart shows fresh input + output only (matching the rest of the page) instead of
   // always rendering the full composition.
-  const kindCount = includeCache ? 4 : 2;
+  const kindCount = includeCache ? 5 : 2;
   const kindSegments = (d: DailyBucket) =>
-    [d.inputTokens, d.outputTokens, d.cacheReadTokens, d.cacheCreationTokens]
+    [
+      d.inputTokens,
+      d.outputTokens,
+      d.cacheReadTokens,
+      d.cacheCreation5mTokens,
+      d.cacheCreation1hTokens,
+    ]
       .slice(0, kindCount)
       .map((value, idx) => ({
-        label: KIND_LABELS[idx],
+        label: KIND_SEGMENT_LABELS[idx],
         value,
         color: KIND_SEGMENT_COLORS[idx],
       }));
@@ -842,7 +857,7 @@ function DailyUsage({
 
   const legend =
     stackBy === "kind"
-      ? KIND_LABELS.slice(0, kindCount).map((label, i) => ({
+      ? KIND_SEGMENT_LABELS.slice(0, kindCount).map((label, i) => ({
           label,
           color: KIND_SEGMENT_COLORS[i],
         }))
@@ -851,12 +866,13 @@ function DailyUsage({
           color: s.color,
         }));
 
-  // Index-aligned with KIND_LABELS / KIND_SEGMENT_COLORS, so a kind segment maps to its costByKind field.
+  // Index-aligned with KIND_SEGMENT_LABELS / KIND_SEGMENT_COLORS, so a kind segment maps to its costByKind field.
   const KIND_COST_KEYS = [
     "input",
     "output",
     "cacheRead",
-    "cacheWrite",
+    "cacheWrite5m",
+    "cacheWrite1h",
   ] as const;
 
   const renderTooltip = (i: number): ReactNode => {
