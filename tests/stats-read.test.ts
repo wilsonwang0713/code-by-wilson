@@ -324,6 +324,8 @@ describe("registerIpc stats:read", () => {
         outputTokens: 0,
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
+        cacheCreation5mTokens: 0,
+        cacheCreation1hTokens: 0,
         equivApiValueUsd: 0,
         equivApiValueFreshUsd: 0,
       },

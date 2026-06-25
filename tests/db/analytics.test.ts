@@ -432,6 +432,26 @@ describe("analytics store", () => {
     expect(t.cacheCreationTokens).toBe(2_000_000); // total column intact
     expect(t.equivApiValueUsd).toBeCloseTo(16.25); // 5m + 1h priced apart
   });
+
+  it("sums the 5m/1h cache-write split into the totals", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        usage: {
+          cacheCreationTokens: 30,
+          cacheCreation5mTokens: 20,
+          cacheCreation1hTokens: 10,
+        },
+      }),
+    ]);
+    const t = readTotals(db);
+    expect(t.cacheCreation5mTokens).toBe(20);
+    expect(t.cacheCreation1hTokens).toBe(10);
+    expect(t.cacheCreation5mTokens + t.cacheCreation1hTokens).toBe(
+      t.cacheCreationTokens,
+    );
+  });
 });
 
 describe("readByModel", () => {
@@ -1905,6 +1925,28 @@ describe("readDaily", () => {
     // still sum to the day's fresh Total (the model-stack + cache-off regression this guards).
     expect(d.byModel[0].equivApiValueUsd).toBeCloseTo(18.3);
     expect(d.byModel[0].equivApiValueFreshUsd).toBeCloseTo(18);
+  });
+
+  it("carries the 5m/1h token split and prices both write kinds in costByKind", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({
+        ts: Date.parse("2026-06-20T12:00:00.000Z"),
+        modelRaw: "claude-opus-4-8",
+        usage: {
+          cacheCreationTokens: 2_000_000,
+          cacheCreation5mTokens: 1_000_000,
+          cacheCreation1hTokens: 1_000_000,
+        },
+      }),
+    ]);
+    const [d] = readDaily(db);
+    expect(d.cacheCreation5mTokens).toBe(1_000_000);
+    expect(d.cacheCreation1hTokens).toBe(1_000_000);
+    expect(d.costByKind!.cacheWrite5m).toBeCloseTo(6.25); // 1M @ $6.25/M
+    expect(d.costByKind!.cacheWrite1h).toBeCloseTo(10); // 1M @ $10/M
+    expect(d.costByKind!.cacheWrite).toBeCloseTo(16.25); // the grouped sum
   });
 });
 

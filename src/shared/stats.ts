@@ -13,6 +13,8 @@ export interface StatsTotals {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  cacheCreation5mTokens: number;
+  cacheCreation1hTokens: number;
   equivApiValueUsd: number;
   /** Equivalent API value pricing only the fresh tokens (input + output rates), the figure shown when the
    *  page's "Include cache" pill is off — the cost mirror of the fresh token subset. */
@@ -29,6 +31,8 @@ export function emptyTotals(): StatsTotals {
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    cacheCreation5mTokens: 0,
+    cacheCreation1hTokens: 0,
     equivApiValueUsd: 0,
     equivApiValueFreshUsd: 0,
   };
@@ -410,6 +414,8 @@ export interface DailyBucket {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  cacheCreation5mTokens: number;
+  cacheCreation1hTokens: number;
   /** The day's Equivalent API value summed over its recognized models, or null (n/a) when none of its
    *  turns ran a known model — never a guessed $0. Prices every kind, unaffected by the cache pill. */
   equivApiValueUsd: number | null;
@@ -423,7 +429,10 @@ export interface DailyBucket {
     input: number;
     output: number;
     cacheRead: number;
+    /** cacheWrite5m + cacheWrite1h — the grouped parent total. */
     cacheWrite: number;
+    cacheWrite5m: number;
+    cacheWrite1h: number;
   } | null;
   /** Total tokens (all four kinds) per raw model id active this day, ordered by tokens descending then
    *  raw id, each with its Equivalent API value — the all-kinds figure and the fresh input+output subset,
@@ -468,6 +477,8 @@ export function emptyDay(day: string): DailyBucket {
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    cacheCreation5mTokens: 0,
+    cacheCreation1hTokens: 0,
     equivApiValueUsd: null,
     equivApiValueFreshUsd: null,
     costByKind: null,

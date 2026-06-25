@@ -220,6 +220,8 @@ interface TotalsRow {
   output_tokens: number;
   cache_read_tokens: number;
   cache_creation_tokens: number;
+  cache_creation_5m_tokens: number;
+  cache_creation_1h_tokens: number;
 }
 
 interface ModelRow {
@@ -334,7 +336,9 @@ export function readTotals(
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+         COALESCE(SUM(cache_creation_5m_tokens), 0) AS cache_creation_5m_tokens,
+         COALESCE(SUM(cache_creation_1h_tokens), 0) AS cache_creation_1h_tokens
        FROM turns ${where}`,
     )
     .get(...bind) as TotalsRow;
@@ -360,6 +364,8 @@ export function readTotals(
     outputTokens: t.output_tokens,
     cacheReadTokens: t.cache_read_tokens,
     cacheCreationTokens: t.cache_creation_tokens,
+    cacheCreation5mTokens: t.cache_creation_5m_tokens,
+    cacheCreation1hTokens: t.cache_creation_1h_tokens,
     equivApiValueUsd,
     equivApiValueFreshUsd,
   };
@@ -862,12 +868,16 @@ interface DayAgg {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  cacheCreation5mTokens: number;
+  cacheCreation1hTokens: number;
   models: Map<string | null, number>;
   modelCost: Map<string | null, { total: number; fresh: number } | null>;
   kindInputUsd: number;
   kindOutputUsd: number;
   kindCacheReadUsd: number;
   kindCacheWriteUsd: number;
+  kindCacheWrite5mUsd: number;
+  kindCacheWrite1hUsd: number;
   knownCost: number;
   hasKnownCost: boolean;
 }
@@ -889,6 +899,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         outputTokens: 0,
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
+        cacheCreation5mTokens: 0,
+        cacheCreation1hTokens: 0,
         models: new Map<string | null, number>(),
         modelCost: new Map<
           string | null,
@@ -898,6 +910,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         kindOutputUsd: 0,
         kindCacheReadUsd: 0,
         kindCacheWriteUsd: 0,
+        kindCacheWrite5mUsd: 0,
+        kindCacheWrite1hUsd: 0,
         knownCost: 0,
         hasKnownCost: false,
       };
@@ -907,6 +921,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
     a.outputTokens += r.output_tokens;
     a.cacheReadTokens += r.cache_read_tokens;
     a.cacheCreationTokens += r.cache_creation_tokens;
+    a.cacheCreation5mTokens += r.cache_creation_5m_tokens;
+    a.cacheCreation1hTokens += r.cache_creation_1h_tokens;
     const modelTotal =
       r.input_tokens +
       r.output_tokens +
@@ -927,6 +943,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
       a.kindOutputUsd += b.output;
       a.kindCacheReadUsd += b.cacheRead;
       a.kindCacheWriteUsd += b.cacheWrite;
+      a.kindCacheWrite5mUsd += b.cacheWrite5m;
+      a.kindCacheWrite1hUsd += b.cacheWrite1h;
       a.knownCost += b.total;
       a.hasKnownCost = true;
     }
@@ -939,6 +957,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         outputTokens: a.outputTokens,
         cacheReadTokens: a.cacheReadTokens,
         cacheCreationTokens: a.cacheCreationTokens,
+        cacheCreation5mTokens: a.cacheCreation5mTokens,
+        cacheCreation1hTokens: a.cacheCreation1hTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
         equivApiValueFreshUsd: a.hasKnownCost
           ? a.kindInputUsd + a.kindOutputUsd
@@ -949,6 +969,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
               output: a.kindOutputUsd,
               cacheRead: a.kindCacheReadUsd,
               cacheWrite: a.kindCacheWriteUsd,
+              cacheWrite5m: a.kindCacheWrite5mUsd,
+              cacheWrite1h: a.kindCacheWrite1hUsd,
             }
           : null,
         byModel: [...a.models.entries()]
