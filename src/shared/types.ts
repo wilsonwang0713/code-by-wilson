@@ -18,6 +18,16 @@ export interface Usage {
   cacheCreation1hTokens: number;
 }
 
+/** One model's token usage within a session — the (session × model) shape the analytics store records,
+ *  carried per-session so the Tokens panel can price each model (main thread and subagents) at its own
+ *  rate. `modelRaw` is the transcript's raw id (e.g. "claude-opus-4-8"), or null for a turn that recorded
+ *  no model; an id matching no known family still counts its tokens but prices to n/a, exactly as the
+ *  overview treats it. */
+export interface ModelUsage {
+  modelRaw: string | null;
+  usage: Usage;
+}
+
 export interface Task {
   id: string;
   subject: string;
