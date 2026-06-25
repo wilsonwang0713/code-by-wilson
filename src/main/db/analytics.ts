@@ -16,6 +16,7 @@ import {
   type CostBreakdown,
   isKnownModelString,
   normalizeModelId,
+  type PricingOverrides,
 } from "@shared/models";
 import { transaction, type SqliteDb } from "./driver";
 
@@ -27,14 +28,14 @@ import { transaction, type SqliteDb } from "./driver";
  * That delete is the single exception to "never lose history on a bump": slice 2 re-keys an id-less
  * turn's surrogate from the parsed-row index to the absolute line number (so an incremental, mid-file
  * parse keys it the same way a full parse does), and the only coherent way to switch schemes is to let
- * the next scan rebuild `turns` from disk. It's a deliberate, related migration — not the unrelated
- * churn the durability rule guards against — and the chunked backfill repopulates within seconds.
+ * the next scan rebuild `turns` from disk. It's a deliberate, related migration (not the unrelated
+ * churn the durability rule guards against) and the chunked backfill repopulates within seconds.
  *
  * Critically the delete is scoped to exactly the v1 -> v2 step (`from === 1`), NOT every upgrade: it
  * must never re-run on a future bump, or a later schema change would silently re-wipe a v2+ user's
- * durable history — the precise durability violation this file guards against.
+ * durable history, the precise durability violation this file guards against.
  */
-const ANALYTICS_SCHEMA_VERSION = 2;
+const ANALYTICS_SCHEMA_VERSION = 3;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -43,33 +44,71 @@ function userVersion(db: SqliteDb): number {
 
 export function migrateAnalytics(db: SqliteDb): void {
   const from = userVersion(db);
-  if (from < ANALYTICS_SCHEMA_VERSION) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS turns (
-        message_id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        ts INTEGER NOT NULL DEFAULT 0,
-        model_raw TEXT,
-        input_tokens INTEGER NOT NULL DEFAULT 0,
-        output_tokens INTEGER NOT NULL DEFAULT 0,
-        cache_read_tokens INTEGER NOT NULL DEFAULT 0,
-        cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
-        cwd TEXT NOT NULL DEFAULT '',
-        project TEXT NOT NULL DEFAULT '',
-        branch TEXT
-      );
-      CREATE INDEX IF NOT EXISTS turns_ts ON turns(ts);
-      CREATE INDEX IF NOT EXISTS turns_session ON turns(session_id);
-      CREATE INDEX IF NOT EXISTS turns_project ON turns(project);
-      CREATE TABLE IF NOT EXISTS processed_files (
-        path TEXT PRIMARY KEY,
-        mtime REAL NOT NULL,
-        lines INTEGER NOT NULL
-      );
-      ${from === 1 ? "DELETE FROM turns;" : ""}
-      PRAGMA user_version = ${ANALYTICS_SCHEMA_VERSION};
-    `);
+  if (from >= ANALYTICS_SCHEMA_VERSION) return;
+
+  // Fresh installs get the columns from CREATE; an existing turns table (v1/v2) keeps its rows and gets
+  // the columns via ALTER below — never DROP, per the durability rule.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS turns (
+      message_id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      ts INTEGER NOT NULL DEFAULT 0,
+      model_raw TEXT,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0,
+      cwd TEXT NOT NULL DEFAULT '',
+      project TEXT NOT NULL DEFAULT '',
+      branch TEXT
+    );
+    CREATE INDEX IF NOT EXISTS turns_ts ON turns(ts);
+    CREATE INDEX IF NOT EXISTS turns_session ON turns(session_id);
+    CREATE INDEX IF NOT EXISTS turns_project ON turns(project);
+    CREATE TABLE IF NOT EXISTS processed_files (
+      path TEXT PRIMARY KEY,
+      mtime REAL NOT NULL,
+      lines INTEGER NOT NULL
+    );
+  `);
+
+  // A pre-existing turns table from an older schema lacks the split columns; add them if missing. (A fresh
+  // install just made the table WITH them, so guard on table_info to avoid a duplicate-column error.)
+  const cols = (
+    db.prepare("PRAGMA table_info(turns)").all() as { name: string }[]
+  ).map((c) => c.name);
+  if (!cols.includes("cache_creation_5m_tokens"))
+    db.exec(
+      "ALTER TABLE turns ADD COLUMN cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0",
+    );
+  if (!cols.includes("cache_creation_1h_tokens"))
+    db.exec(
+      "ALTER TABLE turns ADD COLUMN cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0",
+    );
+
+  // The v1 → v2 one-time wipe (id-less surrogate re-key), scoped to exactly `from === 1` so a later bump
+  // never re-wipes a v2+ user's durable history. Clear processed_files too so the next scan re-ingests
+  // everything rather than treating already-mtime-matched files as done.
+  if (from === 1) {
+    db.exec("DELETE FROM turns");
+    db.exec("DELETE FROM processed_files");
   }
+
+  // Upgrading a store that already held turns (v2+): seed the all-5m fallback so existing rows price their
+  // cache writes immediately (5m + 1h == total holds), then clear the high-water marks so the next scan
+  // re-ingests live transcripts and backfills the REAL split to transcript-retention depth. Orphaned rows
+  // (their transcript gone) keep the all-5m fallback. Scoped to `from >= 2` so it never runs on the v1
+  // wipe (which already emptied turns) or a fresh install (no rows to seed).
+  if (from >= 2) {
+    db.exec(
+      "UPDATE turns SET cache_creation_5m_tokens = cache_creation_tokens WHERE cache_creation_5m_tokens = 0 AND cache_creation_1h_tokens = 0",
+    );
+    db.exec("DELETE FROM processed_files");
+  }
+
+  db.exec(`PRAGMA user_version = ${ANALYTICS_SCHEMA_VERSION}`);
 }
 
 /**
@@ -90,9 +129,9 @@ export interface AnalyticsTurn {
 
 const UPSERT_TURN = `
   INSERT INTO turns
-    (message_id, session_id, ts, model_raw, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cwd, project, branch)
+    (message_id, session_id, ts, model_raw, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, cwd, project, branch)
   VALUES
-    (@message_id, @session_id, @ts, @model_raw, @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cwd, @project, @branch)
+    (@message_id, @session_id, @ts, @model_raw, @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @cwd, @project, @branch)
   ON CONFLICT(message_id) DO UPDATE SET
     session_id = excluded.session_id,
     ts = excluded.ts,
@@ -101,6 +140,8 @@ const UPSERT_TURN = `
     output_tokens = excluded.output_tokens,
     cache_read_tokens = excluded.cache_read_tokens,
     cache_creation_tokens = excluded.cache_creation_tokens,
+    cache_creation_5m_tokens = excluded.cache_creation_5m_tokens,
+    cache_creation_1h_tokens = excluded.cache_creation_1h_tokens,
     cwd = excluded.cwd,
     project = excluded.project,
     branch = excluded.branch
@@ -121,6 +162,8 @@ export function upsertTurns(db: SqliteDb, turns: AnalyticsTurn[]): void {
         output_tokens: t.usage.outputTokens,
         cache_read_tokens: t.usage.cacheReadTokens,
         cache_creation_tokens: t.usage.cacheCreationTokens,
+        cache_creation_5m_tokens: t.usage.cacheCreation5mTokens,
+        cache_creation_1h_tokens: t.usage.cacheCreation1hTokens,
         cwd: t.cwd,
         project: t.project,
         branch: t.branch ?? null,
@@ -182,6 +225,8 @@ interface TotalsRow {
   output_tokens: number;
   cache_read_tokens: number;
   cache_creation_tokens: number;
+  cache_creation_5m_tokens: number;
+  cache_creation_1h_tokens: number;
 }
 
 interface ModelRow {
@@ -190,6 +235,8 @@ interface ModelRow {
   output_tokens: number;
   cache_read_tokens: number;
   cache_creation_tokens: number;
+  cache_creation_5m_tokens: number;
+  cache_creation_1h_tokens: number;
 }
 
 /** All-zero totals, re-exported from the shared single source so the no-db fallback here and the
@@ -237,7 +284,9 @@ function groupByModel(db: SqliteDb, win: StatsWindow): ModelRow[] {
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+         COALESCE(SUM(cache_creation_5m_tokens), 0) AS cache_creation_5m_tokens,
+         COALESCE(SUM(cache_creation_1h_tokens), 0) AS cache_creation_1h_tokens
        FROM turns ${where}
        GROUP BY model_raw`,
     )
@@ -247,7 +296,10 @@ function groupByModel(db: SqliteDb, win: StatsWindow): ModelRow[] {
 /** A grouped row's per-kind Equivalent API value, or null (n/a) when its raw id matches no known family.
  *  The single cost-split mapping the daily fold reads. Pricing flows through costBreakdown (the per-session
  *  Cost panel's formula too). */
-function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
+function modelRowCostBreakdown(
+  m: ModelRow,
+  overrides: PricingOverrides = {},
+): CostBreakdown | null {
   const raw = m.model_raw ?? undefined;
   if (!isKnownModelString(raw)) return null; // n/a cost: the tokens still count toward the token totals
   return costBreakdown(
@@ -256,8 +308,11 @@ function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
       outputTokens: m.output_tokens,
       cacheReadTokens: m.cache_read_tokens,
       cacheCreationTokens: m.cache_creation_tokens,
+      cacheCreation5mTokens: m.cache_creation_5m_tokens,
+      cacheCreation1hTokens: m.cache_creation_1h_tokens,
     },
     normalizeModelId(raw),
+    overrides,
   );
 }
 
@@ -271,6 +326,7 @@ function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
 export function readTotals(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsTotals {
   // win.sinceMs null → all-time (no bound). A number → an inclusive lower bound on ts (the window's start,
   // computed local-day-aware by the caller via rangeSinceMs). `bind` is spread into get/all: an empty
@@ -290,7 +346,9 @@ export function readTotals(
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+         COALESCE(SUM(cache_creation_5m_tokens), 0) AS cache_creation_5m_tokens,
+         COALESCE(SUM(cache_creation_1h_tokens), 0) AS cache_creation_1h_tokens
        FROM turns ${where}`,
     )
     .get(...bind) as TotalsRow;
@@ -302,7 +360,7 @@ export function readTotals(
   let equivApiValueUsd = 0;
   let equivApiValueFreshUsd = 0;
   for (const m of groupByModel(db, win)) {
-    const b = modelRowCostBreakdown(m);
+    const b = modelRowCostBreakdown(m, overrides);
     if (b != null) {
       equivApiValueUsd += b.total;
       equivApiValueFreshUsd += b.input + b.output;
@@ -316,6 +374,8 @@ export function readTotals(
     outputTokens: t.output_tokens,
     cacheReadTokens: t.cache_read_tokens,
     cacheCreationTokens: t.cache_creation_tokens,
+    cacheCreation5mTokens: t.cache_creation_5m_tokens,
+    cacheCreation1hTokens: t.cache_creation_1h_tokens,
     equivApiValueUsd,
     equivApiValueFreshUsd,
   };
@@ -343,8 +403,9 @@ export function hasAnyTurns(db: SqliteDb): boolean {
 export function readByModel(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsByModel[] {
-  return foldModels(groupByModel(db, win));
+  return foldModels(groupByModel(db, win), overrides);
 }
 
 /**
@@ -355,7 +416,10 @@ export function readByModel(
  * modelRowCostBreakdown (n/a for an unrecognized id). Rows order by total tokens descending, then by raw id so ties
  * stay stable across polls.
  */
-function foldModels(rows: ModelRow[]): StatsByModel[] {
+function foldModels(
+  rows: ModelRow[],
+  overrides: PricingOverrides = {},
+): StatsByModel[] {
   const map = new Map<string | null, ModelRow>();
   for (const r of rows) {
     let m = map.get(r.model_raw);
@@ -366,6 +430,8 @@ function foldModels(rows: ModelRow[]): StatsByModel[] {
         output_tokens: 0,
         cache_read_tokens: 0,
         cache_creation_tokens: 0,
+        cache_creation_5m_tokens: 0,
+        cache_creation_1h_tokens: 0,
       };
       map.set(r.model_raw, m);
     }
@@ -373,10 +439,12 @@ function foldModels(rows: ModelRow[]): StatsByModel[] {
     m.output_tokens += r.output_tokens;
     m.cache_read_tokens += r.cache_read_tokens;
     m.cache_creation_tokens += r.cache_creation_tokens;
+    m.cache_creation_5m_tokens += r.cache_creation_5m_tokens;
+    m.cache_creation_1h_tokens += r.cache_creation_1h_tokens;
   }
   return [...map.values()]
     .map((m): StatsByModel => {
-      const cb = modelRowCostBreakdown(m);
+      const cb = modelRowCostBreakdown(m, overrides);
       return {
         modelRaw: m.model_raw,
         totalTokens:
@@ -429,7 +497,9 @@ function groupByDimsAndModel(
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+         COALESCE(SUM(cache_creation_5m_tokens), 0) AS cache_creation_5m_tokens,
+         COALESCE(SUM(cache_creation_1h_tokens), 0) AS cache_creation_1h_tokens
        FROM turns ${where}
        GROUP BY ${cols}, model_raw`,
     )
@@ -460,6 +530,7 @@ interface DimAgg {
 function foldByDim(
   rows: DimModelRow[],
   keyOf: (r: DimModelRow) => string,
+  overrides: PricingOverrides = {},
 ): DimAgg[] {
   const map = new Map<string, DimAgg>();
   for (const r of rows) {
@@ -486,7 +557,7 @@ function foldByDim(
       r.cache_creation_tokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     if (b != null) {
       a.knownCost += b.total;
       a.freshCost += b.input + b.output;
@@ -520,8 +591,11 @@ const FINEST_DIMS = "cwd, project, branch";
  * folds each model slice through modelRowCostBreakdown and reconciles with the grand total. Rows order by total tokens
  * descending, then by cwd so ties (and same-basename projects) stay stable across polls.
  */
-function foldProjects(rows: DimModelRow[]): StatsByProject[] {
-  return foldByDim(rows, (r) => r.cwd)
+function foldProjects(
+  rows: DimModelRow[],
+  overrides: PricingOverrides = {},
+): StatsByProject[] {
+  return foldByDim(rows, (r) => r.cwd, overrides)
     .map(
       (a): StatsByProject => ({
         cwd: a.cwd,
@@ -545,8 +619,15 @@ function foldProjects(rows: DimModelRow[]): StatsByProject[] {
  * and cost fold exactly as the per-project read. Rows order by total tokens descending, then by cwd then
  * branch for a stable tie order.
  */
-function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
-  return foldByDim(rows, (r) => branchRowKey(r.cwd, r.branch ?? null))
+function foldBranches(
+  rows: DimModelRow[],
+  overrides: PricingOverrides = {},
+): StatsByBranch[] {
+  return foldByDim(
+    rows,
+    (r) => branchRowKey(r.cwd, r.branch ?? null),
+    overrides,
+  )
     .map(
       (a): StatsByBranch => ({
         cwd: a.cwd,
@@ -570,15 +651,17 @@ function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
 export function readByProject(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsByProject[] {
-  return foldProjects(groupByDimsAndModel(db, "cwd, project", win));
+  return foldProjects(groupByDimsAndModel(db, "cwd, project", win), overrides);
 }
 
 export function readByBranch(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsByBranch[] {
-  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, win));
+  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, win), overrides);
 }
 
 /**
@@ -618,7 +701,9 @@ function groupBySession(db: SqliteDb, win: StatsWindow): SessionModelRow[] {
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+         COALESCE(SUM(cache_creation_5m_tokens), 0) AS cache_creation_5m_tokens,
+         COALESCE(SUM(cache_creation_1h_tokens), 0) AS cache_creation_1h_tokens
        FROM turns ${where}
        GROUP BY session_id, model_raw`,
     )
@@ -654,7 +739,10 @@ interface SessionAgg {
  * polls. Rows order by last activity descending, then session id for a stable tie order — the table's
  * default ("most recent first") so a non-sorting consumer still gets a sensible order.
  */
-function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
+function foldSessions(
+  rows: SessionModelRow[],
+  overrides: PricingOverrides = {},
+): StatsBySession[] {
   const map = new Map<string, SessionAgg>();
   for (const r of rows) {
     let a = map.get(r.session_id);
@@ -691,7 +779,7 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
     a.totalTokens += groupTokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     if (b != null) {
       a.knownCost += b.total;
       a.freshCost += b.input + b.output;
@@ -737,8 +825,9 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
 export function readBySession(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsBySession[] {
-  return foldSessions(groupBySession(db, win));
+  return foldSessions(groupBySession(db, win), overrides);
 }
 
 /**
@@ -752,14 +841,15 @@ export function readBySession(
 export function readBreakdowns(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsBreakdowns {
   const rows = groupByDimsAndModel(db, FINEST_DIMS, win);
   return {
-    byModel: foldModels(rows),
-    byProject: foldProjects(rows),
+    byModel: foldModels(rows, overrides),
+    byProject: foldProjects(rows, overrides),
     // The session cut needs the session grain plus per-session span/count aggregates the dims scan above
     // can't express, so it runs its own GROUP BY rather than folding `rows`.
-    bySession: readBySession(db, win),
+    bySession: readBySession(db, win, overrides),
   };
 }
 
@@ -792,7 +882,9 @@ function groupByDayAndModel(db: SqliteDb, win: StatsWindow): DayModelRow[] {
          COALESCE(SUM(input_tokens), 0) AS input_tokens,
          COALESCE(SUM(output_tokens), 0) AS output_tokens,
          COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
-         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens
+         COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+         COALESCE(SUM(cache_creation_5m_tokens), 0) AS cache_creation_5m_tokens,
+         COALESCE(SUM(cache_creation_1h_tokens), 0) AS cache_creation_1h_tokens
        FROM turns ${where}
        GROUP BY day, model_raw`,
     )
@@ -808,12 +900,16 @@ interface DayAgg {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
+  cacheCreation5mTokens: number;
+  cacheCreation1hTokens: number;
   models: Map<string | null, number>;
   modelCost: Map<string | null, { total: number; fresh: number } | null>;
   kindInputUsd: number;
   kindOutputUsd: number;
   kindCacheReadUsd: number;
   kindCacheWriteUsd: number;
+  kindCacheWrite5mUsd: number;
+  kindCacheWrite1hUsd: number;
   knownCost: number;
   hasKnownCost: boolean;
 }
@@ -824,7 +920,10 @@ interface DayAgg {
  * tokens descending, ties broken by raw id — the same stable order foldModels uses, so the stacking and
  * its colors don't flicker across polls. Buckets emit ascending by day (string compare on 'YYYY-MM-DD').
  */
-function foldDays(rows: DayModelRow[]): DailyBucket[] {
+function foldDays(
+  rows: DayModelRow[],
+  overrides: PricingOverrides = {},
+): DailyBucket[] {
   const map = new Map<string, DayAgg>();
   for (const r of rows) {
     let a = map.get(r.day);
@@ -835,6 +934,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         outputTokens: 0,
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
+        cacheCreation5mTokens: 0,
+        cacheCreation1hTokens: 0,
         models: new Map<string | null, number>(),
         modelCost: new Map<
           string | null,
@@ -844,6 +945,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         kindOutputUsd: 0,
         kindCacheReadUsd: 0,
         kindCacheWriteUsd: 0,
+        kindCacheWrite5mUsd: 0,
+        kindCacheWrite1hUsd: 0,
         knownCost: 0,
         hasKnownCost: false,
       };
@@ -853,6 +956,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
     a.outputTokens += r.output_tokens;
     a.cacheReadTokens += r.cache_read_tokens;
     a.cacheCreationTokens += r.cache_creation_tokens;
+    a.cacheCreation5mTokens += r.cache_creation_5m_tokens;
+    a.cacheCreation1hTokens += r.cache_creation_1h_tokens;
     const modelTotal =
       r.input_tokens +
       r.output_tokens +
@@ -863,7 +968,7 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
     // cost (all-kinds total and the fresh input+output subset, so a tooltip row honors the cache pill), and
     // the day total; an unrecognized one adds tokens above but null cost (n/a). groupByDayAndModel groups by
     // (day, model_raw), so each model lands once per day — set, not accumulate, the per-model cost.
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     a.modelCost.set(
       r.model_raw,
       b == null ? null : { total: b.total, fresh: b.input + b.output },
@@ -873,6 +978,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
       a.kindOutputUsd += b.output;
       a.kindCacheReadUsd += b.cacheRead;
       a.kindCacheWriteUsd += b.cacheWrite;
+      a.kindCacheWrite5mUsd += b.cacheWrite5m;
+      a.kindCacheWrite1hUsd += b.cacheWrite1h;
       a.knownCost += b.total;
       a.hasKnownCost = true;
     }
@@ -885,6 +992,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
         outputTokens: a.outputTokens,
         cacheReadTokens: a.cacheReadTokens,
         cacheCreationTokens: a.cacheCreationTokens,
+        cacheCreation5mTokens: a.cacheCreation5mTokens,
+        cacheCreation1hTokens: a.cacheCreation1hTokens,
         equivApiValueUsd: a.hasKnownCost ? a.knownCost : null,
         equivApiValueFreshUsd: a.hasKnownCost
           ? a.kindInputUsd + a.kindOutputUsd
@@ -895,6 +1004,8 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
               output: a.kindOutputUsd,
               cacheRead: a.kindCacheReadUsd,
               cacheWrite: a.kindCacheWriteUsd,
+              cacheWrite5m: a.kindCacheWrite5mUsd,
+              cacheWrite1h: a.kindCacheWrite1hUsd,
             }
           : null,
         byModel: [...a.models.entries()]
@@ -926,8 +1037,9 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
 export function readDaily(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): DailyBucket[] {
-  return foldDays(groupByDayAndModel(db, win));
+  return foldDays(groupByDayAndModel(db, win), overrides);
 }
 
 /** A calendar day mid-fold: turns and tokens summed across the day's models (total plus the fresh input/
@@ -951,7 +1063,10 @@ interface CalAgg {
  * same per-model cost mapping readTotals/readByModel use, so the calendar reconciles with them. Days emit
  * ascending (string compare on 'YYYY-MM-DD').
  */
-function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
+function foldCalendar(
+  rows: DayModelRow[],
+  overrides: PricingOverrides = {},
+): CalendarDay[] {
   const map = new Map<string, CalAgg>();
   for (const r of rows) {
     let a = map.get(r.day);
@@ -976,7 +1091,7 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
       r.cache_creation_tokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     if (b != null) {
       a.knownCost += b.total;
       a.freshCost += b.input + b.output;
@@ -1007,8 +1122,9 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
 export function readCalendar(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): CalendarDay[] {
-  return foldCalendar(groupByDayAndModel(db, win));
+  return foldCalendar(groupByDayAndModel(db, win), overrides);
 }
 
 /**

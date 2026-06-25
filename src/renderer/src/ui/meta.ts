@@ -99,7 +99,18 @@ export const KIND_SEGMENT_COLORS = [
   "var(--color-token-input)", // Input — light teal
   "var(--color-token-output)", // Output — deep teal
   "var(--color-data-3)", // Cache read — grey
-  "var(--color-data-4)", // Cache write — grey (dimmest)
+  "var(--color-data-4)", // Cache write · 5-minute — grey
+  "var(--color-data-5)", // Cache write · 1-hour — grey (dimmest)
+] as const;
+
+/** Compact per-kind labels paired by index with KIND_SEGMENT_COLORS, for the KPI strip and the daily
+ *  chart legends/tooltips (the session panel uses the longer descriptions in token-kinds.ts). */
+export const KIND_SEGMENT_LABELS = [
+  "Input",
+  "Output",
+  "Cache read",
+  "Cache write 5m",
+  "Cache write 1h",
 ] as const;
 
 /** Model identity colors (Aurora): one fixed hue per known family, looked up BY family — not cycled by row

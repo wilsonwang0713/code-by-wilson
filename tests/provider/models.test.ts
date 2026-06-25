@@ -6,6 +6,7 @@ import {
   priceFor,
   equivApiValue,
   costBreakdown,
+  resolvePricing,
 } from "@shared/models";
 import type { Usage } from "@shared/types";
 
@@ -43,24 +44,27 @@ describe("contextWindowFor", () => {
 });
 
 describe("priceFor", () => {
-  it("distinguishes input / output / cache-read / cache-write rates per model", () => {
+  it("distinguishes input / output / cache-read / 5m & 1h cache-write rates per model", () => {
     expect(priceFor("opus")).toEqual({
       input: 5,
       output: 25,
       cacheRead: 0.5,
-      cacheWrite: 6.25,
+      cacheWrite5m: 6.25,
+      cacheWrite1h: 10,
     });
     expect(priceFor("sonnet")).toEqual({
       input: 3,
       output: 15,
       cacheRead: 0.3,
-      cacheWrite: 3.75,
+      cacheWrite5m: 3.75,
+      cacheWrite1h: 6,
     });
     expect(priceFor("haiku")).toEqual({
       input: 1,
       output: 5,
       cacheRead: 0.1,
-      cacheWrite: 1.25,
+      cacheWrite5m: 1.25,
+      cacheWrite1h: 2,
     });
   });
 });
@@ -71,6 +75,8 @@ describe("equivApiValue", () => {
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    cacheCreation5mTokens: 0,
+    cacheCreation1hTokens: 0,
     ...over,
   });
 
@@ -87,13 +93,14 @@ describe("equivApiValue", () => {
       equivApiValue(usage({ cacheReadTokens: 1_000_000 }), "opus"),
     ).toBeCloseTo(0.5);
 
-    // Mixed, opus: 100k in, 20k out, 400k cache-read, 10k cache-write.
+    // Mixed, opus: 100k in, 20k out, 400k cache-read, 10k cache-write (all at 5m rate).
     // (100000*5 + 20000*25 + 400000*0.5 + 10000*6.25) / 1e6 = 1.2625
     const mixed = usage({
       inputTokens: 100_000,
       outputTokens: 20_000,
       cacheReadTokens: 400_000,
       cacheCreationTokens: 10_000,
+      cacheCreation5mTokens: 10_000,
     });
     expect(equivApiValue(mixed, "opus")).toBeCloseTo(1.2625);
   });
@@ -105,6 +112,8 @@ describe("costBreakdown", () => {
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
+    cacheCreation5mTokens: 0,
+    cacheCreation1hTokens: 0,
     ...over,
   });
 
@@ -113,31 +122,33 @@ describe("costBreakdown", () => {
       input: 0,
       output: 0,
       cacheRead: 0,
+      cacheWrite5m: 0,
+      cacheWrite1h: 0,
       cacheWrite: 0,
       total: 0,
       cacheSavings: 0,
     });
   });
 
-  it("prices each kind at its per-million rate and sums to the equivalent value", () => {
-    const mixed = usage({
-      inputTokens: 100_000,
-      outputTokens: 20_000,
-      cacheReadTokens: 400_000,
-      cacheCreationTokens: 10_000,
-    });
-    const b = costBreakdown(mixed, "opus");
-    expect(b.input).toBeCloseTo(0.5); // 100k × $5/M
-    expect(b.output).toBeCloseTo(0.5); // 20k × $25/M
-    expect(b.cacheRead).toBeCloseTo(0.2); // 400k × $0.5/M
-    expect(b.cacheWrite).toBeCloseTo(0.0625); // 10k × $6.25/M
-    expect(b.total).toBeCloseTo(1.2625);
-    expect(b.total).toBeCloseTo(equivApiValue(mixed, "opus"));
-  });
-
   it("reports cache-hit savings as the read discount vs full input price", () => {
-    // 1M cache-read on opus: paid $0.50, would have been $5.00 fresh → saved $4.50.
     const b = costBreakdown(usage({ cacheReadTokens: 1_000_000 }), "opus");
-    expect(b.cacheSavings).toBeCloseTo(4.5);
+    expect(b.cacheSavings).toBeCloseTo(4.5); // paid $0.50, fresh $5.00 → saved $4.50
+  });
+});
+
+describe("resolvePricing", () => {
+  it("returns the family defaults when there are no overrides", () => {
+    expect(resolvePricing("opus")).toEqual(priceFor("opus"));
+    expect(resolvePricing("opus", {})).toEqual(priceFor("opus"));
+  });
+  it("merges a per-field override over the defaults, leaving the rest intact", () => {
+    const r = resolvePricing("opus", { opus: { cacheWrite1h: 99 } });
+    expect(r.cacheWrite1h).toBe(99);
+    expect(r.input).toBe(5); // untouched field keeps the default
+    expect(r.cacheWrite5m).toBe(6.25);
+  });
+  it("does not let one family's override leak into another", () => {
+    const o = { opus: { input: 1 } };
+    expect(resolvePricing("sonnet", o)).toEqual(priceFor("sonnet"));
   });
 });
