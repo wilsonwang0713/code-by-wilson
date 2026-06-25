@@ -1,7 +1,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { PersistedSession, SessionCandidate } from "@shared/types";
+import type {
+  PersistedSession,
+  SessionCandidate,
+  ModelUsage,
+} from "@shared/types";
 import { normalizeModelId } from "@shared/models";
+import { usageByModelFor } from "./usage-by-model";
 import { projectFromCwd } from "../../project-name";
 import {
   parseTranscript,
@@ -197,11 +202,17 @@ export function listCandidates({
  */
 export function summarize(c: SessionCandidate): PersistedSession {
   let t: TranscriptSummary | null = null;
+  let usageByModel: ModelUsage[] = [];
   if (c.transcriptPath) {
     try {
-      t = parseTranscript(readFileSync(c.transcriptPath, "utf8"), c.cwd);
+      const jsonl = readFileSync(c.transcriptPath, "utf8");
+      t = parseTranscript(jsonl, c.cwd);
+      // Same jsonl, no second read: the per-model breakdown shares the file parseTranscript just consumed,
+      // plus the session's subagent transcripts.
+      usageByModel = usageByModelFor(jsonl, c.transcriptPath, c.id);
     } catch {
       t = null;
+      usageByModel = [];
     }
   }
   const fallbackName = projectFromCwd(c.cwd);
@@ -233,6 +244,7 @@ export function summarize(c: SessionCandidate): PersistedSession {
       cacheCreation5mTokens: 0,
       cacheCreation1hTokens: 0,
     },
+    usageByModel,
     contextTokens: t?.contextTokens ?? 0,
   };
 }

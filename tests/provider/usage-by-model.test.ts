@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { summarize } from "../../src/main/provider/claude/discover";
+import type { SessionCandidate } from "@shared/types";
 import {
   extractTurns,
   foldTurnsByModel,
@@ -140,6 +142,42 @@ describe("usageByModelFor", () => {
     const folded = usageByModelFor(readFileSync(path, "utf8"), path, "sess-2");
     expect(folded).toHaveLength(1);
     expect(folded[0]).toMatchObject({ modelRaw: "claude-opus-4-8" });
+  });
+});
+
+describe("summarize includes the per-model breakdown", () => {
+  it("folds main + subagent usage onto the snapshot", () => {
+    const home = makeHome();
+    const path = writeMain(home, "-work-proj", "sess-9", [
+      assistant("m1", "claude-opus-4-8", 1000),
+    ]);
+    writeSubagent(home, "-work-proj", "sess-9", "aaa", [
+      assistant("s1", "claude-sonnet-4-6", 200),
+    ]);
+
+    const cand: SessionCandidate = {
+      id: "sess-9",
+      alive: false,
+      cwd: "/work/proj",
+      transcriptPath: path,
+      transcriptMtimeMs: 1,
+    };
+    const snap = summarize(cand);
+    const byRaw = Object.fromEntries(
+      (snap.usageByModel ?? []).map((m) => [m.modelRaw, m.usage.inputTokens]),
+    );
+    expect(byRaw["claude-opus-4-8"]).toBe(1000);
+    expect(byRaw["claude-sonnet-4-6"]).toBe(200);
+  });
+
+  it("yields an empty breakdown when there is no transcript", () => {
+    const snap = summarize({
+      id: "x",
+      alive: false,
+      cwd: "/work/proj",
+      transcriptMtimeMs: 0,
+    });
+    expect(snap.usageByModel).toEqual([]);
   });
 });
 
