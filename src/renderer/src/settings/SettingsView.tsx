@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { CliStatus } from "@shared/cli-status";
 import type { Account } from "@shared/types";
+import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
 import type { IconName } from "../ui/icon-names";
@@ -44,6 +45,7 @@ export function SettingsView({
   onSetBinPath,
   section,
   onSectionChange,
+  update,
 }: {
   cliStatus: CliStatus | null;
   account: Account | null;
@@ -52,6 +54,7 @@ export function SettingsView({
   onSetBinPath: (path: string | null) => void;
   section: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
+  update?: UpdateControls;
 }) {
   const cliDot = footerView(cliStatus).dot;
   const cliTrips = cliDot === "warn" || cliDot === "error";
@@ -117,7 +120,7 @@ export function SettingsView({
           )}
           {section === "account" && <AccountSection account={account} />}
           {section === "appearance" && <AppearanceSection />}
-          {section === "about" && <AboutSection />}
+          {section === "about" && <AboutSection update={update} />}
         </div>
       </OverlayScroll>
     </div>
@@ -585,7 +588,7 @@ function AppearanceSection() {
   );
 }
 
-function AboutSection() {
+function AboutSection({ update }: { update?: UpdateControls }) {
   return (
     <>
       <Header title="About" />
@@ -601,6 +604,7 @@ function AboutSection() {
           </div>
         </div>
       </Card>
+      {update && <SoftwareUpdateCard update={update} />}
     </>
   );
 }
