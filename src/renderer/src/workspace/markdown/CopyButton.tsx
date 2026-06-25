@@ -4,18 +4,17 @@ import { Icon } from "../../ui/icons";
 
 /**
  * Copy-to-clipboard affordance shared by code blocks and assistant bubbles. Writes via the app's
- * clipboard IPC, then flips to a check for ~1.5s. The parent controls visibility (opacity / reveal)
- * through `className` plus a named group; `revealLabelOnHover` hides the label until group hover.
+ * clipboard IPC, then flips to a check for ~1.5s. The icon always shows; pass `label` to add text
+ * beside it. The consumer controls the button's own visibility (e.g. an opacity reveal on parent
+ * group hover) through `className`.
  */
 export function CopyButton({
   text,
   label,
-  revealLabelOnHover = false,
   className,
 }: {
   text: string;
   label?: string;
-  revealLabelOnHover?: boolean;
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -39,7 +38,7 @@ export function CopyButton({
     <button
       type="button"
       onClick={onClick}
-      aria-label="Copy"
+      aria-label={copied ? "Copied" : "Copy"}
       className={cx(
         "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] text-fg-faint transition-colors hover:text-fg",
         className,
@@ -51,12 +50,7 @@ export function CopyButton({
         className={copied ? "text-ok" : undefined}
       />
       {label && (
-        <span
-          className={cx(
-            copied && "text-ok",
-            revealLabelOnHover && !copied && "hidden group-hover/msg:inline",
-          )}
-        >
+        <span className={cx(copied && "text-ok")}>
           {copied ? "Copied" : label}
         </span>
       )}

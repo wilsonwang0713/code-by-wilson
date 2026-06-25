@@ -29,17 +29,12 @@ export function EventItem({
       return <Bubble role="user">{event.text}</Bubble>;
     case "assistant":
       return (
-        <div className="group/msg">
+        <div>
           <Bubble role="assistant">
             <MarkdownMessage text={event.text} />
           </Bubble>
           <div className="ml-[34px] mt-1">
-            <CopyButton
-              text={event.text}
-              label="Copy"
-              revealLabelOnHover
-              className="opacity-50 group-hover/msg:opacity-100"
-            />
+            <CopyButton text={event.text} />
           </div>
         </div>
       );
