@@ -356,4 +356,23 @@ describe("createTerminalStore", () => {
     h.route("b", "x");
     expect(h.made[0].writes.at(-1)?.data).toBe("x");
   });
+
+  it("reattach opens the gate and flushes the queue even when api.reattach rejects", async () => {
+    const h = harness();
+    h.api.reattach.mockRejectedValue(new Error("ipc failed"));
+    h.store.create("a", { replayOnCreate: true });
+    h.route("a", "Q1"); // queued while gate is up, acked immediately
+    h.route("a", "Q2");
+
+    // The method re-throws after the finally runs — that's expected. Wrap so we can assert on state.
+    await expect(h.store.reattach("a", 80, 24)).rejects.toThrow("ipc failed");
+
+    // No snapshot was written (api.reattach rejected before returning one) — only the queued chunks.
+    expect(h.made[0].writes.map((w) => w.data)).toEqual(["Q1", "Q2"]);
+
+    // Gate is open: further output now writes directly, with an ack callback.
+    h.route("a", "live");
+    expect(h.made[0].writes.at(-1)?.data).toBe("live");
+    expect(h.made[0].writes.at(-1)?.cb).toBeTypeOf("function");
+  });
 });

@@ -190,15 +190,22 @@ export function createTerminalStore({
     async reattach(id, cols, rows) {
       const h = handles.get(id);
       if (!h || !h.replayPending) return; // not a reattaching terminal — nothing to replay
-      const snapshot = await api.reattach(id, cols, rows);
-      // A /clear rename keeps the SAME handle object (just re-keyed), so operate on the captured `h`. But
-      // bail if it's no longer the live handle for its (possibly rotated) id — a dispose during the await
-      // removes it from the map, and writing to a disposed xterm would throw.
-      if (handles.get(h.id) !== h || !h.replayPending) return;
-      if (snapshot) h.term.write(snapshot);
-      for (const chunk of h.replayQueue) h.term.write(chunk); // already acked when queued — no ack callback
-      h.replayQueue = [];
-      h.replayPending = false;
+      let snapshot: string | null = null;
+      try {
+        snapshot = await api.reattach(id, cols, rows);
+      } finally {
+        // Open the gate even if api.reattach rejected: otherwise a transient IPC failure would strand the
+        // terminal gated forever (queuing + acking live output but never rendering it). On failure we lose
+        // the snapshot but live output resumes. A /clear rename keeps the SAME handle object (re-keyed), so
+        // operate on the captured `h`; bail if it's no longer the live handle for its id (a dispose during
+        // the await removes it from the map, and writing to a disposed xterm would throw) or already flushed.
+        if (handles.get(h.id) === h && h.replayPending) {
+          if (snapshot) h.term.write(snapshot);
+          for (const chunk of h.replayQueue) h.term.write(chunk); // already acked when queued — no ack callback
+          h.replayQueue = [];
+          h.replayPending = false;
+        }
+      }
     },
   };
 }
