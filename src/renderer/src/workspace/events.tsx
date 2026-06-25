@@ -5,6 +5,8 @@ import { Icon } from "../ui/icons";
 import { toolIcon } from "./tool-icon";
 import { TURN_STATUS } from "./turn-status";
 import type { DispatchDrill } from "./drill-index";
+import { CopyButton } from "./markdown/CopyButton";
+import { MarkdownMessage } from "./markdown/MarkdownMessage";
 
 /** A request to open a detail modal for one transcript event. Threaded from the feed up to the view that
  *  owns the modal state. A discriminated union so the view renders the right modal. */
@@ -26,7 +28,21 @@ export function EventItem({
     case "user":
       return <Bubble role="user">{event.text}</Bubble>;
     case "assistant":
-      return <Bubble role="assistant">{event.text}</Bubble>;
+      return (
+        <div className="group/msg">
+          <Bubble role="assistant">
+            <MarkdownMessage text={event.text} />
+          </Bubble>
+          <div className="ml-[34px] mt-1">
+            <CopyButton
+              text={event.text}
+              label="Copy"
+              revealLabelOnHover
+              className="opacity-50 group-hover/msg:opacity-100"
+            />
+          </div>
+        </div>
+      );
     case "thinking":
       return <Thinking text={event.text} />;
     case "tool":
@@ -90,9 +106,9 @@ function Bubble({
       </div>
       <div
         className={cx(
-          "max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed",
+          "max-w-[85%] break-words rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed",
           user
-            ? "bg-ink-900 text-fg"
+            ? "whitespace-pre-wrap bg-ink-900 text-fg"
             : "bg-ink-925 text-fg ring-1 ring-ink-800",
         )}
       >
