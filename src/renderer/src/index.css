@@ -62,8 +62,9 @@
      kind, with a dimmest tail for cache-write. */
   --color-data-1: #c2c9d2; /* lightest — Input */
   --color-data-2: #9098a3; /* Output */
-  --color-data-3: #646c77; /* Cache read / Cached */
-  --color-data-4: #474e58; /* dimmest — Cache write */
+  --color-data-3: #707885; /* Cache read */
+  --color-data-4: #565d68; /* Cache write · 5-minute */
+  --color-data-5: #3e444d; /* Cache write · 1-hour (dimmest) */
 
   /* Model identity colors (Aurora) — one fixed hue per known family, reused everywhere a model appears
      (By model bars, daily stack-by-model, By session). Restrained jewel tones, held off the danger/
