@@ -154,13 +154,11 @@ function SessionRow({
       aria-pressed={selected}
       aria-label={`Open ${s.title}`}
       className={cx(
-        // Raised-card selection: a full softened-teal border over a faint teal fill, no leading rail.
-        // The unselected border stays transparent (1px on all sides) so there's no width shift.
-        "block w-full rounded-md border px-2.5 py-2 text-left transition-colors",
+        // No border. Selection is carried by the teal fill plus the brightened icon and
+        // semibold title.
+        "block w-full rounded-md px-2.5 py-2 text-left transition-colors",
         focusRingInset,
-        selected
-          ? "border-primary/50 bg-primary/[0.05]"
-          : "border-transparent hover:bg-ink-900",
+        selected ? "bg-primary/[0.1]" : "hover:bg-ink-900",
       )}
     >
       <div className="flex items-start gap-2.5">
