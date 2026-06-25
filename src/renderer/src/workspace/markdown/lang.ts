@@ -41,7 +41,9 @@ export const ALIAS: Record<string, string> = {
 
 /** A loaded Shiki language id for the fence, or "text" (plaintext) when missing or unsupported. */
 export function languageFromClassName(className?: string): string {
-  const match = /language-([\w-]+)/.exec(className ?? "");
+  // Anchor to the start of a class token (string start or whitespace) so only a real `language-*`
+  // class matches, not an arbitrary substring like the "language-" inside "not-a-language-go".
+  const match = /(?:^|\s)language-([\w-]+)/.exec(className ?? "");
   const raw = match?.[1]?.toLowerCase();
   if (!raw) return "text";
   const id = ALIAS[raw] ?? raw;

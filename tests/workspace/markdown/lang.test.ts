@@ -34,7 +34,12 @@ describe("languageFromClassName — resolve a fence class to a loaded Shiki lang
     expect(languageFromClassName("language-cobol")).toBe("text");
     expect(languageFromClassName("")).toBe("text");
     expect(languageFromClassName(undefined)).toBe("text");
-    expect(languageFromClassName("not-a-language-class")).toBe("text");
+  });
+
+  it("ignores 'language-' that is only a substring of another class", () => {
+    // The capture would be "go" on a naive substring match; only a real class token counts.
+    expect(languageFromClassName("not-a-language-go")).toBe("text");
+    expect(languageFromClassName("mylanguage-typescript")).toBe("text");
   });
 
   it("every alias target is itself a loaded language", () => {

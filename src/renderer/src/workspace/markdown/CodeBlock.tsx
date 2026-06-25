@@ -6,7 +6,8 @@ import { getHighlighter, type HighlighterInstance } from "./highlighter";
 /**
  * One fenced code block. Highlights with the shared Shiki singleton on the sunken well background.
  * Top-right swaps on hover: the language label shows at rest (react-shiki's own, hidden via
- * `langClassName` on group/code hover), and the copy button (icon + "Copy") fades in. The button
+ * `langClassName` on group/code hover, and suppressed entirely for plain `text` fences so a
+ * no-language block shows no badge), and the copy button (icon + "Copy") fades in. The button
  * needs `z-10` because react-shiki's wrapper carries `position: relative` (from the stylesheet
  * react-shiki/core imports), making it a positioned later-sibling that would otherwise paint over the
  * button; the well backdrop keeps it legible above the code. While the singleton is still loading it
@@ -16,7 +17,7 @@ import { getHighlighter, type HighlighterInstance } from "./highlighter";
 const SURFACE =
   "group/code relative my-2.5 overflow-hidden rounded-lg border border-ink-800";
 const PRE_RESET =
-  "[&_pre]:!m-0 [&_pre]:!bg-well [&_pre]:overflow-x-auto [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-[12px] [&_pre]:leading-relaxed";
+  "[&_pre]:!m-0 [&_pre]:!bg-well [&_pre]:overflow-x-auto [&_pre]:!p-3 [&_pre]:font-mono [&_pre]:text-[12px] [&_pre]:leading-relaxed";
 const COPY =
   "absolute right-1.5 top-1.5 z-10 bg-well opacity-0 group-hover/code:opacity-100";
 
@@ -52,7 +53,9 @@ export function CodeBlock({
           highlighter={hl}
           language={language}
           theme="vitesse-dark"
-          langClassName="group-hover/code:hidden"
+          langClassName={
+            language === "text" ? "hidden" : "group-hover/code:hidden"
+          }
         >
           {code}
         </ShikiHighlighter>

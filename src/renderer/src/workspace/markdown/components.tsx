@@ -1,8 +1,18 @@
+import type { ReactNode } from "react";
 import type { Components } from "react-markdown";
 import { isInlineCode, type Element } from "react-shiki";
 import { CodeBlock } from "./CodeBlock";
 import { ExternalLink } from "./ExternalLink";
 import { languageFromClassName } from "./lang";
+
+/** Flatten a code fence's children to its raw text. For a fenced block react-markdown passes a single
+ *  string, but a non-string (an array of nodes) must not silently drop the code — recurse and keep the
+ *  text. Avoids String(children), which would emit "[object Object]" or comma-join an array. */
+function codeText(node: ReactNode): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(codeText).join("");
+  return "";
+}
 
 /** Tailwind-token overrides for assistant markdown. Restrained: color stays state-only, teal only on
  *  links, code is the only multicolor surface (contained to the well by CodeBlock). */
@@ -43,13 +53,25 @@ export const markdownComponents: Components = {
       {children}
     </h4>
   ),
-  ul: ({ children }) => (
-    <ul className="my-2 list-disc pl-5 marker:text-fg-faint">{children}</ul>
-  ),
+  // GFM task lists arrive as `ul.contains-task-list > li.task-list-item` with a disabled checkbox. Drop
+  // the disc/indent for those so the checkbox isn't doubled up with a bullet; plain lists keep the disc.
+  ul: ({ className, children }) =>
+    className?.includes("contains-task-list") ? (
+      <ul className="my-2 list-none pl-0">{children}</ul>
+    ) : (
+      <ul className="my-2 list-disc pl-5 marker:text-fg-faint">{children}</ul>
+    ),
   ol: ({ children }) => (
     <ol className="my-2 list-decimal pl-5 marker:text-fg-faint">{children}</ol>
   ),
-  li: ({ children }) => <li className="my-0.5">{children}</li>,
+  li: ({ className, children }) =>
+    className?.includes("task-list-item") ? (
+      <li className="my-0.5 [&>input]:mr-2 [&>input]:align-middle">
+        {children}
+      </li>
+    ) : (
+      <li className="my-0.5">{children}</li>
+    ),
   blockquote: ({ children }) => (
     <blockquote className="my-2 border-l-2 border-ink-700 pl-3 text-fg-muted">
       {children}
@@ -83,8 +105,7 @@ export const markdownComponents: Components = {
         </code>
       );
     }
-    const code =
-      typeof children === "string" ? children.replace(/\n$/, "") : "";
+    const code = codeText(children).replace(/\n$/, "");
     return (
       <CodeBlock code={code} language={languageFromClassName(className)} />
     );
