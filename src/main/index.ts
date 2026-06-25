@@ -23,6 +23,7 @@ import { resolveClaudeDir } from "./claude-config";
 import { createAppSettingsStore } from "./app-settings";
 import { createSessionTitleStore } from "./session-titles";
 import { createCliStatusController } from "./cli-check";
+import { createUpdater } from "./updater";
 import {
   probeShellEnv,
   resolveShellPath,
@@ -178,6 +179,16 @@ app
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) openWindow();
     });
+    // Push update-state to whatever window is open (resolved at send-time, like the fullscreen push).
+    const sendUpdate = (state: import("@shared/update").UpdateState): void => {
+      const w = BrowserWindow.getAllWindows()[0];
+      if (w && !w.isDestroyed()) w.webContents.send(IPC.updateState, state);
+    };
+    const updater = createUpdater({
+      send: sendUpdate,
+      isPackaged: app.isPackaged,
+      currentVersion: app.getVersion(),
+    });
     // One login-shell probe at startup: recover the real PATH and a rc-set CLAUDE_CONFIG_DIR that a
     // Finder-launched .app doesn't inherit. Packaged-only (dev inherits the shell env); tight timeout. Runs
     // AFTER createWindow (above) so it never blocks first paint, but BEFORE the settings/statusline/provider
@@ -293,7 +304,16 @@ app
       claudeDir,
       cliStatus,
       sessionTitles,
+      updater,
+      appSettings,
     });
+
+    // One-shot launch check: packaged only, and only when the user hasn't turned it off. Deferred so it
+    // never blocks first paint (mirrors the setTimeout'd CLI check). No recurring timer — see the
+    // "renderer polls; no main timers" invariant; this fires once per launch.
+    if (app.isPackaged && (appSettings.read().autoCheckUpdates ?? true)) {
+      setTimeout(() => void updater.check(), 3000);
+    }
 
     try {
       sync(); // incremental parse of ~/.claude → SQLite; the window's first overview() is served right after
