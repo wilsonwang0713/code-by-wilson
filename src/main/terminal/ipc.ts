@@ -20,6 +20,7 @@ import { projectFromCwd } from "../project-name";
 import type { ManagedRegistry } from "../managed-registry";
 import { createTerminalManager } from "./manager";
 import { createPtyProcess } from "./pty-process";
+import { createRecorder } from "./recorder";
 
 /**
  * Build the optimistic Managed draft the renderer shows the instant a session is spawned, before
@@ -88,13 +89,7 @@ export function registerTerminalIpc({
     // The composition root: this is the one place node-pty is injected, so the manager (and its tests)
     // stay free of the native addon.
     createPty: createPtyProcess,
-    // Temporary stub — Task 3 replaces this with the real createRecorder from recorder.ts.
-    createRecorder: () => ({
-      write: () => {},
-      resize: () => {},
-      snapshot: () => Promise.resolve(""),
-      dispose: () => {},
-    }),
+    createRecorder,
     env,
   });
 
@@ -169,6 +164,18 @@ export function registerTerminalIpc({
     });
     return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
   });
+  ipcMain.handle(
+    TERMINAL.reattach,
+    async (
+      _e,
+      id: string,
+      cols: number,
+      rows: number,
+    ): Promise<string | null> => {
+      manager.resize(id, cols, rows); // size pty + recorder to the renderer's grid before serializing
+      return manager.snapshot(id);
+    },
+  );
 
   // Also kill ptys on app quit: a quit can tear the main process down without ever emitting the
   // window's 'closed' event, which would otherwise orphan the spawned `claude` children.
@@ -191,6 +198,7 @@ export function registerTerminalIpc({
     ipcMain.removeHandler(TERMINAL.adopt);
     ipcMain.removeHandler(TERMINAL.fork);
     ipcMain.removeHandler(TERMINAL.pickDirectory);
+    ipcMain.removeHandler(TERMINAL.reattach);
     ipcMain.removeListener(TERMINAL.write, onWrite);
     ipcMain.removeListener(TERMINAL.resize, onResize);
     ipcMain.removeListener(TERMINAL.ack, onAck);

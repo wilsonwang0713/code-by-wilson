@@ -15,6 +15,7 @@ export const TERMINAL = {
   data: "terminal:data",
   exit: "terminal:exit",
   rename: "terminal:rename",
+  reattach: "terminal:reattach",
 } as const;
 
 /**
@@ -119,6 +120,11 @@ export interface TerminalApi {
   resize(id: string, cols: number, rows: number): void;
   ack(id: string, charCount: number): void;
   kill(id: string): void;
+  /** After a window refresh, fetch the current screen for a still-live managed session so the renderer
+   *  can replay it into its fresh xterm. Resolves to the serialized screen, or null if no live pty exists
+   *  for `id` (e.g. the session ended). Resizes the live pty + recorder to (cols, rows) first so the
+   *  serialized frame matches the renderer's grid. */
+  reattach(id: string, cols: number, rows: number): Promise<string | null>;
   /** Open a native directory picker; resolves to the chosen path, or null if cancelled. */
   pickDirectory(): Promise<string | null>;
   /** Subscribe to batched output for ANY Managed session (the chunk carries its id). Returns unsubscribe. */

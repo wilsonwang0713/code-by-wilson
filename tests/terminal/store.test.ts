@@ -52,6 +52,7 @@ function harness(isMac = true) {
     ack: vi.fn(),
     kill: vi.fn(),
     pickDirectory: vi.fn(),
+    reattach: vi.fn(),
     onData: (cb: (id: string, d: string) => void) => {
       dataRouter = cb;
       return () => {};
