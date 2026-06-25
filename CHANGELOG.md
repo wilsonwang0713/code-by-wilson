@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-06-25
+
+### Added
+
+- In-app software updates. The app checks for a new version on launch and lets you trigger a check manually from Settings → About. A "Software update" card shows the current state; the settings gear gains an arrow badge when an update is ready to install. Download progress tracks in the card; the update installs on quit.
+
 ## [0.1.16] - 2026-06-25
 
 ### Changed
@@ -379,7 +385,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.16...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.17...HEAD
+[0.1.17]: https://github.com/luojiahai/code-by-wire/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/luojiahai/code-by-wire/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/luojiahai/code-by-wire/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/luojiahai/code-by-wire/compare/v0.1.13...v0.1.14
