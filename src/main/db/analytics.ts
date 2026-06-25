@@ -16,6 +16,7 @@ import {
   type CostBreakdown,
   isKnownModelString,
   normalizeModelId,
+  type PricingOverrides,
 } from "@shared/models";
 import { transaction, type SqliteDb } from "./driver";
 
@@ -291,7 +292,10 @@ function groupByModel(db: SqliteDb, win: StatsWindow): ModelRow[] {
 /** A grouped row's per-kind Equivalent API value, or null (n/a) when its raw id matches no known family.
  *  The single cost-split mapping the daily fold reads. Pricing flows through costBreakdown (the per-session
  *  Cost panel's formula too). */
-function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
+function modelRowCostBreakdown(
+  m: ModelRow,
+  overrides: PricingOverrides = {},
+): CostBreakdown | null {
   const raw = m.model_raw ?? undefined;
   if (!isKnownModelString(raw)) return null; // n/a cost: the tokens still count toward the token totals
   return costBreakdown(
@@ -304,6 +308,7 @@ function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
       cacheCreation1hTokens: m.cache_creation_1h_tokens,
     },
     normalizeModelId(raw),
+    overrides,
   );
 }
 
@@ -317,6 +322,7 @@ function modelRowCostBreakdown(m: ModelRow): CostBreakdown | null {
 export function readTotals(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsTotals {
   // win.sinceMs null → all-time (no bound). A number → an inclusive lower bound on ts (the window's start,
   // computed local-day-aware by the caller via rangeSinceMs). `bind` is spread into get/all: an empty
@@ -350,7 +356,7 @@ export function readTotals(
   let equivApiValueUsd = 0;
   let equivApiValueFreshUsd = 0;
   for (const m of groupByModel(db, win)) {
-    const b = modelRowCostBreakdown(m);
+    const b = modelRowCostBreakdown(m, overrides);
     if (b != null) {
       equivApiValueUsd += b.total;
       equivApiValueFreshUsd += b.input + b.output;
@@ -393,8 +399,9 @@ export function hasAnyTurns(db: SqliteDb): boolean {
 export function readByModel(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsByModel[] {
-  return foldModels(groupByModel(db, win));
+  return foldModels(groupByModel(db, win), overrides);
 }
 
 /**
@@ -405,7 +412,10 @@ export function readByModel(
  * modelRowCostBreakdown (n/a for an unrecognized id). Rows order by total tokens descending, then by raw id so ties
  * stay stable across polls.
  */
-function foldModels(rows: ModelRow[]): StatsByModel[] {
+function foldModels(
+  rows: ModelRow[],
+  overrides: PricingOverrides = {},
+): StatsByModel[] {
   const map = new Map<string | null, ModelRow>();
   for (const r of rows) {
     let m = map.get(r.model_raw);
@@ -430,7 +440,7 @@ function foldModels(rows: ModelRow[]): StatsByModel[] {
   }
   return [...map.values()]
     .map((m): StatsByModel => {
-      const cb = modelRowCostBreakdown(m);
+      const cb = modelRowCostBreakdown(m, overrides);
       return {
         modelRaw: m.model_raw,
         totalTokens:
@@ -516,6 +526,7 @@ interface DimAgg {
 function foldByDim(
   rows: DimModelRow[],
   keyOf: (r: DimModelRow) => string,
+  overrides: PricingOverrides = {},
 ): DimAgg[] {
   const map = new Map<string, DimAgg>();
   for (const r of rows) {
@@ -542,7 +553,7 @@ function foldByDim(
       r.cache_creation_tokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     if (b != null) {
       a.knownCost += b.total;
       a.freshCost += b.input + b.output;
@@ -576,8 +587,11 @@ const FINEST_DIMS = "cwd, project, branch";
  * folds each model slice through modelRowCostBreakdown and reconciles with the grand total. Rows order by total tokens
  * descending, then by cwd so ties (and same-basename projects) stay stable across polls.
  */
-function foldProjects(rows: DimModelRow[]): StatsByProject[] {
-  return foldByDim(rows, (r) => r.cwd)
+function foldProjects(
+  rows: DimModelRow[],
+  overrides: PricingOverrides = {},
+): StatsByProject[] {
+  return foldByDim(rows, (r) => r.cwd, overrides)
     .map(
       (a): StatsByProject => ({
         cwd: a.cwd,
@@ -601,8 +615,15 @@ function foldProjects(rows: DimModelRow[]): StatsByProject[] {
  * and cost fold exactly as the per-project read. Rows order by total tokens descending, then by cwd then
  * branch for a stable tie order.
  */
-function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
-  return foldByDim(rows, (r) => branchRowKey(r.cwd, r.branch ?? null))
+function foldBranches(
+  rows: DimModelRow[],
+  overrides: PricingOverrides = {},
+): StatsByBranch[] {
+  return foldByDim(
+    rows,
+    (r) => branchRowKey(r.cwd, r.branch ?? null),
+    overrides,
+  )
     .map(
       (a): StatsByBranch => ({
         cwd: a.cwd,
@@ -626,15 +647,17 @@ function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
 export function readByProject(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsByProject[] {
-  return foldProjects(groupByDimsAndModel(db, "cwd, project", win));
+  return foldProjects(groupByDimsAndModel(db, "cwd, project", win), overrides);
 }
 
 export function readByBranch(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsByBranch[] {
-  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, win));
+  return foldBranches(groupByDimsAndModel(db, FINEST_DIMS, win), overrides);
 }
 
 /**
@@ -712,7 +735,10 @@ interface SessionAgg {
  * polls. Rows order by last activity descending, then session id for a stable tie order — the table's
  * default ("most recent first") so a non-sorting consumer still gets a sensible order.
  */
-function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
+function foldSessions(
+  rows: SessionModelRow[],
+  overrides: PricingOverrides = {},
+): StatsBySession[] {
   const map = new Map<string, SessionAgg>();
   for (const r of rows) {
     let a = map.get(r.session_id);
@@ -749,7 +775,7 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
     a.totalTokens += groupTokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     if (b != null) {
       a.knownCost += b.total;
       a.freshCost += b.input + b.output;
@@ -795,8 +821,9 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
 export function readBySession(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsBySession[] {
-  return foldSessions(groupBySession(db, win));
+  return foldSessions(groupBySession(db, win), overrides);
 }
 
 /**
@@ -810,14 +837,15 @@ export function readBySession(
 export function readBreakdowns(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): StatsBreakdowns {
   const rows = groupByDimsAndModel(db, FINEST_DIMS, win);
   return {
-    byModel: foldModels(rows),
-    byProject: foldProjects(rows),
+    byModel: foldModels(rows, overrides),
+    byProject: foldProjects(rows, overrides),
     // The session cut needs the session grain plus per-session span/count aggregates the dims scan above
     // can't express, so it runs its own GROUP BY rather than folding `rows`.
-    bySession: readBySession(db, win),
+    bySession: readBySession(db, win, overrides),
   };
 }
 
@@ -888,7 +916,10 @@ interface DayAgg {
  * tokens descending, ties broken by raw id — the same stable order foldModels uses, so the stacking and
  * its colors don't flicker across polls. Buckets emit ascending by day (string compare on 'YYYY-MM-DD').
  */
-function foldDays(rows: DayModelRow[]): DailyBucket[] {
+function foldDays(
+  rows: DayModelRow[],
+  overrides: PricingOverrides = {},
+): DailyBucket[] {
   const map = new Map<string, DayAgg>();
   for (const r of rows) {
     let a = map.get(r.day);
@@ -933,7 +964,7 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
     // cost (all-kinds total and the fresh input+output subset, so a tooltip row honors the cache pill), and
     // the day total; an unrecognized one adds tokens above but null cost (n/a). groupByDayAndModel groups by
     // (day, model_raw), so each model lands once per day — set, not accumulate, the per-model cost.
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     a.modelCost.set(
       r.model_raw,
       b == null ? null : { total: b.total, fresh: b.input + b.output },
@@ -1002,8 +1033,9 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
 export function readDaily(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): DailyBucket[] {
-  return foldDays(groupByDayAndModel(db, win));
+  return foldDays(groupByDayAndModel(db, win), overrides);
 }
 
 /** A calendar day mid-fold: turns and tokens summed across the day's models (total plus the fresh input/
@@ -1027,7 +1059,10 @@ interface CalAgg {
  * same per-model cost mapping readTotals/readByModel use, so the calendar reconciles with them. Days emit
  * ascending (string compare on 'YYYY-MM-DD').
  */
-function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
+function foldCalendar(
+  rows: DayModelRow[],
+  overrides: PricingOverrides = {},
+): CalendarDay[] {
   const map = new Map<string, CalAgg>();
   for (const r of rows) {
     let a = map.get(r.day);
@@ -1052,7 +1087,7 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
       r.cache_creation_tokens;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
-    const b = modelRowCostBreakdown(r);
+    const b = modelRowCostBreakdown(r, overrides);
     if (b != null) {
       a.knownCost += b.total;
       a.freshCost += b.input + b.output;
@@ -1083,8 +1118,9 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
 export function readCalendar(
   db: SqliteDb,
   win: StatsWindow = ALL_TIME,
+  overrides: PricingOverrides = {},
 ): CalendarDay[] {
-  return foldCalendar(groupByDayAndModel(db, win));
+  return foldCalendar(groupByDayAndModel(db, win), overrides);
 }
 
 /**

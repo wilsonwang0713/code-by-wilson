@@ -10,7 +10,7 @@ import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
 import type { ApiConfig } from "./settings/api-config";
-import type { ModelDefaults } from "@shared/models";
+import type { ModelDefaults, PricingOverrides } from "@shared/models";
 import type { CliStatus } from "@shared/cli-status";
 import type { CliStatusController } from "./cli-check";
 import type { Updater } from "./updater";
@@ -147,6 +147,7 @@ export function registerIpc({
     read: () => ({}),
     setClaudeBinPath: () => {},
     setAutoCheckUpdates: () => {},
+    setPricingOverrides: () => {},
   };
 
   const sync = (): void => {
@@ -273,6 +274,13 @@ export function registerIpc({
   ipcMain.handle(IPC.updateSetAutoCheck, (_e, enabled: boolean): void =>
     settings.setAutoCheckUpdates(enabled),
   );
+  ipcMain.handle(
+    IPC.pricingGet,
+    (): PricingOverrides => settings.read().pricingOverrides ?? {},
+  );
+  ipcMain.handle(IPC.pricingSet, (_e, overrides: PricingOverrides): void =>
+    settings.setPricingOverrides(overrides),
+  );
 
   // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan
   // step (the event loop breathes between calls, so pty output and IPC stay responsive) and returns the
@@ -283,9 +291,13 @@ export function registerIpc({
     filesDone: 0,
     done: true,
   });
-  const safeTotals = (adb: SqliteDb, win: StatsWindow): StatsTotals => {
+  const safeTotals = (
+    adb: SqliteDb,
+    win: StatsWindow,
+    overrides: PricingOverrides,
+  ): StatsTotals => {
     try {
-      return readTotals(adb, win);
+      return readTotals(adb, win, overrides);
     } catch (err) {
       console.error("stats read failed; serving zeros", err);
       return emptyTotals();
@@ -304,9 +316,13 @@ export function registerIpc({
   };
   // All three breakdowns from one finest-grain scan; on any read error serve empty breakdowns so a bad row
   // never sinks the whole snapshot (matching safeTotals' "serve zeros" posture).
-  const safeBreakdowns = (adb: SqliteDb, win: StatsWindow): StatsBreakdowns => {
+  const safeBreakdowns = (
+    adb: SqliteDb,
+    win: StatsWindow,
+    overrides: PricingOverrides,
+  ): StatsBreakdowns => {
     try {
-      return readBreakdowns(adb, win);
+      return readBreakdowns(adb, win, overrides);
     } catch (err) {
       console.error("stats breakdown read failed; serving none", err);
       return emptyBreakdowns();
@@ -341,9 +357,13 @@ export function registerIpc({
   };
   // The daily time-series, range-scoped; on a read error serve an empty series so a bad row never sinks
   // the snapshot (matching safeTotals/safeBreakdowns' "serve a safe default" posture).
-  const safeDaily = (adb: SqliteDb, win: StatsWindow): DailyBucket[] => {
+  const safeDaily = (
+    adb: SqliteDb,
+    win: StatsWindow,
+    overrides: PricingOverrides,
+  ): DailyBucket[] => {
     try {
-      return readDaily(adb, win);
+      return readDaily(adb, win, overrides);
     } catch (err) {
       console.error("stats daily read failed; serving none", err);
       return [];
@@ -353,9 +373,13 @@ export function registerIpc({
   // of the page range. On a read error serve an empty series/list so a bad row never sinks the snapshot
   // (same "serve a safe default" posture as safeDaily/safeBreakdowns). A CalendarWindow's sinceMs/untilMs are
   // always set, so it satisfies readCalendar's StatsWindow structurally — pass it straight through.
-  const safeCalendar = (adb: SqliteDb, win: CalendarWindow): CalendarDay[] => {
+  const safeCalendar = (
+    adb: SqliteDb,
+    win: CalendarWindow,
+    overrides: PricingOverrides,
+  ): CalendarDay[] => {
     try {
-      return readCalendar(adb, win);
+      return readCalendar(adb, win, overrides);
     } catch (err) {
       console.error("stats calendar read failed; serving none", err);
       return [];
@@ -470,15 +494,16 @@ export function registerIpc({
       if (since === token && token !== "" && progress.done && !wrote)
         return { status: "unchanged", token };
 
-      const breakdowns = safeBreakdowns(analyticsDb, win);
+      const overrides = settings.read().pricingOverrides ?? {};
+      const breakdowns = safeBreakdowns(analyticsDb, win, overrides);
       return {
         status: "changed",
         token,
         snapshot: {
-          totals: safeTotals(analyticsDb, win),
+          totals: safeTotals(analyticsDb, win, overrides),
           progress,
           hasAnyTurns: safeHasAnyTurns(analyticsDb),
-          daily: safeDaily(analyticsDb, win),
+          daily: safeDaily(analyticsDb, win, overrides),
           ...breakdowns,
           bySession: withSessionTitles(
             breakdowns.bySession,
@@ -486,7 +511,7 @@ export function registerIpc({
             sessionTitles?.read() ?? {},
             safeLiveNames(),
           ),
-          calendar: safeCalendar(analyticsDb, cal),
+          calendar: safeCalendar(analyticsDb, cal, overrides),
           calendarStart: cal.startDay,
           calendarEnd: cal.endDay,
           calendarYears: safeCalendarYears(analyticsDb),

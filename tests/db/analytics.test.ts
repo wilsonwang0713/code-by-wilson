@@ -747,6 +747,19 @@ describe("readByModel", () => {
     expect(row.equivApiValueUsd).toBeCloseTo(0.5); // 1M cache-read @ $0.5/M
     expect(row.equivApiValueFreshUsd).toBe(0); // recognized but no fresh tokens → honest 0, never null
   });
+
+  it("honors a pricing override when valuing usage", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({ modelRaw: "claude-opus-4-8", usage: { inputTokens: 1_000_000 } }),
+    ]);
+    // default opus input is $5/M; override to $1/M → $1.00.
+    expect(
+      readTotals(db, { sinceMs: null, untilMs: null }, { opus: { input: 1 } })
+        .equivApiValueUsd,
+    ).toBeCloseTo(1);
+  });
 });
 
 describe("readByProject", () => {
