@@ -1,6 +1,6 @@
 import { Center, TranscriptFeed } from "./TranscriptView";
 import type { DocState } from "./use-transcript";
-import { cx, focusRing } from "../ui/atoms";
+import { cx } from "../ui/atoms";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import type { DispatchDrill } from "./drill-index";
 import { useTranscriptModals } from "./use-transcript-modals";
@@ -83,10 +83,7 @@ function Breadcrumb({
       <button
         type="button"
         onClick={() => onNavigate(0)}
-        className={cx(
-          "inline-flex shrink-0 items-center gap-1 rounded-sm text-fg-muted transition-colors hover:text-fg",
-          focusRing,
-        )}
+        className="inline-flex shrink-0 items-center gap-1 rounded-sm text-fg-muted transition-colors hover:text-fg"
       >
         <span aria-hidden>←</span> Session
       </button>
@@ -112,10 +109,7 @@ function Breadcrumb({
               <button
                 type="button"
                 onClick={() => onNavigate(i + 1)}
-                className={cx(
-                  "shrink-0 rounded-sm text-fg-muted transition-colors hover:text-fg",
-                  focusRing,
-                )}
+                className="shrink-0 rounded-sm text-fg-muted transition-colors hover:text-fg"
               >
                 {c.type}
               </button>

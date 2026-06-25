@@ -23,7 +23,7 @@ export function InfoButton({
         type="button"
         aria-label={label}
         aria-describedby={tooltipId}
-        className="inline-flex h-[14px] w-[14px] items-center justify-center rounded-full text-fg-faint transition-colors hover:text-fg-muted focus-visible:text-fg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        className="inline-flex h-[14px] w-[14px] items-center justify-center rounded-full text-fg-faint transition-colors hover:text-fg-muted focus-visible:text-fg-muted"
       >
         <Icon name="info" size={12} />
       </button>

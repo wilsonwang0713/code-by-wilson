@@ -6,7 +6,7 @@ import {
   formatTokensShort,
 } from "@shared/format";
 import { spanPct } from "../../ui/charts-geom";
-import { cx, focusRingInset } from "../../ui/atoms";
+import { cx } from "../../ui/atoms";
 import { Icon } from "../../ui/icons";
 import { FAMILY_LABEL } from "../../ui/meta";
 import { EmptyState } from "./chrome";
@@ -195,10 +195,7 @@ function GroupHeader({
       type="button"
       onClick={onToggle}
       aria-expanded={!collapsed}
-      className={cx(
-        "flex w-full items-center gap-2 border-b border-ink-850 py-1 pl-2 pr-1.5 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900",
-        focusRingInset,
-      )}
+      className="flex w-full items-center gap-2 border-b border-ink-850 py-1 pl-2 pr-1.5 text-left font-mono text-[10px] tabular-nums transition-colors hover:bg-ink-900"
     >
       <Icon
         name="chevron-right"

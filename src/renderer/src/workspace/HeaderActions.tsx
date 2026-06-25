@@ -90,7 +90,7 @@ export function HeaderActions({
         canSpawn={canSpawn}
         resumable={s.resumable}
         iconSize={13}
-        className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors enabled:hover:border-ink-700 enabled:hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-40"
+        className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors enabled:hover:border-ink-700 enabled:hover:text-fg disabled:opacity-40"
       />
 
       {live && (
@@ -99,7 +99,7 @@ export function HeaderActions({
             type="button"
             onClick={end.request}
             title="End this session"
-            className="inline-flex items-center gap-1.5 rounded-md border border-danger/30 bg-danger/5 px-2.5 py-1 text-[12px] text-danger transition-colors hover:border-danger/50 hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40"
+            className="inline-flex items-center gap-1.5 rounded-md border border-danger/30 bg-danger/5 px-2.5 py-1 text-[12px] text-danger transition-colors hover:border-danger/50 hover:bg-danger/10"
           >
             <Icon name="square" size={13} />
             End session

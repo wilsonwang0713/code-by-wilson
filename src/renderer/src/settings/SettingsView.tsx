@@ -396,7 +396,7 @@ function BinaryOverride({
             value={binPath}
             onChange={(e) => setBinPath(e.target.value)}
             placeholder="/absolute/path/to/claude"
-            className="min-w-0 flex-1 rounded-md border border-ink-700 bg-well px-2.5 py-1.5 font-mono text-[12px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+            className="min-w-0 flex-1 rounded-md border border-ink-700 bg-well px-2.5 py-1.5 font-mono text-[12px] text-fg outline-none focus:border-primary"
           />
           <button
             type="button"

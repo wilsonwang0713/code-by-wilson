@@ -97,7 +97,7 @@ export function NewSessionDialog({
             userPickedModel.current = true;
             setModel(e.target.value as Family);
           }}
-          className="w-full appearance-none rounded-md border border-ink-700 bg-well py-2 pl-2.5 pr-8 text-[13px] text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+          className="w-full appearance-none rounded-md border border-ink-700 bg-well py-2 pl-2.5 pr-8 text-[13px] text-fg outline-none focus:border-primary"
         >
           {(defaults?.allowed ?? FAMILIES).map((id) => {
             const override = defaults?.overrides[id];

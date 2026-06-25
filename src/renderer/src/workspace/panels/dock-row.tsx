@@ -1,10 +1,10 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from "react";
-import { cx, focusRingInset } from "../../ui/atoms";
+import { cx } from "../../ui/atoms";
 
 // Shared row grammar for the Structure dock tabs (Tasks / Subagents / Shells / Turns): a fixed status
 // gutter, a flex-1 truncating label, and a right-aligned mono metric rack. Each row is a listitem (the tab
 // wraps them in a role="list"). Rows are transparent and split by a hairline; interactive rows hover (but
-// an active row holds its background) and carry the inset focus ring. A `fill` node renders as a full-bleed
+// an active row holds its background). A `fill` node renders as a full-bleed
 // band behind the content, clipped to the row and kept a sibling of the button rather than nested inside
 // it, used by the Subagents Gantt. Restyling the dock lands here once.
 
@@ -48,7 +48,7 @@ export function DockRow({
         <button
           type="button"
           onClick={onClick}
-          className={cx(row, focusRingInset)}
+          className={row}
           {...(rest as ComponentPropsWithoutRef<"button">)}
         >
           {leading}

@@ -60,7 +60,7 @@ export function OpenInMenu({ sessionId }: { sessionId: string }) {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}
-        className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-700 hover:text-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        className="inline-flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2.5 py-1 text-[12px] text-fg-muted transition-colors hover:border-ink-700 hover:text-fg"
       >
         Open in
         <Icon name="chevron-down" size={13} />

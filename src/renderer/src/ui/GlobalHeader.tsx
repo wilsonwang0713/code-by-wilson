@@ -59,7 +59,7 @@ export function GlobalHeader({
           aria-label="Settings"
           title={trips ? `Settings · ${v.statusLabel}` : "Settings"}
           className={cx(
-            "relative inline-flex items-center justify-center rounded-md border p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
+            "relative inline-flex items-center justify-center rounded-md border p-1.5 transition-colors",
             settingsActive
               ? "border-ink-700 bg-ink-900 text-fg"
               : "border-ink-800 text-fg-faint hover:border-ink-700 hover:text-fg-muted",
