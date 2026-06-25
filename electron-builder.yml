@@ -20,6 +20,10 @@ asarUnpack:
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.png
+  # Force ${arch} into the zip filename so the arm64 and x64 update zips stay distinct in latest-mac.yml
+  # (the same arch-clobber reasoning behind the dmg/nsis artifactName overrides). The dmg keeps its own
+  # dmg.artifactName, so this only names the zip.
+  artifactName: ${productName}-${arch}.${ext}
   # Signed + notarized in CI, where the Developer ID cert (CSC_LINK) and App
   # Store Connect API key (APPLE_API_* env) are present. Locally, `pnpm dist`
   # sets CSC_IDENTITY_AUTO_DISCOVERY=false to skip all of this and stay fast.
@@ -29,6 +33,8 @@ mac:
   notarize: true
   target:
     - target: dmg
+    # Squirrel.Mac (electron-updater) can only apply an update from a .zip; the .dmg is install-only.
+    - target: zip
 dmg:
   # Force ${arch} into the filename. electron-builder's default drops it for x64, so the Intel dmg
   # would ship as Code-by-wire.dmg with no arch label next to Code-by-wire-arm64.dmg — distinct

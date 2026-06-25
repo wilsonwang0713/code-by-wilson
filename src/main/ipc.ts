@@ -4,6 +4,7 @@ import {
   type OverviewData,
   type StatsRead,
   type OpenInTarget,
+  type UpdateState,
 } from "@shared/ipc";
 import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
@@ -12,6 +13,8 @@ import type { ApiConfig } from "./settings/api-config";
 import type { ModelDefaults } from "@shared/models";
 import type { CliStatus } from "@shared/cli-status";
 import type { CliStatusController } from "./cli-check";
+import type { Updater } from "./updater";
+import type { AppSettingsStore } from "./app-settings";
 import {
   deriveAccount,
   overlaySessions,
@@ -87,6 +90,10 @@ export interface IpcDeps {
   /** Durable user-chosen title overrides, applied over the live overlay so a rename wins over the
    *  derived title and Claude's live session_name. Defaults to no overrides. */
   sessionTitles?: SessionTitleStore;
+  /** The update controller. Defaults to an inert "unsupported" updater when not wired. */
+  updater?: Updater;
+  /** The app's own settings store (auto-check preference). Defaults to a no-op. */
+  appSettings?: AppSettingsStore;
 }
 
 export function attachCliStatus<T extends object>(
@@ -108,6 +115,8 @@ export function registerIpc({
   claudeDir,
   cliStatus,
   sessionTitles,
+  updater,
+  appSettings,
 }: IpcDeps): { sync: () => void } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
@@ -123,6 +132,21 @@ export function registerIpc({
       throw new Error("CLI status not wired");
     },
     resolvedPath: () => null,
+  };
+  const inertState: UpdateState = {
+    currentVersion: "",
+    phase: { kind: "unsupported" },
+  };
+  const upd: Updater = updater ?? {
+    getState: () => inertState,
+    check: () => Promise.resolve(inertState),
+    download: () => Promise.resolve(),
+    quitAndInstall: () => {},
+  };
+  const settings: AppSettingsStore = appSettings ?? {
+    read: () => ({}),
+    setClaudeBinPath: () => {},
+    setAutoCheckUpdates: () => {},
   };
 
   const sync = (): void => {
@@ -238,6 +262,17 @@ export function registerIpc({
   ipcMain.handle(IPC.clipboardWriteText, (_e, text: string) => {
     clipboard.writeText(text);
   });
+  ipcMain.handle(IPC.updateGetState, (): UpdateState => upd.getState());
+  ipcMain.handle(IPC.updateCheck, (): Promise<UpdateState> => upd.check());
+  ipcMain.handle(IPC.updateDownload, (): Promise<void> => upd.download());
+  ipcMain.handle(IPC.updateInstall, (): void => upd.quitAndInstall());
+  ipcMain.handle(
+    IPC.updateGetAutoCheck,
+    (): boolean => settings.read().autoCheckUpdates ?? true,
+  );
+  ipcMain.handle(IPC.updateSetAutoCheck, (_e, enabled: boolean): void =>
+    settings.setAutoCheckUpdates(enabled),
+  );
 
   // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan
   // step (the event loop breathes between calls, so pty output and IPC stay responsive) and returns the

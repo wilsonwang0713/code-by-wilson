@@ -164,6 +164,10 @@ warning and no quarantine workaround.
 On Windows, run the `.exe`. It's unsigned for now, so Windows SmartScreen may warn.
 Click **More info → Run anyway**.
 
+Once installed, Code-by-wire keeps itself current: it checks for new releases on
+launch and lets you download and install them from Settings → About. You can turn
+the launch check off there.
+
 ### Build from source
 
 Build an unsigned app locally instead. Run the command for your platform:

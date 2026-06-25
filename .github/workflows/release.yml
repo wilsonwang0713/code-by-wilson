@@ -101,7 +101,15 @@ jobs:
         name: Upload macOS installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" --clobber release/*.dmg release/*.dmg.blockmap
+        run: |
+          shopt -s nullglob
+          zips=(release/*.zip)
+          if [[ ${#zips[@]} -eq 0 ]]; then
+            echo "::error::No .zip artifact found in release/; auto-update artifact wasn't built"
+            exit 1
+          fi
+          assets=(release/*.dmg release/*.dmg.blockmap release/*.zip release/*.zip.blockmap)
+          gh release upload "${GITHUB_REF_NAME}" --clobber "${assets[@]}"
 
       # ---- Windows: unsigned NSIS + upload ----
       - if: matrix.platform == 'win'
