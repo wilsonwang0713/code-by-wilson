@@ -128,7 +128,7 @@ function StatusRow({ update }: { update: UpdateControls }) {
       extra = (
         <div className="mt-2 h-[5px] overflow-hidden rounded-full bg-ink-800">
           <span
-            className="block h-full rounded-full bg-primary transition-all"
+            className="block h-full rounded-full bg-accent transition-all"
             style={{ width: `${Math.round(p.percent)}%` }}
           />
         </div>
