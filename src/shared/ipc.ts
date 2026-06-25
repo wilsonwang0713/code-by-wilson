@@ -16,6 +16,8 @@ import type { MetricsRead } from "./metrics";
 import type { ModelDefaults } from "./models";
 import type { StatsSnapshot, StatsRange } from "./stats";
 import type { CliStatus } from "./cli-status";
+import type { UpdateState } from "./update";
+export { type UpdateState };
 export const IPC = {
   overview: "overview:get",
   refresh: "sessions:refresh",
@@ -37,6 +39,14 @@ export const IPC = {
   clipboardWriteText: "clipboard:writeText",
   renameSession: "session:rename",
   getToolResult: "toolResult:get",
+  updateGetState: "update:getState",
+  updateCheck: "update:check",
+  updateDownload: "update:download",
+  updateInstall: "update:install",
+  updateGetAutoCheck: "update:getAutoCheck",
+  updateSetAutoCheck: "update:setAutoCheck",
+  /** PUSH: main -> renderer on every update-state transition. */
+  updateState: "update:state",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -165,6 +175,18 @@ export interface IpcApi {
     toolUseId: string,
     agentId?: string,
   ): Promise<ToolResultDetail>;
+  /** The current update state (initial paint + post-action reconciliation). */
+  getUpdateState(): Promise<UpdateState>;
+  /** Trigger a check; resolves to the resulting state. Live transitions also arrive via onUpdateState. */
+  checkForUpdate(): Promise<UpdateState>;
+  /** Download the available update. Progress arrives via onUpdateState. */
+  downloadUpdate(): Promise<void>;
+  /** Quit and install a downloaded update — the app quits, so this never resolves. */
+  installUpdate(): void;
+  /** Whether the launch check is enabled (missing setting reads as true). */
+  getAutoCheckUpdates(): Promise<boolean>;
+  /** Persist the launch-check preference. */
+  setAutoCheckUpdates(enabled: boolean): Promise<void>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
@@ -180,4 +202,7 @@ export type AppApi = IpcApi & {
    *  enter/leave-full-screen and on each load; the callback receives it, and the returned fn
    *  unsubscribes for effect cleanup. Off macOS main never sends, so the state stays false. */
   onFullscreenChange(cb: (isFullscreen: boolean) => void): () => void;
+  /** Subscribe to update-state pushes. Main sends on every transition (including download progress);
+   *  the returned fn unsubscribes. Mirrors onFullscreenChange. */
+  onUpdateState(cb: (state: UpdateState) => void): () => void;
 };

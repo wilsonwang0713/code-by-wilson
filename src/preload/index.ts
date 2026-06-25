@@ -27,6 +27,15 @@ const api: AppApi = {
     ipcRenderer.invoke(IPC.readTranscript, id, sinceMtimeMs),
   getToolResult: (id, toolUseId, agentId) =>
     ipcRenderer.invoke(IPC.getToolResult, id, toolUseId, agentId),
+  getUpdateState: () => ipcRenderer.invoke(IPC.updateGetState),
+  checkForUpdate: () => ipcRenderer.invoke(IPC.updateCheck),
+  downloadUpdate: () => ipcRenderer.invoke(IPC.updateDownload),
+  installUpdate: () => {
+    void ipcRenderer.invoke(IPC.updateInstall);
+  },
+  getAutoCheckUpdates: () => ipcRenderer.invoke(IPC.updateGetAutoCheck),
+  setAutoCheckUpdates: (enabled) =>
+    ipcRenderer.invoke(IPC.updateSetAutoCheck, enabled),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>
@@ -44,6 +53,14 @@ const api: AppApi = {
       cb(isFullscreen);
     ipcRenderer.on(IPC.fullscreen, handler);
     return () => ipcRenderer.removeListener(IPC.fullscreen, handler);
+  },
+  onUpdateState: (cb) => {
+    const handler = (
+      _e: IpcRendererEvent,
+      state: import("@shared/ipc").UpdateState,
+    ) => cb(state);
+    ipcRenderer.on(IPC.updateState, handler);
+    return () => ipcRenderer.removeListener(IPC.updateState, handler);
   },
   terminal: {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),
