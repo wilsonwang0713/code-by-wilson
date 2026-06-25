@@ -289,4 +289,71 @@ describe("createTerminalStore", () => {
     h.exit("b", 1);
     expect(h.made[0].writes.at(-1)?.data).toContain("(1)");
   });
+
+  it("does not gate output for a normal create (fresh spawn streams immediately)", () => {
+    const h = harness();
+    h.store.create("a");
+    h.route("a", "hi");
+    expect(h.made[0].writes.map((w) => w.data)).toEqual(["hi"]);
+    expect(h.made[0].writes[0].cb).toBeTypeOf("function"); // written with an ack callback, as normal
+  });
+
+  it("replayOnCreate gates live output: it queues instead of writing, and acks immediately", () => {
+    const h = harness();
+    h.store.create("a", { replayOnCreate: true });
+    h.route("a", "live");
+    expect(h.made[0].writes).toHaveLength(0); // queued, not written to xterm yet
+    expect(h.api.ack).toHaveBeenCalledWith("a", 4); // acked so flow control never wedges
+  });
+
+  it("reattach writes the snapshot, then flushes queued output in order, then opens the gate", async () => {
+    const h = harness();
+    h.api.reattach.mockResolvedValue("SNAP");
+    h.store.create("a", { replayOnCreate: true });
+    h.route("a", "L1");
+    h.route("a", "L2");
+
+    await h.store.reattach("a", 80, 24);
+
+    expect(h.api.reattach).toHaveBeenCalledWith("a", 80, 24);
+    expect(h.made[0].writes.map((w) => w.data)).toEqual(["SNAP", "L1", "L2"]);
+
+    // Gate is open now: further output writes directly, with an ack callback.
+    h.route("a", "live");
+    expect(h.made[0].writes.at(-1)?.data).toBe("live");
+    expect(h.made[0].writes.at(-1)?.cb).toBeTypeOf("function");
+  });
+
+  it("reattach with no live pty (null snapshot) still flushes the queue and opens the gate", async () => {
+    const h = harness();
+    h.api.reattach.mockResolvedValue(null);
+    h.store.create("a", { replayOnCreate: true });
+    h.route("a", "queued");
+
+    await h.store.reattach("a", 80, 24);
+
+    expect(h.made[0].writes.map((w) => w.data)).toEqual(["queued"]); // no snapshot, just the queued output
+    h.route("a", "after");
+    expect(h.made[0].writes.at(-1)?.data).toBe("after"); // gate open
+  });
+
+  it("reattach survives a /clear rename during the await (snapshot lands on the rotated handle)", async () => {
+    const h = harness();
+    let resolveSnap: (s: string) => void = () => {};
+    h.api.reattach.mockReturnValue(
+      new Promise<string>((res) => {
+        resolveSnap = res;
+      }),
+    );
+    h.store.create("a", { replayOnCreate: true });
+    const pending = h.store.reattach("a", 80, 24);
+    h.store.rename("a", "b"); // a /clear rotates a->b mid-await
+    resolveSnap("SNAP");
+    await pending;
+
+    expect(h.made[0].writes.map((w) => w.data)).toEqual(["SNAP"]); // same xterm, restored after the rotation
+    // Gate dropped on the rotated handle: output under the new id writes directly.
+    h.route("b", "x");
+    expect(h.made[0].writes.at(-1)?.data).toBe("x");
+  });
 });
