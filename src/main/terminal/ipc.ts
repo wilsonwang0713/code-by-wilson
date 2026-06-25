@@ -88,6 +88,13 @@ export function registerTerminalIpc({
     // The composition root: this is the one place node-pty is injected, so the manager (and its tests)
     // stay free of the native addon.
     createPty: createPtyProcess,
+    // Temporary stub — Task 3 replaces this with the real createRecorder from recorder.ts.
+    createRecorder: () => ({
+      write: () => {},
+      resize: () => {},
+      snapshot: () => Promise.resolve(""),
+      dispose: () => {},
+    }),
     env,
   });
 

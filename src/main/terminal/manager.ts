@@ -12,6 +12,7 @@ import { isDirectory } from "../fs-dir";
 // Type-only: importing pty-process for VALUES would pull node-pty (a native addon) into the test
 // graph and break `pnpm test`. The real factory is injected at the composition root (the IPC layer).
 import type { PtyProcess, SpawnOptions } from "./pty-process";
+import type { Recorder } from "./recorder";
 
 interface Term {
   /** The session id this pty currently writes. Mutable: a `/clear` rotates it (see `rename`), and the
@@ -19,6 +20,7 @@ interface Term {
   id: string;
   pty: PtyProcess;
   bufferer: DataBufferer;
+  recorder: Recorder;
   /** Chars sent to the renderer but not yet acked — the flow-control credit. */
   unacked: number;
   paused: boolean;
@@ -77,6 +79,9 @@ export interface TerminalManagerDeps {
   createPty: (o: SpawnOptions) => PtyProcess;
   /** Injected in tests; defaults to the 5ms coalescer (pure, safe to import here). */
   createBufferer?: (flush: (data: string) => void) => DataBufferer;
+  /** The headless-xterm recorder factory. REQUIRED (injected at the composition root, like createPty) so
+   *  the manager carries no value import of @xterm/headless and tests inject a fake. */
+  createRecorder: (o: { cols: number; rows: number }) => Recorder;
   /** Returns the child env, resolved at spawn time; defaults to the app's `process.env` (whose PATH must
    *  carry `claude`, as under `pnpm dev`). A thunk so a costly PATH probe runs lazily, not at startup. */
   env?: () => NodeJS.ProcessEnv;
@@ -104,6 +109,8 @@ export interface TerminalManager {
   kill(id: string): void;
   /** Kill every pty (window closed / app quit) — Managed sessions don't outlive the app. */
   disposeAll(): void;
+  /** Serialize the current screen for `id` (for replay after a window refresh), or null if no live pty. */
+  snapshot(id: string): Promise<string | null>;
 }
 
 /**
@@ -169,7 +176,15 @@ export function createTerminalManager(
     // The flush reads `term.id`, not the captured `id`, so a rename re-points output without rewiring the
     // bufferer. Safe to reference `term` before its declaration: the closure only runs once data flows.
     const bufferer = createBufferer((data) => deps.send(term.id, data));
-    const term: Term = { id, pty, bufferer, unacked: 0, paused: false };
+    const recorder = deps.createRecorder({ cols, rows });
+    const term: Term = {
+      id,
+      pty,
+      bufferer,
+      recorder,
+      unacked: 0,
+      paused: false,
+    };
     terms.set(id, term);
 
     pty.onData((data) => {
@@ -178,6 +193,7 @@ export function createTerminalManager(
         term.paused = true;
         pty.pause();
       }
+      term.recorder.write(data);
       bufferer.add(data);
     });
 
@@ -185,6 +201,7 @@ export function createTerminalManager(
       if (!terms.has(term.id)) return; // torn down by disposeAll, not a natural exit
       bufferer.flush(); // drain the tail of output instead of stranding it behind the 5ms timer
       bufferer.dispose();
+      term.recorder.dispose();
       terms.delete(term.id);
       deps.onClosed(term.id); // pty is gone → drop the Managed label so it re-derives as Observed
       deps.notifyExit(term.id, exitCode);
@@ -260,8 +277,17 @@ export function createTerminalManager(
     fork,
     rename,
     write: (id, data) => terms.get(id)?.pty.write(data),
-    resize: (id, cols, rows) => terms.get(id)?.pty.resize(cols, rows),
+    resize: (id, cols, rows) => {
+      const term = terms.get(id);
+      if (!term) return;
+      term.pty.resize(cols, rows);
+      term.recorder.resize(cols, rows);
+    },
     ack,
+    snapshot: async (id) => {
+      const term = terms.get(id);
+      return term ? await term.recorder.snapshot() : null;
+    },
     // We kill the pty synchronously here and in disposeAll — on Windows too, unlike VSCode, which defers
     // an immediate kill on Windows to dodge a ConPTY hang. VSCode can afford the deferral because its
     // pty-host process outlives the window and force-kills after a timeout; we run ptys in the main
@@ -271,6 +297,7 @@ export function createTerminalManager(
     disposeAll: () => {
       for (const [id, term] of terms) {
         term.bufferer.dispose();
+        term.recorder.dispose();
         terms.delete(id);
         term.pty.kill();
         deps.onClosed(id); // window closing → the pty dies, so drop its Managed label too

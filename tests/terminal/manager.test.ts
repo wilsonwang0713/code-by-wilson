@@ -57,8 +57,37 @@ const passthroughBufferer = (flush: (d: string) => void) => ({
   dispose: () => {},
 });
 
+/** A fake recorder that records what it's fed and returns a canned snapshot, so the manager's wiring is
+ *  testable without loading @xterm/headless. */
+function recorderFactory() {
+  const made: Array<{
+    writes: string[];
+    resizes: Array<[number, number]>;
+    disposed: boolean;
+  }> = [];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const create = (_o: { cols: number; rows: number }) => {
+    const rec = {
+      writes: [] as string[],
+      resizes: [] as Array<[number, number]>,
+      disposed: false,
+    };
+    made.push(rec);
+    return {
+      write: (d: string) => rec.writes.push(d),
+      resize: (c: number, r: number) => rec.resizes.push([c, r]),
+      snapshot: () => Promise.resolve(`SNAP:${rec.writes.join("")}`),
+      dispose: () => {
+        rec.disposed = true;
+      },
+    };
+  };
+  return { create, made };
+}
+
 function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
   const ptys: ReturnType<typeof fakePty>[] = [];
+  const recorders = recorderFactory();
   const sent: Array<[string, string]> = [];
   const exited: Array<[string, number]> = [];
   const spawned: string[] = [];
@@ -82,6 +111,7 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
       return f.proc;
     },
     createBufferer: passthroughBufferer,
+    createRecorder: recorders.create,
     env: () => ({ PATH: "/usr/bin" }),
     statDir: over.statDir ?? (() => true),
     // Pin POSIX so the bare-`claude` command and `/work/app` fixtures aren't reshaped by the Windows
@@ -91,6 +121,7 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
   return {
     manager,
     ptys,
+    recorders,
     sent,
     exited,
     spawned,
@@ -321,5 +352,45 @@ describe("createTerminalManager", () => {
       "sess-1",
       expect.stringContaining("/work/app"), // the message names the bad dir
     ]);
+  });
+
+  it("feeds pty output into the recorder alongside the renderer send", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitData("hello");
+    expect(h.recorders.made[0].writes).toEqual(["hello"]);
+  });
+
+  it("resizes the recorder so its serialized frame matches the pty grid", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.manager.resize("sess-1", 120, 40);
+    expect(h.recorders.made[0].resizes).toEqual([[120, 40]]);
+  });
+
+  it("disposes the recorder on natural exit", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitExit(0);
+    expect(h.recorders.made[0].disposed).toBe(true);
+  });
+
+  it("disposes the recorder on disposeAll", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.manager.disposeAll();
+    expect(h.recorders.made[0].disposed).toBe(true);
+  });
+
+  it("snapshot returns the recorder's serialization for a live id", async () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitData("abc");
+    await expect(h.manager.snapshot("sess-1")).resolves.toBe("SNAP:abc");
+  });
+
+  it("snapshot returns null for an unknown id", async () => {
+    const h = harness();
+    await expect(h.manager.snapshot("nope")).resolves.toBeNull();
   });
 });
