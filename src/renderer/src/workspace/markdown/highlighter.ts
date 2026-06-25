@@ -16,7 +16,8 @@ export type HighlighterInstance = Awaited<
 let singleton: Promise<HighlighterInstance> | null = null;
 
 export function getHighlighter(): Promise<HighlighterInstance> {
-  singleton ??= createHighlighterCore({
+  if (singleton) return singleton;
+  const build = createHighlighterCore({
     themes: [import("@shikijs/themes/vitesse-dark")],
     langs: [
       import("@shikijs/langs/typescript"),
@@ -37,5 +38,12 @@ export function getHighlighter(): Promise<HighlighterInstance> {
     ],
     engine: createJavaScriptRegexEngine({ forgiving: true }),
   });
-  return singleton;
+  // Don't cache a rejected build. If a lang/theme chunk fails to load once (a transient
+  // network/chunk-load hiccup in the packaged app), clearing the slot lets the next code
+  // block retry instead of leaving highlighting dead for the whole session.
+  void build.catch(() => {
+    if (singleton === build) singleton = null;
+  });
+  singleton = build;
+  return build;
 }

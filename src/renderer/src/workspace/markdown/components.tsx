@@ -1,11 +1,8 @@
 import type { Components } from "react-markdown";
 import { isInlineCode, type Element } from "react-shiki";
 import { CodeBlock } from "./CodeBlock";
+import { ExternalLink } from "./ExternalLink";
 import { languageFromClassName } from "./lang";
-
-function openExternal(href: string | undefined) {
-  if (href) void window.api.openExternal(href);
-}
 
 /** Tailwind-token overrides for assistant markdown. Restrained: color stays state-only, teal only on
  *  links, code is the only multicolor surface (contained to the well by CodeBlock). */
@@ -17,17 +14,14 @@ export const markdownComponents: Components = {
   em: ({ children }) => <em className="italic">{children}</em>,
   del: ({ children }) => <del className="text-fg-faint">{children}</del>,
   a: ({ href, children }) => (
-    <a
-      href={href}
-      rel="noreferrer"
-      onClick={(e) => {
-        e.preventDefault();
-        openExternal(href);
-      }}
-      className="text-primary-bright underline decoration-primary/40 underline-offset-2 hover:decoration-primary-bright"
-    >
-      {children}
-    </a>
+    <ExternalLink href={href}>{children}</ExternalLink>
+  ),
+  // No <img>: render images as a click-to-open link so untrusted image URLs in assistant output don't
+  // auto-fetch on render. Labelled with the alt text when present.
+  img: ({ src, alt }) => (
+    <ExternalLink href={typeof src === "string" ? src : undefined}>
+      {alt || "image"}
+    </ExternalLink>
   ),
   h1: ({ children }) => (
     <h1 className="mb-2 mt-4 text-[18px] font-semibold leading-tight first:mt-0">

@@ -31,9 +31,14 @@ export function CodeBlock({
 
   useEffect(() => {
     let alive = true;
-    void getHighlighter().then((h) => {
-      if (alive) setHl(h);
-    });
+    void getHighlighter().then(
+      (h) => {
+        if (alive) setHl(h);
+      },
+      () => {
+        // Build failed; keep the plain-pre fallback. A later mount retries.
+      },
+    );
     return () => {
       alive = false;
     };
