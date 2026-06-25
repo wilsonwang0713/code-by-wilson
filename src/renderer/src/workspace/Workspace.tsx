@@ -236,7 +236,7 @@ function WorkspaceBody({
           contextWindow={s.contextWindow}
         />
         <TokensPanel
-          usage={s.usage}
+          usageByModel={s.usageByModel ?? []}
           model={s.model}
           liveCostUsd={s.liveCostUsd}
           billingMode={account?.billingMode}

@@ -1,10 +1,16 @@
-import { useMemo, useState } from "react";
-import type { Family, Usage } from "@shared/types";
-import { costBreakdown, type PricingOverrides } from "@shared/models";
+import { useMemo, useState, type ReactNode } from "react";
+import type { Family, ModelUsage, Usage } from "@shared/types";
+import {
+  isKnownModelString,
+  normalizeModelId,
+  type CostBreakdown,
+  type PricingOverrides,
+} from "@shared/models";
+import { viewUsageByModel, type ModelUsageView } from "@shared/usage-by-model";
 import { formatUsd, formatTokensShort, costDisplay } from "@shared/format";
 import { StackedBar } from "../../ui/charts";
 import { Swatch } from "../../ui/atoms";
-import { KIND_SEGMENT_COLORS } from "../../ui/meta";
+import { KIND_SEGMENT_COLORS, FAMILY_LABEL } from "../../ui/meta";
 import { MetricTip } from "../../ui/MetricTip";
 import {
   TOKEN_KINDS,
@@ -16,46 +22,117 @@ import { PricingModal } from "./PricingModal";
 import { Icon } from "../../ui/icons";
 
 const TOKENS_INFO =
-  "This session's tokens by kind: fresh input, generated output, cached reads, and the 5-minute and 1-hour cache writes, each paired with its Equivalent API value. Cached tokens are replayed context, far cheaper than fresh input. Shows real spend instead when the account bills per API call.";
+  "This session's tokens by kind: fresh input, generated output, cached reads, and the 5-minute and 1-hour cache writes, each paired with its Equivalent API value. When subagents ran, usage spans models — each is priced at its own rate, with a per-model breakdown one hover away. Shows real spend instead when the account bills per API call.";
 
 const POPOVER =
-  "absolute left-0 top-full z-20 mt-1 w-52 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-left text-[11px] leading-snug text-fg-muted shadow-lg";
+  "absolute left-0 top-full z-20 mt-1 w-60 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-left text-[11px] leading-snug text-fg-muted shadow-lg";
 
-/** A kind label wrapped in a MetricTip whose popover gives the spec description plus the live $/1M rate for
- *  this session's model (honoring any override). */
+/** TokenKind.key → the matching Usage token field and CostBreakdown USD field, so the per-model popover
+ *  and the kind rows read off one mapping. */
+const KIND_TOKENS: Record<TokenKind["key"], (u: Usage) => number> = {
+  input: (u) => u.inputTokens,
+  output: (u) => u.outputTokens,
+  cacheRead: (u) => u.cacheReadTokens,
+  cacheWrite5m: (u) => u.cacheCreation5mTokens,
+  cacheWrite1h: (u) => u.cacheCreation1hTokens,
+};
+const KIND_COST: Record<TokenKind["key"], (c: CostBreakdown) => number> = {
+  input: (c) => c.input,
+  output: (c) => c.output,
+  cacheRead: (c) => c.cacheRead,
+  cacheWrite5m: (c) => c.cacheWrite5m,
+  cacheWrite1h: (c) => c.cacheWrite1h,
+};
+
+const KIND_BY_KEY = Object.fromEntries(
+  TOKEN_KINDS.map((k) => [k.key, k]),
+) as Record<TokenKind["key"], TokenKind>;
+
+/** A model's short attribution label: the lowercased family ("opus"), the raw id for an unrecognized
+ *  model (honest, never the Opus fallback), or "unknown" for a turn that recorded none. */
+function modelLabel(modelRaw: string | null): string {
+  if (modelRaw == null) return "unknown";
+  if (isKnownModelString(modelRaw))
+    return FAMILY_LABEL[normalizeModelId(modelRaw)].toLowerCase();
+  return modelRaw;
+}
+
+/** A kind label wrapped in a MetricTip whose popover gives the spec description plus, for a single-model
+ *  session, the live $/1M rate for that model (honoring any override). In a multi-model session the
+ *  per-model rates live in the attribution popovers, so the rate line is omitted here. */
 function KindLabel({
   kind,
   model,
   overrides,
 }: {
   kind: TokenKind;
-  model: Family;
+  model?: Family;
   overrides?: PricingOverrides;
 }) {
   return (
     <MetricTip label={kind.label} popoverClassName={POPOVER}>
       <span className="block font-medium text-fg">{kind.label}</span>
       <span className="mt-0.5 block">{kind.description}</span>
-      <span className="mt-1 block font-mono text-[10.5px] text-fg-faint">
-        {kindRateLabel(kind, model, overrides)}
+      {model && (
+        <span className="mt-1 block font-mono text-[10.5px] text-fg-faint">
+          {kindRateLabel(kind, model, overrides)}
+        </span>
+      )}
+    </MetricTip>
+  );
+}
+
+/** One model's chip in the "by model" line: its label + total tokens, with a hover popover carrying its
+ *  full 5-kind breakdown (tokens · ~USD, or n/a for an unrecognized model) and a subtotal. */
+function ModelChip({ m }: { m: ModelUsageView }) {
+  const name = modelLabel(m.modelRaw);
+  return (
+    <MetricTip
+      label={
+        <span className="font-mono tabular-nums">
+          {name} {formatTokensShort(m.totalTokens)}
+        </span>
+      }
+      popoverClassName={POPOVER}
+    >
+      <span className="block font-medium text-fg">{name}</span>
+      <span className="mt-1 block space-y-0.5">
+        {TOKEN_KINDS.map((k) => (
+          <span
+            key={k.key}
+            className="flex items-baseline justify-between gap-3"
+          >
+            <span>{k.label}</span>
+            <span className="font-mono tabular-nums text-fg">
+              {formatTokensShort(KIND_TOKENS[k.key](m.usage))}
+              <span className="text-fg-faint">
+                {" · "}
+                {m.cost ? `~${formatUsd(KIND_COST[k.key](m.cost))}` : "n/a"}
+              </span>
+            </span>
+          </span>
+        ))}
+      </span>
+      <span className="mt-1 flex items-baseline justify-between gap-3 border-t border-ink-700 pt-1">
+        <span className="font-medium text-fg">Subtotal</span>
+        <span className="font-mono tabular-nums text-fg">
+          {m.cost ? `~${formatUsd(m.cost.total)}` : "n/a"}
+        </span>
       </span>
     </MetricTip>
   );
 }
 
-const KIND_BY_KEY = Object.fromEntries(
-  TOKEN_KINDS.map((k) => [k.key, k]),
-) as Record<TokenKind["key"], TokenKind>;
-
 /**
- * The session's token usage and its cost: a headline of total tokens · the Equivalent API value (Claude's
- * live number when present), a 5-segment stacked bar (Input · Output · Cache read · 5m write · 1h write), and
- * one flat row per kind pairing its tokens with its ~cost. The 1-hour cache-write row dims to `0 / —` when
- * the session never used 1h caching. The ✎ in the header opens the pricing editor; each kind label reveals
- * its description + live rate.
+ * The session's token usage and its cost, reconciled with the Usage overview: a headline of total tokens ·
+ * the Equivalent API value (Claude's live number when present), a 5-segment stacked bar, one flat row per
+ * kind pairing its tokens with its ~cost (summed across every model at each model's own rate), and — when
+ * more than one model touched the session — a "by model" attribution line whose chips reveal each model's
+ * full breakdown on hover. The ✎ opens the pricing editor; each kind label reveals its description (and,
+ * single-model, its live rate).
  */
 export function TokensPanel({
-  usage,
+  usageByModel,
   model,
   liveCostUsd,
   billingMode,
@@ -63,7 +140,7 @@ export function TokensPanel({
   pricingOverrides,
   onPricingChange,
 }: {
-  usage: Usage;
+  usageByModel: ModelUsage[];
   model: Family;
   liveCostUsd?: number;
   billingMode?: "subscription" | "api" | "unknown";
@@ -72,82 +149,70 @@ export function TokensPanel({
   onPricingChange?: (next: PricingOverrides) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const { headline, total, bar, rows, cacheSavings } = useMemo(() => {
-    const b = costBreakdown(usage, model, pricingOverrides);
-    // A custom rate for this session's model means the user wants usage valued at THEIR price. Claude's
-    // live cost figure is at standard rates and can't reflect that, so drop it and show the override-priced
-    // equivalent — otherwise the headline would ignore the edit while the per-kind rows below re-price.
-    const modelOverridden =
-      Object.keys(pricingOverrides?.[model] ?? {}).length > 0;
-    return {
-      headline: costDisplay({
-        liveCostUsd: modelOverridden ? undefined : liveCostUsd,
-        equivApiValueUsd: b.total,
-        billingMode,
-        anthropicDirect,
-      }),
-      total:
-        usage.inputTokens +
-        usage.outputTokens +
-        usage.cacheReadTokens +
-        usage.cacheCreationTokens,
-      // The 5 bar segments, in cost-palette order, parallel to TOKEN_KINDS.
-      bar: [
-        { value: usage.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-        { value: usage.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-        { value: usage.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
-        { value: usage.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
-        { value: usage.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
-      ],
-      // All five kinds as flat rows, in cost-palette order. The 1-hour row dims to `0 / —`
-      // when the session never used 1h caching.
-      rows: [
-        {
-          kind: KIND_BY_KEY.input,
-          tokens: usage.inputTokens,
-          usd: b.input,
-          color: KIND_SEGMENT_COLORS[0],
-          dim: false,
-        },
-        {
-          kind: KIND_BY_KEY.output,
-          tokens: usage.outputTokens,
-          usd: b.output,
-          color: KIND_SEGMENT_COLORS[1],
-          dim: false,
-        },
-        {
-          kind: KIND_BY_KEY.cacheRead,
-          tokens: usage.cacheReadTokens,
-          usd: b.cacheRead,
-          color: KIND_SEGMENT_COLORS[2],
-          dim: false,
-        },
-        {
-          kind: KIND_BY_KEY.cacheWrite5m,
-          tokens: usage.cacheCreation5mTokens,
-          usd: b.cacheWrite5m,
-          color: KIND_SEGMENT_COLORS[3],
-          dim: false,
-        },
-        {
-          kind: KIND_BY_KEY.cacheWrite1h,
-          tokens: usage.cacheCreation1hTokens,
-          usd: b.cacheWrite1h,
-          color: KIND_SEGMENT_COLORS[4],
-          dim: usage.cacheCreation1hTokens === 0,
-        },
-      ],
-      cacheSavings: b.cacheSavings,
-    };
-  }, [
-    usage,
-    model,
-    liveCostUsd,
+  const view = useMemo(
+    () => viewUsageByModel(usageByModel, pricingOverrides),
+    [usageByModel, pricingOverrides],
+  );
+  const { usage, cost, models } = view;
+  const multiModel = models.length > 1;
+
+  // A custom rate for any present model means the user wants usage valued at THEIR price. Claude's live
+  // figure is at standard rates and can't reflect that, so drop it and show the override-priced equivalent.
+  const headline = costDisplay({
+    liveCostUsd: view.anyOverride ? undefined : liveCostUsd,
+    equivApiValueUsd: cost.total,
     billingMode,
     anthropicDirect,
-    pricingOverrides,
-  ]);
+  });
+
+  // The 5 bar segments + flat rows, in cost-palette order, parallel to TOKEN_KINDS. Tokens are combined
+  // across models; USD is the summed per-model cost. The 1-hour row dims to `0 / —` when unused.
+  const bar = [
+    { value: usage.inputTokens, color: KIND_SEGMENT_COLORS[0] },
+    { value: usage.outputTokens, color: KIND_SEGMENT_COLORS[1] },
+    { value: usage.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
+    { value: usage.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
+    { value: usage.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
+  ];
+  const rows = [
+    {
+      kind: KIND_BY_KEY.input,
+      tokens: usage.inputTokens,
+      usd: cost.input,
+      color: KIND_SEGMENT_COLORS[0],
+      dim: false,
+    },
+    {
+      kind: KIND_BY_KEY.output,
+      tokens: usage.outputTokens,
+      usd: cost.output,
+      color: KIND_SEGMENT_COLORS[1],
+      dim: false,
+    },
+    {
+      kind: KIND_BY_KEY.cacheRead,
+      tokens: usage.cacheReadTokens,
+      usd: cost.cacheRead,
+      color: KIND_SEGMENT_COLORS[2],
+      dim: false,
+    },
+    {
+      kind: KIND_BY_KEY.cacheWrite5m,
+      tokens: usage.cacheCreation5mTokens,
+      usd: cost.cacheWrite5m,
+      color: KIND_SEGMENT_COLORS[3],
+      dim: false,
+    },
+    {
+      kind: KIND_BY_KEY.cacheWrite1h,
+      tokens: usage.cacheCreation1hTokens,
+      usd: cost.cacheWrite1h,
+      color: KIND_SEGMENT_COLORS[4],
+      dim: usage.cacheCreation1hTokens === 0,
+    },
+  ];
+  const total = view.totalTokens;
+  const cacheSavings = cost.cacheSavings;
 
   return (
     <PanelSection>
@@ -185,6 +250,21 @@ export function TokensPanel({
 
       <StackedBar className="mt-1" segments={bar} />
 
+      {multiModel && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-fg-muted">
+          <span className="text-fg-faint">by model</span>
+          {models.map((m, i) => (
+            <span
+              key={m.modelRaw ?? "null"}
+              className="flex items-center gap-1.5"
+            >
+              {i > 0 && <span className="text-fg-faint">·</span>}
+              <ModelChip m={m} />
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="mt-2.5 space-y-1.5">
         {rows.map((r) => (
           <Row
@@ -192,7 +272,7 @@ export function TokensPanel({
             label={
               <KindLabel
                 kind={r.kind}
-                model={model}
+                model={multiModel ? undefined : model}
                 overrides={pricingOverrides}
               />
             }
@@ -234,7 +314,7 @@ function Row({
   usd,
   dim,
 }: {
-  label: React.ReactNode;
+  label: ReactNode;
   color: string;
   tokens: number;
   usd: number;
