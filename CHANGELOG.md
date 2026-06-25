@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-06-25
+
+### Added
+
+- Assistant transcript messages now render as Markdown: GitHub-flavored tables, lists, and inline formatting, with fenced code blocks syntax-highlighted by Shiki (vitesse-dark). Each code block leads with a language label that swaps to a copy button on hover, and every assistant bubble carries an icon-only copy button.
+- The live terminal restores its screen on a window refresh. The terminal manager records each pty's screen state and replays it on reattach, so reloading the window no longer drops the terminal to a blank panel.
+
+### Fixed
+
+- Dropped the border on the selected session row, along with the leftover transparent border on the others.
+
 ## [0.1.14] - 2026-06-25
 
 ### Fixed
@@ -362,7 +373,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/luojiahai/code-by-wire/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/luojiahai/code-by-wire/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/luojiahai/code-by-wire/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/luojiahai/code-by-wire/compare/v0.1.11...v0.1.12
