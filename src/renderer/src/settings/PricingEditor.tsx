@@ -10,12 +10,12 @@ import { FAMILY_LABEL } from "../ui/meta";
 import { Icon } from "../ui/icons";
 import { cx } from "../ui/atoms";
 
-/** The editable rate columns, in Anthropic pricing-page order, each mapping to a ModelPricing field. */
+/** The editable rate columns, each mapping to a ModelPricing field. */
 const COLUMNS: { field: keyof ModelPricing; label: string }[] = [
-  { field: "input", label: "Base Input" },
-  { field: "cacheWrite5m", label: "5m Writes" },
-  { field: "cacheWrite1h", label: "1h Writes" },
-  { field: "cacheRead", label: "Cache Hits & Refreshes" },
+  { field: "input", label: "Input" },
+  { field: "cacheWrite5m", label: "Cache write 5m" },
+  { field: "cacheWrite1h", label: "Cache write 1h" },
+  { field: "cacheRead", label: "Cache read" },
   { field: "output", label: "Output" },
 ];
 

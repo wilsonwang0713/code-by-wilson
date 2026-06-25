@@ -660,7 +660,7 @@ function KpiStrip({
       totals.cacheCreationTokens
     : totals.inputTokens + totals.outputTokens;
   return (
-    <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-ink-800 bg-ink-925 lg:grid-cols-4">
+    <div className="grid grid-cols-2 rounded-xl border border-ink-800 bg-ink-925 lg:grid-cols-4">
       <KpiCard
         label="Sessions"
         value={totals.sessions.toLocaleString("en-US")}
@@ -674,7 +674,7 @@ function KpiStrip({
               <Swatch color={KIND_SEGMENT_COLORS[i]} />
               <MetricTip
                 label={label}
-                popoverClassName="left-0 top-full z-20 mt-1 w-52 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg"
+                popoverClassName="left-0 top-full z-50 mt-1 w-52 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg"
               >
                 {TOKEN_KINDS[i].description}
               </MetricTip>

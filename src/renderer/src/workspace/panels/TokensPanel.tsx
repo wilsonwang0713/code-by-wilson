@@ -48,11 +48,11 @@ const KIND_BY_KEY = Object.fromEntries(
 ) as Record<TokenKind["key"], TokenKind>;
 
 /**
- * The session's token usage and its cost, grouped: a headline of total tokens · the Equivalent API value
- * (Claude's live number when present), a 5-segment stacked bar (Input · Output · Cache read · 5m write · 1h
- * write), and rows pairing each kind's tokens with its ~cost. Cache write is a grouped parent total with
- * indented 5-minute / 1-hour sub-rows; the 1-hour row dims to `0 / —` when the session never used 1h
- * caching. The ✎ in the header opens the pricing editor; each kind label reveals its description + live rate.
+ * The session's token usage and its cost: a headline of total tokens · the Equivalent API value (Claude's
+ * live number when present), a 5-segment stacked bar (Input · Output · Cache read · 5m write · 1h write), and
+ * one flat row per kind pairing its tokens with its ~cost. The 1-hour cache-write row dims to `0 / —` when
+ * the session never used 1h caching. The ✎ in the header opens the pricing editor; each kind label reveals
+ * its description + live rate.
  */
 export function TokensPanel({
   usage,
@@ -72,78 +72,77 @@ export function TokensPanel({
   onPricingChange?: (next: PricingOverrides) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const { headline, total, bar, topRows, subRows, cacheSavings } =
-    useMemo(() => {
-      const b = costBreakdown(usage, model, pricingOverrides);
-      return {
-        headline: costDisplay({
-          liveCostUsd,
-          equivApiValueUsd: b.total,
-          billingMode,
-          anthropicDirect,
-        }),
-        total:
-          usage.inputTokens +
-          usage.outputTokens +
-          usage.cacheReadTokens +
-          usage.cacheCreationTokens,
-        // The 5 bar segments, in cost-palette order, parallel to TOKEN_KINDS.
-        bar: [
-          { value: usage.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-          { value: usage.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-          { value: usage.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
-          { value: usage.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
-          { value: usage.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
-        ],
-        topRows: [
-          {
-            kind: KIND_BY_KEY.input,
-            tokens: usage.inputTokens,
-            usd: b.input,
-            color: KIND_SEGMENT_COLORS[0],
-          },
-          {
-            kind: KIND_BY_KEY.output,
-            tokens: usage.outputTokens,
-            usd: b.output,
-            color: KIND_SEGMENT_COLORS[1],
-          },
-          {
-            kind: KIND_BY_KEY.cacheRead,
-            tokens: usage.cacheReadTokens,
-            usd: b.cacheRead,
-            color: KIND_SEGMENT_COLORS[2],
-          },
-        ],
-        subRows: [
-          {
-            kind: KIND_BY_KEY.cacheWrite5m,
-            tokens: usage.cacheCreation5mTokens,
-            usd: b.cacheWrite5m,
-            color: KIND_SEGMENT_COLORS[3],
-            dim: false,
-          },
-          {
-            kind: KIND_BY_KEY.cacheWrite1h,
-            tokens: usage.cacheCreation1hTokens,
-            usd: b.cacheWrite1h,
-            color: KIND_SEGMENT_COLORS[4],
-            dim: usage.cacheCreation1hTokens === 0,
-          },
-        ],
-        cacheSavings: b.cacheSavings,
-      };
-    }, [
-      usage,
-      model,
-      liveCostUsd,
-      billingMode,
-      anthropicDirect,
-      pricingOverrides,
-    ]);
-
-  const cacheWriteTokens = usage.cacheCreationTokens;
-  const cacheWriteUsd = subRows[0].usd + subRows[1].usd;
+  const { headline, total, bar, rows, cacheSavings } = useMemo(() => {
+    const b = costBreakdown(usage, model, pricingOverrides);
+    return {
+      headline: costDisplay({
+        liveCostUsd,
+        equivApiValueUsd: b.total,
+        billingMode,
+        anthropicDirect,
+      }),
+      total:
+        usage.inputTokens +
+        usage.outputTokens +
+        usage.cacheReadTokens +
+        usage.cacheCreationTokens,
+      // The 5 bar segments, in cost-palette order, parallel to TOKEN_KINDS.
+      bar: [
+        { value: usage.inputTokens, color: KIND_SEGMENT_COLORS[0] },
+        { value: usage.outputTokens, color: KIND_SEGMENT_COLORS[1] },
+        { value: usage.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
+        { value: usage.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
+        { value: usage.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
+      ],
+      // All five kinds as flat rows, in cost-palette order. The 1-hour row dims to `0 / —`
+      // when the session never used 1h caching.
+      rows: [
+        {
+          kind: KIND_BY_KEY.input,
+          tokens: usage.inputTokens,
+          usd: b.input,
+          color: KIND_SEGMENT_COLORS[0],
+          dim: false,
+        },
+        {
+          kind: KIND_BY_KEY.output,
+          tokens: usage.outputTokens,
+          usd: b.output,
+          color: KIND_SEGMENT_COLORS[1],
+          dim: false,
+        },
+        {
+          kind: KIND_BY_KEY.cacheRead,
+          tokens: usage.cacheReadTokens,
+          usd: b.cacheRead,
+          color: KIND_SEGMENT_COLORS[2],
+          dim: false,
+        },
+        {
+          kind: KIND_BY_KEY.cacheWrite5m,
+          tokens: usage.cacheCreation5mTokens,
+          usd: b.cacheWrite5m,
+          color: KIND_SEGMENT_COLORS[3],
+          dim: false,
+        },
+        {
+          kind: KIND_BY_KEY.cacheWrite1h,
+          tokens: usage.cacheCreation1hTokens,
+          usd: b.cacheWrite1h,
+          color: KIND_SEGMENT_COLORS[4],
+          dim: usage.cacheCreation1hTokens === 0,
+        },
+      ],
+      cacheSavings: b.cacheSavings,
+    };
+  }, [
+    usage,
+    model,
+    liveCostUsd,
+    billingMode,
+    anthropicDirect,
+    pricingOverrides,
+  ]);
 
   return (
     <PanelSection>
@@ -182,7 +181,7 @@ export function TokensPanel({
       <StackedBar className="mt-1" segments={bar} />
 
       <div className="mt-2.5 space-y-1.5">
-        {topRows.map((r) => (
+        {rows.map((r) => (
           <Row
             key={r.kind.key}
             label={
@@ -195,39 +194,8 @@ export function TokensPanel({
             color={r.color}
             tokens={r.tokens}
             usd={r.usd}
+            dim={r.dim}
           />
-        ))}
-        {/* Grouped Cache write parent total (no swatch — its two sub-rows carry the colors). */}
-        <div className="flex items-center gap-2 text-[12px]">
-          <span className="w-3" />
-          <span className="flex-1 text-fg-muted">Cache write</span>
-          <span className="font-mono tabular-nums text-fg">
-            {formatTokensShort(cacheWriteTokens)}
-          </span>
-          <span className="w-12 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-            ~{formatUsd(cacheWriteUsd)}
-          </span>
-        </div>
-        {subRows.map((r) => (
-          <div
-            key={r.kind.key}
-            className={`flex items-center gap-2 pl-3 text-[12px] ${r.dim ? "opacity-40" : ""}`}
-          >
-            <Swatch color={r.color} />
-            <span className="flex-1 text-fg-muted">
-              <KindLabel
-                kind={r.kind}
-                model={model}
-                overrides={pricingOverrides}
-              />
-            </span>
-            <span className="font-mono tabular-nums text-fg">
-              {r.dim ? "0" : formatTokensShort(r.tokens)}
-            </span>
-            <span className="w-12 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-              {r.dim ? "—" : `~${formatUsd(r.usd)}`}
-            </span>
-          </div>
         ))}
       </div>
 
@@ -252,27 +220,32 @@ export function TokensPanel({
   );
 }
 
-/** A top-level kind row: swatch · MetricTip label · tokens · ~cost. */
+/** One kind row: swatch · MetricTip label · tokens · ~cost. Dims to `0 / —` when the kind is unused
+ *  (the 1-hour cache-write row for a session that never used 1h caching). */
 function Row({
   label,
   color,
   tokens,
   usd,
+  dim,
 }: {
   label: React.ReactNode;
   color: string;
   tokens: number;
   usd: number;
+  dim?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 text-[12px]">
+    <div
+      className={`flex items-center gap-2 text-[12px] ${dim ? "opacity-40" : ""}`}
+    >
       <Swatch color={color} />
       <span className="flex-1 text-fg-muted">{label}</span>
       <span className="font-mono tabular-nums text-fg">
-        {formatTokensShort(tokens)}
+        {dim ? "0" : formatTokensShort(tokens)}
       </span>
       <span className="w-12 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-        ~{formatUsd(usd)}
+        {dim ? "—" : `~${formatUsd(usd)}`}
       </span>
     </div>
   );
