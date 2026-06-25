@@ -7,10 +7,10 @@ import { cx } from "../ui/atoms";
 export interface UpdateControls {
   state: UpdateState;
   autoCheck: boolean;
-  check(): void;
-  download(): void;
-  install(): void;
-  setAutoCheck(enabled: boolean): void;
+  check: () => void;
+  download: () => void;
+  install: () => void;
+  setAutoCheck: (enabled: boolean) => void;
 }
 
 type LampTone = "ok" | "warn" | "hot" | "error" | "idle";

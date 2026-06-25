@@ -133,10 +133,14 @@ export function registerIpc({
     },
     resolvedPath: () => null,
   };
+  const inertState: UpdateState = {
+    currentVersion: "",
+    phase: { kind: "unsupported" },
+  };
   const upd: Updater = updater ?? {
-    getState: () => ({ currentVersion: "", phase: { kind: "unsupported" } }),
-    check: async () => ({ currentVersion: "", phase: { kind: "unsupported" } }),
-    download: async () => {},
+    getState: () => inertState,
+    check: () => Promise.resolve(inertState),
+    download: () => Promise.resolve(),
     quitAndInstall: () => {},
   };
   const settings: AppSettingsStore = appSettings ?? {
