@@ -54,12 +54,18 @@ const api: AppApi = {
       ipcRenderer.send(TERMINAL.resize, id, cols, rows),
     ack: (id, charCount) => ipcRenderer.send(TERMINAL.ack, id, charCount),
     kill: (id) => ipcRenderer.send(TERMINAL.kill, id),
+    reattach: (id, cols, rows) =>
+      ipcRenderer.invoke(TERMINAL.reattach, id, cols, rows),
     pickDirectory: () => ipcRenderer.invoke(TERMINAL.pickDirectory),
     // The two PUSH channels. Each returns an unsubscribe fn so a React effect can detach its exact
     // handler on cleanup — without it, every remount would stack another listener (a classic leak).
     onData: (cb) => {
-      const handler = (_e: IpcRendererEvent, id: string, data: string) =>
-        cb(id, data);
+      const handler = (
+        _e: IpcRendererEvent,
+        id: string,
+        data: string,
+        offset: number,
+      ) => cb(id, data, offset);
       ipcRenderer.on(TERMINAL.data, handler);
       return () => ipcRenderer.removeListener(TERMINAL.data, handler);
     },

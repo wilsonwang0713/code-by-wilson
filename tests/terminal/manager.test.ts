@@ -57,9 +57,56 @@ const passthroughBufferer = (flush: (d: string) => void) => ({
   dispose: () => {},
 });
 
-function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
+/** A fake recorder that records what it's fed and returns a canned snapshot, so the manager's wiring is
+ *  testable without loading @xterm/headless. */
+function recorderFactory() {
+  const made: Array<{
+    writes: string[];
+    resizes: Array<[number, number]>;
+    disposed: boolean;
+    wroteAfterDispose: boolean;
+  }> = [];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const create = (_o: { cols: number; rows: number }) => {
+    const rec = {
+      writes: [] as string[],
+      resizes: [] as Array<[number, number]>,
+      disposed: false,
+      wroteAfterDispose: false, // flags a write that lands after dispose (the hazard #11 guards against)
+    };
+    made.push(rec);
+    return {
+      write: (d: string) => {
+        if (rec.disposed) rec.wroteAfterDispose = true;
+        rec.writes.push(d);
+      },
+      resize: (c: number, r: number) => rec.resizes.push([c, r]),
+      snapshot: () => {
+        const data = `SNAP:${rec.writes.join("")}`;
+        return Promise.resolve({ data, offset: rec.writes.join("").length });
+      },
+      dispose: () => {
+        rec.disposed = true;
+      },
+    };
+  };
+  return { create, made };
+}
+
+function harness(
+  over: {
+    statDir?: (cwd: string) => boolean;
+    createBufferer?: (flush: (d: string) => void) => {
+      add: (d: string) => void;
+      flush: () => void;
+      dispose: () => void;
+    };
+  } = {},
+) {
   const ptys: ReturnType<typeof fakePty>[] = [];
+  const recorders = recorderFactory();
   const sent: Array<[string, string]> = [];
+  const sentOffsets: Array<[string, number]> = [];
   const exited: Array<[string, number]> = [];
   const spawned: string[] = [];
   const spawnedPids: number[] = [];
@@ -67,7 +114,10 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
   const closed: string[] = [];
   let nextPid = 1000;
   const manager = createTerminalManager({
-    send: (id, data) => sent.push([id, data]),
+    send: (id, data, offset) => {
+      sent.push([id, data]);
+      sentOffsets.push([id, offset]);
+    },
     notifyExit: (id, code) => exited.push([id, code]),
     onSpawned: (id, pid, model) => {
       spawned.push(id);
@@ -81,7 +131,8 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
       ptys.push(f);
       return f.proc;
     },
-    createBufferer: passthroughBufferer,
+    createBufferer: over.createBufferer ?? passthroughBufferer,
+    createRecorder: recorders.create,
     env: () => ({ PATH: "/usr/bin" }),
     statDir: over.statDir ?? (() => true),
     // Pin POSIX so the bare-`claude` command and `/work/app` fixtures aren't reshaped by the Windows
@@ -91,7 +142,9 @@ function harness(over: { statDir?: (cwd: string) => boolean } = {}) {
   return {
     manager,
     ptys,
+    recorders,
     sent,
+    sentOffsets,
     exited,
     spawned,
     spawnedPids,
@@ -170,6 +223,17 @@ describe("createTerminalManager", () => {
     h.manager.spawn(REQ);
     h.ptys[0].emitData("hello");
     expect(h.sent).toEqual([["sess-1", "hello"]]);
+  });
+
+  it("stamps each sent chunk with its cumulative output end offset, so a reattach can dedupe against it", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitData("abc"); // 3 chars → offset 3
+    h.ptys[0].emitData("de"); // +2 → offset 5
+    expect(h.sentOffsets).toEqual([
+      ["sess-1", 3],
+      ["sess-1", 5],
+    ]);
   });
 
   it("routes write and resize to the right pty", () => {
@@ -321,5 +385,96 @@ describe("createTerminalManager", () => {
       "sess-1",
       expect.stringContaining("/work/app"), // the message names the bad dir
     ]);
+  });
+
+  it("feeds pty output into the recorder alongside the renderer send", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitData("hello");
+    expect(h.recorders.made[0].writes).toEqual(["hello"]);
+  });
+
+  it("feeds the recorder the coalesced batch, not each raw chunk, and drains it before snapshotting", async () => {
+    // A bufferer that holds output until flush() is called, so we can tell whether the recorder is fed
+    // per raw pty chunk (the old behavior — one full xterm write per chunk during a flood) or the
+    // coalesced batch, and whether snapshot drains the batch first.
+    const manualBufferer = (flush: (d: string) => void) => {
+      let buf = "";
+      return {
+        add: (d: string) => {
+          buf += d;
+        },
+        flush: () => {
+          if (buf) {
+            flush(buf);
+            buf = "";
+          }
+        },
+        dispose: () => {},
+      };
+    };
+    const h = harness({ createBufferer: manualBufferer });
+    h.manager.spawn(REQ);
+    h.ptys[0].emitData("ab");
+    h.ptys[0].emitData("cd");
+    expect(h.recorders.made[0].writes).toEqual([]); // held in the bufferer — not written per raw chunk
+
+    const snap = await h.manager.snapshot("sess-1");
+    expect(h.recorders.made[0].writes).toEqual(["abcd"]); // one coalesced write, drained before serialize
+    expect(snap).toEqual({ data: "SNAP:abcd", offset: 4 });
+  });
+
+  it("resizes the recorder so its serialized frame matches the pty grid", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.manager.resize("sess-1", 120, 40);
+    expect(h.recorders.made[0].resizes).toEqual([[120, 40]]);
+  });
+
+  it("disposes the recorder on natural exit", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitExit(0);
+    expect(h.recorders.made[0].disposed).toBe(true);
+  });
+
+  it("disposes the recorder on disposeAll", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.manager.disposeAll();
+    expect(h.recorders.made[0].disposed).toBe(true);
+  });
+
+  it("disposeAll kills the pty before disposing its sinks, so a final flush never hits a disposed recorder", () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    // A pty can emit one last chunk synchronously as it's killed; route it through the manager's onData.
+    const pty = h.ptys[0];
+    pty.proc.kill = () => {
+      pty.state.killed = true;
+      pty.emitData("tail");
+    };
+
+    h.manager.disposeAll();
+
+    expect(pty.state.killed).toBe(true);
+    expect(h.recorders.made[0].disposed).toBe(true);
+    expect(h.recorders.made[0].wroteAfterDispose).toBe(false); // killed before the recorder was disposed
+    expect(h.recorders.made[0].writes).toContain("tail"); // and the final chunk still reached it
+  });
+
+  it("snapshot returns the recorder's serialization and offset for a live id", async () => {
+    const h = harness();
+    h.manager.spawn(REQ);
+    h.ptys[0].emitData("abc");
+    await expect(h.manager.snapshot("sess-1")).resolves.toEqual({
+      data: "SNAP:abc",
+      offset: 3,
+    });
+  });
+
+  it("snapshot returns null for an unknown id", async () => {
+    const h = harness();
+    await expect(h.manager.snapshot("nope")).resolves.toBeNull();
   });
 });

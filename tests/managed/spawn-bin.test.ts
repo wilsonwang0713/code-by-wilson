@@ -24,6 +24,12 @@ const baseDeps = {
   onSpawned: vi.fn(),
   onClosed: vi.fn(),
   statDir: () => true,
+  createRecorder: () => ({
+    write: vi.fn(),
+    resize: vi.fn(),
+    snapshot: () => Promise.resolve({ data: "", offset: 0 }),
+    dispose: vi.fn(),
+  }),
 };
 
 describe("manager passes the resolved bin to the pty", () => {
