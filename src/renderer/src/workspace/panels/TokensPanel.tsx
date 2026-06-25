@@ -74,9 +74,14 @@ export function TokensPanel({
   const [editing, setEditing] = useState(false);
   const { headline, total, bar, rows, cacheSavings } = useMemo(() => {
     const b = costBreakdown(usage, model, pricingOverrides);
+    // A custom rate for this session's model means the user wants usage valued at THEIR price. Claude's
+    // live cost figure is at standard rates and can't reflect that, so drop it and show the override-priced
+    // equivalent — otherwise the headline would ignore the edit while the per-kind rows below re-price.
+    const modelOverridden =
+      Object.keys(pricingOverrides?.[model] ?? {}).length > 0;
     return {
       headline: costDisplay({
-        liveCostUsd,
+        liveCostUsd: modelOverridden ? undefined : liveCostUsd,
         equivApiValueUsd: b.total,
         billingMode,
         anthropicDirect,
