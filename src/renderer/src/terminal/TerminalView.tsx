@@ -29,9 +29,20 @@ export function TerminalView({ sessionId }: { sessionId: string }) {
 
     let reattachStarted = false;
     const sync = () => {
+      // Don't fit/resize against a collapsed or not-yet-laid-out container — measuring a 0-size element
+      // yields a 0/NaN grid and a bogus pty resize, and seeds xterm with junk dimensions (VSCode's
+      // layout() bails on width/height <= 0). The ResizeObserver fires again with real dimensions once the
+      // flex layout settles.
       if (container.clientWidth <= 0 || container.clientHeight <= 0) return;
       handle.fit.fit();
       window.api.terminal.resize(sessionId, handle.term.cols, handle.term.rows);
+      // Rebuild xterm's viewport geometry against the live element after every (re)layout. While the wrapper
+      // was detached the pty kept streaming, so background renders recorded the off-DOM offsetHeight of 0 —
+      // shrinking the scroll-area and resetting the DOM scrollTop, which buries the bottom-most line (the
+      // Claude prompt). The fit above is a no-op when the size is unchanged (the StructureDock pins a fixed
+      // height across a tab switch), so driving this from sync — not just the mount tick — is what lets the
+      // ResizeObserver re-run it when a collapsed container later gets its real size; otherwise that stale
+      // geometry would survive and the prompt would stay unreachable.
       handle.rebuildViewport();
       // Reattach after a refresh: once we have real dimensions, fetch and replay the screen snapshot once.
       // The store gated live output at create time, so this lands the snapshot before any live chunk.
