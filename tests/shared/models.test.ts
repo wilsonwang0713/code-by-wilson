@@ -48,7 +48,8 @@ describe("priceFor", () => {
       input: 10,
       output: 50,
       cacheRead: 1,
-      cacheWrite: 12.5,
+      cacheWrite5m: 12.5,
+      cacheWrite1h: 20,
     });
   });
 });
