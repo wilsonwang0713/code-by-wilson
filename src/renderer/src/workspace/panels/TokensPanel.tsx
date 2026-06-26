@@ -196,6 +196,11 @@ export function TokensPanel({
     [usageByModel, pricingOverrides],
   );
   const { usage, cost, models } = view;
+
+  // When no model is recognized AND the statusLine didn't report a live cost, there's
+  // genuinely nothing to show — display n/a / — instead of a misleading ~$0.00.
+  const noPricing = models.every(m => m.cost === null) && liveCostUsd == null;
+
   const multiModel = models.length > 1;
 
   // A custom rate for any present model means the user wants usage valued at THEIR price. Claude's live
@@ -265,13 +270,18 @@ export function TokensPanel({
             <span
               className="font-mono text-[13px] tabular-nums text-fg"
               title={
-                headline.equivalent
-                  ? "Total tokens · Equivalent API value (estimate)"
-                  : "Total tokens · actual API spend"
+                noPricing
+                  ? "Total tokens · cost unavailable"
+                  : headline.equivalent
+                    ? "Total tokens · Equivalent API value (estimate)"
+                    : "Total tokens · actual API spend"
               }
             >
               {formatTokensShort(total)}
-              <span className="text-fg-faint"> · {headline.text}</span>
+              <span className="text-fg-faint">
+                {" · "}
+                {noPricing ? "n/a" : headline.text}
+              </span>
             </span>
             {onPricingChange && (
               <button
@@ -309,6 +319,7 @@ export function TokensPanel({
             tokens={r.tokens}
             usd={r.usd}
             dim={r.dim}
+            noPricing={noPricing}
           />
         ))}
       </div>
@@ -362,12 +373,14 @@ function Row({
   tokens,
   usd,
   dim,
+  noPricing,
 }: {
   label: ReactNode;
   color: string;
   tokens: number;
   usd: number;
   dim?: boolean;
+  noPricing?: boolean;
 }) {
   return (
     <div
@@ -379,7 +392,7 @@ function Row({
         {dim ? "0" : formatTokensShort(tokens)}
       </span>
       <span className="w-12 text-right font-mono text-[11px] tabular-nums text-fg-faint">
-        {dim ? "—" : `~${formatUsd(usd)}`}
+        {dim ? "—" : noPricing ? "—" : `~${formatUsd(usd)}`}
       </span>
     </div>
   );
