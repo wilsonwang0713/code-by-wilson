@@ -383,7 +383,7 @@ describe("analytics store", () => {
     expect(hasAnyTurns(db)).toBe(true);
   });
 
-  it("counts an unrecognized model's tokens but gives it n/a cost", () => {
+  it("prices an unrecognized model at Opus fallback rates alongside recognized models", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -399,7 +399,7 @@ describe("analytics store", () => {
       }),
       turn({
         messageId: "unknown",
-        modelRaw: "gpt-9-ultra", // matches no family
+        modelRaw: "gpt-9-ultra", // falls back to Opus pricing
         usage: {
           inputTokens: 1_000_000,
           outputTokens: 0,
@@ -411,7 +411,7 @@ describe("analytics store", () => {
     const t = readTotals(db);
     expect(t.turns).toBe(2);
     expect(t.inputTokens).toBe(2_000_000); // unknown model's tokens still counted
-    expect(t.equivApiValueUsd).toBeCloseTo(3); // only sonnet ($3/M); the unknown adds nothing
+    expect(t.equivApiValueUsd).toBeCloseTo(8); // sonnet $3 + gpt at Opus $5/M = $8
   });
 
   it("prices 5m and 1h cache writes at distinct rates and carries both columns", () => {
@@ -538,7 +538,7 @@ describe("readByModel", () => {
     ]);
   });
 
-  it("maps cost per model and gives an unrecognized id null (n/a), still counting its tokens", () => {
+  it("maps cost per model including unrecognized ids at Opus fallback rates", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -553,7 +553,7 @@ describe("readByModel", () => {
           cacheCreationTokens: 0,
         },
       }),
-      // unrecognized id: matches no family → cost null, but its 2M tokens still appear.
+      // unrecognized id: falls back to Opus pricing → 2M input at $5/M = $10.
       turn({
         messageId: "unknown",
         modelRaw: "gpt-9-ultra",
@@ -567,7 +567,7 @@ describe("readByModel", () => {
     ]);
     const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
     expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueUsd).toBeCloseTo(3);
-    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeNull();
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeCloseTo(10); // 2M input at Opus $5/M fallback
     expect(byRaw.get("gpt-9-ultra")!.totalTokens).toBe(2_000_000);
   });
 
@@ -656,7 +656,7 @@ describe("readByModel", () => {
           cacheCreationTokens: 0,
         },
       }),
-      // an unrecognized id contributes null to the breakdown and nothing to readTotals' cost.
+      // an unrecognized id now contributes at Opus fallback cost.
       turn({
         messageId: "c",
         modelRaw: "gpt-9-ultra",
@@ -673,12 +673,12 @@ describe("readByModel", () => {
     const byRaw = new Map(readByModel(db).map((r) => [r.modelRaw, r]));
     expect(byRaw.get("claude-opus-4-8")!.equivApiValueUsd).toBeCloseTo(5); // 1M input @ $5/M
     expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueUsd).toBeCloseTo(3); // 1M input @ $3/M
-    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeNull(); // unrecognized → n/a
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueUsd).toBeCloseTo(5); // 1M input at Opus $5/M fallback
     const summed = readByModel(db).reduce(
       (acc, r) => acc + (r.equivApiValueUsd ?? 0),
       0,
     );
-    expect(summed).toBeCloseTo(readTotals(db).equivApiValueUsd); // $5 opus + $3 sonnet = $8
+    expect(summed).toBeCloseTo(readTotals(db).equivApiValueUsd); // $5 opus + $3 sonnet + $5 gpt = $13
   });
 
   it("prices a fresh equiv value per model (input + output only) that reconciles with the totals", () => {
@@ -721,7 +721,7 @@ describe("readByModel", () => {
     expect(byRaw.get("claude-sonnet-4-6")!.equivApiValueFreshUsd).toBeCloseTo(
       3,
     ); // 1M input @ $3/M
-    expect(byRaw.get("gpt-9-ultra")!.equivApiValueFreshUsd).toBeNull(); // unrecognized → n/a
+    expect(byRaw.get("gpt-9-ultra")!.equivApiValueFreshUsd).toBeCloseTo(5); // 1M input at Opus $5/M fallback
     const summed = readByModel(db).reduce(
       (acc, r) => acc + (r.equivApiValueFreshUsd ?? 0),
       0,
@@ -841,7 +841,7 @@ describe("readByProject", () => {
     );
   });
 
-  it("gives a project with only unrecognized models n/a cost, still counting its tokens", () => {
+  it("prices a project with only unrecognized models at Opus fallback rates, still counting its tokens", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -849,7 +849,7 @@ describe("readByProject", () => {
         messageId: "x",
         cwd: "/w/proj",
         project: "proj",
-        modelRaw: "gpt-9-ultra", // matches no family
+        modelRaw: "gpt-9-ultra", // falls back to Opus pricing
         usage: {
           inputTokens: 500,
           outputTokens: 0,
@@ -861,15 +861,15 @@ describe("readByProject", () => {
     const rows = readByProject(db);
     expect(rows).toHaveLength(1);
     expect(rows[0].totalTokens).toBe(500); // tokens still counted
-    expect(rows[0].equivApiValueUsd).toBeNull(); // no recognized model → n/a, not $0
+    expect(rows[0].equivApiValueUsd).toBeCloseTo(0.0025); // 500 input at Opus $5/M fallback
   });
 
-  it("on a mixed project counts both models' tokens but prices only the recognized one", () => {
+  it("on a mixed project counts and prices both models' tokens at their rates", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      // one project, one recognized + one unrecognized model: tokens sum both, cost is the known one only,
-      // and equivApiValueUsd is non-null (hasKnownCost flips true) — n/a is reserved for an ALL-unknown group.
+      // one project, one recognized + one unrecognized model: tokens sum both, cost sums both
+      // (the unrecognized model priced at Opus fallback), equivApiValueUsd is the combined total.
       turn({
         messageId: "known",
         cwd: "/w/proj",
@@ -886,7 +886,7 @@ describe("readByProject", () => {
         messageId: "unknown",
         cwd: "/w/proj",
         project: "proj",
-        modelRaw: "gpt-9-ultra", // matches no family → tokens count, cost excluded
+        modelRaw: "gpt-9-ultra", // falls back to Opus pricing
         usage: {
           inputTokens: 2_000_000,
           outputTokens: 0,
@@ -898,7 +898,7 @@ describe("readByProject", () => {
     const rows = readByProject(db);
     expect(rows).toHaveLength(1);
     expect(rows[0].totalTokens).toBe(3_000_000); // both models' tokens
-    expect(rows[0].equivApiValueUsd).toBeCloseTo(3); // sonnet only; the unknown adds nothing to cost
+    expect(rows[0].equivApiValueUsd).toBeCloseTo(13); // sonnet $3 + gpt 2M at Opus $5/M = $10 → $13
   });
 
   it("respects the range bound, excluding out-of-window turns", () => {
@@ -1414,14 +1414,14 @@ describe("readBySession", () => {
     expect(rows[0].equivApiValueUsd).toBeCloseTo(11); // summed across both models
   });
 
-  it("gives a session with only an unrecognized model n/a cost, still counting its tokens", () => {
+  it("prices a session with only an unrecognized model at Opus fallback rates, still counting its tokens", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
       turn({
         messageId: "x",
         sessionId: "s1",
-        modelRaw: "gpt-9-ultra", // unrecognized
+        modelRaw: "gpt-9-ultra", // falls back to Opus pricing
         usage: {
           inputTokens: 1234,
           outputTokens: 0,
@@ -1432,7 +1432,7 @@ describe("readBySession", () => {
     ]);
     const rows = readBySession(db);
     expect(rows[0].totalTokens).toBe(1234);
-    expect(rows[0].equivApiValueUsd).toBeNull();
+    expect(rows[0].equivApiValueUsd).toBeCloseTo(0.00617); // 1234 input at Opus $5/M fallback
   });
 
   it("orders rows by last activity descending, breaking ties by session id", () => {
@@ -1559,7 +1559,7 @@ describe("readBreakdowns", () => {
       cwd: "/work/app",
       project: "app",
       branch: "feature",
-      modelRaw: "gpt-9-ultra", // unrecognized: tokens count, cost n/a
+      modelRaw: "gpt-9-ultra", // unrecognized: priced at Opus fallback
       usage: {
         inputTokens: 500,
         outputTokens: 0,
@@ -1627,7 +1627,7 @@ describe("readBreakdowns", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, seed());
-    // $5 opus (1M input) + $6 sonnet (2M input); the unrecognized model contributes tokens but no cost.
+    // $5 opus (1M input) + $6 sonnet (2M input) + gpt 500 at Opus $5/M = $0.0025 ≈ $11.0025.
     const total = readTotals(db).equivApiValueUsd;
     const sum = (rows: { equivApiValueUsd: number | null }[]): number =>
       rows.reduce((acc, r) => acc + (r.equivApiValueUsd ?? 0), 0);
@@ -1838,7 +1838,7 @@ describe("readDaily", () => {
     expect(readDaily(db)).toEqual([]);
   });
 
-  it("prices each day: total, per-kind split, and per-model cost, with unrecognized models n/a", () => {
+  it("prices each day: total, per-kind split, and per-model cost, including unrecognized at Opus fallback", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -1866,7 +1866,7 @@ describe("readDaily", () => {
           cacheCreationTokens: 0,
         },
       }),
-      // unrecognized model: tokens count, cost does not
+      // unrecognized model: priced at Opus fallback — 500 input at $5/M = $0.0025
       turn({
         messageId: "unknown",
         ts: noon(2026, 6, 14),
@@ -1880,8 +1880,8 @@ describe("readDaily", () => {
       }),
     ]);
     const [d] = readDaily(db);
-    expect(d.equivApiValueUsd).toBeCloseTo(20); // $5 opus + $15 sonnet; unknown adds nothing
-    expect(d.costByKind!.input).toBeCloseTo(5);
+    expect(d.equivApiValueUsd).toBeCloseTo(20.0025); // $5 opus + $15 sonnet + gpt 500 at Opus $5/M = $0.0025
+    expect(d.costByKind!.input).toBeCloseTo(5.0025); // opus $5 + gpt 500 at Opus $5/M = $0.0025
     expect(d.costByKind!.output).toBeCloseTo(15);
     expect(d.costByKind!.cacheRead).toBeCloseTo(0);
     expect(d.costByKind!.cacheWrite).toBeCloseTo(0);
@@ -1890,10 +1890,10 @@ describe("readDaily", () => {
     );
     expect(byRaw.get("claude-opus-4-8")).toBeCloseTo(5);
     expect(byRaw.get("claude-sonnet-4-6")).toBeCloseTo(15);
-    expect(byRaw.get("gpt-9-ultra")).toBeNull(); // unrecognized → n/a
+    expect(byRaw.get("gpt-9-ultra")).toBeCloseTo(0.0025); // Opus fallback
   });
 
-  it("prices an all-unrecognized day as n/a, not $0, while still counting its tokens", () => {
+  it("prices an all-unrecognized day at Opus fallback rates, still counting all tokens", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -1911,9 +1911,9 @@ describe("readDaily", () => {
     ]);
     const [d] = readDaily(db);
     expect(d.inputTokens).toBe(1000);
-    expect(d.equivApiValueUsd).toBeNull();
-    expect(d.costByKind).toBeNull();
-    expect(d.byModel[0].equivApiValueUsd).toBeNull();
+    expect(d.equivApiValueUsd).toBeCloseTo(0.005); // 1000 input at Opus $5/M fallback
+    expect(d.costByKind).not.toBeNull();
+    expect(d.byModel[0].equivApiValueUsd).toBeCloseTo(0.005);
   });
 
   it("prices a fresh equiv value per day (input + output only)", () => {
@@ -2088,7 +2088,7 @@ describe("readCalendar", () => {
     expect(cal[0].outputTokens).toBe(5); // fresh subset = 15, far below the total
   });
 
-  it("reports n/a (null) equiv on a day whose only model is unrecognized, while still counting tokens", () => {
+  it("prices a day whose only model is unrecognized at Opus fallback rates, still counting tokens", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -2107,14 +2107,14 @@ describe("readCalendar", () => {
     const cal = readCalendar(db, { sinceMs: since, untilMs: until });
     expect(cal[0].totalTokens).toBe(100);
     expect(cal[0].turns).toBe(1);
-    expect(cal[0].equivApiValueUsd).toBeNull();
+    expect(cal[0].equivApiValueUsd).toBeCloseTo(0.0005); // 100 input at Opus $5/M fallback
   });
 
-  it("prices only the recognized models on a mixed day, counting every model's tokens", () => {
+  it("prices both recognized and unrecognized models on a mixed day, counting every model's tokens", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      // Recognized opus: 1M input → $5. Its single presence unlocks a real (non-null) equiv.
+      // Recognized opus: 1M input → $5.
       turn({
         messageId: "known",
         ts: noon(2026, 6, 14),
@@ -2126,7 +2126,7 @@ describe("readCalendar", () => {
           cacheCreationTokens: 0,
         },
       }),
-      // Unrecognized model: its tokens still count, but it contributes no cost (not a guessed $0).
+      // Unrecognized model: tokens count and priced at Opus fallback — 500 input at $5/M = $0.0025.
       turn({
         messageId: "unknown",
         ts: noon(2026, 6, 14),
@@ -2143,7 +2143,7 @@ describe("readCalendar", () => {
     expect(cal).toHaveLength(1);
     expect(cal[0].turns).toBe(2);
     expect(cal[0].totalTokens).toBe(1_000_500);
-    expect(cal[0].equivApiValueUsd).toBeCloseTo(5); // opus only; the unknown model adds tokens, no cost
+    expect(cal[0].equivApiValueUsd).toBeCloseTo(5.0025); // $5 opus + $0.0025 gpt at Opus fallback
   });
 
   it("buckets by local day, ascending, and honors the window's bounds", () => {

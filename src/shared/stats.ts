@@ -44,9 +44,9 @@ export function emptyTotals(): StatsTotals {
  * token kinds; `inputTokens + outputTokens` is the fresh subset. The donut and the table's Tokens column
  * both follow the page-level "Include cache" toggle (StatsView's `tokensOf`): on by default they read
  * `totalTokens`, so a cache-heavy model can dominate the donut; off they read the fresh subset, which keeps
- * cache-read volume from swamping the chart. `equivApiValueUsd` is null when the raw id matches no known
- * family: an honest n/a, never a guessed $0. A null `modelRaw` is a turn that recorded no model; it renders
- * as "Unknown" with n/a cost.
+ * cache-read volume from swamping the chart. `equivApiValueUsd` is priced at Opus fallback rates for
+ * unrecognized model ids. It is null only when `modelRaw` is genuinely absent (a turn that recorded no
+ * model), rendered as "Unknown" with n/a cost.
  */
 export interface StatsByModel {
   modelRaw: string | null;
@@ -55,7 +55,7 @@ export interface StatsByModel {
    *  page's "Include cache" toggle is off, kept apart from totalTokens. Mirrors StatsByProject/StatsByBranch. */
   inputTokens: number;
   outputTokens: number;
-  /** Equivalent API value for this model, or null (n/a) when the raw id matches no known family. */
+  /** Equivalent API value for this model, priced at Opus fallback for unrecognized ids; null only when modelRaw is absent. */
   equivApiValueUsd: number | null;
   /** The same value pricing only input + output (cache excluded): shown when the page cache pill is off.
    *  0 (not null) for a recognized model with no fresh tokens; null only when the id is unrecognized. */
