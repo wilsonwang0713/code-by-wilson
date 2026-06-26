@@ -1,7 +1,6 @@
 import type { ModelUsage, Usage } from "./types";
 import {
   costBreakdown,
-  isKnownModelString,
   normalizeModelId,
   type CostBreakdown,
   type Family,
@@ -64,7 +63,7 @@ export interface ModelUsageView {
 }
 
 /** The Tokens panel's whole data source for a session's per-model breakdown: the combined token usage
- *  (every model, recognized or not), the combined per-kind cost (summed across recognized models, each at
+ *  (every model, recognized or not), the combined per-kind cost (summed across all models (unrecognized ids priced at the default family rate), each at
  *  its own rate), the per-model rows (biggest-tokens first) for the attribution line and popovers, and
  *  whether any present recognized model carries a pricing override (which drops the live-cost headline).
  *  Pure and JSX-free, so it typechecks under tsconfig.node.json and is unit-testable. */
