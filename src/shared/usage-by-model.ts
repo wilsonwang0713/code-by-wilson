@@ -43,19 +43,19 @@ export function tokenTotal(u: Usage): number {
   );
 }
 
-/** Price one model's usage to a per-kind CostBreakdown, or null (n/a) when its raw id matches no known
- *  family — the shared per-model mapping the panel and the overview both use (the renderer twin of
- *  analytics' modelRowCostBreakdown). */
+/** Price one model's usage to a per-kind CostBreakdown, or null (n/a) when modelRaw is absent.
+ *  A raw id that matches no known family falls back to the default family (Opus), so non-Anthropic
+ *  providers still get a meaningful cost estimate. Pricing overrides on the fallback family apply. */
 export function modelUsageCost(
   mu: ModelUsage,
   overrides?: PricingOverrides,
 ): CostBreakdown | null {
   const raw = mu.modelRaw ?? undefined;
-  if (!isKnownModelString(raw)) return null;
+  if (!raw) return null; // genuinely absent model → n/a
   return costBreakdown(mu.usage, normalizeModelId(raw), overrides);
 }
 
-/** One model's row in the panel view: its raw id, usage, total tokens, and breakdown (null → n/a cost). */
+/** One model's row in the panel view: its raw id, usage, total tokens, and breakdown (null → no model recorded). */
 export interface ModelUsageView {
   modelRaw: string | null;
   usage: Usage;
