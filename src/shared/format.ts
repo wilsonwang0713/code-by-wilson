@@ -1,7 +1,9 @@
-/** Equivalent API value as a short dollar string: $0.30 / $6.42 / $42.0 / $143. */
+/** Equivalent API value as a short dollar string: $0.30 / $6.42 / $42.0 / $143.
+ *  Very small non-zero costs (< $0.01) use 7 decimal places so single-token costs aren't rounded away. */
 export function formatUsd(n: number): string {
   if (n >= 100) return "$" + n.toFixed(0);
   if (n >= 10) return "$" + n.toFixed(1);
+  if (n > 0 && n < 0.01) return "$" + n.toFixed(7);
   return "$" + n.toFixed(2);
 }
 

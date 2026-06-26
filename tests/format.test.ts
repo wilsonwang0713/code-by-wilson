@@ -21,6 +21,13 @@ describe("formatUsd", () => {
     expect(formatUsd(42)).toBe("$42.0");
     expect(formatUsd(142.7)).toBe("$143");
   });
+
+  it("uses 7 decimals for sub-cent non-zero values so small costs aren't rounded to $0.00", () => {
+    expect(formatUsd(0.0005)).toBe("$0.0005000");
+    expect(formatUsd(0.0025)).toBe("$0.0025000");
+    expect(formatUsd(0.00617)).toBe("$0.0061700");
+    expect(formatUsd(0.000005)).toBe("$0.0000050");
+  });
 });
 
 describe("formatRelativeTime", () => {

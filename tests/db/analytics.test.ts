@@ -1634,7 +1634,7 @@ describe("readBreakdowns", () => {
     const b = readBreakdowns(db);
     expect(sum(b.byModel)).toBeCloseTo(total);
     expect(sum(b.byProject)).toBeCloseTo(total);
-    expect(total).toBeCloseTo(11);
+    expect(total).toBeCloseTo(11.0025);
   });
 
   it("returns three empty breakdowns for an empty store", () => {
