@@ -41,13 +41,16 @@ describe("modelUsageCost", () => {
     expect(c!.input).toBeCloseTo(5); // opus input $5/1M
   });
 
-  it("returns null for an unrecognized id (n/a cost)", () => {
-    expect(
-      modelUsageCost({
-        modelRaw: "gpt-5",
-        usage: usage({ inputTokens: 1_000_000 }),
-      }),
-    ).toBeNull();
+  it("prices an unrecognized model at Opus (fallback) rates", () => {
+    const c = modelUsageCost({
+      modelRaw: "deepseek-v4-pro",
+      usage: usage({ inputTokens: 1_000_000 }),
+    });
+    expect(c).not.toBeNull();
+    expect(c!.input).toBeCloseTo(5); // opus input $5/1M fallback
+  });
+
+  it("returns null when modelRaw is null (genuinely absent model)", () => {
     expect(
       modelUsageCost({
         modelRaw: null,
@@ -95,16 +98,27 @@ describe("viewUsageByModel", () => {
     );
   });
 
-  it("counts an unrecognized model's tokens but excludes it from cost (n/a)", () => {
+  it("prices an unrecognized model at Opus fallback rates alongside recognized models", () => {
     const v = viewUsageByModel([
       { modelRaw: "claude-opus-4-8", usage: usage({ inputTokens: 1_000_000 }) },
-      { modelRaw: "gpt-5", usage: usage({ inputTokens: 1_000_000 }) },
+      { modelRaw: "deepseek-v4-pro", usage: usage({ inputTokens: 1_000_000 }) },
     ]);
     expect(v.usage.inputTokens).toBe(2_000_000); // tokens still combine
-    expect(v.cost.input).toBeCloseTo(5); // only opus priced
-    const unknown = v.models.find((m) => m.modelRaw === "gpt-5");
-    expect(unknown!.cost).toBeNull();
-    expect(unknown!.totalTokens).toBe(1_000_000);
+    // Both priced at Opus: 2M × $5/1M = $10
+    expect(v.cost.input).toBeCloseTo(10);
+    const deepseek = v.models.find((m) => m.modelRaw === "deepseek-v4-pro");
+    expect(deepseek!.cost).not.toBeNull();
+    expect(deepseek!.cost!.input).toBeCloseTo(5);
+    expect(deepseek!.totalTokens).toBe(1_000_000);
+  });
+
+  it("applies Opus pricing override to an unrecognized model", () => {
+    const v = viewUsageByModel(
+      [{ modelRaw: "deepseek-v4-pro", usage: usage({ inputTokens: 1_000_000 }) }],
+      { opus: { input: 0.5 } },
+    );
+    expect(v.cost.input).toBeCloseTo(0.5); // overridden Opus rate
+    expect(v.anyOverride).toBe(true);
   });
 
   it("applies a per-model override only to that model and flags anyOverride", () => {
