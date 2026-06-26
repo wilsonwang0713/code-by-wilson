@@ -19,3 +19,5 @@ docs/superpowers/
 # Agent scratch state and generated decks: local only, never tracked
 .agents/
 docs/deck/
+
+.design-previews/
