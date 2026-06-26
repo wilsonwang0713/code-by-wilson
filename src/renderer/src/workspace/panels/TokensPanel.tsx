@@ -199,7 +199,7 @@ export function TokensPanel({
 
   // When no model is recognized AND the statusLine didn't report a live cost, there's
   // genuinely nothing to show — display n/a / — instead of a misleading ~$0.00.
-  const noPricing = models.every(m => m.cost === null) && liveCostUsd == null;
+  const noPricing = models.every((m) => m.cost === null) && liveCostUsd == null;
 
   const multiModel = models.length > 1;
 

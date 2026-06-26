@@ -114,7 +114,12 @@ describe("viewUsageByModel", () => {
 
   it("applies Opus pricing override to an unrecognized model", () => {
     const v = viewUsageByModel(
-      [{ modelRaw: "deepseek-v4-pro", usage: usage({ inputTokens: 1_000_000 }) }],
+      [
+        {
+          modelRaw: "deepseek-v4-pro",
+          usage: usage({ inputTokens: 1_000_000 }),
+        },
+      ],
       { opus: { input: 0.5 } },
     );
     expect(v.cost.input).toBeCloseTo(0.5); // overridden Opus rate
