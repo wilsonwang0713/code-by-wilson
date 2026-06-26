@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { PersistedSession, SessionCandidate } from "@shared/types";
+import type {
+  PersistedSession,
+  SessionCandidate,
+  ModelUsage,
+} from "@shared/types";
 import { normalizeModelId } from "@shared/models";
+import { usageByModelFor } from "./usage-by-model";
+import { subagentsDirFor, subagentsNewestMtime } from "./subagents";
 import { projectFromCwd } from "../../project-name";
 import {
   parseTranscript,
@@ -183,7 +189,14 @@ export function listCandidates({
       status: raw?.status,
       cwd: raw?.cwd ?? "",
       transcriptPath: t?.path,
-      transcriptMtimeMs: t?.mtimeMs ?? 0,
+      // The reparse trigger spans the main transcript AND its subagent transcripts: a subagent appends to
+      // its own file without touching the parent, so without folding its newest mtime here a subagent-only
+      // burst would leave usageByModel stale until the parent next moved. subagentsNewestMtime is a cheap
+      // readdir+stat (0 when there's no subagents dir), preserving the gentle-poll cost model; the expensive
+      // re-read happens only in summarize, only when this token advances. Mirrors readTranscript's token.
+      transcriptMtimeMs: t
+        ? Math.max(t.mtimeMs, subagentsNewestMtime(subagentsDirFor(t.path)))
+        : 0,
       updatedAt: raw?.updatedAt,
     });
   }
@@ -197,11 +210,22 @@ export function listCandidates({
  */
 export function summarize(c: SessionCandidate): PersistedSession {
   let t: TranscriptSummary | null = null;
+  let usageByModel: ModelUsage[] = [];
   if (c.transcriptPath) {
     try {
-      t = parseTranscript(readFileSync(c.transcriptPath, "utf8"), c.cwd);
+      const jsonl = readFileSync(c.transcriptPath, "utf8");
+      t = parseTranscript(jsonl, c.cwd);
+      // Same jsonl, no second read: the per-model breakdown shares the file parseTranscript just consumed,
+      // plus the session's subagent transcripts. Inner try: a usageByModelFor failure must not discard
+      // the already-parsed transcript.
+      try {
+        usageByModel = usageByModelFor(jsonl, c.transcriptPath, c.id);
+      } catch {
+        usageByModel = [];
+      }
     } catch {
       t = null;
+      usageByModel = [];
     }
   }
   const fallbackName = projectFromCwd(c.cwd);
@@ -233,6 +257,7 @@ export function summarize(c: SessionCandidate): PersistedSession {
       cacheCreation5mTokens: 0,
       cacheCreation1hTokens: 0,
     },
+    usageByModel,
     contextTokens: t?.contextTokens ?? 0,
   };
 }

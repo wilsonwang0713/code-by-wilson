@@ -1,15 +1,12 @@
-import type { Session, PersistedSession } from "@shared/types";
-import {
-  contextWindowFor,
-  equivApiValue,
-  normalizeModelId,
-} from "@shared/models";
+import type { Session, PersistedSession, ModelUsage } from "@shared/types";
+import { contextWindowFor, normalizeModelId } from "@shared/models";
+import { equivApiValueByModel } from "@shared/usage-by-model";
 import type { IndexOverview } from "@shared/ipc";
 import { isResumable } from "@shared/resumable";
 import { transaction, type SqliteDb } from "./driver";
 
 /** Bump when the schema changes; `migrate` rebuilds the index (a disposable cache) to match. */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -44,6 +41,7 @@ export function migrate(db: SqliteDb): void {
         cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
         cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0,
         cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0,
+        usage_by_model TEXT,
         context_tokens INTEGER NOT NULL DEFAULT 0
       );
       PRAGMA user_version = ${SCHEMA_VERSION};
@@ -70,7 +68,22 @@ interface Row {
   cache_creation_tokens: number;
   cache_creation_5m_tokens: number;
   cache_creation_1h_tokens: number;
+  usage_by_model: string | null;
   context_tokens: number;
+}
+
+/** Parse the persisted usageByModel JSON column into ModelUsage[], or [] when the column is null (an old
+ *  cached row written before the column existed) or the JSON is unreadable. hydrate then synthesizes the
+ *  single-entry main-thread fallback, so a pre-column row still renders until the next re-summarize fills
+ *  in the real breakdown. */
+function parseUsageByModel(json: string | null): ModelUsage[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? (v as ModelUsage[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function rowToPersisted(r: Row): PersistedSession {
@@ -95,6 +108,7 @@ function rowToPersisted(r: Row): PersistedSession {
       cacheCreation5mTokens: r.cache_creation_5m_tokens,
       cacheCreation1hTokens: r.cache_creation_1h_tokens,
     },
+    usageByModel: parseUsageByModel(r.usage_by_model),
     contextTokens: r.context_tokens,
   };
 }
@@ -113,6 +127,18 @@ function pctOfWindow(tokens: number, window: number): number {
  */
 export function hydrate(p: PersistedSession): Session {
   const contextWindow = contextWindowFor(p.model);
+  // The panel reads usageByModel for everything. A session summarized with the column carries its real
+  // per-model breakdown; an old cached row (pre-column) or an empty transcript falls back to a single
+  // main-thread entry, so the panel still renders main-only until the next re-summarize. The fallback's
+  // modelRaw prefers the stored raw id, else the family alias (which isKnownModelString recognizes), so
+  // its Equivalent API value equals the pre-change single-model figure.
+  // Fall back to the single-entry main-thread model when usageByModel is absent/empty OR when every
+  // entry has a null modelRaw (turns that recorded no model at all): the fallback's modelRaw is always
+  // a recognized string, so equivApiValueByModel prices it at the family rate rather than returning $0.
+  const models: ModelUsage[] =
+    p.usageByModel?.length && p.usageByModel.some((mu) => mu.modelRaw !== null)
+      ? p.usageByModel
+      : [{ modelRaw: p.modelRaw ?? p.model, usage: p.usage }];
   return {
     id: p.id,
     title: p.title,
@@ -126,7 +152,8 @@ export function hydrate(p: PersistedSession): Session {
     contextPct: pctOfWindow(p.contextTokens, contextWindow),
     contextWindow,
     usage: p.usage,
-    equivApiValueUsd: equivApiValue(p.usage, p.model),
+    usageByModel: models,
+    equivApiValueUsd: equivApiValueByModel(models),
     lastActivityMs: p.lastActivityMs,
     createdMs: p.createdMs,
   };
@@ -135,10 +162,10 @@ export function hydrate(p: PersistedSession): Session {
 const UPSERT = `
   INSERT INTO sessions
     (id, title, project, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
-     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, context_tokens)
+     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens)
   VALUES
     (@id, @title, @project, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
-     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @context_tokens)
+     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens)
   ON CONFLICT(id) DO UPDATE SET
     title = excluded.title,
     project = excluded.project,
@@ -161,6 +188,7 @@ const UPSERT = `
     cache_creation_tokens = excluded.cache_creation_tokens,
     cache_creation_5m_tokens = excluded.cache_creation_5m_tokens,
     cache_creation_1h_tokens = excluded.cache_creation_1h_tokens,
+    usage_by_model = excluded.usage_by_model,
     context_tokens = excluded.context_tokens
 `;
 
@@ -195,6 +223,7 @@ export function upsertSessions(
         cache_creation_tokens: s.usage.cacheCreationTokens,
         cache_creation_5m_tokens: s.usage.cacheCreation5mTokens,
         cache_creation_1h_tokens: s.usage.cacheCreation1hTokens,
+        usage_by_model: JSON.stringify(s.usageByModel ?? []),
         context_tokens: s.contextTokens,
       });
     }

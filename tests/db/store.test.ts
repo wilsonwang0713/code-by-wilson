@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { PersistedSession } from "@shared/types";
+import { usage } from "../helpers/usage";
+import { equivApiValueByModel } from "../../src/shared/usage-by-model";
 import {
   migrate,
   upsertSessions,
@@ -32,6 +34,7 @@ const snap = (over: Partial<PersistedSession> = {}): PersistedSession => ({
     cacheCreation1hTokens: 0,
   },
   contextTokens: 0,
+  usageByModel: [],
   ...over,
 });
 
@@ -43,7 +46,7 @@ describe("store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(6);
+    ).toBe(7);
   });
 
   it("round-trips a snapshot, coercing missing branch and the awaitingUser flag", () => {
@@ -221,5 +224,53 @@ describe("store", () => {
       a: "Fix the parser",
       b: "Bump version 0.4.0",
     });
+  });
+
+  it("round-trips usageByModel through upsert and getPersisted", () => {
+    const db = openTestDb();
+    migrate(db);
+    const models = [
+      { modelRaw: "claude-opus-4-8", usage: usage({ inputTokens: 100 }) },
+      { modelRaw: "claude-sonnet-4-6", usage: usage({ inputTokens: 50 }) },
+    ];
+    upsertSessions(db, [snap({ id: "u1", usageByModel: models })]);
+    expect(getPersisted(db)[0].usageByModel).toEqual(models);
+  });
+
+  it("hydrate prices equivApiValueUsd across every model in the breakdown", () => {
+    const db = openTestDb();
+    migrate(db);
+    const models = [
+      { modelRaw: "claude-opus-4-8", usage: usage({ inputTokens: 1_000_000 }) },
+      {
+        modelRaw: "claude-sonnet-4-6",
+        usage: usage({ inputTokens: 1_000_000 }),
+      },
+    ];
+    const s = hydrate(snap({ id: "u2", usageByModel: models }));
+    expect(s.equivApiValueUsd).toBeCloseTo(equivApiValueByModel(models)); // 5 + 3
+    expect(s.usageByModel).toEqual(models);
+  });
+
+  it("hydrate falls back to a single main-thread entry when the breakdown is absent", () => {
+    // An old cached row (pre-column) or an empty transcript: no usageByModel. The fallback prices to the
+    // same figure the single-model path always did (modelRaw absent → the model family alias).
+    const s = hydrate(
+      snap({
+        id: "u3",
+        model: "opus",
+        modelRaw: undefined,
+        usageByModel: undefined,
+        usage: usage({
+          inputTokens: 100_000,
+          outputTokens: 50_000,
+          cacheReadTokens: 1_000,
+          cacheCreationTokens: 1_000,
+        }),
+      }),
+    );
+    expect(s.usageByModel).toHaveLength(1);
+    expect(s.usageByModel![0].modelRaw).toBe("opus");
+    expect(s.equivApiValueUsd).toBeCloseTo(1.75675); // opus rates, matching the pre-change single-model formula
   });
 });

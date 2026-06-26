@@ -1,7 +1,8 @@
 import type { AnalyticsTurn } from "../../db/analytics";
 import { projectFromCwd } from "../../project-name";
 import { num, parseJsonlRowsAt, cacheCreationSplit } from "./transcript-row";
-import type { Usage } from "@shared/types";
+import type { ModelUsage, Usage } from "@shared/types";
+import { emptyUsage, tokenTotal } from "@shared/usage-by-model";
 
 /** Claude injects '<synthetic>' assistant turns (cancelled / over-limit placeholders) that carry zero
  *  usage. Skipping the whole row here is a deliberate simplification: parseTranscript instead suppresses
@@ -70,4 +71,33 @@ export function extractTurns(
     });
   });
   return out;
+}
+
+/** Fold a session's assistant turns into one ModelUsage per model, summing usage field by field and keying
+ *  on the raw model id (an id-less turn folds under null, matching the overview's null "Unknown" bucket).
+ *  This is the same per-(session × model) shape the analytics scan stores via groupBySession — and sharing
+ *  extractTurns with the scan is exactly what makes the panel reconcile with the overview (issue #240).
+ *  Entries order by total tokens descending, then raw id, so the stored breakdown and the panel's
+ *  attribution line are stable across re-summarize. */
+export function foldTurnsByModel(turns: AnalyticsTurn[]): ModelUsage[] {
+  const map = new Map<string | null, ModelUsage>();
+  for (const t of turns) {
+    const key = t.modelRaw ?? null;
+    let mu = map.get(key);
+    if (!mu) {
+      mu = { modelRaw: key, usage: emptyUsage() };
+      map.set(key, mu);
+    }
+    mu.usage.inputTokens += t.usage.inputTokens;
+    mu.usage.outputTokens += t.usage.outputTokens;
+    mu.usage.cacheReadTokens += t.usage.cacheReadTokens;
+    mu.usage.cacheCreationTokens += t.usage.cacheCreationTokens;
+    mu.usage.cacheCreation5mTokens += t.usage.cacheCreation5mTokens;
+    mu.usage.cacheCreation1hTokens += t.usage.cacheCreation1hTokens;
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      tokenTotal(b.usage) - tokenTotal(a.usage) ||
+      (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
+  );
 }

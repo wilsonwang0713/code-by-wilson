@@ -18,6 +18,16 @@ export interface Usage {
   cacheCreation1hTokens: number;
 }
 
+/** One model's token usage within a session — the (session × model) shape the analytics store records,
+ *  carried per-session so the Tokens panel can price each model (main thread and subagents) at its own
+ *  rate. `modelRaw` is the transcript's raw id (e.g. "claude-opus-4-8"), or null for a turn that recorded
+ *  no model; an id matching no known family still counts its tokens but prices to n/a, exactly as the
+ *  overview treats it. */
+export interface ModelUsage {
+  modelRaw: string | null;
+  usage: Usage;
+}
+
 export interface Task {
   id: string;
   subject: string;
@@ -110,6 +120,11 @@ export interface Session {
    *  whose transcript reported no model yet. */
   modelRaw?: string;
   usage: Usage;
+  /** Per-model token breakdown — main thread and subagents both — that the Tokens panel reads for
+   *  everything (combined rows, per-model pricing, attribution, popovers). Always set by hydrate (≥1
+   *  entry, the single-entry fallback for a session with no subagents). `usage` above stays main-thread
+   *  only and unchanged, so no other consumer is surprised. */
+  usageByModel?: ModelUsage[];
   equivApiValueUsd: number;
   /** Live USD cost from the statusLine when a capture exists (Claude's own figure): real spend on an
    *  API account, Equivalent API value on a subscription. Absent ⇒ no statusLine sample for this Session. */
@@ -159,6 +174,10 @@ export interface PersistedSession {
   transcriptMtimeMs: number;
   /** Token usage summed across the transcript's assistant turns — the basis for Equivalent API value. */
   usage: Usage;
+  /** The per-session, per-model usage breakdown (main `<session>.jsonl` plus each `subagents/agent-*.jsonl`),
+   *  folded by raw model id. Empty for a transcript with no assistant turns; hydrate synthesizes a
+   *  single-entry main-thread fallback so the panel still renders. */
+  usageByModel?: ModelUsage[];
   /** Latest turn's full prompt (input + cache-read + cache-creation): the current context size, for context %. */
   contextTokens: number;
 }
