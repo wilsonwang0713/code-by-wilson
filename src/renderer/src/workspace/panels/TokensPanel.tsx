@@ -250,7 +250,7 @@ export function TokensPanel({
       tokens: usage.cacheCreation1hTokens,
       usd: cost.cacheWrite1h,
       color: KIND_SEGMENT_COLORS[4],
-      dim: usage.cacheCreation1hTokens === 0,
+      dim: false,
     },
   ];
   const total = view.totalTokens;
