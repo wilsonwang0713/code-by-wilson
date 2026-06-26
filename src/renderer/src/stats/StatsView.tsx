@@ -52,7 +52,7 @@ import {
   modelColorOf,
   CALENDAR_RAMP,
 } from "../ui/meta";
-import { TOKEN_KINDS } from "../ui/token-kinds";
+import { TOKEN_KINDS, type TokenKind } from "../ui/token-kinds";
 import { MetricTip } from "../ui/MetricTip";
 import {
   calendarGrid,
@@ -629,6 +629,16 @@ function YearSwitcher({
   );
 }
 
+/** TokenKind.key → the matching StatsTotals token field, so the KPI strip's kind-segment bar reads
+ *  off one mapping instead of manually enumerating every field with positional color indices. */
+const STATS_TOKEN_OF: Record<TokenKind["key"], (t: StatsTotals) => number> = {
+  input: (t) => t.inputTokens,
+  output: (t) => t.outputTokens,
+  cacheRead: (t) => t.cacheReadTokens,
+  cacheWrite5m: (t) => t.cacheCreation5mTokens,
+  cacheWrite1h: (t) => t.cacheCreation1hTokens,
+};
+
 /** The headline KPI strip: Sessions, Turns, Tokens (with a mini kind-split bar), and Equivalent API value
  *  (with the reference-figure explainer). Replaces the old Totals card. The Tokens number and its split
  *  both follow the page's Include-cache toggle, so the bar and the figure above it always agree. */
@@ -641,18 +651,12 @@ function KpiStrip({
 }) {
   // Segments under the Tokens number, in the shared cost-palette order. Cache off counts fresh tokens
   // only, so drop the two cache segments — then the bar composition matches the number above it.
-  const kindSegments = includeCache
-    ? [
-        { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-        { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-        { value: totals.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
-        { value: totals.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
-        { value: totals.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
-      ]
-    : [
-        { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-        { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-      ];
+  const kindSegments = TOKEN_KINDS.filter(
+    (k) => includeCache || k.key === "input" || k.key === "output",
+  ).map((k, i) => ({
+    value: STATS_TOKEN_OF[k.key](totals),
+    color: KIND_SEGMENT_COLORS[i],
+  }));
   const tokenTotal = includeCache
     ? totals.inputTokens +
       totals.outputTokens +

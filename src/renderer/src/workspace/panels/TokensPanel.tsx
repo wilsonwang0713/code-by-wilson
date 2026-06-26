@@ -51,10 +51,6 @@ const KIND_COST: Record<TokenKind["key"], (c: CostBreakdown) => number> = {
   cacheWrite1h: (c) => c.cacheWrite1h,
 };
 
-const KIND_BY_KEY = Object.fromEntries(
-  TOKEN_KINDS.map((k) => [k.key, k]),
-) as Record<TokenKind["key"], TokenKind>;
-
 /** A model's short attribution label: the Title-Case family ("Opus"), the raw id for an unrecognized
  *  model (honest, never the Opus fallback), or "Unknown" for a turn that recorded none. */
 function modelLabel(modelRaw: string | null): string {
@@ -209,45 +205,16 @@ export function TokensPanel({
 
   // The 5 bar segments + flat rows, in cost-palette order, parallel to TOKEN_KINDS. Tokens are combined
   // across models; USD is the summed per-model cost.
-  const bar = [
-    { value: usage.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-    { value: usage.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-    { value: usage.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
-    { value: usage.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
-    { value: usage.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
-  ];
-  const rows = [
-    {
-      kind: KIND_BY_KEY.input,
-      tokens: usage.inputTokens,
-      usd: cost.input,
-      color: KIND_SEGMENT_COLORS[0],
-    },
-    {
-      kind: KIND_BY_KEY.output,
-      tokens: usage.outputTokens,
-      usd: cost.output,
-      color: KIND_SEGMENT_COLORS[1],
-    },
-    {
-      kind: KIND_BY_KEY.cacheRead,
-      tokens: usage.cacheReadTokens,
-      usd: cost.cacheRead,
-      color: KIND_SEGMENT_COLORS[2],
-    },
-    {
-      kind: KIND_BY_KEY.cacheWrite5m,
-      tokens: usage.cacheCreation5mTokens,
-      usd: cost.cacheWrite5m,
-      color: KIND_SEGMENT_COLORS[3],
-    },
-    {
-      kind: KIND_BY_KEY.cacheWrite1h,
-      tokens: usage.cacheCreation1hTokens,
-      usd: cost.cacheWrite1h,
-      color: KIND_SEGMENT_COLORS[4],
-    },
-  ];
+  const bar = TOKEN_KINDS.map((k, i) => ({
+    value: KIND_TOKENS[k.key](usage),
+    color: KIND_SEGMENT_COLORS[i],
+  }));
+  const rows = TOKEN_KINDS.map((k, i) => ({
+    kind: k,
+    tokens: KIND_TOKENS[k.key](usage),
+    usd: KIND_COST[k.key](cost),
+    color: KIND_SEGMENT_COLORS[i],
+  }));
   const total = view.totalTokens;
   const cacheSavings = cost.cacheSavings;
 
