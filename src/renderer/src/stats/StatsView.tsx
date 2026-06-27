@@ -48,7 +48,6 @@ import {
 } from "../ui/charts";
 import {
   KIND_SEGMENT_COLORS,
-  KIND_SEGMENT_LABELS,
   modelColorOf,
   CALENDAR_RAMP,
 } from "../ui/meta";
@@ -649,20 +648,17 @@ function KpiStrip({
   totals: StatsTotals;
   includeCache: boolean;
 }) {
-  // Segments under the Tokens number, in the shared cost-palette order. Cache off counts fresh tokens
-  // only, so drop the two cache segments — then the bar composition matches the number above it.
-  const kindSegments = TOKEN_KINDS.filter(
+  // Segments under the Tokens number, derived from TOKEN_KINDS so the bar, the number above it, and
+  // the legend below it all stay in lockstep when a kind is added, removed, or reordered.
+  const kinds = TOKEN_KINDS.filter(
     (k) => includeCache || k.key === "input" || k.key === "output",
-  ).map((k, i) => ({
+  );
+  const kindSegments = kinds.map((k) => ({
     value: STATS_TOKEN_OF[k.key](totals),
-    color: KIND_SEGMENT_COLORS[i],
+    color: KIND_SEGMENT_COLORS[TOKEN_KINDS.indexOf(k)],
+    kind: k,
   }));
-  const tokenTotal = includeCache
-    ? totals.inputTokens +
-      totals.outputTokens +
-      totals.cacheReadTokens +
-      totals.cacheCreationTokens
-    : totals.inputTokens + totals.outputTokens;
+  const tokenTotal = kindSegments.reduce((sum, s) => sum + s.value, 0);
   return (
     <div className="grid grid-cols-2 rounded-xl border border-ink-800 bg-ink-925 lg:grid-cols-4">
       <KpiCard
@@ -673,14 +669,14 @@ function KpiStrip({
       <KpiCard label="Tokens" value={formatTokensShort(tokenTotal)}>
         <StackedBar segments={kindSegments} height={6} className="mt-3" />
         <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 text-[9px] text-fg-faint">
-          {KIND_SEGMENT_LABELS.slice(0, kindSegments.length).map((label, i) => (
-            <span key={label} className="relative flex items-center gap-1">
-              <Swatch color={KIND_SEGMENT_COLORS[i]} />
+          {kindSegments.map((s) => (
+            <span key={s.kind.key} className="relative flex items-center gap-1">
+              <Swatch color={s.color} />
               <MetricTip
-                label={label}
+                label={s.kind.label}
                 popoverClassName="left-0 top-full z-50 mt-1 w-52 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-[11px] leading-snug text-fg-muted shadow-lg"
               >
-                {TOKEN_KINDS[i].description}
+                {s.kind.description}
               </MetricTip>
             </span>
           ))}
@@ -795,7 +791,7 @@ function DailyUsage({
     ]
       .slice(0, kindCount)
       .map((value, idx) => ({
-        label: KIND_SEGMENT_LABELS[idx],
+        label: TOKEN_KINDS[idx].label,
         value,
         color: KIND_SEGMENT_COLORS[idx],
       }));
@@ -861,8 +857,8 @@ function DailyUsage({
 
   const legend =
     stackBy === "kind"
-      ? KIND_SEGMENT_LABELS.slice(0, kindCount).map((label, i) => ({
-          label,
+      ? TOKEN_KINDS.slice(0, kindCount).map((k, i) => ({
+          label: k.label,
           color: KIND_SEGMENT_COLORS[i],
         }))
       : series.map((s) => ({
@@ -870,7 +866,7 @@ function DailyUsage({
           color: s.color,
         }));
 
-  // Index-aligned with KIND_SEGMENT_LABELS / KIND_SEGMENT_COLORS, so a kind segment maps to its costByKind field.
+  // Index-aligned with TOKEN_KINDS / KIND_SEGMENT_COLORS, so a kind segment maps to its costByKind field.
   const KIND_COST_KEYS = [
     "input",
     "output",

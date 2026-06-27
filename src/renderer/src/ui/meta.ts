@@ -94,6 +94,8 @@ export function ctxColor(pct: number): string {
  * the two read the same: input and output carry color (the fresh-token split is the meaningful part of a
  * usage chart), cache greys back. Input / Output use dedicated teal tones — their own telemetry family,
  * distinct from the model jewels. CSS var strings so a retone stays in index.css.
+ *
+ * Index-aligned with TOKEN_KINDS from token-kinds.ts; labels and descriptions come from there.
  */
 export const KIND_SEGMENT_COLORS = [
   "var(--color-token-input)", // Input — light teal
@@ -101,16 +103,6 @@ export const KIND_SEGMENT_COLORS = [
   "var(--color-data-3)", // Cache read — grey
   "var(--color-data-4)", // Cache write · 5-minute — grey
   "var(--color-data-5)", // Cache write · 1-hour — grey (dimmest)
-] as const;
-
-/** Compact per-kind labels paired by index with KIND_SEGMENT_COLORS, for the KPI strip and the daily
- *  chart legends/tooltips (the session panel uses the longer descriptions in token-kinds.ts). */
-export const KIND_SEGMENT_LABELS = [
-  "Input",
-  "Output",
-  "Cache read",
-  "Cache write 5m",
-  "Cache write 1h",
 ] as const;
 
 /** Model identity colors (Aurora): one fixed hue per known family, looked up BY family — not cycled by row
