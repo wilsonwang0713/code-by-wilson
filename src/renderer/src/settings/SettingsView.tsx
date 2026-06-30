@@ -11,6 +11,7 @@ import { footerView, type FooterView } from "../ui/rail-footer";
 import { cliStatusView } from "../ui/cli-status-view";
 import { RateBar } from "../ui/charts";
 import { ctxColor } from "../ui/meta";
+import { clampPct } from "../ui/charts-geom";
 import { remediesFor, INSTALL_TABS } from "../ui/cli-remedies";
 
 export type SettingsSection = "system" | "account" | "appearance" | "about";
@@ -527,19 +528,22 @@ function AccountSection({ account }: { account: Account | null }) {
       {mode === "subscription" && gauges.length > 0 && (
         <Card title="Rate limits">
           <div className="flex flex-col gap-2.5 px-4 py-3.5">
-            {gauges.map((g) => (
-              <div key={g.label}>
-                <RateBar
-                  label={g.label}
-                  pct={g.w.usedPct}
-                  value={`${g.w.usedPct}%`}
-                  color={ctxColor(g.w.usedPct)}
-                />
-                <div className="ml-14 mt-0.5 text-[10.5px] text-fg-faint">
-                  resets in {formatResetCountdown(g.w.resetsAt, Date.now())}
+            {gauges.map((g) => {
+              const pct = clampPct(Math.round(g.w.usedPct));
+              return (
+                <div key={g.label}>
+                  <RateBar
+                    label={g.label}
+                    pct={pct}
+                    value={`${pct}%`}
+                    color={ctxColor(pct)}
+                  />
+                  <div className="ml-14 mt-0.5 text-[10.5px] text-fg-faint">
+                    resets in {formatResetCountdown(g.w.resetsAt, Date.now())}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       )}
