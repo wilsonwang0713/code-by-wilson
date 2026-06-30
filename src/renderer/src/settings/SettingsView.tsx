@@ -515,7 +515,9 @@ function AccountSection({ account }: { account: Account | null }) {
       />
       <Card title="Identity">
         <Row label="Signed in" desc="Read from ~/.claude">
-          <span className="font-mono text-[12px] text-fg">{account?.email ?? "—"}</span>
+          <span className="font-mono text-[12px] text-fg">
+            {account?.email ?? "—"}
+          </span>
         </Row>
         <Row label="Plan" desc="Detected from rate-limit presence">
           <span className="text-[12.5px] text-fg">{plan}</span>
@@ -527,7 +529,12 @@ function AccountSection({ account }: { account: Account | null }) {
           <div className="flex flex-col gap-2.5 px-4 py-3.5">
             {gauges.map((g) => (
               <div key={g.label}>
-                <RateBar label={g.label} pct={g.w.usedPct} value={`${g.w.usedPct}%`} color={ctxColor(g.w.usedPct)} />
+                <RateBar
+                  label={g.label}
+                  pct={g.w.usedPct}
+                  value={`${g.w.usedPct}%`}
+                  color={ctxColor(g.w.usedPct)}
+                />
                 <div className="ml-14 mt-0.5 text-[10.5px] text-fg-faint">
                   resets in {formatResetCountdown(g.w.resetsAt, Date.now())}
                 </div>
