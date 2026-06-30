@@ -120,7 +120,7 @@ describe("incremental sync (real provider, scratch SQLite)", () => {
     expect(byId1["live"].state).toBe("working");
     expect(byId1["ended"].state).toBe("ended");
     expect(byId1["ancient"]).toBeUndefined();
-    // AC1: context % and Equivalent API value are computed from the parsed token data.
+    // AC1: context % is computed from the parsed token data.
     expect(byId1["live"].usage).toEqual({
       inputTokens: 50000,
       outputTokens: 1000,

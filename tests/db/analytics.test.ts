@@ -275,11 +275,11 @@ describe("analytics store", () => {
     expect(readTotals(db, { sinceMs: null, untilMs: null }).turns).toBe(2);
   });
 
-  it("scopes sessions and Equivalent API value to the window", () => {
+  it("scopes sessions and tokens to the window", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      // out of window: a different session, 1M opus input ($5) — must not leak into the scoped value.
+      // out of window: a different session, 1M opus input — must not leak into the scoped value.
       turn({
         messageId: "old",
         sessionId: "s-old",
@@ -292,7 +292,7 @@ describe("analytics store", () => {
           cacheCreationTokens: 0,
         },
       }),
-      // in window: a sonnet turn, 1M input ($3).
+      // in window: a sonnet turn, 1M input.
       turn({
         messageId: "new",
         sessionId: "s-new",
@@ -374,10 +374,10 @@ describe("analytics store", () => {
     expect(t.inputTokens).toBe(2_000_000); // unknown model's tokens still counted
   });
 
-  it("prices 5m and 1h cache writes at distinct rates and carries both columns", () => {
+  it("carries the 5m and 1h cache-write token columns", () => {
     const db = openTestDb();
     migrateAnalytics(db);
-    // opus: cacheWrite5m $6.25/M, cacheWrite1h $10/M. 1M of each → $6.25 + $10 = $16.25.
+    // opus: 1M tokens into the 5m cache and 1M into the 1h cache.
     upsertTurns(db, [
       turn({
         modelRaw: "claude-opus-4-8",
@@ -654,7 +654,7 @@ describe("readByProject", () => {
     expect(rows[0].totalTokens).toBe(500); // tokens still counted
   });
 
-  it("on a mixed project counts both models' tokens but prices only the recognized one", () => {
+  it("on a mixed project counts tokens across recognized and unrecognized models", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -665,7 +665,7 @@ describe("readByProject", () => {
         project: "proj",
         modelRaw: "claude-sonnet-4-6",
         usage: {
-          inputTokens: 1_000_000, // $3 at sonnet's $3/M input
+          inputTokens: 1_000_000,
           outputTokens: 0,
           cacheReadTokens: 0,
           cacheCreationTokens: 0,
@@ -1543,11 +1543,11 @@ describe("readCalendar", () => {
   const since = new Date(2026, 0, 1).getTime();
   const until = new Date(2027, 0, 1).getTime();
 
-  it("returns turns, tokens, and equiv value per local day", () => {
+  it("returns turns and tokens per local day", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      // Two opus turns on the 14th: 1M input + 1M output → equiv = $5 + $25 = $30; tokens = 2,000,000.
+      // Two opus turns on the 14th: 1M input + 1M output → tokens = 2,000,000.
       turn({
         messageId: "a",
         ts: noon(2026, 6, 14),
@@ -1602,7 +1602,7 @@ describe("readCalendar", () => {
     expect(cal[0].outputTokens).toBe(5); // fresh subset = 15, far below the total
   });
 
-  it("reports n/a (null) equiv on a day whose only model is unrecognized, while still counting tokens", () => {
+  it("still counts tokens on a day whose only model is unrecognized", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -1623,11 +1623,11 @@ describe("readCalendar", () => {
     expect(cal[0].turns).toBe(1);
   });
 
-  it("prices only the recognized models on a mixed day, counting every model's tokens", () => {
+  it("counts tokens across recognized and unrecognized models on a mixed day", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      // Recognized opus: 1M input → $5. Its single presence unlocks a real (non-null) equiv.
+      // Recognized opus: 1M input tokens.
       turn({
         messageId: "known",
         ts: noon(2026, 6, 14),
@@ -1639,7 +1639,7 @@ describe("readCalendar", () => {
           cacheCreationTokens: 0,
         },
       }),
-      // Unrecognized model: its tokens still count, but it contributes no cost (not a guessed $0).
+      // Unrecognized model: its tokens still count.
       turn({
         messageId: "unknown",
         ts: noon(2026, 6, 14),

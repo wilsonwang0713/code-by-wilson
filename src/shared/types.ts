@@ -19,10 +19,9 @@ export interface Usage {
 }
 
 /** One model's token usage within a session — the (session × model) shape the analytics store records,
- *  carried per-session so the Tokens panel can price each model (main thread and subagents) at its own
- *  rate. `modelRaw` is the transcript's raw id (e.g. "claude-opus-4-8"), or null for a turn that recorded
- *  no model; an id matching no known family still counts its tokens but prices to n/a, exactly as the
- *  overview treats it. */
+ *  carried per-session so the Tokens panel can show per-model token attribution (main thread and subagents).
+ *  `modelRaw` is the transcript's raw id (e.g. "claude-opus-4-8"), or null for a turn that recorded
+ *  no model; an id matching no known family still counts its tokens. */
 export interface ModelUsage {
   modelRaw: string | null;
   usage: Usage;
@@ -111,8 +110,8 @@ export interface Session {
   /** The live context split from the statusLine capture (current_usage), or null/undefined when no
    *  capture reported it. Preferred over the transcript-derived split in the Context panel. */
   liveContext?: ContextBreakdown | null;
-  /** The capture's raw model id and Claude's own label, used only for the honest model label (pricing
-   *  and window still ride the normalized `model`). Absent when there's no capture. */
+  /** The capture's raw model id and Claude's own label, used only for the honest model label (the
+   *  context window still rides the normalized `model`). Absent when there's no capture. */
   modelId?: string;
   modelDisplayName?: string;
   /** The exact resolved model id from the transcript (`message.model`), persisted across syncs. The
@@ -121,9 +120,9 @@ export interface Session {
   modelRaw?: string;
   usage: Usage;
   /** Per-model token breakdown — main thread and subagents both — that the Tokens panel reads for
-   *  everything (combined rows, per-model pricing, attribution, popovers). Always set by hydrate (≥1
-   *  entry, the single-entry fallback for a session with no subagents). `usage` above stays main-thread
-   *  only and unchanged, so no other consumer is surprised. */
+   *  everything (combined rows, attribution, popovers). Always set by hydrate (≥1 entry, the
+   *  single-entry fallback for a session with no subagents). `usage` above stays main-thread only and
+   *  unchanged, so no other consumer is surprised. */
   usageByModel?: ModelUsage[];
   /** Lines added/removed this session, from the statusLine `cost` block. Absent ⇒ no sample. */
   linesAdded?: number;
@@ -168,7 +167,7 @@ export interface PersistedSession {
   /** mtime (ms) of the transcript when it was last parsed — the incremental high-water mark. A sync
    *  reparses only when the file's current mtime exceeds this. 0 means the session has no transcript. */
   transcriptMtimeMs: number;
-  /** Token usage summed across the transcript's assistant turns — the basis for Equivalent API value. */
+  /** Token usage summed across the transcript's assistant turns. */
   usage: Usage;
   /** The per-session, per-model usage breakdown (main `<session>.jsonl` plus each `subagents/agent-*.jsonl`),
    *  folded by raw model id. Empty for a transcript with no assistant turns; hydrate synthesizes a

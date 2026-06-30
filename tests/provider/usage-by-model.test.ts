@@ -180,7 +180,7 @@ describe("summarize includes the per-model breakdown", () => {
 });
 
 describe("reconciliation with the analytics scan", () => {
-  it("the panel's equiv equals the overview's total for the same files", () => {
+  it("the panel's per-model tokens equal the overview's totals for the same files", () => {
     const home = makeHome();
     const path = writeMain(home, "-work-proj", "sess-1", [
       assistant("m1", "claude-opus-4-8", 1000),

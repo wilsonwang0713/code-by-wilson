@@ -89,8 +89,8 @@ export function migrateAnalytics(db: SqliteDb): void {
     db.exec("DELETE FROM processed_files");
   }
 
-  // Upgrading a store that already held turns (v2+): seed the all-5m fallback so existing rows price their
-  // cache writes immediately (5m + 1h == total holds), then clear the high-water marks so the next scan
+  // Upgrading a store that already held turns (v2+): seed the all-5m fallback to initialize the
+  // 5m/1h token split (5m + 1h == total holds), then clear the high-water marks so the next scan
   // re-ingests live transcripts and backfills the REAL split to transcript-retention depth. Orphaned rows
   // (their transcript gone) keep the all-5m fallback. Scoped to `from >= 2` so it never runs on the v1
   // wipe (which already emptied turns) or a fresh install (no rows to seed).

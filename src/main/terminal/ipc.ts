@@ -26,7 +26,7 @@ import { createRecorder } from "./recorder";
 /**
  * Build the optimistic Managed draft the renderer shows the instant a session is spawned, before
  * discovery has indexed the real process. Hydrated from zero usage so the derived display fields
- * (context %, equiv value) are well-formed; the real row supersedes it on the next sync.
+ * (context %) are well-formed; the real row supersedes it on the next sync.
  */
 function draftSession(id: string, cwd: string, model: Family): Session {
   const project = projectFromCwd(cwd);
