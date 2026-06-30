@@ -274,13 +274,6 @@ export function registerIpc({
   ipcMain.handle(IPC.updateSetAutoCheck, (_e, enabled: boolean): void =>
     settings.setAutoCheckUpdates(enabled),
   );
-  ipcMain.handle(
-    IPC.pricingGet,
-    (): PricingOverrides => settings.read().pricingOverrides ?? {},
-  );
-  ipcMain.handle(IPC.pricingSet, (_e, overrides: PricingOverrides): void =>
-    settings.setPricingOverrides(overrides),
-  );
 
   // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan
   // step (the event loop breathes between calls, so pty output and IPC stay responsive) and returns the
