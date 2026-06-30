@@ -1,10 +1,6 @@
 import { useId, useMemo, type ReactNode } from "react";
 import type { Family, ModelUsage, Usage } from "@shared/types";
-import {
-  isKnownModelString,
-  normalizeModelId,
-  type PricingOverrides,
-} from "@shared/models";
+import { isKnownModelString, normalizeModelId } from "@shared/models";
 import { viewUsageByModel, type ModelUsageView } from "@shared/usage-by-model";
 import { formatTokensShort } from "@shared/format";
 import { StackedBar } from "../../ui/charts";
@@ -126,16 +122,12 @@ export function TokensPanel({
   liveCostUsd: _liveCostUsd,
   billingMode: _billingMode,
   anthropicDirect: _anthropicDirect,
-  pricingOverrides,
-  onPricingChange,
 }: {
   usageByModel: ModelUsage[];
   model: Family;
   liveCostUsd?: number;
   billingMode?: "subscription" | "api" | "unknown";
   anthropicDirect?: boolean;
-  pricingOverrides?: PricingOverrides;
-  onPricingChange?: (next: PricingOverrides) => void;
 }) {
   const view = useMemo(
     () => viewUsageByModel(usageByModel),

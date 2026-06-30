@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, Family, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
-import type { PricingOverrides } from "@shared/models";
 import {
   mergeManaged,
   applyAdopting,
@@ -64,9 +63,6 @@ export function App() {
   // spawns two divergent forks. Keyed by source id; cleared when the attempt settles.
   const forkingRef = useRef<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
-  const [pricingOverrides, setPricingOverrides] = useState<PricingOverrides>(
-    {},
-  );
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
   // reopens wherever the user last was.
@@ -119,10 +115,6 @@ export function App() {
 
   useEffect(() => {
     void load();
-  }, []);
-
-  useEffect(() => {
-    void window.api.getPricing().then(setPricingOverrides);
   }, []);
 
   // Background re-sync so session state stays live. Silent (no loading spinner) and paused while the
@@ -290,13 +282,6 @@ export function App() {
     window.api.terminal.kill(id);
   }
 
-  // Persist pricing overrides and re-price immediately: set local state first so the open Tokens panel
-  // re-prices on the next render, then persist (the next overview/stats poll picks up the main-side copy).
-  function savePricing(next: PricingOverrides): void {
-    setPricingOverrides(next);
-    void window.api.setPricing(next);
-  }
-
   // Persist a display-name override for a session and apply the fresh overview the main process returns.
   // Mirror the change into the draft overlay first so a not-yet-indexed draft (which main can't title)
   // reflects the rename — or the clear — immediately; indexed rows reconcile from the overview the IPC
@@ -433,11 +418,9 @@ export function App() {
               section={settingsSection}
               onSectionChange={setSettingsSection}
               update={update}
-              pricingOverrides={pricingOverrides}
-              onPricingChange={savePricing}
             />
           ) : isOverview ? (
-            <StatsView pricingOverrides={pricingOverrides} />
+            <StatsView />
           ) : selected ? (
             <Workspace
               key={selected.id}
@@ -448,8 +431,6 @@ export function App() {
               onFork={forkSession}
               onEnd={endSession}
               onRename={(id, title) => void renameSession(id, title)}
-              pricingOverrides={pricingOverrides}
-              onPricingChange={savePricing}
             />
           ) : (
             <EmptyDetail empty={all.length === 0} loading={loading} />

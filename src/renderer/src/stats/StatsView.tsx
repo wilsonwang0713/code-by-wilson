@@ -67,7 +67,6 @@ import {
   type SessionSort,
   type SessionSortKey,
 } from "./session-sort";
-import type { PricingOverrides } from "@shared/models";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -82,11 +81,7 @@ const WARM_POLL_MS = 1500;
  * on their own. The effect's cleanup stops the poll on unmount, so selecting any Session ends all scan
  * work; the main process does nothing unprompted.
  */
-export function StatsView({
-  pricingOverrides,
-}: {
-  pricingOverrides: PricingOverrides;
-}) {
+export function StatsView() {
   const [snap, setSnap] = useState<StatsSnapshot | null>(null);
   const [range, setRange] = useState<StatsRange>(DEFAULT_RANGE);
   const [includeCache, setIncludeCache] = useState(true);
@@ -194,7 +189,7 @@ export function StatsView({
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [range, calendarYear, resetNonce, pricingOverrides]);
+  }, [range, calendarYear, resetNonce]);
 
   return (
     <OverlayScroll className="h-full min-w-0 flex-1 bg-ink-950 text-fg">
