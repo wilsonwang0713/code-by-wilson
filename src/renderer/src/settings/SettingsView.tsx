@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { CliStatus } from "@shared/cli-status";
-import type { Account } from "@shared/types";
+import type { Account, RateLimit } from "@shared/types";
+import { formatResetCountdown } from "@shared/format";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
@@ -8,7 +9,6 @@ import type { IconName } from "../ui/icon-names";
 import { Wordmark, cx } from "../ui/atoms";
 import { footerView, type FooterView } from "../ui/rail-footer";
 import { cliStatusView } from "../ui/cli-status-view";
-import { railAccountModel } from "../ui/rail-account";
 import { RateBar } from "../ui/charts";
 import { ctxColor } from "../ui/meta";
 import { remediesFor, INSTALL_TABS } from "../ui/cli-remedies";
@@ -493,23 +493,20 @@ function Req({ state, label }: { state: ReqState; label: string }) {
   );
 }
 
-/** The billing row's label/description for an `api` account. A host with an upstream provider is a gateway;
- *  a provider with no host is a cloud routing; a host alone is the direct endpoint. */
-function apiBillingRow(account: Account | null): {
-  label: string;
-  desc: string;
-} {
-  if (account?.apiBaseUrl && account.apiProvider)
-    return { label: "Gateway", desc: "API billing gateway" };
-  if (account?.apiProvider)
-    return { label: "Provider", desc: "Cloud API provider" };
-  return { label: "Endpoint", desc: "Direct API endpoint" };
-}
-
 function AccountSection({ account }: { account: Account | null }) {
-  const model = railAccountModel(account, Date.now());
-  const plan = model?.plan ?? "Claude";
-  const billing = apiBillingRow(account);
+  const mode = account?.billingMode;
+  const plan =
+    mode === "subscription"
+      ? "Claude · subscription"
+      : mode === "api"
+        ? "API Usage Billing"
+        : "Claude";
+  const gauges = [
+    { label: "5-hour", w: account?.fiveHour },
+    { label: "7-day", w: account?.sevenDay },
+    { label: "7-day · Sonnet", w: account?.sevenDaySonnet },
+    { label: "7-day · Opus", w: account?.sevenDayOpus },
+  ].filter((g): g is { label: string; w: RateLimit } => g.w != null);
   return (
     <>
       <Header
@@ -518,28 +515,21 @@ function AccountSection({ account }: { account: Account | null }) {
       />
       <Card title="Identity">
         <Row label="Signed in" desc="Read from ~/.claude">
-          <span className="font-mono text-[12px] text-fg">
-            {account?.email ?? "—"}
-          </span>
+          <span className="font-mono text-[12px] text-fg">{account?.email ?? "—"}</span>
         </Row>
         <Row label="Plan" desc="Detected from rate-limit presence">
           <span className="text-[12.5px] text-fg">{plan}</span>
         </Row>
       </Card>
 
-      {model?.mode === "subscription" && model.gauges.length > 0 && (
+      {mode === "subscription" && gauges.length > 0 && (
         <Card title="Rate limits">
           <div className="flex flex-col gap-2.5 px-4 py-3.5">
-            {model.gauges.map((g) => (
+            {gauges.map((g) => (
               <div key={g.label}>
-                <RateBar
-                  label={g.label}
-                  pct={g.pct}
-                  value={`${g.pct}%`}
-                  color={ctxColor(g.pct)}
-                />
+                <RateBar label={g.label} pct={g.w.usedPct} value={`${g.w.usedPct}%`} color={ctxColor(g.w.usedPct)} />
                 <div className="ml-14 mt-0.5 text-[10.5px] text-fg-faint">
-                  resets in {g.reset}
+                  resets in {formatResetCountdown(g.w.resetsAt, Date.now())}
                 </div>
               </div>
             ))}
@@ -547,10 +537,10 @@ function AccountSection({ account }: { account: Account | null }) {
         </Card>
       )}
 
-      {model?.mode === "api" && (
+      {mode === "api" && (
         <Card title="API billing">
-          <Row label={billing.label} desc={billing.desc}>
-            <span className="font-mono text-[12px] text-fg">{model.label}</span>
+          <Row label="Usage" desc="Billed per API usage">
+            <span className="text-[12.5px] text-fg">API Usage Billing</span>
           </Row>
         </Card>
       )}
