@@ -1,6 +1,5 @@
 import { useState } from "react";
-import type { Session, Account } from "@shared/types";
-import { RailPanel } from "./ui/RailPanel";
+import type { Session } from "@shared/types";
 import { railSections } from "@shared/overview";
 import { formatRelativeTime } from "@shared/format";
 import { cx, focusRing, focusRingInset, SessionTile } from "./ui/atoms";
@@ -18,32 +17,21 @@ export function SessionList({
   selectedId,
   onSelect,
   onNew,
-  account,
   canSpawn,
 }: {
   sessions: Session[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
-  account?: Account | null;
   canSpawn: boolean;
 }) {
   // One timestamp per render for the relative-time labels; the 3s background re-sync re-renders.
   const now = Date.now();
-  // The account gauges only need second granularity for their reset countdowns. Floor the clock so a
-  // re-render doesn't re-tick the memoized RailPanel.
-  const accountClock = Math.floor(now / 1000) * 1000;
   const { active, ended } = railSections(sessions, "");
   // Only Ended collapses — it's the archive. Active is your live work and stays open.
   const [endedCollapsed, setEndedCollapsed] = useState(true);
   return (
     <aside className="flex w-[332px] shrink-0 flex-col border-r border-ink-800 bg-ink-925">
-      <RailPanel
-        account={account ?? null}
-        now={accountClock}
-        selectedId={selectedId}
-        onSelect={onSelect}
-      />
       <div className="shrink-0 p-2">
         <button
           type="button"
