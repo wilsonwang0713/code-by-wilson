@@ -166,7 +166,7 @@ describe("registerIpc overview — statusLine overlay", () => {
     expect(s.contextPct).toBe(47);
   });
 
-  it("serves account null and untouched computed values when there is no statusLine data (AC #4)", () => {
+  it("serves account null when there is no statusLine data (AC #4)", () => {
     const db = openTestDb();
     migrate(db);
     upsertSessions(db, [seed]);

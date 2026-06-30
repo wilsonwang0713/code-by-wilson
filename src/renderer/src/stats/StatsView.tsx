@@ -658,7 +658,7 @@ function KpiStrip({
 }
 
 /** One headline KPI: an uppercase eyebrow over a large display figure, with an optional detail slot below
- *  (the Tokens card's mini split bar, or the Equiv card's subline + info popover). */
+ *  (the Tokens card's mini split bar). */
 function KpiCard({
   label,
   value,

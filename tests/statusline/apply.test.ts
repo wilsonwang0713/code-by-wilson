@@ -311,7 +311,7 @@ describe("overlaySessions", () => {
     expect(out.contextWindow).toBe(200_000);
   });
 
-  it("leaves a Session WITHOUT a sample untouched — computed context % and value still show (graceful degradation)", () => {
+  it("leaves a Session WITHOUT a sample untouched — computed context % still shows (graceful degradation)", () => {
     const out = overlaySessions(
       [session({ id: "no-sample" })],
       freshestBySession([sample({ sessionId: "other" })]),

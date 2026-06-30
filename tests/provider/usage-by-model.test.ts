@@ -13,10 +13,7 @@ import {
 import { tempHomes } from "../helpers/temp-home";
 import { usageByModelFor } from "../../src/main/provider/claude/usage-by-model";
 import { scanAllTranscripts } from "../../src/main/analytics/scan";
-import {
-  migrateAnalytics,
-  readByModel,
-} from "../../src/main/db/analytics";
+import { migrateAnalytics, readByModel } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
 
 /** One assistant JSONL line with a given model + input tokens. */

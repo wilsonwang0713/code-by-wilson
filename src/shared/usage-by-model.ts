@@ -52,11 +52,13 @@ export interface UsageByModelView {
 }
 
 export function viewUsageByModel(models: ModelUsage[]): UsageByModelView {
-  const rows = models.map((mu): ModelUsageView => ({
-    modelRaw: mu.modelRaw,
-    usage: mu.usage,
-    totalTokens: tokenTotal(mu.usage),
-  }));
+  const rows = models.map(
+    (mu): ModelUsageView => ({
+      modelRaw: mu.modelRaw,
+      usage: mu.usage,
+      totalTokens: tokenTotal(mu.usage),
+    }),
+  );
   rows.sort(
     (a, b) =>
       b.totalTokens - a.totalTokens ||

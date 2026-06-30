@@ -40,4 +40,3 @@ describe("isKnownModelString", () => {
     expect(isKnownModelString("claude-fable-5")).toBe(true);
   });
 });
-

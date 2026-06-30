@@ -1,5 +1,5 @@
 import { useId, useMemo, type ReactNode } from "react";
-import type { Family, ModelUsage, Usage } from "@shared/types";
+import type { ModelUsage, Usage } from "@shared/types";
 import { isKnownModelString, normalizeModelId } from "@shared/models";
 import { viewUsageByModel, type ModelUsageView } from "@shared/usage-by-model";
 import { formatTokensShort } from "@shared/format";
@@ -7,10 +7,7 @@ import { StackedBar } from "../../ui/charts";
 import { Swatch } from "../../ui/atoms";
 import { KIND_SEGMENT_COLORS, FAMILY_LABEL, modelColorOf } from "../../ui/meta";
 import { MetricTip } from "../../ui/MetricTip";
-import {
-  TOKEN_KINDS,
-  type TokenKind,
-} from "../../ui/token-kinds";
+import { TOKEN_KINDS, type TokenKind } from "../../ui/token-kinds";
 import { PanelSection, PanelHeading } from "./chrome";
 
 const TOKENS_INFO =
@@ -116,21 +113,8 @@ function ModelRow({ m }: { m: ModelUsageView }) {
  * kind showing its tokens, and, when more than one model touched the session, a "by model" attribution
  * list, one row per model in its Aurora identity hue, each row revealing that model's full breakdown on hover.
  */
-export function TokensPanel({
-  usageByModel,
-  model,
-  billingMode: _billingMode,
-  anthropicDirect: _anthropicDirect,
-}: {
-  usageByModel: ModelUsage[];
-  model: Family;
-  billingMode?: "subscription" | "api" | "unknown";
-  anthropicDirect?: boolean;
-}) {
-  const view = useMemo(
-    () => viewUsageByModel(usageByModel),
-    [usageByModel],
-  );
+export function TokensPanel({ usageByModel }: { usageByModel: ModelUsage[] }) {
+  const view = useMemo(() => viewUsageByModel(usageByModel), [usageByModel]);
   const { usage, models } = view;
   const multiModel = models.length > 1;
   const total = view.totalTokens;
@@ -182,7 +166,10 @@ export function TokensPanel({
       <PanelHeading
         info={TOKENS_INFO}
         right={
-          <span className="font-mono text-[13px] tabular-nums text-fg" title="Total tokens">
+          <span
+            className="font-mono text-[13px] tabular-nums text-fg"
+            title="Total tokens"
+          >
             {formatTokensShort(total)}
           </span>
         }
@@ -213,10 +200,7 @@ export function TokensPanel({
             <div className="mb-1 text-[11px] text-fg-faint">by model</div>
             <div className="space-y-0.5">
               {models.map((m) => (
-                <ModelRow
-                  key={m.modelRaw ?? "null"}
-                  m={m}
-                />
+                <ModelRow key={m.modelRaw ?? "null"} m={m} />
               ))}
             </div>
           </div>

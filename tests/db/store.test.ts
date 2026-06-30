@@ -235,8 +235,8 @@ describe("store", () => {
   });
 
   it("hydrate falls back to a single main-thread entry when the breakdown is absent", () => {
-    // An old cached row (pre-column) or an empty transcript: no usageByModel. The fallback prices to the
-    // same figure the single-model path always did (modelRaw absent → the model family alias).
+    // An old cached row (pre-column) or an empty transcript: no usageByModel. The fallback produces a
+    // single entry from the stored raw id / family alias (modelRaw absent → the model family alias).
     const s = hydrate(
       snap({
         id: "u3",

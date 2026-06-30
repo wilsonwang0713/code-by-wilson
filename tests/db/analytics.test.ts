@@ -344,7 +344,7 @@ describe("analytics store", () => {
     expect(hasAnyTurns(db)).toBe(true);
   });
 
-  it("counts an unrecognized model's tokens but gives it n/a cost", () => {
+  it("counts an unrecognized model's tokens", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -556,7 +556,6 @@ describe("readByModel", () => {
     migrateAnalytics(db);
     expect(readByModel(db)).toEqual([]);
   });
-
 });
 
 describe("readByProject", () => {
@@ -633,7 +632,7 @@ describe("readByProject", () => {
     expect(rows[0].totalTokens).toBe(2_000_000);
   });
 
-  it("gives a project with only unrecognized models n/a cost, still counting its tokens", () => {
+  it("still counts tokens for a project with only unrecognized models", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -659,8 +658,7 @@ describe("readByProject", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
-      // one project, one recognized + one unrecognized model: tokens sum both, cost is the known one only,
-      // and equivApiValueUsd is non-null (hasKnownCost flips true) — n/a is reserved for an ALL-unknown group.
+      // one project, one recognized + one unrecognized model: tokens sum across both models.
       turn({
         messageId: "known",
         cwd: "/w/proj",
@@ -815,7 +813,6 @@ describe("readByProject", () => {
     expect(rows[0].inputTokens).toBe(300);
     expect(rows[0].outputTokens).toBe(50);
   });
-
 });
 
 describe("readByBranch", () => {
@@ -990,7 +987,6 @@ describe("readByBranch", () => {
     expect(rows[0].inputTokens).toBe(300);
     expect(rows[0].outputTokens).toBe(50);
   });
-
 });
 
 describe("readBySession", () => {
@@ -1104,7 +1100,7 @@ describe("readBySession", () => {
     expect(rows[0].totalTokens).toBe(3_000_000);
   });
 
-  it("gives a session with only an unrecognized model n/a cost, still counting its tokens", () => {
+  it("still counts tokens for a session with only an unrecognized model", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -1156,7 +1152,6 @@ describe("readBySession", () => {
     migrateAnalytics(db);
     expect(readBySession(db)).toEqual([]);
   });
-
 });
 
 describe("readBreakdowns", () => {
@@ -1682,7 +1677,6 @@ describe("readCalendar", () => {
     migrateAnalytics(db);
     expect(readCalendar(db, { sinceMs: since, untilMs: until })).toEqual([]);
   });
-
 });
 
 describe("readCalendarYears", () => {
