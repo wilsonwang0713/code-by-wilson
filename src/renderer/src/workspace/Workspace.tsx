@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type {
-  Session,
-  Account,
-  Subagent,
-  BackgroundShell,
-} from "@shared/types";
-import type { PricingOverrides } from "@shared/models";
+import type { Session, Subagent, BackgroundShell } from "@shared/types";
 import { Icon } from "../ui/icons";
 import { useCopyFlash } from "../ui/use-copy-flash";
 import { Tabs } from "../ui/Tabs";
@@ -33,17 +27,13 @@ import { OverlayScroll } from "../ui/OverlayScroll";
 
 export function Workspace({
   session: s,
-  account,
   canSpawn,
   onAdopt,
   onFork,
   onEnd,
   onRename,
-  pricingOverrides,
-  onPricingChange,
 }: {
   session: Session;
-  account: Account | null;
   /** Whether the Claude Code CLI is usable; gates Adopt and Fork (both spawn the CLI). */
   canSpawn: boolean;
   onAdopt: (id: string) => Promise<void>;
@@ -52,8 +42,6 @@ export function Workspace({
   onEnd: (id: string) => void;
   /** Persist a display-name override for this session (null/empty clears it). Applies to any session. */
   onRename: (id: string, title: string | null) => void;
-  pricingOverrides: PricingOverrides;
-  onPricingChange: (next: PricingOverrides) => void;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
@@ -80,14 +68,11 @@ export function Workspace({
       <div className="min-h-0 flex-1">
         <WorkspaceBody
           session={s}
-          account={account}
           now={now}
           metrics={metrics}
           canSpawn={canSpawn}
           onAdopt={onAdopt}
           onFork={onFork}
-          pricingOverrides={pricingOverrides}
-          onPricingChange={onPricingChange}
         />
       </div>
     </div>
@@ -115,28 +100,22 @@ function SessionIdChip({ id }: { id: string }) {
 /**
  * The workspace body: a center column (the live view with the Structure dock below it) and a right rail
  * of telemetry panels. One transcript poll (useTranscript) feeds the center, the context panel, and the
- * dock; the cost panel reads the Session directly. The rail and the dock both hide below `lg`.
+ * dock. The rail and the dock both hide below `lg`.
  */
 function WorkspaceBody({
   session: s,
-  account,
   now,
   metrics,
   canSpawn,
   onAdopt,
   onFork,
-  pricingOverrides,
-  onPricingChange,
 }: {
   session: Session;
-  account: Account | null;
   now: number;
   metrics: MetricsState;
   canSpawn: boolean;
   onAdopt: (id: string) => Promise<void>;
   onFork: (session: Session) => Promise<void>;
-  pricingOverrides: PricingOverrides;
-  onPricingChange: (next: PricingOverrides) => void;
 }) {
   const doc = useTranscript(s.id);
   const tasks = useTasks(s.id);
@@ -235,15 +214,7 @@ function WorkspaceBody({
           contextPct={s.contextPct}
           contextWindow={s.contextWindow}
         />
-        <TokensPanel
-          usageByModel={s.usageByModel ?? []}
-          model={s.model}
-          liveCostUsd={s.liveCostUsd}
-          billingMode={account?.billingMode}
-          anthropicDirect={account?.anthropicDirect}
-          pricingOverrides={pricingOverrides}
-          onPricingChange={onPricingChange}
-        />
+        <TokensPanel usageByModel={s.usageByModel ?? []} />
         <TokenSpeedPanel speed={metrics ? metrics.tokenSpeed : null} />
       </OverlayScroll>
     </div>

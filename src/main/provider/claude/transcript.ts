@@ -22,7 +22,7 @@ export interface TranscriptSummary {
   createdMs: number;
   /** The last turn left a question or permission prompt unanswered (a tool_use with no result). */
   awaitingUser: boolean;
-  /** Token usage summed across the transcript's assistant turns — the basis for Equivalent API value. */
+  /** Token usage summed across the transcript's assistant turns. */
   usage: Usage;
   /** Latest turn's full prompt (input + cache-read + cache-creation): the current context size, for context %. */
   contextTokens: number;

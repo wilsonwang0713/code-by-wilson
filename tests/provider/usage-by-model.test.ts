@@ -13,13 +13,8 @@ import {
 import { tempHomes } from "../helpers/temp-home";
 import { usageByModelFor } from "../../src/main/provider/claude/usage-by-model";
 import { scanAllTranscripts } from "../../src/main/analytics/scan";
-import {
-  migrateAnalytics,
-  readTotals,
-  readByModel,
-} from "../../src/main/db/analytics";
+import { migrateAnalytics, readByModel } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
-import { equivApiValueByModel } from "../../src/shared/usage-by-model";
 
 /** One assistant JSONL line with a given model + input tokens. */
 const assistant = (id: string, model: string, input: number): string =>
@@ -185,7 +180,7 @@ describe("summarize includes the per-model breakdown", () => {
 });
 
 describe("reconciliation with the analytics scan", () => {
-  it("the panel's equiv equals the overview's total for the same files", () => {
+  it("the panel's per-model tokens equal the overview's totals for the same files", () => {
     const home = makeHome();
     const path = writeMain(home, "-work-proj", "sess-1", [
       assistant("m1", "claude-opus-4-8", 1000),
@@ -202,13 +197,9 @@ describe("reconciliation with the analytics scan", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     scanAllTranscripts(db, home);
-    const totals = readTotals(db);
 
     // Panel path: fold the same session's files.
     const folded = usageByModelFor(readFileSync(path, "utf8"), path, "sess-1");
-
-    // The reconciliation guarantee: same extraction → same equiv, by construction.
-    expect(equivApiValueByModel(folded)).toBeCloseTo(totals.equivApiValueUsd);
 
     // Per-model token totals match the overview's per-model breakdown for this single-session fixture.
     const overviewByRaw = Object.fromEntries(

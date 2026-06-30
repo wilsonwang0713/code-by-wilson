@@ -36,8 +36,6 @@ const api: AppApi = {
   getAutoCheckUpdates: () => ipcRenderer.invoke(IPC.updateGetAutoCheck),
   setAutoCheckUpdates: (enabled) =>
     ipcRenderer.invoke(IPC.updateSetAutoCheck, enabled),
-  getPricing: () => ipcRenderer.invoke(IPC.pricingGet),
-  setPricing: (overrides) => ipcRenderer.invoke(IPC.pricingSet, overrides),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>

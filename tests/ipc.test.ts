@@ -137,7 +137,7 @@ describe("registerIpc overview — statusLine overlay", () => {
   it("overlays live cost/context onto the matching session and derives a subscription account", () => {
     const db = openTestDb();
     migrate(db);
-    upsertSessions(db, [seed]); // id 'seed', opus, zero computed usage → equivApiValueUsd 0
+    upsertSessions(db, [seed]); // id 'seed', opus, zero computed usage
     registerIpc({
       db,
       provider: provider(() => []),
@@ -162,12 +162,11 @@ describe("registerIpc overview — statusLine overlay", () => {
       sevenDay: undefined,
     });
     const s = o.sessions.find((x) => x.id === "seed")!;
-    expect(s.liveCostUsd).toBe(1.25);
     expect(s.linesAdded).toBe(10);
     expect(s.contextPct).toBe(47);
   });
 
-  it("serves account null and untouched computed values when there is no statusLine data (AC #4)", () => {
+  it("serves account null when there is no statusLine data (AC #4)", () => {
     const db = openTestDb();
     migrate(db);
     upsertSessions(db, [seed]);
@@ -175,9 +174,6 @@ describe("registerIpc overview — statusLine overlay", () => {
 
     const o = handlers.get(IPC.overview)!() as OverviewData;
     expect(o.account).toBeNull();
-    const s = o.sessions.find((x) => x.id === "seed")!;
-    expect(s.liveCostUsd).toBeUndefined();
-    expect(s.equivApiValueUsd).toBe(0); // computed, still present
   });
 
   it("defaults to no live data when no statusLine reader is provided", () => {
@@ -287,8 +283,8 @@ describe("registerIpc overview — api billing", () => {
   it("does not relabel a dormant subscription (all windows expired) as api even when apiConfig is present", () => {
     // Regression: a real subscription gone idle still writes captures carrying rate_limits whose windows
     // have reset. deriveAccount returns 'unknown', but the rate_limits history proves the account is a
-    // subscriber, not API billing. Promoting it to 'api' just because a base URL is configured would flip
-    // every session's cost label from '~equivalent value' to 'Actual API spend'.
+    // subscriber, not API billing. Promoting it to 'api' just because a base URL is configured would
+    // misclassify the account type.
     const db = openTestDb();
     migrate(db);
     upsertSessions(db, [seed]);

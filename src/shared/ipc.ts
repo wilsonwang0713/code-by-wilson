@@ -13,7 +13,7 @@ import type {
 } from "./transcript";
 import type { TerminalApi } from "./terminal";
 import type { MetricsRead } from "./metrics";
-import type { ModelDefaults, PricingOverrides } from "./models";
+import type { ModelDefaults } from "./models";
 import type { StatsSnapshot, StatsRange } from "./stats";
 import type { CliStatus } from "./cli-status";
 import type { UpdateState } from "./update";
@@ -47,8 +47,6 @@ export const IPC = {
   updateSetAutoCheck: "update:setAutoCheck",
   /** PUSH: main -> renderer on every update-state transition. */
   updateState: "update:state",
-  pricingGet: "pricing:get",
-  pricingSet: "pricing:set",
 } as const;
 
 /** The index-only slice: the indexed session list from one SQLite read. The SQLite index holds no
@@ -189,10 +187,6 @@ export interface IpcApi {
   getAutoCheckUpdates(): Promise<boolean>;
   /** Persist the launch-check preference. */
   setAutoCheckUpdates(enabled: boolean): Promise<void>;
-  /** The user's per-family pricing overrides (empty object when none set). */
-  getPricing(): Promise<PricingOverrides>;
-  /** Persist the full overrides object (replaces, not merges). */
-  setPricing(overrides: PricingOverrides): Promise<void>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */

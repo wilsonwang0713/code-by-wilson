@@ -120,7 +120,7 @@ describe("incremental sync (real provider, scratch SQLite)", () => {
     expect(byId1["live"].state).toBe("working");
     expect(byId1["ended"].state).toBe("ended");
     expect(byId1["ancient"]).toBeUndefined();
-    // AC1: context % and Equivalent API value are computed from the parsed token data.
+    // AC1: context % is computed from the parsed token data.
     expect(byId1["live"].usage).toEqual({
       inputTokens: 50000,
       outputTokens: 1000,
@@ -131,7 +131,6 @@ describe("incremental sync (real provider, scratch SQLite)", () => {
     });
     expect(byId1["live"].contextWindow).toBe(200_000); // every family defaults to the standard 200K
     expect(byId1["live"].contextPct).toBe(41); // (50000 + 30000 + 2000) / 200000, rounded
-    expect(byId1["live"].equivApiValueUsd).toBeCloseTo(0.3025); // opus: (50000*5 + 1000*25 + 30000*0.5 + 2000*6.25)/1e6
 
     // AC2: a second pass with no file changes reparses nothing and leaves the rows identical.
     const before = getSessions(db);
