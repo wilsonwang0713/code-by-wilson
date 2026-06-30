@@ -404,7 +404,6 @@ export function App() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           onNew={() => setCreating(true)}
-          account={account}
           canSpawn={spawnGate(cliStatus).canSpawn}
         />
         <div className="flex min-w-0 flex-1">
