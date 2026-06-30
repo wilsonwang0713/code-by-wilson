@@ -57,20 +57,20 @@
   --color-model-sonnet: #b37bd9; /* orchid */
   --color-model-haiku: #db7fa4; /* rose */
 
-  /* Type — Inter for UI/body AND placards/labels (display reuses the sans face; the label/body
-     hierarchy comes from case, tracking, weight, and color, not a separate font), Cascadia Mono for
-     the wordmark, JetBrains Mono for all telemetry and identifiers. The "* Variable" names are the
-     bundled @fontsource-variable builds; the plain name stays as a fallback for a locally-installed
-     static font. */
+  /* Type — hermes "Mono" desktop fonts. System sans for all UI/body and
+     placards/labels (display reuses the sans face; hierarchy comes from case,
+     tracking, weight, color — not a separate font). JetBrains Mono (bundled,
+     @fontsource) leads the mono stack so code/diff/telemetry match the
+     terminal on every platform. Every stack ends in the emoji fallback. */
   --font-display: var(--font-sans);
   --font-sans:
-    "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
-    sans-serif;
+    "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "SF Pro Display", system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", emoji;
   --font-mono:
-    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", Menlo,
-    Consolas, monospace;
-  --font-brand:
-    "Cascadia Mono Variable", "Cascadia Mono", ui-monospace, monospace;
+    "JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", "SF Mono",
+    ui-monospace, Menlo, Consolas, monospace, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", emoji;
 }
 
 html,
@@ -84,6 +84,8 @@ body {
   color: var(--color-fg);
   font-family: var(--font-sans);
   font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

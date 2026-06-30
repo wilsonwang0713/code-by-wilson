@@ -26,7 +26,7 @@ interface TerminalWithCore {
 const OPTIONS = {
   scrollback: 5000,
   fontFamily:
-    '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+    '"JetBrains Mono Variable", "JetBrains Mono", "Cascadia Code", "SF Mono", ui-monospace, Menlo, Consolas, monospace',
   fontSize: 12,
   cursorBlink: true,
   customGlyphs: true, // draw block/box/powerline glyphs in the atlas, font-independent (default true; inert on the DOM renderer)

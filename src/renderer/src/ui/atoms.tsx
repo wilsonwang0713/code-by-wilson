@@ -125,7 +125,7 @@ export function Bar({
 export function Wordmark() {
   return (
     <span className="inline-flex shrink-0 items-center gap-2">
-      <span className="inline-flex items-center gap-1.5 font-brand text-xs font-semibold uppercase text-fg">
+      <span className="inline-flex items-center gap-1.5 font-display text-xs font-semibold uppercase text-fg">
         <Icon name="terminal" size={15} />
         <span>
           Code-by-<span className="text-primary">wire</span>
