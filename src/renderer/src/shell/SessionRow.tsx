@@ -6,7 +6,7 @@ import { ctxTone, isContextHigh } from "../ui/meta";
 /**
  * The compact 2-line sidebar row (design spec §4): state LED + title + relative time on line 1;
  * `project · branch` + a context-% chip (only once it's high) on line 2. Observed sessions carry
- * an explicit `OBS` tag alongside the `Dot`'s hollow-ring encoding. Selection is a raised
+ * a hollow ring on the `Dot`, with no separate text tag. Selection is a raised
  * background plus a semibold title — deliberately no left accent bar.
  */
 export function SessionRow({
@@ -25,7 +25,6 @@ export function SessionRow({
   const projectLine = session.branch
     ? `${session.project} · ${session.branch}`
     : session.project;
-  const observed = session.management === "observed";
   return (
     <button
       type="button"
@@ -42,7 +41,7 @@ export function SessionRow({
         <Dot state={session.state} management={session.management} />
         <span
           className={cx(
-            "min-w-0 flex-1 truncate text-meta text-fg",
+            "min-w-0 flex-1 truncate text-body text-fg",
             selected ? "font-semibold" : "font-medium",
           )}
           title={session.title}
@@ -60,11 +59,6 @@ export function SessionRow({
         >
           {projectLine}
         </span>
-        {observed && (
-          <span className="shrink-0 font-mono text-label text-fg-faint">
-            OBS
-          </span>
-        )}
         {isContextHigh(session.contextPct) && (
           <span
             className={cx(
