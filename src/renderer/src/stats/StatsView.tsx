@@ -37,6 +37,7 @@ import {
   formatMonthShort,
 } from "@shared/format";
 import { Icon } from "../ui/icons";
+import { PageHeader } from "../shell/page-primitives";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
   BarSeries,
@@ -194,46 +195,46 @@ export function StatsView() {
   return (
     <OverlayScroll className="h-full min-w-0 flex-1 bg-ink-950 text-fg">
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4 px-6 py-6">
-        <header className="flex items-center justify-between">
-          <h1 className="font-display text-heading font-semibold tracking-tight text-fg">
-            Usage
-          </h1>
-          <div className="flex items-center gap-2">
-            {isDayRange(range) && (
+        <PageHeader
+          title="Usage"
+          right={
+            <>
+              {isDayRange(range) && (
+                <button
+                  type="button"
+                  onClick={() => setRange(DEFAULT_RANGE)}
+                  title="Clear the day filter"
+                  className="flex items-center gap-1 rounded-md border border-ink-700 bg-ink-700 px-2 py-0.5 text-meta text-fg transition-colors hover:bg-ink-600"
+                >
+                  {formatDayShort(range.day)}
+                  <span aria-hidden className="text-fg-muted">
+                    ×
+                  </span>
+                </button>
+              )}
+              <CacheToggle on={includeCache} onChange={setIncludeCache} />
+              <RangeFilter value={range} onChange={setRange} />
+              <span aria-hidden className="h-5 w-px bg-ink-800" />
               <button
                 type="button"
-                onClick={() => setRange(DEFAULT_RANGE)}
-                title="Clear the day filter"
-                className="flex items-center gap-1 rounded-md border border-ink-700 bg-ink-700 px-2 py-0.5 text-meta text-fg transition-colors hover:bg-ink-600"
+                onClick={() => {
+                  setResetError(false);
+                  setConfirmReset(true);
+                }}
+                disabled={rebuilding}
+                aria-label="Reset analytics"
+                title="Reset analytics"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-fg-faint transition-colors hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {formatDayShort(range.day)}
-                <span aria-hidden className="text-fg-muted">
-                  ×
-                </span>
+                <Icon
+                  name="rotate-ccw"
+                  size={14}
+                  className={rebuilding ? "animate-spin" : undefined}
+                />
               </button>
-            )}
-            <CacheToggle on={includeCache} onChange={setIncludeCache} />
-            <RangeFilter value={range} onChange={setRange} />
-            <span aria-hidden className="h-5 w-px bg-ink-800" />
-            <button
-              type="button"
-              onClick={() => {
-                setResetError(false);
-                setConfirmReset(true);
-              }}
-              disabled={rebuilding}
-              aria-label="Reset analytics"
-              title="Reset analytics"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-fg-faint transition-colors hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Icon
-                name="rotate-ccw"
-                size={14}
-                className={rebuilding ? "animate-spin" : undefined}
-              />
-            </button>
-          </div>
-        </header>
+            </>
+          }
+        />
         {confirmReset && (
           <ConfirmDialog
             title="Reset analytics?"
