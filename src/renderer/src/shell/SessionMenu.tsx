@@ -225,7 +225,7 @@ export function SessionMenu({
     : "End is only available for a live session you manage.";
 
   return (
-    <div ref={rootRef} className="relative min-w-0 flex-1">
+    <div ref={rootRef} className="no-drag relative min-w-0 flex-1">
       <button
         type="button"
         onClick={toggleMenu}
