@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import { MAX_SESSION_TITLE_LEN } from "@shared/title-override";
 import { OPEN_IN_FAILED_MESSAGE, type OpenInTarget } from "@shared/ipc";
@@ -7,6 +8,8 @@ import { Icon, type IconName } from "../ui/icons";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useSessionActions } from "../workspace/session-actions";
 import { openInItems } from "../workspace/open-in-items";
+
+const MENU_WIDTH = 256;
 
 /**
  * The middle header's session-name dropdown (design spec §5): one menu that consolidates what used to be
@@ -43,9 +46,11 @@ export function SessionMenu({
   const [draft, setDraft] = useState(session.title);
   const [openInBusy, setOpenInBusy] = useState(false);
   const [openInError, setOpenInError] = useState<string | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   // Set for the lifetime of one Esc-cancel so the blur it triggers doesn't also save (mirrors SessionTitle).
   const cancelledRef = useRef(false);
   // Synchronous mirror of `editing` so the unmount flush below can tell a still-pending edit from one a
@@ -58,22 +63,51 @@ export function SessionMenu({
     { onAdopt, onFork, onEnd },
   );
 
+  // The dropdown is portaled to `document.body` (the header it lives in clips overflow at 40px tall), so
+  // its position has to be computed from the trigger's live rect rather than left to CSS. Left-aligned to
+  // the trigger — unlike GitReadout's right-aligned popover — with a defensive clamp off the right edge of
+  // the viewport. Mirrors GitReadout's `place`.
+  const place = useCallback(() => {
+    const r = rootRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const left = Math.min(r.left, window.innerWidth - MENU_WIDTH - 8);
+    setPos({ left, top: r.bottom + 6 });
+  }, []);
+
+  // Mirrors GitReadout's `toggle`: closing needs no repositioning, but opening must (re)compute the
+  // position fresh, since layout may have shifted since the menu last closed.
+  function toggleMenu(): void {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    place();
+    setOpen(true);
+  }
+
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node))
-        setOpen(false);
+      const t = e.target as Node;
+      // The portaled menu is no longer a DOM descendant of `rootRef`, so both refs need checking — a click
+      // inside the portaled dropdown must not read as "outside".
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
     };
-  }, [open]);
+  }, [open, place]);
 
   // Drop a stale Open-in error whenever the menu closes, so reopening starts clean (mirrors OpenInMenu).
   useEffect(() => {
@@ -194,7 +228,7 @@ export function SessionMenu({
     <div ref={rootRef} className="relative min-w-0 flex-1">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleMenu}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}
@@ -217,89 +251,102 @@ export function SessionMenu({
         </span>
       </button>
 
-      {open && (
-        <div
-          id={menuId}
-          role="menu"
-          className="absolute left-0 top-full z-30 mt-1.5 w-64 rounded-lg border border-ink-700 bg-ink-900 p-1.5 shadow-xl"
-        >
-          <MenuItem
-            icon="pin"
-            label="Pin"
-            title="Pinning sessions is coming soon."
-            onClick={() => setOpen(false)}
-          />
-          <MenuItem
-            icon="copy"
-            label="Copy session ID"
-            title={session.id}
-            onClick={() => {
-              void window.api.clipboardWriteText(session.id);
-              setOpen(false);
-            }}
-          />
-          <MenuItem icon="pencil" label="Rename" onClick={openEdit} />
+      {open && pos
+        ? createPortal(
+            <div
+              id={menuId}
+              ref={menuRef}
+              role="menu"
+              style={{
+                position: "fixed",
+                left: pos.left,
+                top: pos.top,
+                width: MENU_WIDTH,
+              }}
+              className="z-50 rounded-lg border border-ink-700 bg-ink-900 p-1.5 shadow-xl"
+            >
+              <MenuItem
+                icon="pin"
+                label="Pin"
+                title="Pinning sessions is coming soon."
+                onClick={() => setOpen(false)}
+              />
+              <MenuItem
+                icon="copy"
+                label="Copy session ID"
+                title={session.id}
+                onClick={() => {
+                  void window.api.clipboardWriteText(session.id);
+                  setOpen(false);
+                }}
+              />
+              <MenuItem icon="pencil" label="Rename" onClick={openEdit} />
 
-          {adopt.error && (
-            <p role="alert" className="px-2 py-1 text-meta text-danger">
-              {adopt.error}
-            </p>
-          )}
-          <MenuItem
-            icon="git-pull-request-arrow"
-            label={adopt.busy ? "Adopting…" : "Adopt"}
-            onClick={adopt.request}
-            disabled={adoptDisabled || adopt.busy}
-            title={adoptTitle}
-          />
+              {adopt.error && (
+                <p role="alert" className="px-2 py-1 text-meta text-danger">
+                  {adopt.error}
+                </p>
+              )}
+              <MenuItem
+                icon="git-pull-request-arrow"
+                label={adopt.busy ? "Adopting…" : "Adopt"}
+                onClick={adopt.request}
+                disabled={adoptDisabled || adopt.busy}
+                title={adoptTitle}
+              />
 
-          {fork.error && (
-            <p role="alert" className="px-2 py-1 text-meta text-danger">
-              {fork.error}
-            </p>
-          )}
-          <MenuItem
-            icon="git-branch"
-            label={fork.busy ? "Forking…" : "Fork"}
-            onClick={fork.request}
-            disabled={forkDisabled || fork.busy}
-            title={forkTitle}
-          />
+              {fork.error && (
+                <p role="alert" className="px-2 py-1 text-meta text-danger">
+                  {fork.error}
+                </p>
+              )}
+              <MenuItem
+                icon="git-branch"
+                label={fork.busy ? "Forking…" : "Fork"}
+                onClick={fork.request}
+                disabled={forkDisabled || fork.busy}
+                title={forkTitle}
+              />
 
-          <MenuItem
-            icon="square"
-            label="End session"
-            onClick={end.request}
-            disabled={!live}
-            title={endTitle}
-            danger
-          />
+              <MenuItem
+                icon="square"
+                label="End session"
+                onClick={end.request}
+                disabled={!live}
+                title={endTitle}
+                danger
+              />
 
-          <div
-            role="separator"
-            aria-orientation="horizontal"
-            className="my-1 h-px bg-ink-800"
-          />
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                className="my-1 h-px bg-ink-800"
+              />
 
-          <div className="px-2 pb-1 pt-0.5 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
-            Open in
-          </div>
-          {items.map((item) => (
-            <MenuItem
-              key={item.key}
-              icon={item.icon}
-              label={item.label}
-              onClick={() => void handleOpenIn(item.key)}
-              disabled={openInBusy}
-            />
-          ))}
-          {openInError && (
-            <p role="alert" className="mt-1 px-2 py-1 text-meta text-danger">
-              {openInError}
-            </p>
-          )}
-        </div>
-      )}
+              <div className="px-2 pb-1 pt-0.5 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
+                Open in
+              </div>
+              {items.map((item) => (
+                <MenuItem
+                  key={item.key}
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => void handleOpenIn(item.key)}
+                  disabled={openInBusy}
+                />
+              ))}
+              {openInError && (
+                <p
+                  role="alert"
+                  className="mt-1 px-2 py-1 text-meta text-danger"
+                >
+                  {openInError}
+                </p>
+              )}
+            </div>,
+            document.body,
+          )
+        : null}
 
       {adopt.confirmOpen && (
         <ConfirmDialog
