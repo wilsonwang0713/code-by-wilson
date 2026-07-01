@@ -266,12 +266,6 @@ export function SessionMenu({
               className="z-50 rounded-lg border border-ink-700 bg-ink-900 p-1.5 shadow-xl"
             >
               <MenuItem
-                icon="pin"
-                label="Pin"
-                title="Pinning sessions is coming soon."
-                onClick={() => setOpen(false)}
-              />
-              <MenuItem
                 icon="copy"
                 label="Copy session ID"
                 title={session.id}

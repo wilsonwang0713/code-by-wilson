@@ -13,8 +13,8 @@ import { SETTINGS_ID } from "../settings/sentinel";
 
 /**
  * The left sidebar's content (design spec §4): a draggable top bar with the collapse toggle, a
- * 3-row menu (New session / Stats / Settings), a search box, a static "Pinned" placeholder, and
- * the compact session list. Renders as plain content — the caller slots it inside a `Pane`
+ * 3-row menu (New session / Stats / Settings), a search box, and the compact session list.
+ * Renders as plain content — the caller slots it inside a `Pane`
  * (Task 11), so this owns no width/position of its own beyond filling its parent.
  */
 export function LeftSidebar({
@@ -138,15 +138,6 @@ export function LeftSidebar({
               focusRing,
             )}
           />
-        </div>
-      </div>
-
-      <div className="shrink-0 px-2 pb-2">
-        <div className="px-0.5 pb-1 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
-          Pinned
-        </div>
-        <div className="rounded border border-dashed border-ink-800 px-2 py-2.5 text-center text-label text-fg-faint">
-          No pinned sessions
         </div>
       </div>
 
