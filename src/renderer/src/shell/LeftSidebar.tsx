@@ -141,7 +141,7 @@ export function LeftSidebar({
         </div>
       </div>
 
-      <div className="px-2.5 pb-1 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
+      <div className="px-4 pb-1 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
         Sessions
       </div>
       <OverlayScroll className="min-h-0 flex-1" contentClassName="px-2 pb-2">
