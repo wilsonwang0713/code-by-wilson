@@ -8,10 +8,8 @@ import { Icon } from "../ui/icons";
 import { useFullscreen } from "../ui/use-fullscreen";
 import { filterSessions, sortSessions } from "./session-list-model";
 import { SessionRow } from "./SessionRow";
-
-/** IDs the caller (Task 11's `App.tsx`) routes to for the two non-session menu destinations. */
-const OVERVIEW_ID = "overview";
-const SETTINGS_ID = "settings";
+import { OVERVIEW_ID } from "../stats/sentinel";
+import { SETTINGS_ID } from "../settings/sentinel";
 
 /**
  * The left sidebar's content (design spec §4): a draggable top bar with the collapse toggle, a
