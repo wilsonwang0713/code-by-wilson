@@ -107,6 +107,9 @@ html,
 body,
 #root {
   height: 100%;
+  /* App shell, not a document: the window itself never scrolls on either axis
+     (panes own their own scroll). */
+  overflow: hidden;
 }
 body {
   margin: 0;
