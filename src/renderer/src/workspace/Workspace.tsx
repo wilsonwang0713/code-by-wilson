@@ -24,7 +24,8 @@ export function Workspace({
   onFork,
   onEnd,
   onRename,
-  leftCollapsed,
+  leftEdgeExposed,
+  showLeftReopen,
   onShowLeft,
   rightCollapsed,
   onShowRight,
@@ -38,8 +39,10 @@ export function Workspace({
   onEnd: (id: string) => void;
   /** Persist a display-name override for this session (null/empty clears it). Applies to any session. */
   onRename: (id: string, title: string | null) => void;
-  /** Whether the left sidebar is collapsed — reserves the traffic-light inset and shows the reopen button. */
-  leftCollapsed: boolean;
+  /** Whether the left pane isn't actually docked next to the header — reserves the traffic-light inset. */
+  leftEdgeExposed: boolean;
+  /** Whether a manual "show sidebar" button makes sense (pane closed and wide enough to dock back). */
+  showLeftReopen: boolean;
   onShowLeft: () => void;
   /** Whether the right sidebar is collapsed — shows the reopen button. */
   rightCollapsed: boolean;
@@ -70,7 +73,8 @@ export function Workspace({
         session={s}
         transcriptOn={transcriptOn}
         onToggleTranscript={() => setTranscriptOn((v) => !v)}
-        leftCollapsed={leftCollapsed}
+        leftEdgeExposed={leftEdgeExposed}
+        showLeftReopen={showLeftReopen}
         onShowLeft={onShowLeft}
         rightCollapsed={rightCollapsed}
         onShowRight={onShowRight}

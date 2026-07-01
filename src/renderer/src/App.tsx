@@ -384,6 +384,17 @@ export function App() {
   const narrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
   const leftOpen = useStore($paneOpen(CBW_LEFT_PANE_ID));
   const rightOpen = useStore($paneOpen(CBW_RIGHT_PANE_ID));
+  // The header's left padding must reserve the traffic-light inset whenever the left pane isn't
+  // actually docked next to it — whether the user closed it, or a narrow window force-collapsed it —
+  // so it's driven by rendered state, not the raw stored preference `leftOpen` alone.
+  const leftEdgeExposed = narrow || !leftOpen;
+  // A manual "show sidebar" button only makes sense when the pane is closed AND wide enough to
+  // actually dock back open. While force-collapsed by a narrow window, hover-reveal is the intended
+  // way in — a button here would flip the stored preference with no visible effect until widened.
+  const showLeftReopen = !narrow && !leftOpen;
+  // Same "suppress while narrow" rule for the right sidebar's reopen button — it has no padding/
+  // traffic-light concern, so it only ever needed a value change here, not a prop split.
+  const rightCollapsed = !narrow && !rightOpen;
   const metrics = useMetrics(selected?.id ?? "", hasSession);
 
   // Re-home the selection only when the list first arrives, the open session vanishes, or the list
@@ -413,18 +424,30 @@ export function App() {
   // header), the live `Workspace` (which renders its own `MiddleHeader` + `SessionMenu`), or the
   // empty state when nothing is selected (e.g. a stale/vanished session id with no pinned route).
   const middle: ReactNode = isNewSession ? (
-    <MiddleNonSession title="New session" leftOpen={leftOpen}>
+    <MiddleNonSession
+      title="New session"
+      leftEdgeExposed={leftEdgeExposed}
+      showLeftReopen={showLeftReopen}
+    >
       <NewSessionView
         onCreate={createSession}
         onCancel={() => setSelectedId(OVERVIEW_ID)}
       />
     </MiddleNonSession>
   ) : isOverview ? (
-    <MiddleNonSession title="code-by-wire" leftOpen={leftOpen}>
+    <MiddleNonSession
+      title="code-by-wire"
+      leftEdgeExposed={leftEdgeExposed}
+      showLeftReopen={showLeftReopen}
+    >
       <StatsView />
     </MiddleNonSession>
   ) : isSettings ? (
-    <MiddleNonSession title="Settings" leftOpen={leftOpen}>
+    <MiddleNonSession
+      title="Settings"
+      leftEdgeExposed={leftEdgeExposed}
+      showLeftReopen={showLeftReopen}
+    >
       <SettingsView
         cliStatus={cliStatus}
         account={account}
@@ -445,13 +468,18 @@ export function App() {
       onFork={forkSession}
       onEnd={endSession}
       onRename={(id, title) => void renameSession(id, title)}
-      leftCollapsed={!leftOpen}
+      leftEdgeExposed={leftEdgeExposed}
+      showLeftReopen={showLeftReopen}
       onShowLeft={() => togglePane(CBW_LEFT_PANE_ID)}
-      rightCollapsed={!rightOpen}
+      rightCollapsed={rightCollapsed}
       onShowRight={() => togglePane(CBW_RIGHT_PANE_ID)}
     />
   ) : (
-    <MiddleNonSession title="code-by-wire" leftOpen={leftOpen}>
+    <MiddleNonSession
+      title="code-by-wire"
+      leftEdgeExposed={leftEdgeExposed}
+      showLeftReopen={showLeftReopen}
+    >
       <EmptyDetail empty={all.length === 0} loading={loading} />
     </MiddleNonSession>
   );
@@ -515,11 +543,13 @@ export function App() {
  */
 function MiddleNonSession({
   title,
-  leftOpen,
+  leftEdgeExposed,
+  showLeftReopen,
   children,
 }: {
   title: string;
-  leftOpen: boolean;
+  leftEdgeExposed: boolean;
+  showLeftReopen: boolean;
   children: ReactNode;
 }) {
   return (
@@ -529,7 +559,8 @@ function MiddleNonSession({
         title={title}
         transcriptOn={false}
         onToggleTranscript={() => {}}
-        leftCollapsed={!leftOpen}
+        leftEdgeExposed={leftEdgeExposed}
+        showLeftReopen={showLeftReopen}
         onShowLeft={() => togglePane(CBW_LEFT_PANE_ID)}
         rightCollapsed={false}
         onShowRight={() => togglePane(CBW_RIGHT_PANE_ID)}

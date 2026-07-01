@@ -23,7 +23,8 @@ export function MiddleHeader({
   session,
   transcriptOn,
   onToggleTranscript,
-  leftCollapsed,
+  leftEdgeExposed,
+  showLeftReopen,
   onShowLeft,
   rightCollapsed,
   onShowRight,
@@ -33,7 +34,14 @@ export function MiddleHeader({
   session: Session | null;
   transcriptOn: boolean;
   onToggleTranscript: () => void;
-  leftCollapsed: boolean;
+  /** True whenever the left pane isn't actually docked next to this header — closed by the user, or
+   *  force-collapsed by a narrow window — so this header becomes the true visual left edge and must
+   *  reserve the traffic-light inset. */
+  leftEdgeExposed: boolean;
+  /** True only when a manual "show sidebar" affordance makes sense: the pane is closed AND the window
+   *  is wide enough to dock it back. Suppressed while force-collapsed by a narrow window, where
+   *  hover-reveal is the intended way in. */
+  showLeftReopen: boolean;
   onShowLeft: () => void;
   rightCollapsed: boolean;
   onShowRight: () => void;
@@ -41,7 +49,7 @@ export function MiddleHeader({
 }) {
   const isMac = isMacPlatform(window.api.platform);
   const isFullscreen = useFullscreen();
-  const paddingLeft = leftCollapsed
+  const paddingLeft = leftEdgeExposed
     ? headerLeftPaddingPx(isMac, isFullscreen)
     : 14;
 
@@ -57,7 +65,7 @@ export function MiddleHeader({
         transition: "padding-left 200ms ease-out",
       }}
     >
-      {leftCollapsed && (
+      {showLeftReopen && (
         <button
           type="button"
           onClick={onShowLeft}
