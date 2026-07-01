@@ -37,6 +37,7 @@ export type IconName =
   | "panel-right-open"
   | "pause"
   | "pencil"
+  | "pin"
   | "plus"
   | "rotate-ccw"
   | "search"
