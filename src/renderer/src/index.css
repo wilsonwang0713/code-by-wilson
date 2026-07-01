@@ -57,6 +57,10 @@
   --color-model-sonnet: #b37bd9; /* orchid */
   --color-model-haiku: #db7fa4; /* rose */
 
+  /* Recessed sidebar — darkened surfaces for the sidebar column */
+  --color-sidebar: #0a0a0a;
+  --color-sidebar-border: #202020;
+
   /* Type — hermes "Mono" desktop fonts. System sans for all UI/body and
      placards/labels (display reuses the sans face; hierarchy comes from case,
      tracking, weight, color — not a separate font). JetBrains Mono (bundled,
@@ -93,6 +97,10 @@
   --text-heading--line-height: 1.25;
   --text-display: 1.5rem; /* 24px — big gauge / stat numerals */
   --text-display--line-height: 1;
+}
+
+:root {
+  --titlebar-height: 40px;
 }
 
 html,
