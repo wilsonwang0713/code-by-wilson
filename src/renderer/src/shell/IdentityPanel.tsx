@@ -9,7 +9,7 @@ import { GitReadout } from "./GitReadout";
 /**
  * The right sidebar's identity readouts (design spec §6): Model, Effort, Git, and session Clock, each an
  * always-shown label/value row — `-` fills a row when its data hasn't landed rather than hiding it. This
- * is the surviving half of the old Annunciator instrument strip; its State lamp moved to the left
+ * is the surviving half of the old status header strip; its State lamp moved to the left
  * sidebar's session row, and its Link/Management lamp moved to the SessionMenu badge, so only the
  * identity readouts remain here, recast as vertical rows instead of the old horizontal strip.
  */
