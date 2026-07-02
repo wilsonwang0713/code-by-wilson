@@ -120,7 +120,7 @@ export function LeftSidebar({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search sessions…"
             aria-label="Search sessions"
-            className="h-7 max-w-full bg-transparent text-xs text-fg [field-sizing:content] placeholder:text-(--ui-text-tertiary) focus:outline-none"
+            className="h-7 max-w-full bg-transparent text-[0.8125rem] text-fg [field-sizing:content] placeholder:text-(--ui-text-tertiary) focus:outline-none"
           />
           {query && (
             <button
