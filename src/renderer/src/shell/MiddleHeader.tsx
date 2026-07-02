@@ -2,13 +2,14 @@ import type { ReactNode } from "react";
 import type { Session } from "@shared/types";
 import { isMacPlatform } from "@shared/platform";
 import { cx } from "../ui/atoms";
+import { Icon, type IconName } from "../ui/icons";
 import { useFullscreen } from "../ui/use-fullscreen";
 import { headerRightPaddingPx, titlebarContentInsetPx } from "./titlebar";
 
 /**
  * The middle column's own in-column header: a draggable strip that carries the active session's
  * menu — name, chevron, and Managed/Observed badge, bundled in `SessionMenu` and passed in as
- * `menu` — or a plain title when there's no session, plus the Transcript on/off switch. The
+ * `menu` — or a plain title when there's no session, plus the Claude Code ⇄ Transcript view switcher. The
  * sidebar toggles live in the fixed `TitlebarControls` clusters, NOT here — nothing in this header
  * mounts or unmounts when a pane toggles.
  *
@@ -67,27 +68,28 @@ export function MiddleHeader({
         )}
         <div className="no-drag ml-auto flex items-center gap-2">
           {session && (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={transcriptOn}
-              onClick={onToggleTranscript}
-              aria-label="Toggle transcript"
-              title="Transcript"
-              className={cx(
-                "relative h-4 w-7 shrink-0 rounded-full border transition-colors duration-100",
-                transcriptOn
-                  ? "border-transparent bg-primary"
-                  : "border-[color-mix(in_srgb,var(--color-fg)_18%,transparent)] bg-transparent",
-              )}
+            <div
+              role="group"
+              aria-label="View"
+              className="flex shrink-0 items-center rounded-[5px] border border-(--ui-stroke-tertiary) bg-[color-mix(in_srgb,var(--color-fg)_5%,transparent)] p-[2px]"
             >
-              <span
-                className={cx(
-                  "absolute top-[1px] h-3 w-3 rounded-full transition-all duration-100",
-                  transcriptOn ? "right-[1px] bg-ink-950" : "left-[1px] bg-fg",
-                )}
+              <ViewSegment
+                icon="terminal"
+                label="Claude Code"
+                active={!transcriptOn}
+                onSelect={() => {
+                  if (transcriptOn) onToggleTranscript();
+                }}
               />
-            </button>
+              <ViewSegment
+                icon="messages-square"
+                label="Transcript"
+                active={transcriptOn}
+                onSelect={() => {
+                  if (!transcriptOn) onToggleTranscript();
+                }}
+              />
+            </div>
           )}
         </div>
       </header>
@@ -96,5 +98,37 @@ export function MiddleHeader({
         className="pointer-events-none relative z-10 -mb-4 h-4 shrink-0 bg-linear-to-b from-(--ui-chat-surface-background) to-transparent"
       />
     </>
+  );
+}
+
+/** One segment of the header's view switcher: icon + label, `aria-pressed` for the active side.
+ *  Active gets the control-active fill; inactive is quiet text that brightens on hover. Clicking
+ *  the active segment is a no-op (the caller's `onSelect` guard). */
+function ViewSegment({
+  icon,
+  label,
+  active,
+  onSelect,
+}: {
+  icon: IconName;
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={cx(
+        "flex h-4 items-center gap-1.5 rounded-[3.5px] px-2 text-[0.7rem] font-medium leading-none transition-colors duration-100",
+        active
+          ? "bg-(--ui-control-active-background) text-fg"
+          : "text-(--ui-text-tertiary) hover:text-fg",
+      )}
+    >
+      <Icon name={icon} size={13} />
+      {label}
+    </button>
   );
 }
