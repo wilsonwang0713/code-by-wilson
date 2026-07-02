@@ -280,6 +280,15 @@ body {
   app-region: no-drag;
 }
 
+/* Hover-reveal suppression (ported from hermes): a collapsed pane slides in when the pointer
+   dwells on its thin edge trigger, so a control sitting over that gutter would drag the panel in
+   by accident. While a marked region is hovered, every edge trigger goes pointer-transparent —
+   auto-resets on mouse-out, no JS. body-scoped (hermes scopes to [data-pane-shell]) because our
+   fixed titlebar clusters live outside the pane grid. */
+body:has([data-suppress-pane-reveal]:hover) [data-pane-reveal-trigger] {
+  pointer-events: none;
+}
+
 /* The title bar counter-zooms so it holds a fixed physical size while the rest of the window zooms,
    keeping the macOS traffic lights (OS-drawn, immune to web zoom) aligned with it. `--zoom-factor` is
    kept in sync from the renderer (GlobalHeader). Mirrors VS Code's `.counter-zoom` title bar. */
