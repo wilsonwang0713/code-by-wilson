@@ -1,4 +1,4 @@
-import type { Account, RateLimit, Session } from "./types";
+import type { Account, RateLimit, Session, SessionPr } from "./types";
 import type { ContextBreakdown } from "./transcript";
 import { contextTotal } from "./context";
 
@@ -32,6 +32,11 @@ export interface StatusLineSample {
   cwd: string | null;
   /** Elapsed session wall-clock in ms (stdin `cost.total_duration_ms`). null when omitted. */
   sessionClockMs: number | null;
+  /** Cumulative time an API request was in flight (stdin cost.total_api_duration_ms) — the Duty
+   *  panel's numerator over sessionClockMs. null when omitted. */
+  apiDurationMs: number | null;
+  /** The capture's `pr` block, or null when absent or malformed (no usable number + url). */
+  pr: SessionPr | null;
   /** Account rate limits, present when the capture carries them (a subscription that has had its first
    *  API response). null when absent: a subscription before that response, or a session whose billing the
    *  app can't determine. Each window may be independently absent. The two weekly sub-buckets join the

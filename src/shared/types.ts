@@ -205,6 +205,15 @@ export interface RateLimit {
   resetsAt: number;
 }
 
+/** The session's pull request as the statusLine capture reports it (`pr` block). `reviewState` is
+ *  the raw review_state string ("pending" / "approved" / "changes_requested" / anything newer), or
+ *  null when the capture omitted it. Fresher than the gh-polled PrInfo and carries state. */
+export interface SessionPr {
+  number: number;
+  url: string;
+  reviewState: string | null;
+}
+
 /** The app-wide account, derived from the freshest statusLine captures. Billing mode is decided in
  *  deriveAccount: a capture carrying rate_limits is a subscription (even when all windows are expired —
  *  the rate_limits history is proof); otherwise api. */

@@ -68,6 +68,24 @@ function parseSample(
     };
   }
 
+  const prRaw = j.pr;
+  let pr: StatusLineSample["pr"] = null;
+  if (prRaw !== null && typeof prRaw === "object") {
+    const p = prRaw as Record<string, unknown>;
+    const prNumber = num(p.number);
+    const prUrl = typeof p.url === "string" && p.url.length > 0 ? p.url : null;
+    if (prNumber !== null && prUrl !== null) {
+      pr = {
+        number: prNumber,
+        url: prUrl,
+        reviewState:
+          typeof p.review_state === "string" && p.review_state.length > 0
+            ? p.review_state
+            : null,
+      };
+    }
+  }
+
   const pct = num(ctx.used_percentage);
   const sessionName =
     typeof j.session_name === "string" && j.session_name.length > 0
@@ -102,6 +120,8 @@ function parseSample(
         : null,
     cwd,
     sessionClockMs: num(cost.total_duration_ms),
+    apiDurationMs: num(cost.total_api_duration_ms),
+    pr,
     rateLimits,
   };
 }

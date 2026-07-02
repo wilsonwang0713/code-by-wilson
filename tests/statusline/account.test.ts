@@ -20,6 +20,8 @@ function sample(over: Partial<StatusLineSample> = {}): StatusLineSample {
     effortLevel: null,
     cwd: null,
     sessionClockMs: null,
+    apiDurationMs: null,
+    pr: null,
     rateLimits: null,
     ...over,
   };
