@@ -24,7 +24,7 @@ const REVIEW_TONE_COLOR: Record<ReviewTone, string> = {
   neutral: "var(--ui-text-tertiary)",
 };
 
-/** The Identity panel's Git readout: a minimal trigger (the branch, or the short sha on a detached HEAD,
+/** The Session panel's Git readout: a minimal trigger (the branch, or the short sha on a detached HEAD,
  *  with an amber dot when the tree is dirty) that opens a detail popover. The popover carries the repo
  *  link, the copy-able branch and commit, the PR link, and the sync/diff/status numbers. Before the
  *  glance lands the readout shows the session's recorded branch as plain text (no popover to fill yet);
