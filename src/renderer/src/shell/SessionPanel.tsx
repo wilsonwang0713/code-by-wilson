@@ -7,13 +7,11 @@ import { PanelSection, PanelHeading } from "../workspace/panels/chrome";
 import { GitReadout } from "./GitReadout";
 
 /**
- * The right sidebar's identity readouts (design spec §6): Model, Effort, Git, and session Clock, each an
- * always-shown label/value row — `-` fills a row when its data hasn't landed rather than hiding it. This
- * is the surviving half of the old status header strip; its State lamp moved to the left
- * sidebar's session row, and its Link/Management lamp moved to the SessionMenu badge, so only the
- * identity readouts remain here, recast as vertical rows instead of the old horizontal strip.
+ * The cockpit's identity footer (cockpit spec §Session): Model (with effort folded in), Git (the
+ * readout, now carrying PR review state), Lines (the session's ± footprint from the capture), and
+ * Clock — each an always-shown label/value row; `-` fills a row whose data hasn't landed.
  */
-export function IdentityPanel({
+export function SessionPanel({
   session: s,
   git,
   pr,
@@ -28,27 +26,38 @@ export function IdentityPanel({
     s.modelDisplayName,
     { known: s.management === "managed" },
   );
+  const modelValue = s.effortLevel ? `${model} · ${s.effortLevel}` : model;
   const clock = s.sessionClockMs != null ? formatClock(s.sessionClockMs) : null;
+  const hasLines = s.linesAdded != null || s.linesRemoved != null;
   return (
     <PanelSection>
-      <PanelHeading>Identity</PanelHeading>
-      <IdentityRow label="Model">
-        <span className="min-w-0 truncate" title={model}>
-          {model}
+      <PanelHeading>Session</PanelHeading>
+      <SessionRow label="Model">
+        <span className="min-w-0 truncate" title={modelValue}>
+          {modelValue}
         </span>
-      </IdentityRow>
-      <IdentityRow label="Effort">{s.effortLevel ?? "-"}</IdentityRow>
-      <IdentityRow label="Git">
+      </SessionRow>
+      <SessionRow label="Git">
         <GitReadout session={s} git={git} pr={pr} />
-      </IdentityRow>
-      <IdentityRow label="Clock">{clock ?? "-"}</IdentityRow>
+      </SessionRow>
+      <SessionRow label="Lines">
+        {hasLines ? (
+          <>
+            <span className="text-(--ui-green)">+{s.linesAdded ?? 0}</span>
+            <span className="text-(--ui-red)">−{s.linesRemoved ?? 0}</span>
+          </>
+        ) : (
+          "-"
+        )}
+      </SessionRow>
+      <SessionRow label="Clock">{clock ?? "-"}</SessionRow>
     </PanelSection>
   );
 }
 
-/** One identity row: a plain-case label on the left, a mono value (or the Git readout) on the right.
+/** One session row: a plain-case label on the left, a mono value cluster on the right.
  *  Plain case — uppercase is reserved for section headers. */
-function IdentityRow({
+function SessionRow({
   label,
   children,
 }: {

@@ -5,13 +5,13 @@ import { PressurePanel } from "../workspace/panels/PressurePanel";
 import { SpendPanel } from "../workspace/panels/SpendPanel";
 import { TokenSpeedPanel } from "../workspace/panels/TokenSpeedPanel";
 import { DutyPanel } from "../workspace/panels/DutyPanel";
-import { IdentityPanel } from "./IdentityPanel";
+import { SessionPanel } from "./SessionPanel";
 
 /**
  * The right sidebar's content (design spec §6): an empty draggable top strip — the fixed right
- * toggle cluster floats over it — then the telemetry panel stack: Identity, Pressure, Spend,
- * Throughput, Duty. Renders as plain content — the caller slots it inside a `Pane` (Task 11), so
- * this owns no width/position of its own beyond filling its parent.
+ * toggle cluster floats over it — then the telemetry panel stack: Pressure, Spend, Throughput,
+ * Duty, then a hairline, then Session. Renders as plain content — the caller slots it inside a
+ * `Pane` (Task 11), so this owns no width/position of its own beyond filling its parent.
  *
  * Polls its own transcript: this pane is now a sibling of `Workspace` at the App level rather than a
  * child of it, so it can't share `WorkspaceBody`'s `useTranscript` poll — a second independent poll of the
@@ -36,11 +36,6 @@ export function RightSidebar({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col pb-2">
-          <IdentityPanel
-            session={session}
-            git={metrics?.git}
-            pr={metrics?.pr}
-          />
           <PressurePanel
             live={session.liveContext ?? null}
             context={doc?.context ?? null}
@@ -57,6 +52,8 @@ export function RightSidebar({
             apiDurationMs={session.apiDurationMs ?? null}
             sessionClockMs={session.sessionClockMs ?? null}
           />
+          <div className="mx-2.5 my-1 border-t border-(--ui-stroke-tertiary)" />
+          <SessionPanel session={session} git={metrics?.git} pr={metrics?.pr} />
         </div>
       </div>
     </div>

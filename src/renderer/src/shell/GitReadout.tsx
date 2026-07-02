@@ -9,10 +9,20 @@ import {
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import type { GitInfo, PrInfo } from "@shared/metrics";
+import { reviewTone, reviewLabel, type ReviewTone } from "@shared/review-state";
 import { Icon } from "../ui/icons";
 import { CopyButton } from "../ui/CopyButton";
 
 const POP_WIDTH = 280;
+
+/** Review-state diamond colors: amber pending, green approved, red changes requested, gray anything
+ *  unrecognized (rendered verbatim, no whitelist). */
+const REVIEW_TONE_COLOR: Record<ReviewTone, string> = {
+  pending: "var(--color-accent)",
+  approved: "var(--ui-green)",
+  changes: "var(--ui-red)",
+  neutral: "var(--ui-text-tertiary)",
+};
 
 /** The Identity panel's Git readout: a minimal trigger (the branch, or the short sha on a detached HEAD,
  *  with an amber dot when the tree is dirty) that opens a detail popover. The popover carries the repo
@@ -50,6 +60,8 @@ export function GitReadout({
   // glance to fill it, so a pre-glance label renders as plain text rather than a dead trigger.
   const headLabel = branch ?? sha ?? s.branch ?? null;
   const interactive = git != null && headLabel != null;
+  const prView = s.pr ?? pr ?? null;
+  const reviewState = s.pr?.reviewState ?? null;
 
   const place = useCallback(() => {
     const r = triggerRef.current?.getBoundingClientRect();
@@ -115,6 +127,19 @@ export function GitReadout({
               title="Uncommitted changes"
             />
           )}
+          {prView && (
+            <span className="flex shrink-0 items-center gap-1 text-fg-muted">
+              · #{prView.number}
+              {reviewState && (
+                <span
+                  style={{ color: REVIEW_TONE_COLOR[reviewTone(reviewState)] }}
+                  title={`Review: ${reviewState}`}
+                >
+                  ◆
+                </span>
+              )}
+            </span>
+          )}
           <Icon
             name="chevron-down"
             size={12}
@@ -167,15 +192,24 @@ export function GitReadout({
                   <CopyButton value={branch} label="Copy branch name" />
                 </Row>
               )}
-              {pr && (
+              {prView && (
                 <Row label="Pull request">
                   <button
                     type="button"
-                    onClick={() => void window.api.openExternal(pr.url)}
+                    onClick={() => void window.api.openExternal(prView.url)}
                     className="cursor-pointer text-accent underline underline-offset-2 hover:text-accent-bright"
                   >
-                    #{pr.number}
+                    #{prView.number}
                   </button>
+                  {reviewState && (
+                    <span
+                      style={{
+                        color: REVIEW_TONE_COLOR[reviewTone(reviewState)],
+                      }}
+                    >
+                      {reviewLabel(reviewState)}
+                    </span>
+                  )}
                 </Row>
               )}
               {ahead != null && behind != null && (
