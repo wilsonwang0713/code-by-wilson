@@ -18,7 +18,7 @@ export function GitReadout({
   const ahead = git?.ahead ?? null;
   const behind = git?.behind ?? null;
   const headLabel = branch ?? sha ?? s.branch ?? null;
-  if (headLabel == null) return <span className="text-fg-muted">—</span>;
+  if (headLabel == null) return <span className="text-fg-muted">-</span>;
   return (
     <span className="flex min-w-0 items-center gap-1.5 text-fg">
       <span className="min-w-0 truncate" title={headLabel}>
