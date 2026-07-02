@@ -92,12 +92,12 @@ export function PressurePanel({
           <div className="flex items-baseline justify-between">
             <div
               className={cx(
-                "font-mono text-display font-medium leading-none tabular-nums",
+                "font-mono text-title font-medium leading-none tabular-nums",
                 ctxTone(view.pct),
               )}
             >
               {view.pct}
-              <span className="text-title text-fg-faint">%</span>
+              <span className="text-xs text-fg-faint">%</span>
             </div>
             <div className="font-mono text-[0.625rem] text-(--ui-text-quaternary)">
               {formatTokensShort(view.total)} /{" "}

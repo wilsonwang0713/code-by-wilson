@@ -46,8 +46,9 @@ export function TokenSpeedPanel({
       </PanelHeading>
       <div className="flex items-baseline justify-between">
         {speed ? (
-          <span className="font-mono text-display font-medium tabular-nums text-fg">
-            {formatTps(speed.totalTps)}
+          <span className="font-mono text-title font-medium tabular-nums text-fg">
+            {formatTps(speed.totalTps).replace(/ t\/s$/, "")}
+            <span className="text-xs text-fg-faint"> t/s</span>
           </span>
         ) : (
           <span className="font-mono text-title font-medium tabular-nums text-fg-faint">

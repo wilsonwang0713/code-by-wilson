@@ -56,9 +56,9 @@ export function SpendPanel({
       <PanelHeading info={SPEND_INFO}>Spend</PanelHeading>
 
       <div className="flex items-baseline justify-between">
-        <div className="font-mono text-display font-medium leading-none tabular-nums text-fg">
+        <div className="font-mono text-title font-medium leading-none tabular-nums text-fg">
           {formatTokensShort(total)}
-          <span className="text-title text-fg-faint"> tokens</span>
+          <span className="text-xs text-fg-faint"> tokens</span>
         </div>
         <span className="font-mono text-xs tabular-nums text-(--ui-text-quaternary)">
           {costUsd != null ? formatUsd(costUsd) : "-"}
