@@ -170,6 +170,9 @@ export function overlaySessions(
       effortLevel: sample.effortLevel ?? undefined,
       sessionClockMs: sample.sessionClockMs ?? undefined,
       cwd: sample.cwd ?? undefined,
+      costUsd: sample.costUsd ?? undefined,
+      apiDurationMs: sample.apiDurationMs ?? undefined,
+      pr: sample.pr ?? undefined,
     };
   });
 }

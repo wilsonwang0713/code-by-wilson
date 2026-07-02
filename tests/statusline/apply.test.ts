@@ -335,6 +335,41 @@ describe("overlaySessions — effort, clock, cwd", () => {
   });
 });
 
+describe("overlaySessions — cockpit fields", () => {
+  it("copies costUsd, apiDurationMs, and pr from the sample", () => {
+    const byId = freshestBySession([
+      sample({
+        costUsd: 170.37,
+        apiDurationMs: 3_852_000,
+        pr: { number: 252, url: "https://x/pull/252", reviewState: "pending" },
+      }),
+    ]);
+    const [out] = overlaySessions([session()], byId);
+    expect(out.costUsd).toBe(170.37);
+    expect(out.apiDurationMs).toBe(3_852_000);
+    expect(out.pr).toEqual({
+      number: 252,
+      url: "https://x/pull/252",
+      reviewState: "pending",
+    });
+  });
+
+  it("leaves them undefined when the sample omitted them", () => {
+    const byId = freshestBySession([sample()]);
+    const [out] = overlaySessions([session()], byId);
+    expect(out.costUsd).toBeUndefined();
+    expect(out.apiDurationMs).toBeUndefined();
+    expect(out.pr).toBeUndefined();
+  });
+
+  it("leaves a sample-less session untouched", () => {
+    const [out] = overlaySessions([session({ id: "other" })], new Map());
+    expect(out.costUsd).toBeUndefined();
+    expect(out.apiDurationMs).toBeUndefined();
+    expect(out.pr).toBeUndefined();
+  });
+});
+
 describe("freshestBySession", () => {
   it("keeps the newest capture per session id", () => {
     const a = sample({ sessionId: "s1", capturedMtimeMs: 100, costUsd: 1 });
