@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Session } from "@shared/types";
 import type { GitInfo, PrInfo } from "@shared/metrics";
-import { formatClock } from "@shared/format";
+import { formatClock, formatRelativeTime } from "@shared/format";
 import { reviewTone, reviewLabel, type ReviewTone } from "@shared/review-state";
 import { modelLabel } from "../ui/meta";
 import { PanelSection, PanelHeading } from "../workspace/panels/chrome";
@@ -19,8 +19,9 @@ const REVIEW_TONE_COLOR: Record<ReviewTone, string> = {
 /**
  * The cockpit's identity footer (cockpit spec §Session): Model (with effort folded in), Git (branch
  * + dirty dot + sync, popover-free), PR (link + review state — the capture's pr wins over the
- * gh-polled one), Lines (the session's ± footprint from the capture), and Clock — each an
- * always-shown label/value row; `-` fills a row whose data hasn't landed.
+ * gh-polled one), Lines (the session's ± footprint from the capture), Clock, and Active (relative
+ * last-activity time — the left sidebar's rows no longer carry it) — each an always-shown
+ * label/value row; `-` fills a row whose data hasn't landed.
  */
 export function SessionPanel({
   session: s,
@@ -87,6 +88,9 @@ export function SessionPanel({
         )}
       </SessionRow>
       <SessionRow label="Clock">{clock ?? "-"}</SessionRow>
+      <SessionRow label="Active">
+        {formatRelativeTime(s.lastActivityMs, Date.now())}
+      </SessionRow>
     </PanelSection>
   );
 }
