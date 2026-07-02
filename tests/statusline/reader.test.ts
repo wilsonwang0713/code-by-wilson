@@ -216,3 +216,83 @@ describe("createStatusLineReader", () => {
     expect(s.sessionName).toBeNull(); // empty string is "not named"
   });
 });
+
+describe("createStatusLineReader — apiDurationMs and pr", () => {
+  it("parses total_api_duration_ms and the pr block", () => {
+    const home = makeHome();
+    writeCapture(home, "sid-pr", {
+      session_id: "sid-pr",
+      cost: {
+        total_duration_ms: 12_270_000,
+        total_api_duration_ms: 3_852_000,
+      },
+      pr: {
+        number: 252,
+        url: "https://github.com/luojiahai/code-by-wire/pull/252",
+        review_state: "pending",
+      },
+    });
+    const [s] = open(home).read();
+    expect(s.apiDurationMs).toBe(3_852_000);
+    expect(s.pr).toEqual({
+      number: 252,
+      url: "https://github.com/luojiahai/code-by-wire/pull/252",
+      reviewState: "pending",
+    });
+  });
+
+  it("degrades both to null when omitted", () => {
+    const home = makeHome();
+    writeCapture(home, "sid-bare", { session_id: "sid-bare" });
+    const [s] = open(home).read();
+    expect(s.apiDurationMs).toBeNull();
+    expect(s.pr).toBeNull();
+  });
+
+  it("drops a pr block missing number or url; review_state alone is optional", () => {
+    const home = makeHome();
+    writeCapture(home, "sid-badpr", {
+      session_id: "sid-badpr",
+      pr: { number: 7 }, // no url — whole block unusable
+    });
+    writeCapture(home, "sid-nostate", {
+      session_id: "sid-nostate",
+      pr: { number: 9, url: "https://example.com/pull/9" }, // no review_state — fine
+    });
+    const byId = new Map(
+      open(home)
+        .read()
+        .map((s) => [s.sessionId, s]),
+    );
+    expect(byId.get("sid-badpr")?.pr).toBeNull();
+    expect(byId.get("sid-nostate")?.pr).toEqual({
+      number: 9,
+      url: "https://example.com/pull/9",
+      reviewState: null,
+    });
+  });
+
+  it("drops a malformed pr block: non-object, non-numeric number, or empty url", () => {
+    const home = makeHome();
+    writeCapture(home, "sid-primitive", {
+      session_id: "sid-primitive",
+      pr: "nope", // not an object at all
+    });
+    writeCapture(home, "sid-badnumber", {
+      session_id: "sid-badnumber",
+      pr: { number: "252", url: "https://example.com/pull/252" }, // number not numeric
+    });
+    writeCapture(home, "sid-emptyurl", {
+      session_id: "sid-emptyurl",
+      pr: { number: 9, url: "" }, // url present but empty
+    });
+    const byId = new Map(
+      open(home)
+        .read()
+        .map((s) => [s.sessionId, s]),
+    );
+    expect(byId.get("sid-primitive")?.pr).toBeNull();
+    expect(byId.get("sid-badnumber")?.pr).toBeNull();
+    expect(byId.get("sid-emptyurl")?.pr).toBeNull();
+  });
+});

@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { InfoButton } from "../../ui/InfoButton";
+import type { IconName } from "../../ui/icon-names";
 import { SidebarPanelLabel } from "../../shell/SidebarPanelLabel";
 
 // Shared chrome for the workspace rail panels and the Structure dock, so a retone lands in one place.
@@ -12,11 +13,13 @@ export function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
-/** A rail panel's shell: flat hermes section chrome — no divider borders, just vertical rhythm and
- *  bottom padding. */
+/** A rail panel's shell: flat hermes section chrome — no divider borders of its own, just vertical
+ *  rhythm. pt-1 balances pb-3 now that the cockpit rail draws hairlines between sections. */
 export function PanelSection({ children }: { children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 px-2.5 pb-3">{children}</section>
+    <section className="flex flex-col gap-2 px-2.5 pt-1 pb-3">
+      {children}
+    </section>
   );
 }
 
@@ -32,17 +35,20 @@ export function PanelHeading({
   children,
   info,
   right,
+  icon,
 }: {
   children: ReactNode;
   info?: ReactNode;
   right?: ReactNode;
+  /** The panel's dedicated lucide glyph (cockpit rail); omitted, the label wears the dither dot. */
+  icon?: IconName;
 }) {
   const title = typeof children === "string" ? children : undefined;
   return (
     <div className="relative -mx-2.5 flex h-7 shrink-0 items-center justify-between gap-2 px-2.5">
       <span className="flex min-w-0 items-center gap-1.5">
         <h2 className="flex min-w-0 items-center">
-          <SidebarPanelLabel>{children}</SidebarPanelLabel>
+          <SidebarPanelLabel icon={icon}>{children}</SidebarPanelLabel>
         </h2>
         {info && (
           // The popover is absolute against this outer relative strip, so left-0/right-0 span its full

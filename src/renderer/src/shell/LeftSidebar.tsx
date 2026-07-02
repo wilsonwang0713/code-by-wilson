@@ -33,9 +33,6 @@ export function LeftSidebar({
 }) {
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  // One timestamp per render for the relative-time labels; the 3s background re-sync (App.tsx's
-  // polling loop) re-renders this list, so the clock stays close enough without its own timer.
-  const now = Date.now();
   const groups = groupSessionsByProject(filterSessions(sessions, query));
   const toggleGroup = (project: string) =>
     setCollapsed((prev) => {
@@ -181,7 +178,6 @@ export function LeftSidebar({
                         key={s.id}
                         session={s}
                         selected={s.id === selectedId}
-                        now={now}
                         onSelect={() => onSelect(s.id)}
                       />
                     ))}

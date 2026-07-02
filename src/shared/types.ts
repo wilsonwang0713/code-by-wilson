@@ -133,6 +133,15 @@ export interface Session {
   sessionClockMs?: number;
   /** Working directory from the live capture, used to scope the lazy git/voice reads. Absent ⇒ no sample. */
   cwd?: string;
+  /** Claude Code's own session cost (statusLine cost.total_cost_usd) — the Spend panel's small $
+   *  readout. Display-only, never derived from a pricing table. Absent ⇒ no sample. */
+  costUsd?: number;
+  /** Cumulative API-in-flight time (cost.total_api_duration_ms), the Duty panel's numerator over
+   *  sessionClockMs. Absent ⇒ no sample. */
+  apiDurationMs?: number;
+  /** The capture's pr block. Preferred over the gh-polled PrInfo (fresher, carries review state);
+   *  gh remains the fallback when there is no capture. Absent ⇒ no sample or no PR. */
+  pr?: SessionPr;
   lastActivityMs: number;
   /** Session creation time (epoch ms); see PersistedSession.createdMs. The rail orders Active
    *  sessions by this, newest first. */
@@ -203,6 +212,15 @@ export interface RateLimit {
   usedPct: number;
   /** When the window resets, epoch ms. The statusLine reports epoch seconds; the reader normalizes to ms. */
   resetsAt: number;
+}
+
+/** The session's pull request as the statusLine capture reports it (`pr` block). `reviewState` is
+ *  the raw review_state string ("pending" / "approved" / "changes_requested" / anything newer), or
+ *  null when the capture omitted it. Fresher than the gh-polled PrInfo and carries state. */
+export interface SessionPr {
+  number: number;
+  url: string;
+  reviewState: string | null;
 }
 
 /** The app-wide account, derived from the freshest statusLine captures. Billing mode is decided in

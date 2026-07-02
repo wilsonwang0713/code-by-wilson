@@ -57,11 +57,12 @@ export const CONTEXT_WARN_PCT = 70;
 /** At or above this %, the context gauge redlines: bright amber fill and a danger tick. */
 export const CONTEXT_DANGER_PCT = 85;
 
-/** Tailwind text tone for a context %: muted when roomy, amber and brightening as it fills. */
+/** Tailwind text tone for a context %: primary at rest — the cockpit's Pressure hero reads at the
+ *  same weight as its sibling heroes — warming to amber and brightening as the window fills. */
 export function ctxTone(pct: number): string {
   if (pct >= CONTEXT_DANGER_PCT) return "text-accent-bright";
   if (pct >= CONTEXT_WARN_PCT) return "text-accent";
-  return "text-fg-muted";
+  return "text-fg";
 }
 
 /** The context % earns a spot in a sidebar row only once it crosses the warning threshold. */
