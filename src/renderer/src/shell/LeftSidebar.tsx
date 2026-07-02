@@ -1,21 +1,18 @@
 import { useState } from "react";
 import type { Session } from "@shared/types";
-import { headerLeftPaddingPx } from "@shared/chrome";
-import { isMacPlatform } from "@shared/platform";
 import { cx, focusRing } from "../ui/atoms";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
-import { useFullscreen } from "../ui/use-fullscreen";
 import { filterSessions, sortSessions } from "./session-list-model";
 import { SessionRow } from "./SessionRow";
 import { OVERVIEW_ID } from "../stats/sentinel";
 import { SETTINGS_ID } from "../settings/sentinel";
 
 /**
- * The left sidebar's content (design spec §4): a draggable top bar with the collapse toggle, a
- * 3-row menu (New session / Stats / Settings), a search box, and the compact session list.
- * Renders as plain content — the caller slots it inside a `Pane`
- * (Task 11), so this owns no width/position of its own beyond filling its parent.
+ * The left sidebar's content (design spec §4): an empty draggable top strip — the traffic lights
+ * and the fixed left toggle cluster float over it — a 3-row menu (New session / Stats / Settings),
+ * a search box, and the compact session list. Renders as plain content — the caller slots it
+ * inside a `Pane` (Task 11), so this owns no width/position of its own beyond filling its parent.
  */
 export function LeftSidebar({
   sessions,
@@ -25,7 +22,6 @@ export function LeftSidebar({
   canSpawn,
   route,
   onRoute,
-  onCollapse,
 }: {
   sessions: Session[];
   selectedId: string | null;
@@ -34,10 +30,7 @@ export function LeftSidebar({
   canSpawn: boolean;
   route: string;
   onRoute: (id: string) => void;
-  onCollapse: () => void;
 }) {
-  const isMac = isMacPlatform(window.api.platform);
-  const isFullscreen = useFullscreen();
   const [query, setQuery] = useState("");
   // One timestamp per render for the relative-time labels; the 3s background re-sync (App.tsx's
   // polling loop) re-renders this list, so the clock stays close enough without its own timer.
@@ -47,25 +40,9 @@ export function LeftSidebar({
   return (
     <div className="flex h-full flex-col border-r border-sidebar-border bg-sidebar">
       <div
-        className="drag-region flex shrink-0 select-none items-center justify-end"
-        style={{
-          height: "var(--titlebar-height)",
-          paddingLeft: headerLeftPaddingPx(isMac, isFullscreen),
-        }}
-      >
-        <button
-          type="button"
-          onClick={onCollapse}
-          aria-label="Collapse sidebar"
-          title="Collapse sidebar"
-          className={cx(
-            "no-drag mr-2 inline-flex items-center justify-center rounded p-1.5 text-fg-faint transition-colors hover:text-fg-muted",
-            focusRing,
-          )}
-        >
-          <Icon name="panel-left-close" size={15} />
-        </button>
-      </div>
+        className="drag-region shrink-0 select-none"
+        style={{ height: "var(--titlebar-height)" }}
+      />
 
       <div className="flex shrink-0 flex-col gap-0.5 px-2 pb-2">
         <button

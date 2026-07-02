@@ -27,16 +27,15 @@ import { OVERVIEW_ID } from "./stats/sentinel";
 import { SettingsView, type SettingsSection } from "./settings/SettingsView";
 import { SETTINGS_ID } from "./settings/sentinel";
 import { useUpdate } from "./ui/use-update";
-import { PaneShell } from "./shell/PaneShell";
-import { Pane } from "./shell/Pane";
-import { MainColumn } from "./shell/MainColumn";
+import { Pane, PaneMain, PaneShell } from "./shell/pane-shell";
+import { TitlebarControls } from "./shell/TitlebarControls";
 import { AppFooter } from "./shell/AppFooter";
 import { LeftSidebar } from "./shell/LeftSidebar";
 import { RightSidebar } from "./shell/RightSidebar";
 import { NewSessionView } from "./shell/NewSessionView";
 import { MiddleHeader } from "./shell/MiddleHeader";
 import { useMediaQuery, NARROW_VIEWPORT_QUERY } from "./shell/use-media-query";
-import { $paneOpen, togglePane } from "./shell/panes";
+import { $paneOpen } from "./shell/panes";
 import {
   CBW_LEFT_PANE_ID,
   CBW_RIGHT_PANE_ID,
@@ -384,17 +383,11 @@ export function App() {
   const narrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
   const leftOpen = useStore($paneOpen(CBW_LEFT_PANE_ID));
   const rightOpen = useStore($paneOpen(CBW_RIGHT_PANE_ID));
-  // The header's left padding must reserve the traffic-light inset whenever the left pane isn't
-  // actually docked next to it — whether the user closed it, or a narrow window force-collapsed it —
-  // so it's driven by rendered state, not the raw stored preference `leftOpen` alone.
+  // The header's insets must clear the traffic lights / fixed toggle clusters whenever a pane
+  // isn't actually docked next to it — whether the user closed it, or a narrow window
+  // force-collapsed it — so both are driven by rendered state, not the stored preference alone.
   const leftEdgeExposed = narrow || !leftOpen;
-  // A manual "show sidebar" button only makes sense when the pane is closed AND wide enough to
-  // actually dock back open. While force-collapsed by a narrow window, hover-reveal is the intended
-  // way in — a button here would flip the stored preference with no visible effect until widened.
-  const showLeftReopen = !narrow && !leftOpen;
-  // Same "suppress while narrow" rule for the right sidebar's reopen button — it has no padding/
-  // traffic-light concern, so it only ever needed a value change here, not a prop split.
-  const rightCollapsed = !narrow && !rightOpen;
+  const rightEdgeExposed = narrow || !rightOpen;
   const metrics = useMetrics(selected?.id ?? "", hasSession);
 
   // Re-home the selection only when the list first arrives, the open session vanishes, or the list
@@ -424,30 +417,18 @@ export function App() {
   // header), the live `Workspace` (which renders its own `MiddleHeader` + `SessionMenu`), or the
   // empty state when nothing is selected (e.g. a stale/vanished session id with no pinned route).
   const middle: ReactNode = isNewSession ? (
-    <MiddleNonSession
-      title="New session"
-      leftEdgeExposed={leftEdgeExposed}
-      showLeftReopen={showLeftReopen}
-    >
+    <MiddleNonSession title="New session" leftEdgeExposed={leftEdgeExposed}>
       <NewSessionView
         onCreate={createSession}
         onCancel={() => setSelectedId(OVERVIEW_ID)}
       />
     </MiddleNonSession>
   ) : isOverview ? (
-    <MiddleNonSession
-      title="code-by-wire"
-      leftEdgeExposed={leftEdgeExposed}
-      showLeftReopen={showLeftReopen}
-    >
+    <MiddleNonSession title="code-by-wire" leftEdgeExposed={leftEdgeExposed}>
       <StatsView />
     </MiddleNonSession>
   ) : isSettings ? (
-    <MiddleNonSession
-      title="Settings"
-      leftEdgeExposed={leftEdgeExposed}
-      showLeftReopen={showLeftReopen}
-    >
+    <MiddleNonSession title="Settings" leftEdgeExposed={leftEdgeExposed}>
       <SettingsView
         cliStatus={cliStatus}
         account={account}
@@ -469,23 +450,17 @@ export function App() {
       onEnd={endSession}
       onRename={(id, title) => void renameSession(id, title)}
       leftEdgeExposed={leftEdgeExposed}
-      showLeftReopen={showLeftReopen}
-      onShowLeft={() => togglePane(CBW_LEFT_PANE_ID)}
-      rightCollapsed={rightCollapsed}
-      onShowRight={() => togglePane(CBW_RIGHT_PANE_ID)}
+      rightEdgeExposed={rightEdgeExposed}
     />
   ) : (
-    <MiddleNonSession
-      title="code-by-wire"
-      leftEdgeExposed={leftEdgeExposed}
-      showLeftReopen={showLeftReopen}
-    >
+    <MiddleNonSession title="code-by-wire" leftEdgeExposed={leftEdgeExposed}>
       <EmptyDetail empty={all.length === 0} loading={loading} />
     </MiddleNonSession>
   );
 
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
+      <TitlebarControls hasSession={hasSession} />
       <PaneShell className="min-h-0 flex-1">
         <Pane
           id={CBW_LEFT_PANE_ID}
@@ -493,6 +468,8 @@ export function App() {
           width={LEFT_DEFAULT_WIDTH}
           minWidth={LEFT_MIN_WIDTH}
           maxWidth={LEFT_MAX_WIDTH}
+          resizable
+          divider
           hoverReveal
           forceCollapsed={narrow}
         >
@@ -504,27 +481,22 @@ export function App() {
             canSpawn={spawnGate(cliStatus).canSpawn}
             route={route}
             onRoute={setSelectedId}
-            onCollapse={() => togglePane(CBW_LEFT_PANE_ID)}
           />
         </Pane>
-        <MainColumn>{middle}</MainColumn>
+        <PaneMain>{middle}</PaneMain>
         <Pane
           id={CBW_RIGHT_PANE_ID}
           side="right"
           width={RIGHT_DEFAULT_WIDTH}
           minWidth={RIGHT_MIN_WIDTH}
           maxWidth={RIGHT_MAX_WIDTH}
+          resizable
+          divider
           hoverReveal
           disabled={!hasSession}
           forceCollapsed={narrow}
         >
-          {selected && (
-            <RightSidebar
-              session={selected}
-              metrics={metrics}
-              onCollapse={() => togglePane(CBW_RIGHT_PANE_ID)}
-            />
-          )}
+          {selected && <RightSidebar session={selected} metrics={metrics} />}
         </Pane>
       </PaneShell>
       <AppFooter version={__APP_VERSION__} />
@@ -535,21 +507,16 @@ export function App() {
 /**
  * The middle column's chrome for every non-`Workspace` route (New session, Overview, Settings, and
  * the empty state): `MiddleHeader` with a plain title (no `SessionMenu`, no Transcript toggle — both
- * are session-only) plus the reopen affordance for a collapsed left rail. There is never a selected
- * session on these routes, so `session={null}`/`rightCollapsed={false}` are correct unconditionally
- * — `MiddleHeader` only ever renders its "show right panel" button when a session is present, so the
- * right rail's reopen control never appears here, matching its auto-hide (the right `Pane` is force-
- * `disabled` on every one of these routes, see the `disabled={!hasSession}` above).
+ * are session-only). These routes never have a session, so the right cluster (which is session-gated)
+ * never floats over their header — `rightEdgeExposed={false}` is correct unconditionally.
  */
 function MiddleNonSession({
   title,
   leftEdgeExposed,
-  showLeftReopen,
   children,
 }: {
   title: string;
   leftEdgeExposed: boolean;
-  showLeftReopen: boolean;
   children: ReactNode;
 }) {
   return (
@@ -560,10 +527,7 @@ function MiddleNonSession({
         transcriptOn={false}
         onToggleTranscript={() => {}}
         leftEdgeExposed={leftEdgeExposed}
-        showLeftReopen={showLeftReopen}
-        onShowLeft={() => togglePane(CBW_LEFT_PANE_ID)}
-        rightCollapsed={false}
-        onShowRight={() => togglePane(CBW_RIGHT_PANE_ID)}
+        rightEdgeExposed={false}
         menu={null}
       />
       <div className="min-h-0 flex-1">{children}</div>

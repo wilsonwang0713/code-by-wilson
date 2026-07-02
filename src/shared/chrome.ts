@@ -24,15 +24,3 @@ export const MAC_TRAFFIC_LIGHT_POSITION: { x: number; y: number } = {
  *  the left side off macOS or in macOS fullscreen. The wordmark drops to this and slides into the corner
  *  when the lights vacate it. */
 export const HEADER_EDGE_PADDING_PX = 16;
-
-/** The wordmark's left inset (CSS px). It clears the macOS traffic lights only when windowed; in
- *  fullscreen the lights are gone, so it falls back to the plain edge padding. Off macOS there are never
- *  lights. Pure (no DOM) so the header's one piece of branching logic can be unit-tested. */
-export function headerLeftPaddingPx(
-  isMac: boolean,
-  isFullscreen: boolean,
-): number {
-  return isMac && !isFullscreen
-    ? MAC_TRAFFIC_LIGHT_INSET_PX
-    : HEADER_EDGE_PADDING_PX;
-}

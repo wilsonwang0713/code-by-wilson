@@ -1,22 +1,23 @@
 import type { ReactNode } from "react";
 import type { Session } from "@shared/types";
-import { headerLeftPaddingPx } from "@shared/chrome";
 import { isMacPlatform } from "@shared/platform";
-import { cx, focusRing } from "../ui/atoms";
-import { Icon } from "../ui/icons";
+import { cx } from "../ui/atoms";
 import { useFullscreen } from "../ui/use-fullscreen";
+import { headerRightPaddingPx, titlebarContentInsetPx } from "./titlebar";
 
 /**
- * The middle column's own in-column header (design spec §5): a draggable strip that carries the
- * active session's menu — name, chevron, and Managed/Observed badge, all bundled in Task 7's
- * `SessionMenu` and passed in as `menu` — or a plain title when there's no session, plus a
- * Transcript on/off switch and the reopen buttons for either sidebar when it's collapsed. Standalone
- * for now; Task 8/11 wire it into `Workspace.tsx`/`App.tsx` above the terminal/transcript view.
+ * The middle column's own in-column header: a draggable strip that carries the active session's
+ * menu — name, chevron, and Managed/Observed badge, bundled in `SessionMenu` and passed in as
+ * `menu` — or a plain title when there's no session, plus the Transcript on/off switch. The
+ * sidebar toggles live in the fixed `TitlebarControls` clusters, NOT here — nothing in this header
+ * mounts or unmounts when a pane toggles.
  *
- * Left padding is its own case, distinct from `GlobalHeader`: when the left sidebar is expanded its
- * own top bar already reserves the traffic-light inset, so this header only needs a small fixed
- * padding; when the left sidebar is collapsed, this header becomes the visual left edge and must
- * reserve the same inset the sidebar's top bar would have.
+ * Both paddings snap (hermes behavior — no transition): they change in the same frame as the
+ * pane's grid track, so the title reflows exactly once, in sync with the sidebar. When the left
+ * pane is docked, its own strip covers the traffic lights and the left cluster, so 14px suffices;
+ * when it isn't, this header is the visual left edge and insets past lights + cluster. The right
+ * padding mirrors that for the right cluster, which only floats over this header while a session
+ * exists and the right pane isn't docked.
  */
 export function MiddleHeader({
   title,
@@ -24,61 +25,36 @@ export function MiddleHeader({
   transcriptOn,
   onToggleTranscript,
   leftEdgeExposed,
-  showLeftReopen,
-  onShowLeft,
-  rightCollapsed,
-  onShowRight,
+  rightEdgeExposed,
   menu,
 }: {
   title: string;
   session: Session | null;
   transcriptOn: boolean;
   onToggleTranscript: () => void;
-  /** True whenever the left pane isn't actually docked next to this header — closed by the user, or
-   *  force-collapsed by a narrow window — so this header becomes the true visual left edge and must
-   *  reserve the traffic-light inset. */
+  /** True whenever the left pane isn't actually docked next to this header — closed by the user,
+   *  or force-collapsed by a narrow window. Rendered state, not the stored preference. */
   leftEdgeExposed: boolean;
-  /** True only when a manual "show sidebar" affordance makes sense: the pane is closed AND the window
-   *  is wide enough to dock it back. Suppressed while force-collapsed by a narrow window, where
-   *  hover-reveal is the intended way in. */
-  showLeftReopen: boolean;
-  onShowLeft: () => void;
-  rightCollapsed: boolean;
-  onShowRight: () => void;
+  /** Same, for the right pane. Only matters while a session exists (the right cluster is hidden
+   *  otherwise). */
+  rightEdgeExposed: boolean;
   menu: ReactNode;
 }) {
   const isMac = isMacPlatform(window.api.platform);
   const isFullscreen = useFullscreen();
   const paddingLeft = leftEdgeExposed
-    ? headerLeftPaddingPx(isMac, isFullscreen)
+    ? titlebarContentInsetPx(isMac, isFullscreen)
     : 14;
+  const paddingRight = headerRightPaddingPx(Boolean(session) && rightEdgeExposed);
 
   return (
     <header
       className={cx(
-        "drag-region flex shrink-0 select-none items-center overflow-hidden border-b border-ink-800 bg-ink-925 pr-4",
+        "drag-region flex shrink-0 select-none items-center overflow-hidden border-b border-ink-800 bg-ink-925",
         isMac && "title-bar",
       )}
-      style={{
-        height: "var(--titlebar-height)",
-        paddingLeft,
-        transition: "padding-left 200ms ease-out",
-      }}
+      style={{ height: "var(--titlebar-height)", paddingLeft, paddingRight }}
     >
-      {showLeftReopen && (
-        <button
-          type="button"
-          onClick={onShowLeft}
-          aria-label="Show sidebar"
-          title="Show sidebar"
-          className={cx(
-            "no-drag mr-2 inline-flex items-center justify-center rounded p-1.5 text-fg-faint transition-colors hover:text-fg-muted",
-            focusRing,
-          )}
-        >
-          <Icon name="panel-left-open" size={15} />
-        </button>
-      )}
       {session ? (
         menu
       ) : (
@@ -104,20 +80,6 @@ export function MiddleHeader({
                 transcriptOn ? "right-[2px]" : "left-[2px]",
               )}
             />
-          </button>
-        )}
-        {rightCollapsed && session && (
-          <button
-            type="button"
-            onClick={onShowRight}
-            aria-label="Show right panel"
-            title="Show right panel"
-            className={cx(
-              "inline-flex items-center justify-center rounded p-1.5 text-fg-faint transition-colors hover:text-fg-muted",
-              focusRing,
-            )}
-          >
-            <Icon name="panel-right-open" size={15} />
           </button>
         )}
       </div>

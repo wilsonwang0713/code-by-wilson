@@ -25,10 +25,7 @@ export function Workspace({
   onEnd,
   onRename,
   leftEdgeExposed,
-  showLeftReopen,
-  onShowLeft,
-  rightCollapsed,
-  onShowRight,
+  rightEdgeExposed,
 }: {
   session: Session;
   /** Whether the Claude Code CLI is usable; gates Adopt and Fork (both spawn the CLI). */
@@ -39,14 +36,10 @@ export function Workspace({
   onEnd: (id: string) => void;
   /** Persist a display-name override for this session (null/empty clears it). Applies to any session. */
   onRename: (id: string, title: string | null) => void;
-  /** Whether the left pane isn't actually docked next to the header — reserves the traffic-light inset. */
+  /** Whether the left pane isn't actually docked next to the header — reserves the cluster inset. */
   leftEdgeExposed: boolean;
-  /** Whether a manual "show sidebar" button makes sense (pane closed and wide enough to dock back). */
-  showLeftReopen: boolean;
-  onShowLeft: () => void;
-  /** Whether the right sidebar is collapsed — shows the reopen button. */
-  rightCollapsed: boolean;
-  onShowRight: () => void;
+  /** Whether the right pane isn't docked — the header clears the fixed right toggle cluster. */
+  rightEdgeExposed: boolean;
 }) {
   // Recomputed each render; App's 3s background re-sync re-renders this, so the timeline timestamps tick.
   const now = Date.now();
@@ -74,10 +67,7 @@ export function Workspace({
         transcriptOn={transcriptOn}
         onToggleTranscript={() => setTranscriptOn((v) => !v)}
         leftEdgeExposed={leftEdgeExposed}
-        showLeftReopen={showLeftReopen}
-        onShowLeft={onShowLeft}
-        rightCollapsed={rightCollapsed}
-        onShowRight={onShowRight}
+        rightEdgeExposed={rightEdgeExposed}
         menu={
           <SessionMenu
             session={s}
