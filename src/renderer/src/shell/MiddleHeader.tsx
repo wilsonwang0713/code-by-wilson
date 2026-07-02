@@ -45,7 +45,9 @@ export function MiddleHeader({
   const paddingLeft = leftEdgeExposed
     ? titlebarContentInsetPx(isMac, isFullscreen)
     : 14;
-  const paddingRight = headerRightPaddingPx(Boolean(session) && rightEdgeExposed);
+  const paddingRight = headerRightPaddingPx(
+    Boolean(session) && rightEdgeExposed,
+  );
 
   return (
     <header
