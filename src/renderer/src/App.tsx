@@ -495,7 +495,13 @@ export function App() {
           disabled={!hasSession}
           forceCollapsed={narrow}
         >
-          {selected && <RightSidebar session={selected} metrics={metrics} />}
+          {selected && (
+            <RightSidebar
+              session={selected}
+              metrics={metrics}
+              account={account}
+            />
+          )}
         </Pane>
       </PaneShell>
       {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
