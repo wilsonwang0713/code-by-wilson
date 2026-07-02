@@ -31,15 +31,17 @@ export const focusRingInset =
 export function Dot({
   state,
   management,
+  sizeClass = "h-2 w-2",
 }: {
   state: SessionState;
   management?: Management;
+  sizeClass?: string;
 }) {
   const cls = glyphClass(state, management ?? "managed");
   return (
     <span
       title={management ? glyphTitle(state, management) : undefined}
-      className={cx("relative inline-flex h-2 w-2 rounded-full", cls)}
+      className={cx("relative inline-flex rounded-full", sizeClass, cls)}
     >
       {glyphPulses(state) && (
         <span
