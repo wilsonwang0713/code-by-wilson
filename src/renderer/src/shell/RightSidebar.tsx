@@ -34,8 +34,10 @@ export function RightSidebar({
         style={{ height: "var(--titlebar-height)" }}
       />
 
+      {/* px-1.5 on top of PanelSection's own px-2.5 ≈ the left sidebar's ~16px content inset,
+          scoped here so the Structure dock's PanelSections keep their tighter fit. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="flex flex-col pb-2">
+        <div className="flex flex-col px-1.5 pb-2">
           <PressurePanel
             live={session.liveContext ?? null}
             context={doc?.context ?? null}
