@@ -8,7 +8,7 @@ import { headerRightPaddingPx, titlebarContentInsetPx } from "./titlebar";
 
 /**
  * The middle column's own in-column header: a draggable strip that carries the active session's
- * menu — name, chevron, and Managed/Observed badge, bundled in `SessionMenu` and passed in as
+ * menu — name and chevron, bundled in `SessionMenu` and passed in as
  * `menu` — or a plain title when there's no session, plus the Claude Code ⇄ Transcript view switcher. The
  * sidebar toggles live in the fixed `TitlebarControls` clusters, NOT here — nothing in this header
  * mounts or unmounts when a pane toggles.

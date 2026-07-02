@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 
 /**
  * A page-level title block: heading + optional lede paragraph + optional right-aligned controls
- * cluster (e.g. Stats' filter/reset row). Shared by Settings, Stats, and New Session so all
- * three read as the same design system rather than three independent one-offs.
+ * cluster. Shared by Settings and New Session so both read as the same design system rather than
+ * two independent one-offs.
  */
 export function PageHeader({
   title,

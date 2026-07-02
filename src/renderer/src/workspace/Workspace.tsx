@@ -206,7 +206,7 @@ function WorkspaceBody({
   );
 }
 
-/** The center column's live view. Every session gets the Terminal ⇄ Transcript toggle in `MiddleHeader`;
+/** The center column's live view. Every session gets the Claude Code ⇄ Transcript switcher in `MiddleHeader`;
  *  `transcriptOn` (lifted to `Workspace`, threaded down here) drives which side shows: off is the Terminal
  *  — the live xterm for a running Managed session, else the ObservedTerminal panel (Fork always, Adopt once
  *  Ended) — on is the Transcript, or the drilled Subagent/Shell surface when the drill-stack is non-empty.
