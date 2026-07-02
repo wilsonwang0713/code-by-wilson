@@ -19,9 +19,15 @@ function spread(hex: string): number {
   return Math.max(r, g, b) - Math.min(r, g, b);
 }
 
-/** Read a `--color-<name>: #hex` value out of the @theme block. */
+/**
+ * Read a `--color-<name>` value out of the @theme block, as a hex triplet. Most tokens are a
+ * plain hex; the hermes Mono text tiers (fg/fg-muted/fg-faint) are `color-mix(in srgb, #hex N%,
+ * transparent)` — the regex tolerates the color-mix() wrapper and pulls out its hex argument.
+ */
 function token(name: string): string {
-  const m = new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6})`).exec(css);
+  const m = new RegExp(
+    `--color-${name}:\\s*(?:color-mix\\([^,]+,\\s*)?(#[0-9a-fA-F]{6})`,
+  ).exec(css);
   if (!m) throw new Error(`token --color-${name} not found in index.css`);
   return m[1];
 }
@@ -61,25 +67,33 @@ describe("cockpit theme — graphite surfaces (not warm, not cool)", () => {
   });
 
   it("scrollbar chrome is graphite too", () => {
+    // hermes's scrollbar-dt thumb is `color-mix(in srgb, var(--ui-accent) N%, transparent)`
+    // rather than a literal hex, so assert on the resolved --ui-accent chain instead: it aliases
+    // to --theme-midground, which must itself be neutral graphite.
     const thumbs = [
       ...css.matchAll(
-        /scrollbar-thumb[^{]*\{[^}]*background:\s*(#[0-9a-fA-F]{6})/g,
+        /scrollbar-thumb[^{]*\{[^}]*background:\s*color-mix\(in srgb,\s*var\(--ui-accent\)/g,
       ),
-    ].map((m) => m[1]);
+    ];
     expect(
       thumbs.length,
-      "expected thumb + hover backgrounds",
+      "expected thumb + hover backgrounds keyed off --ui-accent",
     ).toBeGreaterThanOrEqual(2);
-    for (const hex of thumbs) {
-      expect(
-        spread(hex),
-        `scrollbar thumb ${hex} should be neutral graphite`,
-      ).toBeLessThanOrEqual(1);
-    }
+    const midground = /--theme-midground:\s*(#[0-9a-fA-F]{6})/.exec(css);
+    expect(midground, "--theme-midground hex").toBeTruthy();
+    expect(
+      spread(midground![1]),
+      `--theme-midground (${midground![1]}) should be neutral graphite`,
+    ).toBeLessThanOrEqual(1);
   });
 
-  it("the wire accent and status hues stay chromatic (the brand was not greyed out)", () => {
-    expect(spread(token("primary")), "wire blue").toBeGreaterThan(20);
+  it("status hues stay chromatic; the wire accent was intentionally greyed out (hermes Mono)", () => {
+    // hermes's Mono theme retires the teal brand accent — primary now aliases straight to the
+    // grayscale foreground (see index.css:3-5) — while Working/Waiting keep their state hues.
+    expect(
+      spread(token("primary")),
+      "primary (now = foreground)",
+    ).toBeLessThanOrEqual(1);
     expect(spread(token("working")), "teal Working").toBeGreaterThan(20);
     expect(spread(token("accent")), "amber Waiting").toBeGreaterThan(20);
   });
