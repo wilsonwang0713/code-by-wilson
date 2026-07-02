@@ -24,8 +24,15 @@ import {
   MessagesSquare,
   Monitor,
   Palette,
+  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRight,
+  PanelRightClose,
+  PanelRightOpen,
   Pause,
   Pencil,
+  Pin,
   Plus,
   RotateCcw,
   Search,
@@ -36,6 +43,7 @@ import {
   SquareTerminal,
   Terminal,
   TriangleAlert,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import type { IconName } from "./icon-names";
@@ -75,8 +83,15 @@ const ICONS = {
   "messages-square": MessagesSquare,
   monitor: Monitor,
   palette: Palette,
+  "panel-left": PanelLeft,
+  "panel-left-close": PanelLeftClose,
+  "panel-left-open": PanelLeftOpen,
+  "panel-right": PanelRight,
+  "panel-right-close": PanelRightClose,
+  "panel-right-open": PanelRightOpen,
   pause: Pause,
   pencil: Pencil,
+  pin: Pin,
   plus: Plus,
   "rotate-ccw": RotateCcw,
   search: Search,
@@ -87,6 +102,7 @@ const ICONS = {
   "square-terminal": SquareTerminal,
   terminal: Terminal,
   "triangle-alert": TriangleAlert,
+  x: X,
 } satisfies Record<IconName, LucideIcon>;
 
 /** A Lucide line icon at the cockpit's 1.75 stroke weight; color inherits via currentColor. */

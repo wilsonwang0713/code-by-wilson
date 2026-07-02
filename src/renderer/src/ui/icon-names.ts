@@ -31,8 +31,15 @@ export type IconName =
   | "messages-square"
   | "monitor"
   | "palette"
+  | "panel-left"
+  | "panel-left-close"
+  | "panel-left-open"
+  | "panel-right"
+  | "panel-right-close"
+  | "panel-right-open"
   | "pause"
   | "pencil"
+  | "pin"
   | "plus"
   | "rotate-ccw"
   | "search"
@@ -42,4 +49,5 @@ export type IconName =
   | "square-dashed-mouse-pointer"
   | "square-terminal"
   | "terminal"
-  | "triangle-alert";
+  | "triangle-alert"
+  | "x";

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useStore } from "@nanostores/react";
 import type { Session, Family, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
@@ -17,12 +18,8 @@ import { newSessionId } from "@shared/terminal";
 import { orderedSessions } from "@shared/overview";
 import { applyTitleOverrides } from "@shared/title-override";
 import { Workspace } from "./workspace/Workspace";
-import { NewSessionDialog } from "./terminal/NewSessionDialog";
+import { useMetrics } from "./workspace/use-metrics";
 import { terminalStore } from "./terminal/terminal-store-instance";
-import { GlobalHeader } from "./ui/GlobalHeader";
-import { CautionBanner } from "./ui/CautionBanner";
-import { cliStatusView } from "./ui/cli-status-view";
-import { SessionList } from "./SessionList";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
 import { StatsView } from "./stats/StatsView";
@@ -30,6 +27,30 @@ import { OVERVIEW_ID } from "./stats/sentinel";
 import { SettingsView, type SettingsSection } from "./settings/SettingsView";
 import { SETTINGS_ID } from "./settings/sentinel";
 import { useUpdate } from "./ui/use-update";
+import { Pane, PaneMain, PaneShell } from "./shell/pane-shell";
+import { TitlebarControls } from "./shell/TitlebarControls";
+import { AppFooter } from "./shell/AppFooter";
+import { LeftSidebar } from "./shell/LeftSidebar";
+import { RightSidebar } from "./shell/RightSidebar";
+import { NewSessionView } from "./shell/NewSessionView";
+import { MiddleHeader } from "./shell/MiddleHeader";
+import { useMediaQuery, NARROW_VIEWPORT_QUERY } from "./shell/use-media-query";
+import { $paneOpen } from "./shell/panes";
+import {
+  CBW_LEFT_PANE_ID,
+  CBW_RIGHT_PANE_ID,
+  LEFT_DEFAULT_WIDTH,
+  LEFT_MIN_WIDTH,
+  LEFT_MAX_WIDTH,
+  RIGHT_DEFAULT_WIDTH,
+  RIGHT_MIN_WIDTH,
+  RIGHT_MAX_WIDTH,
+} from "./shell/layout";
+
+/** The middle column's sentinel for the inline new-session view (design spec §5), alongside
+ *  `OVERVIEW_ID`/`SETTINGS_ID`: not a real session id (real ids come from `newSessionId()`, which
+ *  never produces this literal), so it can share the same `selectedId` routing state. */
+const NEW_SESSION_ID = "new-session";
 
 /** How often the session list re-syncs in the background, so an open workspace's state (and the
  *  Overview) tracks a session as it moves. Slower than the transcript poll: metadata changes less
@@ -75,7 +96,6 @@ export function App() {
   // guards on `!isOverview`, so it never yanks this to a session on first load; the user clicks into a
   // session to leave it.
   const [selectedId, setSelectedId] = useState<string | null>(OVERVIEW_ID);
-  const [creating, setCreating] = useState(false);
   const update = useUpdate();
 
   // Sessions and account come from one overview read, so apply them together — a stale or failed
@@ -219,7 +239,6 @@ export function App() {
         rows: 24,
       });
       setDrafts((ds) => [draft, ...ds]);
-      setCreating(false);
       setSelectedId(id);
     } catch (e) {
       terminalStore.dispose(id); // spawn failed → nothing will ever feed this handle; don't leak it
@@ -348,13 +367,28 @@ export function App() {
   );
   const isOverview = selectedId === OVERVIEW_ID;
   const isSettings = selectedId === SETTINGS_ID;
-  // Both pinned views (Overview, Settings) are non-session selections: the per-session lookup and the
-  // auto-select effect must treat them as valid, never as a stale/missing session to re-home.
-  const isPinned = isOverview || isSettings;
+  const isNewSession = selectedId === NEW_SESSION_ID;
+  // All three pinned views (Overview, Settings, New session) are non-session selections: the
+  // per-session lookup and the auto-select effect must treat them as valid, never as a
+  // stale/missing session to re-home — otherwise a background sync that changes the id list while
+  // the inline New session view is open would yank the user back to a session mid-form.
+  const isPinned = isOverview || isSettings || isNewSession;
   const selected =
     !isPinned && selectedId !== null
       ? (all.find((s) => s.id === selectedId) ?? null)
       : null;
+  const hasSession = selected != null;
+  const route = selectedId ?? "";
+
+  const narrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
+  const leftOpen = useStore($paneOpen(CBW_LEFT_PANE_ID));
+  const rightOpen = useStore($paneOpen(CBW_RIGHT_PANE_ID));
+  // The header's insets must clear the traffic lights / fixed toggle clusters whenever a pane
+  // isn't actually docked next to it — whether the user closed it, or a narrow window
+  // force-collapsed it — so both are driven by rendered state, not the stored preference alone.
+  const leftEdgeExposed = narrow || !leftOpen;
+  const rightEdgeExposed = narrow || !rightOpen;
+  const metrics = useMetrics(selected?.id ?? "", hasSession);
 
   // Re-home the selection only when the list first arrives, the open session vanishes, or the list
   // empties. Keyed on the id list so it can't loop on a fresh `all` each render; setting the same id is
@@ -378,69 +412,128 @@ export function App() {
     }
   }, [ids]);
 
-  const showSystem = (): void => {
-    setSettingsSection("system");
-    setSelectedId(SETTINGS_ID);
-  };
-  // The master-caution strip shows whenever the CLI is non-ok, except while already in Settings (the strip
-  // deep-links there) and during the pre-first-check window (no status to judge yet).
-  const showCaution =
-    cliStatus !== null && !isSettings && cliStatusView(cliStatus).tone !== "ok";
+  // The middle column's content, keyed on the current route: the inline new-session form, the
+  // pinned Overview/Settings views (each wrapped in `MiddleNonSession` for its own plain-title
+  // header), the live `Workspace` (which renders its own `MiddleHeader` + `SessionMenu`), or the
+  // empty state when nothing is selected (e.g. a stale/vanished session id with no pinned route).
+  const middle: ReactNode = isNewSession ? (
+    <MiddleNonSession title="New session" leftEdgeExposed={leftEdgeExposed}>
+      <NewSessionView
+        onCreate={createSession}
+        onCancel={() => setSelectedId(OVERVIEW_ID)}
+      />
+    </MiddleNonSession>
+  ) : isOverview ? (
+    <MiddleNonSession title="code-by-wire" leftEdgeExposed={leftEdgeExposed}>
+      <StatsView />
+    </MiddleNonSession>
+  ) : isSettings ? (
+    <MiddleNonSession title="Settings" leftEdgeExposed={leftEdgeExposed}>
+      <SettingsView
+        cliStatus={cliStatus}
+        account={account}
+        checking={checking}
+        onRecheck={() => void recheckCli()}
+        onSetBinPath={(p) => void setClaudeBinPath(p)}
+        section={settingsSection}
+        onSectionChange={setSettingsSection}
+        update={update}
+      />
+    </MiddleNonSession>
+  ) : selected ? (
+    <Workspace
+      key={selected.id}
+      session={selected}
+      canSpawn={spawnGate(cliStatus).canSpawn}
+      onAdopt={adoptSession}
+      onFork={forkSession}
+      onEnd={endSession}
+      onRename={(id, title) => void renameSession(id, title)}
+      leftEdgeExposed={leftEdgeExposed}
+      rightEdgeExposed={rightEdgeExposed}
+    />
+  ) : (
+    <MiddleNonSession title="code-by-wire" leftEdgeExposed={leftEdgeExposed}>
+      <EmptyDetail empty={all.length === 0} loading={loading} />
+    </MiddleNonSession>
+  );
 
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
-      <GlobalHeader
-        cliStatus={cliStatus}
-        onOpenSettings={() => setSelectedId(SETTINGS_ID)}
-        settingsActive={isSettings}
-        updatePhase={update.state.phase.kind}
+      <PaneShell className="min-h-0 flex-1">
+        <Pane
+          id={CBW_LEFT_PANE_ID}
+          side="left"
+          width={LEFT_DEFAULT_WIDTH}
+          minWidth={LEFT_MIN_WIDTH}
+          maxWidth={LEFT_MAX_WIDTH}
+          resizable
+          divider
+          hoverReveal
+          forceCollapsed={narrow}
+        >
+          <LeftSidebar
+            sessions={all}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onNew={() => setSelectedId(NEW_SESSION_ID)}
+            canSpawn={spawnGate(cliStatus).canSpawn}
+            route={route}
+            onRoute={setSelectedId}
+          />
+        </Pane>
+        <PaneMain>{middle}</PaneMain>
+        <Pane
+          id={CBW_RIGHT_PANE_ID}
+          side="right"
+          width={RIGHT_DEFAULT_WIDTH}
+          minWidth={RIGHT_MIN_WIDTH}
+          maxWidth={RIGHT_MAX_WIDTH}
+          resizable
+          divider
+          hoverReveal
+          disabled={!hasSession}
+          forceCollapsed={narrow}
+        >
+          {selected && <RightSidebar session={selected} metrics={metrics} />}
+        </Pane>
+      </PaneShell>
+      {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
+          (drag unions, then no-drag subtracts), so the clusters' no-drag must come after
+          the sidebars'/header's full-width drag strips or the strips swallow their clicks. */}
+      <TitlebarControls hasSession={hasSession} />
+      <AppFooter version={__APP_VERSION__} />
+    </div>
+  );
+}
+
+/**
+ * The middle column's chrome for every non-`Workspace` route (New session, Overview, Settings, and
+ * the empty state): `MiddleHeader` with a plain title (no `SessionMenu`, no Transcript toggle — both
+ * are session-only). These routes never have a session, so the right cluster (which is session-gated)
+ * never floats over their header — `rightEdgeExposed={false}` is correct unconditionally.
+ */
+function MiddleNonSession({
+  title,
+  leftEdgeExposed,
+  children,
+}: {
+  title: string;
+  leftEdgeExposed: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex h-full min-w-0 flex-1 flex-col bg-ink-950 text-fg">
+      <MiddleHeader
+        session={null}
+        title={title}
+        transcriptOn={false}
+        onToggleTranscript={() => {}}
+        leftEdgeExposed={leftEdgeExposed}
+        rightEdgeExposed={false}
+        menu={null}
       />
-      {showCaution && cliStatus && (
-        <CautionBanner status={cliStatus} onOpenSystem={showSystem} />
-      )}
-      <div className="flex min-h-0 flex-1">
-        <SessionList
-          sessions={all}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onNew={() => setCreating(true)}
-          canSpawn={spawnGate(cliStatus).canSpawn}
-        />
-        <div className="flex min-w-0 flex-1">
-          {isSettings ? (
-            <SettingsView
-              cliStatus={cliStatus}
-              account={account}
-              checking={checking}
-              onRecheck={() => void recheckCli()}
-              onSetBinPath={(p) => void setClaudeBinPath(p)}
-              section={settingsSection}
-              onSectionChange={setSettingsSection}
-              update={update}
-            />
-          ) : isOverview ? (
-            <StatsView />
-          ) : selected ? (
-            <Workspace
-              key={selected.id}
-              session={selected}
-              canSpawn={spawnGate(cliStatus).canSpawn}
-              onAdopt={adoptSession}
-              onFork={forkSession}
-              onEnd={endSession}
-              onRename={(id, title) => void renameSession(id, title)}
-            />
-          ) : (
-            <EmptyDetail empty={all.length === 0} loading={loading} />
-          )}
-        </div>
-      </div>
-      {creating && (
-        <NewSessionDialog
-          onCreate={createSession}
-          onCancel={() => setCreating(false)}
-        />
-      )}
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }

@@ -9,19 +9,19 @@ import {
 import { createPortal } from "react-dom";
 import type { Session } from "@shared/types";
 import type { GitInfo, PrInfo } from "@shared/metrics";
-import { Cell } from "./Cell";
 import { Icon } from "../ui/icons";
 import { CopyButton } from "../ui/CopyButton";
 
 const POP_WIDTH = 280;
 
-/** The annunciator's Git cell: a minimal strip readout (the branch, or the short sha on a detached HEAD,
+/** The Identity panel's Git readout: a minimal trigger (the branch, or the short sha on a detached HEAD,
  *  with an amber dot when the tree is dirty) that opens a detail popover. The popover carries the repo
  *  link, the copy-able branch and commit, the PR link, and the sync/diff/status numbers. Before the
- *  glance lands the cell shows the session's recorded branch as plain text (no popover to fill yet); off
- *  a repo-less cwd with no recorded branch it's a bare em dash. The popover is portaled to the body
- *  because the annunciator bar clips its overflow. */
-export function GitCell({
+ *  glance lands the readout shows the session's recorded branch as plain text (no popover to fill yet);
+ *  off a repo-less cwd with no recorded branch it's a bare em dash. The popover is portaled to the body
+ *  because the sidebar clips its overflow. Ported from the old annunciator's `GitCell` — same interactive
+ *  logic, minus the horizontal-strip `Cell` wrapper (the caller supplies its own label/value row shell). */
+export function GitReadout({
   session: s,
   git,
   pr,
@@ -45,8 +45,8 @@ export function GitCell({
   const behind = git?.behind ?? null;
   const insertions = git?.insertions ?? 0;
   const deletions = git?.deletions ?? 0;
-  // The strip label: the live branch, the short sha on a detached HEAD, or — before the glance lands or
-  // off a repo-less cwd — the session's recorded branch. The popover only opens when there's a live
+  // The readout's label: the live branch, the short sha on a detached HEAD, or — before the glance lands
+  // or off a repo-less cwd — the session's recorded branch. The popover only opens when there's a live
   // glance to fill it, so a pre-glance label renders as plain text rather than a dead trigger.
   const headLabel = branch ?? sha ?? s.branch ?? null;
   const interactive = git != null && headLabel != null;
@@ -81,9 +81,9 @@ export function GitCell({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    // Keep the popover glued to its trigger on scroll/resize rather than dismissing it. The annunciator
-    // lives in a non-scrolling header, so an inner pane scrolling (a streaming transcript) must NOT close
-    // the popover — only re-anchor it. Capture phase so a scroll in any descendant re-places it too.
+    // Keep the popover glued to its trigger on scroll/resize rather than dismissing it. A sidebar panel
+    // scrolling (the panel stack above/below it) must NOT close the popover — only re-anchor it. Capture
+    // phase so a scroll in any descendant re-places it too.
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     window.addEventListener("scroll", place, true);
@@ -97,7 +97,7 @@ export function GitCell({
   }, [open, place]);
 
   return (
-    <Cell label="Git" grow={2} raw>
+    <>
       {interactive ? (
         <button
           ref={triggerRef}
@@ -208,7 +208,7 @@ export function GitCell({
             document.body,
           )
         : null}
-    </Cell>
+    </>
   );
 }
 

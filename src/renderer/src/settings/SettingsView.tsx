@@ -13,6 +13,7 @@ import { RateBar } from "../ui/charts";
 import { ctxColor } from "../ui/meta";
 import { clampPct } from "../ui/charts-geom";
 import { remediesFor, INSTALL_TABS } from "../ui/cli-remedies";
+import { PageHeader, Card } from "../shell/page-primitives";
 
 export type SettingsSection = "system" | "account" | "appearance" | "about";
 
@@ -128,32 +129,6 @@ export function SettingsView({
   );
 }
 
-function Header({ title, lede }: { title: string; lede?: string }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <h1 className="font-display text-heading font-semibold tracking-tight text-fg">
-        {title}
-      </h1>
-      {lede && (
-        <p className="max-w-[54ch] text-body leading-relaxed text-fg-muted">
-          {lede}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-ink-800 bg-ink-925">
-      <div className="border-b border-ink-850 px-4 py-2.5 font-display text-label font-semibold uppercase tracking-[0.1em] text-fg-faint">
-        {title}
-      </div>
-      <div className="flex flex-col">{children}</div>
-    </div>
-  );
-}
-
 function Row({
   label,
   desc,
@@ -198,7 +173,7 @@ function SystemSection({
   const tone: FooterView["dot"] = view?.tone ?? "idle";
   return (
     <>
-      <Header
+      <PageHeader
         title="System"
         lede="Code-by-wire reads sessions through the Claude Code CLI and your local transcripts. This is the engine. Keep it green."
       />
@@ -508,7 +483,7 @@ function AccountSection({ account }: { account: Account | null }) {
   ].filter((g): g is { label: string; w: RateLimit } => g.w != null);
   return (
     <>
-      <Header
+      <PageHeader
         title="Account"
         lede="Who Code-by-wire reads usage for. Identity comes from ~/.claude; rate limits ride the live status capture."
       />
@@ -563,7 +538,7 @@ function AppearanceSection() {
   ).matches;
   return (
     <>
-      <Header
+      <PageHeader
         title="Appearance"
         lede="The look is fixed to the Instrument theme. The comfort settings follow your system."
       />
@@ -590,7 +565,7 @@ function AppearanceSection() {
 function AboutSection({ update }: { update?: UpdateControls }) {
   return (
     <>
-      <Header title="About" />
+      <PageHeader title="About" />
       <Card title="Code-by-wire">
         <div className="flex flex-col gap-3 px-4 py-4">
           <Wordmark />
