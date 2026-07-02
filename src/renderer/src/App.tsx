@@ -424,7 +424,7 @@ export function App() {
       />
     </MiddleNonSession>
   ) : isOverview ? (
-    <MiddleNonSession title="code-by-wire" leftEdgeExposed={leftEdgeExposed}>
+    <MiddleNonSession title="Stats" leftEdgeExposed={leftEdgeExposed}>
       <StatsView />
     </MiddleNonSession>
   ) : isSettings ? (
