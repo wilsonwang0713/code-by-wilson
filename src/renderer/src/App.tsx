@@ -460,7 +460,6 @@ export function App() {
 
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
-      <TitlebarControls hasSession={hasSession} />
       <PaneShell className="min-h-0 flex-1">
         <Pane
           id={CBW_LEFT_PANE_ID}
@@ -499,6 +498,10 @@ export function App() {
           {selected && <RightSidebar session={selected} metrics={metrics} />}
         </Pane>
       </PaneShell>
+      {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
+          (drag unions, then no-drag subtracts), so the clusters' no-drag must come after
+          the sidebars'/header's full-width drag strips or the strips swallow their clicks. */}
+      <TitlebarControls hasSession={hasSession} />
       <AppFooter version={__APP_VERSION__} />
     </div>
   );

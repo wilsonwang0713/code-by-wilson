@@ -20,6 +20,14 @@ import {
  * branch (hermes behavior): while a narrow window force-collapses the panes, the click's effect
  * becomes visible when the window widens; hover-reveal is the narrow-mode affordance.
  *
+ * Fixed positioning only takes this component out of layout flow, not out of DOM order for
+ * Chromium's draggable-region computation: that region is built by walking the tree in DOM order,
+ * unioning `drag` rects and subtracting `no-drag` rects as it goes. So this component must be
+ * mounted AFTER every `drag-region` element it visually overlaps (the sidebars' top strips,
+ * MiddleHeader's drag strip) — mounting it earlier lets those later drag unions swallow its
+ * no-drag subtraction back up, making the buttons undraggable-looking but actually click-through
+ * to a window drag.
+ *
  * `data-suppress-pane-reveal` makes the edge triggers pointer-transparent while a cluster is
  * hovered (see index.css) — the left cluster overlaps the left trigger strip whenever it sits at
  * the bare 14px edge inset (non-mac, or macOS fullscreen).
