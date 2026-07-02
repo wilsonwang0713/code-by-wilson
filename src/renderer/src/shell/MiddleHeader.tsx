@@ -44,47 +44,57 @@ export function MiddleHeader({
   const isFullscreen = useFullscreen();
   const paddingLeft = leftEdgeExposed
     ? titlebarContentInsetPx(isMac, isFullscreen)
-    : 14;
+    : 12;
   const paddingRight = headerRightPaddingPx(
     Boolean(session) && rightEdgeExposed,
   );
 
   return (
-    <header
-      className={cx(
-        "drag-region flex shrink-0 select-none items-center overflow-hidden border-b border-ink-800 bg-ink-925",
-        isMac && "title-bar",
-      )}
-      style={{ height: "var(--titlebar-height)", paddingLeft, paddingRight }}
-    >
-      {session ? (
-        menu
-      ) : (
-        <span className="truncate text-body text-fg">{title}</span>
-      )}
-      <div className="no-drag ml-auto flex items-center gap-2">
-        {session && (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={transcriptOn}
-            onClick={onToggleTranscript}
-            aria-label="Toggle transcript"
-            title="Transcript"
-            className={cx(
-              "relative h-[18px] w-8 shrink-0 rounded-full transition-colors",
-              transcriptOn ? "bg-primary" : "bg-ink-700",
-            )}
-          >
-            <span
-              className={cx(
-                "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all",
-                transcriptOn ? "right-[2px]" : "left-[2px]",
-              )}
-            />
-          </button>
+    <>
+      <header
+        className={cx(
+          "drag-region relative flex shrink-0 select-none items-center gap-3 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-chat-surface-background)",
+          isMac && "title-bar",
         )}
-      </div>
-    </header>
+        style={{ height: "var(--titlebar-height)", paddingLeft, paddingRight }}
+      >
+        {session ? (
+          menu
+        ) : (
+          <span className="truncate text-[0.75rem] font-medium leading-none text-(--ui-text-secondary)">
+            {title}
+          </span>
+        )}
+        <div className="no-drag ml-auto flex items-center gap-2">
+          {session && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={transcriptOn}
+              onClick={onToggleTranscript}
+              aria-label="Toggle transcript"
+              title="Transcript"
+              className={cx(
+                "relative h-4 w-7 shrink-0 rounded-full border transition-colors duration-100",
+                transcriptOn
+                  ? "border-transparent bg-primary"
+                  : "border-[color-mix(in_srgb,var(--color-fg)_18%,transparent)] bg-transparent",
+              )}
+            >
+              <span
+                className={cx(
+                  "absolute top-[1px] h-3 w-3 rounded-full transition-all duration-100",
+                  transcriptOn ? "right-[1px] bg-ink-950" : "left-[1px] bg-fg",
+                )}
+              />
+            </button>
+          )}
+        </div>
+      </header>
+      <div
+        aria-hidden
+        className="pointer-events-none relative z-10 -mb-4 h-4 shrink-0 bg-linear-to-b from-(--ui-chat-surface-background) to-transparent"
+      />
+    </>
   );
 }

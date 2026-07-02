@@ -233,20 +233,20 @@ export function SessionMenu({
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}
         title="Session menu"
-        className="flex w-full min-w-0 items-center gap-1.5 rounded px-1 py-0.5 text-left transition-colors hover:bg-ink-850"
+        className="flex h-6 min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-[2.5px] border border-transparent bg-transparent px-2 py-0 text-left text-(--ui-text-secondary) transition-colors duration-100 hover:border-(--ui-stroke-tertiary) hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none aria-expanded:border-(--ui-stroke-tertiary) aria-expanded:bg-(--ui-control-active-background)"
       >
-        <span className="min-w-0 truncate text-subhead font-medium text-fg">
+        <span className="min-w-0 truncate text-[0.75rem] font-medium leading-none">
           {session.title}
         </span>
         <Icon
           name="chevron-down"
           size={13}
           className={cx(
-            "shrink-0 text-fg-faint transition-transform",
+            "shrink-0 text-(--ui-text-tertiary) transition-transform",
             open && "rotate-180",
           )}
         />
-        <span className="shrink-0 rounded border border-ink-700 px-1.5 py-0.5 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
+        <span className="shrink-0 rounded-[3px] border border-(--ui-stroke-secondary) px-1.5 py-0.5 text-[0.65rem] font-medium leading-none text-(--ui-text-tertiary)">
           {badgeLabel}
         </span>
       </button>
@@ -263,7 +263,7 @@ export function SessionMenu({
                 top: pos.top,
                 width: MENU_WIDTH,
               }}
-              className="z-50 rounded-lg border border-ink-700 bg-ink-900 p-1.5 shadow-xl"
+              className="z-50 rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] p-1.5 shadow-(--shadow-md) backdrop-blur-xl"
             >
               <MenuItem
                 icon="copy"
@@ -314,10 +314,10 @@ export function SessionMenu({
               <div
                 role="separator"
                 aria-orientation="horizontal"
-                className="my-1 h-px bg-ink-800"
+                className="my-1 h-px bg-(--ui-stroke-tertiary)"
               />
 
-              <div className="px-2 pb-1 pt-0.5 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
+              <div className="px-2 pb-1 pt-0.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-(--theme-primary)">
                 Open in
               </div>
               {items.map((item) => (
@@ -400,10 +400,10 @@ function MenuItem({
       disabled={disabled}
       title={title}
       className={cx(
-        "flex w-full items-center gap-2.5 rounded px-2 py-1.5 text-left text-aux transition-colors focus-visible:outline-none focus-visible:bg-ink-800 disabled:cursor-default disabled:opacity-40",
+        "flex w-full items-center gap-2.5 rounded-[2.5px] px-2 py-1.5 text-left text-xs transition-colors focus-visible:outline-none focus-visible:bg-ink-800 disabled:cursor-default disabled:opacity-40",
         danger
           ? "text-danger enabled:hover:bg-danger/10"
-          : "text-fg-muted enabled:hover:bg-ink-800 enabled:hover:text-fg",
+          : "text-fg-muted enabled:hover:bg-(--ui-control-hover-background) enabled:hover:text-fg",
       )}
     >
       <Icon name={icon} size={13} />
