@@ -4,13 +4,14 @@ import type { MetricsState } from "../workspace/use-metrics";
 import { PressurePanel } from "../workspace/panels/PressurePanel";
 import { SpendPanel } from "../workspace/panels/SpendPanel";
 import { TokenSpeedPanel } from "../workspace/panels/TokenSpeedPanel";
+import { DutyPanel } from "../workspace/panels/DutyPanel";
 import { IdentityPanel } from "./IdentityPanel";
 
 /**
  * The right sidebar's content (design spec §6): an empty draggable top strip — the fixed right
- * toggle cluster floats over it — then the telemetry panel stack: Identity, Pressure, Spend, Token
- * speed. Renders as plain content — the caller slots it inside a `Pane` (Task 11), so this owns no
- * width/position of its own beyond filling its parent.
+ * toggle cluster floats over it — then the telemetry panel stack: Identity, Pressure, Spend,
+ * Throughput, Duty. Renders as plain content — the caller slots it inside a `Pane` (Task 11), so
+ * this owns no width/position of its own beyond filling its parent.
  *
  * Polls its own transcript: this pane is now a sibling of `Workspace` at the App level rather than a
  * child of it, so it can't share `WorkspaceBody`'s `useTranscript` poll — a second independent poll of the
@@ -52,6 +53,10 @@ export function RightSidebar({
             costUsd={session.costUsd ?? null}
           />
           <TokenSpeedPanel speed={metrics ? metrics.tokenSpeed : null} />
+          <DutyPanel
+            apiDurationMs={session.apiDurationMs ?? null}
+            sessionClockMs={session.sessionClockMs ?? null}
+          />
         </div>
       </div>
     </div>

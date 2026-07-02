@@ -23,16 +23,15 @@ function useSpeedHistory(tps: number | null): number[] {
 }
 
 /** Rolling-window token throughput: a hero total over a trend sparkline, with the output/input split below.
- *  Stays visible once a session has reported throughput — the sparkline persists the trend across turns
- *  instead of flickering out in the idle gap between them. Renders nothing only before the first sample
- *  (an idle/observed/ended session with no generation has no speed to chart). */
+ *  Always renders, per the cockpit's no-vanishing-sections rule — before the first sample the `idle` hero
+ *  shows over an empty sparkline. Stays visible once a session has reported throughput — the sparkline
+ *  persists the trend across turns instead of flickering out in the idle gap between them. */
 export function TokenSpeedPanel({
   speed,
 }: {
   speed: TokenSpeed | null | undefined;
 }) {
   const history = useSpeedHistory(speed?.totalTps ?? null);
-  if (!speed && history.length < 2) return null;
   return (
     <PanelSection>
       <PanelHeading
@@ -43,7 +42,7 @@ export function TokenSpeedPanel({
           </span>
         }
       >
-        Token speed
+        Throughput
       </PanelHeading>
       <div className="flex items-baseline justify-between">
         {speed ? (
