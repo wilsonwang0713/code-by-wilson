@@ -1,12 +1,15 @@
 import { Icon } from "../ui/icons";
 
+/** The hermes statusbar (design spec §footer): a 20px strip on the sidebar surface with 11px
+ *  items. Plain text wordmark — deliberately no brand icon or gradient chip. */
 export function AppFooter({ version }: { version: string | null }) {
   return (
-    <footer className="no-drag flex h-8 shrink-0 items-center justify-between border-t border-ink-800 bg-ink-925 px-3">
-      <div className="flex items-center gap-2">
-        <span className="inline-block h-4 w-4 rounded bg-gradient-to-br from-primary to-primary-deep" />
-        <span className="text-[12px] font-semibold text-fg">code-by-wire</span>
-        <span className="font-mono text-[11px] text-fg-faint">
+    <footer className="no-drag flex h-5 shrink-0 items-stretch justify-between gap-2 border-t border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-1 py-0 text-(--ui-text-tertiary)">
+      <div className="flex items-stretch">
+        <span className="inline-flex h-full items-center px-1.5 text-[0.6875rem] font-medium text-(--ui-text-secondary)">
+          code-by-wire
+        </span>
+        <span className="inline-flex h-full items-center px-1.5 font-mono text-[0.6875rem]">
           {version ? `v${version}` : "—"}
         </span>
       </div>
@@ -15,9 +18,10 @@ export function AppFooter({ version }: { version: string | null }) {
         disabled
         title="Terminal — coming soon"
         aria-label="Terminal (coming soon)"
-        className="inline-flex h-6 w-6 items-center justify-center rounded border border-ink-800 text-fg-faint opacity-40"
+        className="inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] opacity-40"
       >
-        <Icon name="square-terminal" size={14} />
+        <Icon name="square-terminal" size={12} />
+        Terminal
       </button>
     </footer>
   );
