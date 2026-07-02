@@ -14,7 +14,7 @@ const TOKENS_INFO =
   "This session's tokens by kind: fresh input, generated output, cached reads, and the 5-minute and 1-hour cache writes. When subagents ran, usage spans models, each with a per-model breakdown one hover away.";
 
 const POPOVER =
-  "absolute left-0 top-full z-20 mt-1 w-60 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-left text-meta leading-snug text-fg-muted shadow-lg";
+  "absolute left-0 top-full z-20 mt-1 w-60 rounded-md border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_96%,transparent)] px-2.5 py-2 text-left text-meta leading-snug text-fg-muted shadow-(--shadow-md) backdrop-blur-xl";
 
 // The by-model row popover. Anchored to the row's left edge (the row spans the panel's content), so at
 // w-56 (224px) it stays inside the 256px content box — the inline chips it replaced anchored left-0 on a
@@ -97,7 +97,7 @@ function ModelRow({ m }: { m: ModelUsageView }) {
             </span>
           ))}
         </span>
-        <span className="mt-1 flex items-baseline justify-between gap-3 border-t border-ink-700 pt-1">
+        <span className="mt-1 flex items-baseline justify-between gap-3 border-t border-(--ui-stroke-secondary) pt-1">
           <span className="font-medium text-fg">Subtotal</span>
           <span className="font-mono tabular-nums text-fg">
             {formatTokensShort(m.totalTokens)}
@@ -195,9 +195,9 @@ export function TokensPanel({ usageByModel }: { usageByModel: ModelUsage[] }) {
         <>
           {/* The stacked bar above is the kind rack's legend, so the rack follows it directly; the
               per-model attribution sits below, parted by a hairline — who spent it, after what it bought. */}
-          <div className="mt-2.5 h-px bg-ink-800" />
+          <div className="mt-2.5 h-px bg-(--ui-stroke-tertiary)" />
           <div className="mt-2.5">
-            <div className="mb-1 text-meta text-fg-faint">by model</div>
+            <div className="mb-1 text-xs text-(--ui-text-quaternary)">by model</div>
             <div className="space-y-0.5">
               {models.map((m) => (
                 <ModelRow key={m.modelRaw ?? "null"} m={m} />
