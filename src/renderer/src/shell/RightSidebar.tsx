@@ -2,13 +2,13 @@ import type { Account, Session } from "@shared/types";
 import { useTranscript } from "../workspace/use-transcript";
 import type { MetricsState } from "../workspace/use-metrics";
 import { PressurePanel } from "../workspace/panels/PressurePanel";
-import { TokensPanel } from "../workspace/panels/TokensPanel";
+import { SpendPanel } from "../workspace/panels/SpendPanel";
 import { TokenSpeedPanel } from "../workspace/panels/TokenSpeedPanel";
 import { IdentityPanel } from "./IdentityPanel";
 
 /**
  * The right sidebar's content (design spec §6): an empty draggable top strip — the fixed right
- * toggle cluster floats over it — then the telemetry panel stack: Identity, Pressure, Tokens, Token
+ * toggle cluster floats over it — then the telemetry panel stack: Identity, Pressure, Spend, Token
  * speed. Renders as plain content — the caller slots it inside a `Pane` (Task 11), so this owns no
  * width/position of its own beyond filling its parent.
  *
@@ -47,7 +47,10 @@ export function RightSidebar({
             contextWindow={session.contextWindow}
             account={account}
           />
-          <TokensPanel usageByModel={session.usageByModel ?? []} />
+          <SpendPanel
+            usageByModel={session.usageByModel ?? []}
+            costUsd={session.costUsd ?? null}
+          />
           <TokenSpeedPanel speed={metrics ? metrics.tokenSpeed : null} />
         </div>
       </div>
