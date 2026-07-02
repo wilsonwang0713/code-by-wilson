@@ -68,7 +68,7 @@ export function SessionRow({
           aria-label="Copy session ID"
           title="Copy session ID"
           onClick={() => void window.api.clipboardWriteText(session.id)}
-          className="grid size-5 cursor-pointer place-items-center rounded-[4px] text-transparent transition-colors hover:bg-(--ui-control-active-background) group-hover:text-(--ui-text-tertiary) hover:group-hover:text-fg"
+          className="grid size-5 cursor-pointer place-items-center rounded-[4px] text-transparent transition-colors hover:bg-(--ui-control-active-background) group-hover:text-(--ui-text-tertiary) hover:group-hover:text-fg focus-visible:bg-(--ui-control-active-background) focus-visible:text-(--ui-text-tertiary)"
         >
           <Icon name="copy" size={14} />
         </button>
