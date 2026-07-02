@@ -9,6 +9,7 @@ import {
   formatTps,
   formatClock,
   formatMonthShort,
+  formatUsd,
 } from "@shared/format";
 
 describe("formatRelativeTime", () => {
@@ -117,5 +118,20 @@ describe("formatMonthShort", () => {
     expect(formatMonthShort("2026-06-14")).toBe("Jun");
     expect(formatMonthShort("2024-01-01")).toBe("Jan");
     expect(formatMonthShort("2024-12-31")).toBe("Dec");
+  });
+});
+
+describe("formatUsd", () => {
+  it("renders cents under $1,000", () => {
+    expect(formatUsd(4.21)).toBe("$4.21");
+    expect(formatUsd(170.372702)).toBe("$170.37");
+  });
+  it("drops cents and separates thousands at or above $1,000", () => {
+    expect(formatUsd(1204.5)).toBe("$1,205");
+  });
+  it("coerces junk to $0.00", () => {
+    expect(formatUsd(0)).toBe("$0.00");
+    expect(formatUsd(-3)).toBe("$0.00");
+    expect(formatUsd(Number.NaN)).toBe("$0.00");
   });
 });

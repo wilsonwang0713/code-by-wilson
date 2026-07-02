@@ -119,3 +119,12 @@ export function formatMonthShort(day: string): string {
   const [, m] = day.split("-").map(Number);
   return MONTHS[m - 1];
 }
+
+/** A dollar figure from the statusLine's own accounting: "$4.21" / "$170.37"; at or above $1,000 the
+ *  cents drop and thousands separate ("$1,205"). Non-finite or ≤0 coerce to "$0.00". Display-only —
+ *  the value is Claude Code's total_cost_usd, never derived from a pricing table. */
+export function formatUsd(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "$0.00";
+  if (n >= 1000) return "$" + Math.round(n).toLocaleString("en-US");
+  return "$" + n.toFixed(2);
+}
