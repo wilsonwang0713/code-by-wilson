@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  TITLEBAR_CONTROL_SIZE,
+  TITLEBAR_CONTROL_WIDTH,
+  TITLEBAR_CONTROL_HEIGHT,
   TITLEBAR_CONTROLS_TOP,
   TITLEBAR_EDGE_INSET,
   titlebarControlsLeftPx,
@@ -8,28 +9,29 @@ import {
   headerRightPaddingPx,
 } from "../../src/renderer/src/shell/titlebar";
 
-describe("titlebar cluster geometry", () => {
-  it("centers the 28px controls in the 40px band", () => {
-    expect(TITLEBAR_CONTROL_SIZE).toBe(28);
-    expect(TITLEBAR_CONTROLS_TOP).toBe(6);
+describe("titlebar cluster geometry (hermes constants)", () => {
+  it("centers the 20x22 controls in the 34px band", () => {
+    expect(TITLEBAR_CONTROL_WIDTH).toBe(20);
+    expect(TITLEBAR_CONTROL_HEIGHT).toBe(22);
+    expect(TITLEBAR_CONTROLS_TOP).toBe(6); // (34 - 22) / 2
   });
 
   it("puts the left cluster after the traffic lights on mac windowed, at the edge otherwise", () => {
-    expect(titlebarControlsLeftPx(true, false)).toBe(96);
+    expect(titlebarControlsLeftPx(true, false)).toBe(74); // hermes TITLEBAR_CONTROL_OFFSET_X
     expect(titlebarControlsLeftPx(true, true)).toBe(TITLEBAR_EDGE_INSET); // 14
     expect(titlebarControlsLeftPx(false, false)).toBe(TITLEBAR_EDGE_INSET);
     expect(titlebarControlsLeftPx(false, true)).toBe(TITLEBAR_EDGE_INSET);
   });
 
   it("insets the header past the lights AND the left cluster when the edge is exposed", () => {
-    // hermes formula: controls.left + size + round(size / 2)
-    expect(titlebarContentInsetPx(true, false)).toBe(96 + 28 + 14); // 138
-    expect(titlebarContentInsetPx(true, true)).toBe(14 + 28 + 14); // 56
-    expect(titlebarContentInsetPx(false, false)).toBe(56);
+    // hermes formula: controls.left + control width + round(width / 2)
+    expect(titlebarContentInsetPx(true, false)).toBe(74 + 20 + 10); // 104
+    expect(titlebarContentInsetPx(true, true)).toBe(14 + 20 + 10); // 44
+    expect(titlebarContentInsetPx(false, false)).toBe(44);
   });
 
   it("reserves room for the right cluster only when it floats over the header", () => {
-    expect(headerRightPaddingPx(true)).toBe(14 + 28 + 8); // 50
-    expect(headerRightPaddingPx(false)).toBe(16); // HEADER_EDGE_PADDING_PX
+    expect(headerRightPaddingPx(true)).toBe(14 + 20 + 8); // 42
+    expect(headerRightPaddingPx(false)).toBe(12); // HEADER_EDGE_PADDING_PX (hermes 0.75rem)
   });
 });

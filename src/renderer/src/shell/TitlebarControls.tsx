@@ -6,7 +6,8 @@ import { useFullscreen } from "../ui/use-fullscreen";
 import { $paneOpen, togglePane } from "./panes";
 import { CBW_LEFT_PANE_ID, CBW_RIGHT_PANE_ID } from "./layout";
 import {
-  TITLEBAR_CONTROL_SIZE,
+  TITLEBAR_CONTROL_WIDTH,
+  TITLEBAR_CONTROL_HEIGHT,
   TITLEBAR_CONTROLS_TOP,
   TITLEBAR_EDGE_INSET,
   titlebarControlsLeftPx,
@@ -92,7 +93,7 @@ function TitlebarToolButton({
         "inline-flex items-center justify-center rounded text-fg-faint transition-colors hover:bg-ink-900 hover:text-fg-muted",
         focusRing,
       )}
-      style={{ height: TITLEBAR_CONTROL_SIZE, width: TITLEBAR_CONTROL_SIZE }}
+      style={{ height: TITLEBAR_CONTROL_HEIGHT, width: TITLEBAR_CONTROL_WIDTH }}
     >
       <Icon name={icon} size={15} />
     </button>
