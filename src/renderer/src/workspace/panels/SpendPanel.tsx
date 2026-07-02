@@ -67,7 +67,7 @@ export function SpendPanel({
         </span>
       </div>
 
-      <div className="mt-2.5 space-y-1.5">
+      <div className="space-y-1.5">
         {TOKEN_KINDS.map((k, i) => (
           <Row
             key={k.key}

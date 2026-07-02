@@ -13,11 +13,13 @@ export function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
-/** A rail panel's shell: flat hermes section chrome — no divider borders, just vertical rhythm and
- *  bottom padding. */
+/** A rail panel's shell: flat hermes section chrome — no divider borders of its own, just vertical
+ *  rhythm. pt-1 balances pb-3 now that the cockpit rail draws hairlines between sections. */
 export function PanelSection({ children }: { children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 px-2.5 pb-3">{children}</section>
+    <section className="flex flex-col gap-2 px-2.5 pt-1 pb-3">
+      {children}
+    </section>
   );
 }
 
