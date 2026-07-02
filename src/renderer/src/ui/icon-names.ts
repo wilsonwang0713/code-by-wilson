@@ -49,4 +49,5 @@ export type IconName =
   | "square-dashed-mouse-pointer"
   | "square-terminal"
   | "terminal"
-  | "triangle-alert";
+  | "triangle-alert"
+  | "x";

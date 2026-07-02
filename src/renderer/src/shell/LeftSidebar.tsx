@@ -102,21 +102,34 @@ export function LeftSidebar({
         </button>
       </div>
 
+      {/* Hermes SearchField anatomy: inline-flex + field-sizing:content, so the field (and its
+          focus underline) hugs the text instead of spanning the column; a ghost clear button
+          appears once there's a query. */}
       <div className="shrink-0 px-2 pb-1 pt-1">
-        <div className="flex max-w-full items-center gap-1.5 border-b border-transparent px-0.5 transition-colors focus-within:border-(--ui-stroke-secondary)">
+        <div className="inline-flex max-w-full items-center gap-1.5 border-b border-transparent px-0.5 transition-colors focus-within:border-(--ui-stroke-secondary)">
           <Icon
             name="search"
             size={14}
-            className="pointer-events-none shrink-0 text-(--ui-text-tertiary)"
+            className="pointer-events-none shrink-0 text-(--ui-text-tertiary)/70"
           />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search"
+            placeholder="Search sessions"
             aria-label="Search sessions"
-            className="h-7 w-full min-w-0 bg-transparent text-xs text-fg placeholder:text-(--ui-text-quaternary) focus:outline-none"
+            className="h-7 max-w-full bg-transparent text-xs text-fg [field-sizing:content] placeholder:text-(--ui-text-tertiary) focus:outline-none"
           />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setQuery("")}
+              className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-[4px] text-(--ui-text-tertiary)/85 transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+            >
+              <Icon name="x" size={16} />
+            </button>
+          )}
         </div>
       </div>
 

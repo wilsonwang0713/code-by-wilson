@@ -43,6 +43,7 @@ import {
   SquareTerminal,
   Terminal,
   TriangleAlert,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import type { IconName } from "./icon-names";
@@ -101,6 +102,7 @@ const ICONS = {
   "square-terminal": SquareTerminal,
   terminal: Terminal,
   "triangle-alert": TriangleAlert,
+  x: X,
 } satisfies Record<IconName, LucideIcon>;
 
 /** A Lucide line icon at the cockpit's 1.75 stroke weight; color inherits via currentColor. */
