@@ -185,7 +185,7 @@ export function SessionMenu({
             inputRef.current?.blur(); // cancel via onBlur, guarded by cancelledRef
           }
         }}
-        className="h-6 min-w-0 flex-1 rounded-[2.5px] border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-2 text-[0.75rem] font-medium text-fg outline-none"
+        className="no-drag h-6 w-72 max-w-full rounded-[2.5px] border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-2 text-[0.75rem] font-medium text-fg outline-none"
       />
     );
   }
@@ -225,7 +225,7 @@ export function SessionMenu({
     : "End is only available for a live session you manage.";
 
   return (
-    <div ref={rootRef} className="no-drag relative min-w-0 flex-1">
+    <div ref={rootRef} className="no-drag relative min-w-0">
       <button
         type="button"
         onClick={toggleMenu}
