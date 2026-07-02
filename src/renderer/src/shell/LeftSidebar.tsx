@@ -1,12 +1,12 @@
 import { useState } from "react";
 import type { Session } from "@shared/types";
-import { cx, focusRing } from "../ui/atoms";
-import { OverlayScroll } from "../ui/OverlayScroll";
+import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
 import { filterSessions, sortSessions } from "./session-list-model";
 import { SessionRow } from "./SessionRow";
 import { OVERVIEW_ID } from "../stats/sentinel";
 import { SETTINGS_ID } from "../settings/sentinel";
+import { SidebarPanelLabel } from "./SidebarPanelLabel";
 
 /**
  * The left sidebar's content (design spec §4): an empty draggable top strip — the traffic lights
@@ -38,13 +38,13 @@ export function LeftSidebar({
   const rows = filterSessions(sortSessions(sessions), query);
 
   return (
-    <div className="flex h-full flex-col border-r border-sidebar-border bg-sidebar">
+    <div className="flex h-full flex-col border-r border-sidebar-border bg-(--ui-sidebar-surface-background)">
       <div
         className="drag-region shrink-0 select-none"
         style={{ height: "var(--titlebar-height)" }}
       />
 
-      <div className="flex shrink-0 flex-col gap-0.5 px-2 pb-2">
+      <div className="flex shrink-0 flex-col gap-px px-2.5 pb-2 pt-1.5">
         <button
           type="button"
           onClick={onNew}
@@ -55,14 +55,13 @@ export function LeftSidebar({
               : "Claude Code CLI isn't usable — open Sys status in the title bar."
           }
           className={cx(
-            "flex items-center gap-2 rounded px-2 py-1.5 text-left text-meta transition-colors",
-            focusRing,
+            "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
             canSpawn
-              ? "text-fg hover:bg-ink-900"
-              : "cursor-not-allowed text-fg-faint",
+              ? "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg"
+              : "cursor-not-allowed text-(--ui-text-quaternary)",
           )}
         >
-          <Icon name="plus" size={14} />
+          <Icon name="plus" size={16} className="shrink-0 opacity-70" />
           New session
         </button>
         <button
@@ -70,14 +69,13 @@ export function LeftSidebar({
           onClick={() => onRoute(OVERVIEW_ID)}
           aria-pressed={route === OVERVIEW_ID}
           className={cx(
-            "flex items-center gap-2 rounded px-2 py-1.5 text-left text-meta transition-colors",
-            focusRing,
+            "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
             route === OVERVIEW_ID
-              ? "bg-ink-850 text-fg"
-              : "text-fg-muted hover:bg-ink-900",
+              ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+              : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
           )}
         >
-          <Icon name="chart-column" size={14} />
+          <Icon name="chart-column" size={16} className="shrink-0 opacity-70" />
           Stats
         </button>
         <button
@@ -85,45 +83,38 @@ export function LeftSidebar({
           onClick={() => onRoute(SETTINGS_ID)}
           aria-pressed={route === SETTINGS_ID}
           className={cx(
-            "flex items-center gap-2 rounded px-2 py-1.5 text-left text-meta transition-colors",
-            focusRing,
+            "flex h-7 w-full items-center justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium transition-colors duration-100 ease-out hover:transition-none",
             route === SETTINGS_ID
-              ? "bg-ink-850 text-fg"
-              : "text-fg-muted hover:bg-ink-900",
+              ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+              : "text-(--ui-text-secondary) hover:bg-(--ui-control-hover-background) hover:text-fg",
           )}
         >
-          <Icon name="settings" size={14} />
+          <Icon name="settings" size={16} className="shrink-0 opacity-70" />
           Settings
         </button>
       </div>
 
-      <div className="shrink-0 px-2 pb-2">
-        <div className="relative">
-          <Icon
-            name="search"
-            size={13}
-            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-faint"
-          />
+      <div className="shrink-0 px-2 pb-1 pt-1">
+        <div className="flex max-w-full items-center gap-1.5 border-b border-transparent px-0.5 transition-colors focus-within:border-(--ui-stroke-secondary)">
+          <Icon name="search" size={14} className="pointer-events-none shrink-0 text-(--ui-text-tertiary)" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search"
             aria-label="Search sessions"
-            className={cx(
-              "w-full rounded border border-ink-800 bg-ink-950 py-1.5 pl-7 pr-2 text-meta text-fg placeholder:text-fg-faint",
-              focusRing,
-            )}
+            className="h-7 w-full min-w-0 bg-transparent text-xs text-fg placeholder:text-(--ui-text-quaternary) focus:outline-none"
           />
         </div>
       </div>
 
-      <div className="px-4 pb-1 font-display text-micro font-semibold uppercase tracking-[0.1em] text-fg-faint">
-        Sessions
+      <div className="flex shrink-0 items-center justify-between gap-1 px-2.5 pb-1 pt-1.5">
+        <SidebarPanelLabel className="pl-2">Sessions</SidebarPanelLabel>
+        <span className="text-[0.6875rem] font-medium leading-none text-(--ui-text-quaternary)">{rows.length}</span>
       </div>
-      <OverlayScroll className="min-h-0 flex-1" contentClassName="px-2 pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2">
         {rows.length === 0 ? (
-          <p className="px-1.5 py-2 text-label text-fg-faint">
+          <p className="px-2 py-2 text-xs text-(--ui-text-quaternary)">
             No sessions yet.
           </p>
         ) : (
@@ -139,7 +130,7 @@ export function LeftSidebar({
             ))}
           </div>
         )}
-      </OverlayScroll>
+      </div>
     </div>
   );
 }
