@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { IPC } from "@shared/ipc";
 import type { StatsRead } from "@shared/ipc";
 import type { StatsSnapshot, StatsRange, StatsByModel } from "@shared/stats";
+import { emptyRecords } from "@shared/stats";
 import type { Provider } from "../src/main/provider/types";
 
 // Capture the handlers registerIpc registers, without a real Electron ipcMain (same shape as ipc.test.ts).
@@ -326,6 +327,7 @@ describe("registerIpc stats:read", () => {
         cacheCreation5mTokens: 0,
         cacheCreation1hTokens: 0,
       },
+      records: emptyRecords(),
       progress: { filesTotal: 0, filesDone: 0, done: true },
       hasAnyTurns: false,
       byModel: [],

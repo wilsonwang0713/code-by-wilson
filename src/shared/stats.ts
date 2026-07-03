@@ -238,6 +238,9 @@ export function emptyBreakdowns(): StatsBreakdowns {
 export interface StatsSnapshot extends StatsBreakdowns {
   /** Totals scoped to the requested range (all-time when no range bound is applied). */
   totals: StatsTotals;
+  /** The activity-record metrics for the Overview tiles (#spec 2026-07-03), window-scoped like the
+   *  totals (streaks all-time — see StatsRecords). */
+  records: StatsRecords;
   progress: ScanProgress;
   /** Whether the store holds any turn at all (range-independent). The empty state keys off this, not the
    *  scoped totals, so picking a range with no turns shows zeroed cards rather than "No usage yet" when
@@ -264,6 +267,7 @@ export interface StatsSnapshot extends StatsBreakdowns {
 export function emptySnapshot(): StatsSnapshot {
   return {
     totals: emptyTotals(),
+    records: emptyRecords(),
     progress: { filesTotal: 0, filesDone: 0, done: true },
     hasAnyTurns: false,
     daily: [],
