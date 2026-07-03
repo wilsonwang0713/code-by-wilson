@@ -16,7 +16,6 @@ import {
   type StatsByProject,
   type StatsBySession,
   type StatsRange,
-  type RangePreset,
   type DailyBucket,
   type CalendarDay,
   DEFAULT_RANGE,
@@ -67,6 +66,7 @@ import {
   type SessionSort,
   type SessionSortKey,
 } from "./session-sort";
+import { RangeFilter, CacheToggle, StatsPanel } from "./shared";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -342,51 +342,6 @@ function BuildingHistory({ progress }: { progress: ScanProgress }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-    </div>
-  );
-}
-
-/** The page-global range filter (#110): five trailing windows, defaulting to 30d. It scopes every total
- *  on the page (not the calendar, which is range-independent — that's why it sits in the page header, not a
- *  panel). Presentational; the scoping happens main-side via the range passed through stats:read.
- *  `satisfies Record<RangePreset, string>` keeps this list exhaustive: a new preset can't ship a main-side
- *  bound without also growing a button here, the way RANGE_DAYS enforces it for the bound. (The single-day
- *  `{ day }` range isn't a preset, so it's deliberately absent — it has no button.) */
-const RANGE_LABELS = {
-  today: "Today",
-  "7d": "7d",
-  "30d": "30d",
-  "90d": "90d",
-  all: "All",
-} satisfies Record<RangePreset, string>;
-
-// Insertion order is the render order (none of the keys are array-index-like), and the cast restores the
-// RangePreset key type that Object.entries widens to string.
-const RANGE_OPTS = Object.entries(RANGE_LABELS) as [RangePreset, string][];
-
-function RangeFilter({
-  value,
-  onChange,
-}: {
-  value: StatsRange;
-  onChange: (r: StatsRange) => void;
-}) {
-  return (
-    <div className="flex items-center gap-0.5 rounded-md border border-ink-800 bg-ink-900 p-0.5 text-meta">
-      {RANGE_OPTS.map(([v, label]) => (
-        <button
-          key={v}
-          onClick={() => onChange(v)}
-          aria-pressed={v === value}
-          className={`rounded px-2 py-0.5 transition-colors ${
-            v === value
-              ? "bg-ink-700 text-fg"
-              : "text-fg-faint hover:text-fg-muted"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -902,39 +857,6 @@ function StackByToggle({
   );
 }
 
-/** The page-level "Include cache" control in the Stats header, governing the Tokens metric across every
- *  breakdown. A checkbox: a filled, sky-ticked box when on (count all four token kinds), an empty box when
- *  off (fresh input + output only). The checkbox reads its binary state at a glance and stays visually
- *  distinct from the range pill group beside it. */
-function CacheToggle({
-  on,
-  onChange,
-}: {
-  on: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      aria-pressed={on}
-      title="Count cache-read and cache-creation tokens in the token figures"
-      className="flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-meta text-fg-muted transition-colors hover:border-ink-700"
-    >
-      <span
-        className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border transition-colors ${
-          on
-            ? "border-primary bg-primary text-ink-950"
-            : "border-ink-700 text-transparent"
-        }`}
-      >
-        <Icon name="check" size={10} />
-      </span>
-      Include cache
-    </button>
-  );
-}
-
 /** One row of a Breakdown panel: an entity with its displayed-metric tokens and the color its bar (and
  *  optional swatch) take. The caller ranks the rows and assigns colors; the panel slices to `cap`, sizes
  *  bars against the largest displayed value, and renders the header and "+N more" note. */
@@ -1303,30 +1225,5 @@ function EmptyStats() {
       <Icon name="chart-column" size={28} />
       <p className="text-body">No usage yet.</p>
     </div>
-  );
-}
-
-/** A bordered, titled section box for the stats page. `right` is an optional controls slot pinned to the
- *  header's top-right (e.g. the daily chart's stack-by toggle), so a panel can carry its own control
- *  without a shared page toolbar. */
-function StatsPanel({
-  title,
-  right,
-  children,
-}: {
-  title: string;
-  right?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
-      <header className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="font-display text-label font-semibold uppercase tracking-[0.1em] text-fg-faint">
-          {title}
-        </h2>
-        {right}
-      </header>
-      {children}
-    </section>
   );
 }
