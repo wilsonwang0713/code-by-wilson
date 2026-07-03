@@ -31,6 +31,41 @@ export function emptyTotals(): StatsTotals {
 }
 
 /**
+ * The activity-record metrics the Overview tiles read (#spec 2026-07-03): computed store-side over the
+ * turns table, carried on every snapshot. `activeDays`, `mostActiveDay`, and `longestSessionMs` scope to
+ * the page range window like the totals; the two streaks are ALL-TIME (a windowed "current streak" is
+ * meaningless — a 7-day window can't show an 8-day streak), anchored to the local day of the poll.
+ */
+export interface StatsRecords {
+  /** Local days with ≥1 known-time turn in the window. */
+  activeDays: number;
+  /** Total local days in the window: the window's span for a bounded range; for all-time, first
+   *  known-time turn's day through today (inclusive); 0 when all-time and the store is empty. */
+  windowDays: number;
+  /** The local day ('YYYY-MM-DD') with the most turns in the window, ties to the most recent day;
+   *  null when the window holds no known-time turn. */
+  mostActiveDay: string | null;
+  /** The largest per-session span (earliest→latest known-time turn, ms) in the window; 0 when none. */
+  longestSessionMs: number;
+  /** The longest all-time run of consecutive local days each holding ≥1 turn. */
+  longestStreakDays: number;
+  /** The all-time streak of consecutive days ending today (or yesterday when today is idle so far). */
+  currentStreakDays: number;
+}
+
+/** All-zero records: the empty store, the no-analytics-db fallback, and the read-error fallback. */
+export function emptyRecords(): StatsRecords {
+  return {
+    activeDays: 0,
+    windowDays: 0,
+    mostActiveDay: null,
+    longestSessionMs: 0,
+    longestStreakDays: 0,
+    currentStreakDays: 0,
+  };
+}
+
+/**
  * One row of the per-model breakdown (#111), keyed on the raw model id exactly as the transcript recorded
  * it (e.g. "claude-opus-4-8"), so one model version is distinct from the next. `totalTokens` sums all four
  * token kinds; `inputTokens + outputTokens` is the fresh subset. The donut and the table's Tokens column
@@ -203,6 +238,9 @@ export function emptyBreakdowns(): StatsBreakdowns {
 export interface StatsSnapshot extends StatsBreakdowns {
   /** Totals scoped to the requested range (all-time when no range bound is applied). */
   totals: StatsTotals;
+  /** The activity-record metrics for the Overview tiles (#spec 2026-07-03), window-scoped like the
+   *  totals (streaks all-time — see StatsRecords). */
+  records: StatsRecords;
   progress: ScanProgress;
   /** Whether the store holds any turn at all (range-independent). The empty state keys off this, not the
    *  scoped totals, so picking a range with no turns shows zeroed cards rather than "No usage yet" when
@@ -229,6 +267,7 @@ export interface StatsSnapshot extends StatsBreakdowns {
 export function emptySnapshot(): StatsSnapshot {
   return {
     totals: emptyTotals(),
+    records: emptyRecords(),
     progress: { filesTotal: 0, filesDone: 0, done: true },
     hasAnyTurns: false,
     daily: [],
@@ -454,4 +493,49 @@ export function densifyDays(
     day = addDays(day, 1);
   }
   return out;
+}
+
+/**
+ * The inclusive count of local calendar days from `startDay` to `endDay` ('YYYY-MM-DD' keys) — the
+ * Active-days tile's denominator. Local-midnight Dates and a rounded day quotient, so a DST hour can't
+ * skew the count. 0 when `startDay` is after `endDay`.
+ */
+export function daysBetween(startDay: string, endDay: string): number {
+  if (startDay > endDay) return 0;
+  return (
+    Math.round((dayStartMs(endDay) - dayStartMs(startDay)) / 86_400_000) + 1
+  );
+}
+
+/**
+ * The longest run of consecutive local days in `days` — DISTINCT 'YYYY-MM-DD' keys sorted ascending,
+ * exactly the shape the store's DISTINCT-day query returns. Consecutiveness is checked via addDays so
+ * month, year, and DST boundaries behave like every other day-key walk in this file.
+ */
+export function longestStreak(days: string[]): number {
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const day of days) {
+    run = prev !== null && addDays(prev, 1) === day ? run + 1 : 1;
+    if (run > best) best = run;
+    prev = day;
+  }
+  return best;
+}
+
+/**
+ * The streak of consecutive active days ending now: anchored at `today` when it holds a turn, else at
+ * yesterday (today may simply not have a turn YET — an active yesterday still reads as a live streak,
+ * matching Claude Code's own stats). 0 when both are idle. Same input contract as `longestStreak`.
+ */
+export function currentStreak(days: string[], today: string): number {
+  const active = new Set(days);
+  let anchor = active.has(today) ? today : addDays(today, -1);
+  let n = 0;
+  while (active.has(anchor)) {
+    n++;
+    anchor = addDays(anchor, -1);
+  }
+  return n;
 }

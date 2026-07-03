@@ -1,28 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
-  segmentPercents,
   niceAxisMax,
   axisTicks,
   stackBands,
 } from "../../src/renderer/src/ui/charts-geom";
-
-describe("segmentPercents", () => {
-  it("splits values into their share of the total", () => {
-    expect(segmentPercents([1, 1, 2])).toEqual([25, 25, 50]);
-  });
-
-  it("returns all zeros when the total is zero (no divide-by-zero)", () => {
-    expect(segmentPercents([0, 0, 0])).toEqual([0, 0, 0]);
-  });
-
-  it("treats a single value as the whole bar", () => {
-    expect(segmentPercents([7])).toEqual([100]);
-  });
-
-  it("returns [] for an empty input", () => {
-    expect(segmentPercents([])).toEqual([]);
-  });
-});
 
 describe("niceAxisMax", () => {
   it("rounds a positive max up to the nearest 1/2/5 x 10^n", () => {

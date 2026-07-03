@@ -1,40 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { cx } from "./atoms";
-import {
-  segmentPercents,
-  niceAxisMax,
-  axisTicks,
-  stackBands,
-  type Segment,
-} from "./charts-geom";
+import { niceAxisMax, axisTicks, stackBands } from "./charts-geom";
 import type { CalendarCell } from "./contributions-geom";
-
-/** A 100%-stacked horizontal bar. Widths come from each segment's share of the sum. */
-export function StackedBar({
-  segments,
-  height = 13,
-  className,
-}: {
-  segments: Segment[];
-  height?: number;
-  className?: string;
-}) {
-  const widths = segmentPercents(segments.map((s) => s.value));
-  return (
-    <div
-      className={cx("flex overflow-hidden rounded-full bg-ink-850", className)}
-      style={{ height }}
-    >
-      {segments.map((s, i) => (
-        <span
-          key={i}
-          className="h-full shrink-0"
-          style={{ width: `${widths[i]}%`, background: s.color }}
-        />
-      ))}
-    </div>
-  );
-}
 
 /** One labeled throughput row: label, a mini-bar, a right-aligned value. `pct` is the already-scaled
  *  0..100 fill the caller passes in; we clamp defensively. */
