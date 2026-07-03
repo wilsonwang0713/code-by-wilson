@@ -1,37 +1,21 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import {
   type StatsSnapshot,
   type ScanProgress,
-  type StatsByProject,
-  type StatsBySession,
   type StatsRange,
   DEFAULT_RANGE,
   emptySnapshot,
-  tokensOf,
   isDayRange,
 } from "@shared/stats";
-import {
-  formatTokensShort,
-  formatDuration,
-  formatRelativeTime,
-  formatDayShort,
-} from "@shared/format";
+import { formatDayShort } from "@shared/format";
 import { Icon } from "../ui/icons";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { modelColorOf } from "../ui/meta";
-import { Swatch } from "../ui/atoms";
-import { CopyButton } from "../ui/CopyButton";
-import {
-  sortSessions,
-  defaultDirFor,
-  DEFAULT_SESSION_SORT,
-  type SessionSort,
-  type SessionSortKey,
-} from "./session-sort";
-import { RangeFilter, CacheToggle, StatsPanel } from "./shared";
+import { RangeFilter, CacheToggle } from "./shared";
 import { OverviewCard } from "./OverviewCard";
 import { ModelsCard } from "./ModelsCard";
+import { ProjectsCard } from "./ProjectsCard";
+import { SessionsCard } from "./SessionsCard";
 
 /** Poll cadences: brisk while the first cold backfill fills in, gentle once caught up so a turn landing
  *  in another Session still shows up without a manual refresh. */
@@ -39,12 +23,12 @@ const BACKFILL_POLL_MS = 40;
 const WARM_POLL_MS = 1500;
 
 /**
- * The Overall Stats view: a headline KPI strip, then the contributions calendar, the daily time-series,
- * and the per-model / per-project / per-Session breakdowns, with a "building history" progress banner on a
- * first cold run. Polls stats:read while mounted — each poll runs one bounded scan step in the main
- * process — fast until the backfill is done, then at the warm cadence so turns from other Sessions appear
- * on their own. The effect's cleanup stops the poll on unmount, so selecting any Session ends all scan
- * work; the main process does nothing unprompted.
+ * The Overall Stats view: a shell around four cards (Overview, Models, Projects, Sessions), plus the
+ * header's range/cache/reset controls and a "building history" progress banner on a first cold run. Polls
+ * stats:read while mounted — each poll runs one bounded scan step in the main process — fast until the
+ * backfill is done, then at the warm cadence so turns from other Sessions appear on their own. The effect's
+ * cleanup stops the poll on unmount, so selecting any Session ends all scan work; the main process does
+ * nothing unprompted.
  */
 export function StatsView() {
   const [snap, setSnap] = useState<StatsSnapshot | null>(null);
@@ -242,18 +226,14 @@ export function StatsView() {
                   range={range}
                   includeCache={includeCache}
                 />
-                {snap.byProject.length > 0 && (
-                  <ByProject
-                    rows={snap.byProject}
-                    includeCache={includeCache}
-                  />
-                )}
-                {snap.bySession.length > 0 && (
-                  <BySession
-                    rows={snap.bySession}
-                    includeCache={includeCache}
-                  />
-                )}
+                <ProjectsCard
+                  rows={snap.byProject}
+                  includeCache={includeCache}
+                />
+                <SessionsCard
+                  rows={snap.bySession}
+                  includeCache={includeCache}
+                />
               </>
             )}
           </>
@@ -285,326 +265,6 @@ function BuildingHistory({ progress }: { progress: ScanProgress }) {
         />
       </div>
     </div>
-  );
-}
-
-/** One row of a Breakdown panel: an entity with its displayed-metric tokens and the color its bar (and
- *  optional swatch) take. The caller ranks the rows and assigns colors; the panel slices to `cap`, sizes
- *  bars against the largest displayed value, and renders the header and "+N more" note. */
-type BreakdownRow = {
-  key: string;
-  label: string;
-  title?: string;
-  tokens: number;
-  color: string;
-};
-
-/** Display cap shared by the By model and By project panels: rows past the top N roll into a "+N more" note. */
-const TOP_BREAKDOWN_ROWS = 7;
-
-/** The shared ranked-breakdown panel behind By model and By project (#111/#112): a titled table of entities,
- *  biggest first, each a row of name + Tokens with a full-width bar beneath. The two callers differ only in
- *  props: model rows carry a per-model swatch (`showSwatch`); both cap to `cap.n` rows with a "+N more
- *  {cap.noun}s" note. The count and its noun ride in one object so a cap can't be set without the note that
- *  discloses it. Bars size against the largest DISPLAYED row, so a cap changes the denominator; an all-zero
- *  window yields empty bars rather than a divide-by-zero. The bar is built inline (not the `Bar` atom)
- *  because its color is a dynamic CSS value, not a Tailwind class. */
-function Breakdown({
-  title,
-  nameLabel,
-  rows,
-  showSwatch = false,
-  cap,
-}: {
-  title: string;
-  nameLabel: string;
-  rows: BreakdownRow[];
-  showSwatch?: boolean;
-  cap: { n: number; noun: string };
-}) {
-  const shown = rows.slice(0, cap.n);
-  const max = Math.max(...shown.map((r) => r.tokens), 0);
-  const rest = rows.length - shown.length;
-  return (
-    <StatsPanel title={title}>
-      <table className="w-full table-fixed text-aux">
-        <colgroup>
-          <col className="w-[70%]" />
-          <col className="w-[30%]" />
-        </colgroup>
-        <thead>
-          <tr className="text-label uppercase tracking-wide text-fg-faint">
-            <th
-              scope="col"
-              className="whitespace-nowrap pb-1.5 text-left font-normal"
-            >
-              {nameLabel}
-            </th>
-            <th
-              scope="col"
-              className="whitespace-nowrap pb-1.5 text-right font-normal"
-            >
-              Tokens
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((r, i) => (
-            <Fragment key={r.key}>
-              <tr className={i === 0 ? "" : "border-t border-ink-850"}>
-                <td className="pt-2 pr-3 align-middle">
-                  <span className="flex min-w-0 items-center gap-2">
-                    {showSwatch && <Swatch color={r.color} />}
-                    <span className="truncate text-fg" title={r.title}>
-                      {r.label}
-                    </span>
-                  </span>
-                </td>
-                <td className="pt-2 pl-2 text-right align-middle font-mono tabular-nums text-fg-muted">
-                  {formatTokensShort(r.tokens)}
-                </td>
-              </tr>
-              <tr>
-                <td colSpan={2} className="pb-2 pt-1.5">
-                  <div className="h-[5px] overflow-hidden rounded-full bg-ink-850">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${max > 0 ? (r.tokens / max) * 100 : 0}%`,
-                        background: r.color,
-                      }}
-                    />
-                  </div>
-                </td>
-              </tr>
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
-      {rest > 0 && (
-        <p className="mt-2 text-meta text-fg-faint">
-          +{rest} more {rest === 1 ? cap.noun : `${cap.noun}s`}
-        </p>
-      )}
-    </StatsPanel>
-  );
-}
-
-/** The per-project breakdown (#112): top projects as full-width bars with tokens, keyed on the full cwd so
- *  two repos that share a basename stay separate (the cwd rides along as the row's hover title). Ranks by
- *  the displayed Tokens metric, so order follows the page's Include-cache toggle; capped to the top N with a
- *  "+N more" note. Rendering is delegated to the shared `Breakdown`. */
-function ByProject({
-  rows,
-  includeCache,
-}: {
-  rows: StatsByProject[];
-  includeCache: boolean;
-}) {
-  if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const ranked: BreakdownRow[] = rows
-    .slice()
-    .sort(
-      (a, b) =>
-        tokensOf(b, includeCache) - tokensOf(a, includeCache) ||
-        a.cwd.localeCompare(b.cwd),
-    )
-    .map((r) => ({
-      key: r.cwd,
-      label: r.project,
-      title: r.cwd,
-      tokens: tokensOf(r, includeCache),
-      color: "var(--color-data-1)",
-    }));
-  return (
-    <Breakdown
-      title="By project"
-      nameLabel="Project"
-      rows={ranked}
-      cap={{ n: TOP_BREAKDOWN_ROWS, noun: "project" }}
-    />
-  );
-}
-
-/** A capped display list: the per-Session table can run to hundreds of rows over all-time, so it shows the
- *  top N by the ACTIVE sort with a "+N more" note — sort-then-cap, so re-sorting by tokens surfaces the
- *  heaviest sessions across all history, not a reshuffle of the most-recent N. */
-const TOP_SESSIONS = 25;
-
-/** One sortable column header: a button that toggles the active sort. Clicking an inactive column sorts it
- *  by its natural first direction (defaultDirFor); clicking the active column flips direction. The active
- *  column shows a chevron, rotated up when ascending. `aria-sort` rides the th for assistive tech. */
-function SortHeader({
-  label,
-  column,
-  sort,
-  onSort,
-  align = "right",
-}: {
-  label: string;
-  column: SessionSortKey;
-  sort: SessionSort;
-  onSort: (key: SessionSortKey) => void;
-  align?: "left" | "right";
-}) {
-  const active = sort.key === column;
-  return (
-    <th
-      scope="col"
-      aria-sort={
-        active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"
-      }
-      className={`whitespace-nowrap pb-1.5 font-normal ${
-        align === "right" ? "text-right" : "text-left"
-      }`}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(column)}
-        // Buttons don't inherit text-transform from the uppercase <tr>, so set it here or the
-        // sortable headers render mixed-case while the By-project <th>s above stay uppercase.
-        className={`inline-flex items-center gap-0.5 uppercase transition-colors hover:text-fg ${
-          align === "right" ? "flex-row-reverse" : ""
-        } ${active ? "text-fg-muted" : ""}`}
-      >
-        {label}
-        {active && (
-          <Icon
-            name="chevron-down"
-            size={10}
-            className={sort.dir === "asc" ? "rotate-180" : ""}
-          />
-        )}
-      </button>
-    </th>
-  );
-}
-
-/** The per-Session table (#113): one row per Session with its project, last activity, duration, dominant
- *  model, turns, and tokens. Sortable on every column (client-side via sortSessions), defaulting to most
- *  recent activity first. The Tokens column follows the page's "Include cache" toggle, like the other
- *  breakdowns. Capped to the top N by the active sort with a "+N more" note. */
-function BySession({
-  rows,
-  includeCache,
-}: {
-  rows: StatsBySession[];
-  includeCache: boolean;
-}) {
-  const [sort, setSort] = useState<SessionSort>(DEFAULT_SESSION_SORT);
-  // Guard on the full set so the panel never vanishes on a pure-zero window (matches the other breakdowns).
-  if (!rows.some((r) => r.totalTokens > 0)) return null;
-  const onSort = (key: SessionSortKey): void =>
-    setSort((s) =>
-      s.key === key
-        ? { key, dir: s.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: defaultDirFor(key) },
-    );
-  const sorted = sortSessions(rows, sort, includeCache);
-  const top = sorted.slice(0, TOP_SESSIONS);
-  const rest = sorted.length - top.length;
-  const now = Date.now();
-  return (
-    <StatsPanel title="By session">
-      <table className="w-full table-fixed text-aux">
-        <colgroup>
-          <col className="w-[30%]" />
-          <col className="w-[16%]" />
-          <col className="w-[15%]" />
-          <col className="w-[13%]" />
-          <col className="w-[12%]" />
-          <col className="w-[14%]" />
-        </colgroup>
-        <thead>
-          <tr className="text-label uppercase tracking-wide text-fg-faint">
-            <SortHeader
-              label="Session"
-              column="session"
-              sort={sort}
-              onSort={onSort}
-              align="left"
-            />
-            <SortHeader
-              label="Model"
-              column="model"
-              sort={sort}
-              onSort={onSort}
-              align="left"
-            />
-            <SortHeader
-              label="Last activity"
-              column="lastActivity"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Duration"
-              column="duration"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Turns"
-              column="turns"
-              sort={sort}
-              onSort={onSort}
-            />
-            <SortHeader
-              label="Tokens"
-              column="tokens"
-              sort={sort}
-              onSort={onSort}
-            />
-          </tr>
-        </thead>
-        <tbody>
-          {/* Key on the session id (globally unique). */}
-          {top.map((r) => (
-            <tr key={r.sessionId} className="border-t border-ink-850">
-              <td className="py-1 pr-3">
-                <span className="block truncate text-fg" title={r.cwd}>
-                  {r.title ?? r.project}
-                </span>
-                <span className="mt-0.5 flex items-center gap-1.5 text-meta text-fg-faint">
-                  <span className="truncate">{r.project}</span>
-                  <span className="font-mono">{r.sessionId.slice(0, 8)}</span>
-                  <CopyButton value={r.sessionId} label="Copy session id" />
-                </span>
-              </td>
-              <td className="py-1 pr-3">
-                <span className="flex min-w-0 items-center gap-2">
-                  <Swatch color={modelColorOf(r.modelRaw)} />
-                  <span className="truncate font-mono text-fg-muted">
-                    {r.modelRaw ?? "Unknown"}
-                  </span>
-                </span>
-              </td>
-              <td className="py-1 pl-2 text-right tabular-nums text-fg-muted">
-                {/* lastActivityMs is 0 only when no turn had a known time; show a dash, not a
-                    formatRelativeTime epoch render ("20000d ago") that fakes exact data. */}
-                {r.lastActivityMs === 0
-                  ? "—"
-                  : formatRelativeTime(r.lastActivityMs, now)}
-              </td>
-              <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {formatDuration(r.durationMs)}
-              </td>
-              <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {r.turns.toLocaleString("en-US")}
-              </td>
-              <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                {formatTokensShort(tokensOf(r, includeCache))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rest > 0 && (
-        <p className="mt-2 text-meta text-fg-faint">
-          +{rest} more {rest === 1 ? "session" : "sessions"}
-        </p>
-      )}
-    </StatsPanel>
   );
 }
 

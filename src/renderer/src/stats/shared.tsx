@@ -18,8 +18,9 @@ export function CardDivider() {
   return <div aria-hidden className="h-px bg-ink-850" />;
 }
 
-/** One padded region of a StatsCard: the StatsPanel header pattern (overline title left, optional
- *  controls right) minus the panel's own border, which the enclosing StatsCard now draws. */
+/** One padded region of a StatsCard: an overline title left, optional controls right, over the
+ *  region's content — the old bordered-panel header, minus the border, which the enclosing
+ *  StatsCard now draws once for the whole card. */
 export function CardRegion({
   title,
   right,
@@ -77,8 +78,8 @@ export function KpiTile({
   );
 }
 
-/** The page-global range filter — moved verbatim from StatsView (see its doc comment there for the
- *  preset rationale). */
+/** The page-global range filter: five trailing windows (Today/7d/30d/90d/All), defaulting to 30d,
+ *  scoping every total on the page (not the calendar, which is range-independent). */
 const RANGE_LABELS = {
   today: "Today",
   "7d": "7d",
@@ -116,7 +117,8 @@ export function RangeFilter({
   );
 }
 
-/** The page-level "Include cache" checkbox — moved verbatim from StatsView. */
+/** The page-level "Include cache" checkbox: toggles whether cache-read/cache-creation tokens count
+ *  toward the token figures shown across the page's cards. */
 export function CacheToggle({
   on,
   onChange,
@@ -143,29 +145,5 @@ export function CacheToggle({
       </span>
       Include cache
     </button>
-  );
-}
-
-/** The bordered, titled section box the old page used. Kept only until Tasks 5–7 migrate every
- *  section into StatsCard regions; deleted in Task 7. */
-export function StatsPanel({
-  title,
-  right,
-  children,
-}: {
-  title: string;
-  right?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-ink-800 bg-ink-925 p-4">
-      <header className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="font-display text-label font-semibold uppercase tracking-[0.1em] text-fg-faint">
-          {title}
-        </h2>
-        {right}
-      </header>
-      {children}
-    </section>
   );
 }
