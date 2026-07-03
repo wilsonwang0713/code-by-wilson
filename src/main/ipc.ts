@@ -29,6 +29,7 @@ import {
   readDaily,
   readCalendar,
   readCalendarYears,
+  readRecords,
   turnsMaxRowid,
   emptyTotals,
   hasAnyTurns,
@@ -43,6 +44,7 @@ import {
 } from "./analytics/scan";
 import type {
   StatsTotals,
+  StatsRecords,
   StatsBreakdowns,
   ScanProgress,
   StatsRange,
@@ -54,6 +56,7 @@ import type {
 import {
   emptySnapshot,
   emptyBreakdowns,
+  emptyRecords,
   rangeWindow,
   calendarWindow,
   localDayKey,
@@ -280,6 +283,18 @@ export function registerIpc({
       return emptyTotals();
     }
   };
+  const safeRecords = (
+    adb: SqliteDb,
+    win: StatsWindow,
+    nowMs: number,
+  ): StatsRecords => {
+    try {
+      return readRecords(adb, win, nowMs);
+    } catch (err) {
+      console.error("stats records read failed; serving zeros", err);
+      return emptyRecords();
+    }
+  };
   const safeHasAnyTurns = (adb: SqliteDb): boolean => {
     try {
       return hasAnyTurns(adb);
@@ -465,6 +480,7 @@ export function registerIpc({
         token,
         snapshot: {
           totals: safeTotals(analyticsDb, win),
+          records: safeRecords(analyticsDb, win, now),
           progress,
           hasAnyTurns: safeHasAnyTurns(analyticsDb),
           daily: safeDaily(analyticsDb, win),
