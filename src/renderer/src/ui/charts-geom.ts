@@ -4,12 +4,6 @@
  * so these helpers never need to know the palette.
  */
 
-export interface Segment {
-  value: number;
-  /** Any CSS color string — a token var, a color-mix, a hex. */
-  color: string;
-}
-
 /** Clamp a percentage into 0–100. Shared with the Settings account gauges so the 0–100
  *  clamp lives in one React-free, node-testable place. */
 export const clampPct = (n: number): number => Math.min(100, Math.max(0, n));
@@ -20,14 +14,6 @@ export const round2 = (n: number): number => Math.round(n * 100) / 100;
  *  the same way. A zero/negative span yields 0. */
 export const spanPct = (delta: number, span: number): number =>
   span > 0 ? clampPct((delta / span) * 100) : 0;
-
-/** Each value as its percentage share of the total. Assumes all values ≥ 0. All-zero (or empty) yields
- *  zeros — no NaN. */
-export function segmentPercents(values: number[]): number[] {
-  const total = values.reduce((a, b) => a + b, 0);
-  if (total <= 0) return values.map(() => 0);
-  return values.map((v) => (v / total) * 100);
-}
 
 // --- BarSeries geometry (#114): a daily stacked-bar chart's scale, ticks, and segment layout. Pure and
 // React-free so the node-env tests reach it; the SVG component (charts.tsx) maps these fractions to pixels.
