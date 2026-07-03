@@ -62,9 +62,7 @@ describe("currentStreak", () => {
   });
 
   it("anchors to yesterday when today has no turn yet", () => {
-    expect(
-      currentStreak(["2026-06-12", "2026-06-13"], "2026-06-14"),
-    ).toBe(2);
+    expect(currentStreak(["2026-06-12", "2026-06-13"], "2026-06-14")).toBe(2);
   });
 
   it("is 0 when both today and yesterday are idle", () => {
