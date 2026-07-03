@@ -82,7 +82,7 @@ export function MiddleHeader({
                 }}
               />
               <ViewSegment
-                icon="messages-square"
+                icon="scroll-text"
                 label="Transcript"
                 active={transcriptOn}
                 onSelect={() => {
