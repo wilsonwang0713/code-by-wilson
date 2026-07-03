@@ -13,15 +13,8 @@ import {
   formatDayLong,
   formatMonthShort,
 } from "@shared/format";
-import { StackedBar, CalendarHeatmap } from "../ui/charts";
-import {
-  KIND_SEGMENT_COLORS,
-  KIND_SEGMENT_LABELS,
-  CALENDAR_RAMP,
-} from "../ui/meta";
-import { TOKEN_KINDS } from "../ui/token-kinds";
-import { MetricTip } from "../ui/MetricTip";
-import { Swatch } from "../ui/atoms";
+import { CalendarHeatmap } from "../ui/charts";
+import { CALENDAR_RAMP } from "../ui/meta";
 import {
   calendarGrid,
   intensityThresholds,
@@ -83,20 +76,8 @@ export function OverviewCard({
     return top.modelRaw ?? "Unknown";
   }, [empty, byModel, includeCache]);
 
-  // The Tokens tile's mini split bar: all five kinds when cache counts, fresh input+output otherwise —
-  // identical composition rules to the old KpiStrip so the bar always matches the number above it.
-  const kindSegments = includeCache
-    ? [
-        { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-        { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-        { value: totals.cacheReadTokens, color: KIND_SEGMENT_COLORS[2] },
-        { value: totals.cacheCreation5mTokens, color: KIND_SEGMENT_COLORS[3] },
-        { value: totals.cacheCreation1hTokens, color: KIND_SEGMENT_COLORS[4] },
-      ]
-    : [
-        { value: totals.inputTokens, color: KIND_SEGMENT_COLORS[0] },
-        { value: totals.outputTokens, color: KIND_SEGMENT_COLORS[1] },
-      ];
+  // The Tokens tile figure: all four kinds when cache counts, fresh input+output otherwise — matching
+  // the rest of the page's Include-cache behavior.
   const tokenTotal = includeCache
     ? totals.inputTokens +
       totals.outputTokens +
@@ -124,22 +105,6 @@ export function OverviewCard({
         </KpiTile>
         <KpiTile label="Tokens" className={cellBorder(1)}>
           {formatTokensShort(tokenTotal)}
-          <StackedBar segments={kindSegments} height={6} className="mt-3" />
-          <div className="mt-2 flex flex-wrap gap-x-2.5 gap-y-1 font-sans text-micro font-normal tracking-normal text-fg-faint">
-            {KIND_SEGMENT_LABELS.slice(0, kindSegments.length).map(
-              (label, i) => (
-                <span key={label} className="relative flex items-center gap-1">
-                  <Swatch color={KIND_SEGMENT_COLORS[i]} />
-                  <MetricTip
-                    label={label}
-                    popoverClassName="left-0 top-full z-50 mt-1 w-52 rounded-md border border-ink-700 bg-ink-900 px-2.5 py-2 text-meta leading-snug text-fg-muted shadow-lg"
-                  >
-                    {TOKEN_KINDS[i].description}
-                  </MetricTip>
-                </span>
-              ),
-            )}
-          </div>
         </KpiTile>
         <KpiTile label="Favorite model" size="str" className={cellBorder(2)}>
           {favorite ?? EMPTY}

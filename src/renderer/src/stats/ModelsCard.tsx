@@ -26,9 +26,9 @@ const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
 /**
  * Card 2 (#spec 2026-07-03): the daily time-series over the per-model breakdown, one border, hairline
  * between. The chart is ALWAYS stacked by model (the Kind/Model toggle and by-kind stacking are
- * retired — kind composition lives in the Tokens tile's split bar). Per-day model buckets carry only
- * full totals, so the chart deliberately ignores the Include-cache pill (as the old by-model mode did);
- * the breakdown list below re-ranks and re-percentages under the pill via tokensOf.
+ * retired). Per-day model buckets carry only full totals, so the chart deliberately ignores the
+ * Include-cache pill (as the old by-model mode did); the breakdown list below re-ranks and
+ * re-percentages under the pill via tokensOf.
  */
 export function ModelsCard({
   daily,

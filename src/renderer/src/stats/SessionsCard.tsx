@@ -18,10 +18,10 @@ import {
 } from "./session-sort";
 import { StatsCard, CardRegion } from "./shared";
 
-/** A capped display list: the per-Session table can run to hundreds of rows over all-time, so it shows the
- *  top N by the ACTIVE sort with a "+N more" note — sort-then-cap, so re-sorting by tokens surfaces the
- *  heaviest sessions across all history, not a reshuffle of the most-recent N. */
-const TOP_SESSIONS = 50;
+/** How many session rows the table reveals per step: it shows this many by the ACTIVE sort, then a
+ *  "Show N more" button reveals another batch on each click — sort-then-slice, so re-sorting by tokens
+ *  surfaces the heaviest sessions across all history, not a reshuffle of the most-recent N. */
+const SESSION_BATCH = 11;
 
 /** One sortable column header: a button that toggles the active sort. Clicking an inactive column sorts it
  *  by its natural first direction (defaultDirFor); clicking the active column flips direction. The active
@@ -75,7 +75,7 @@ function SortHeader({
 /** The per-Session table (#113): one row per Session with its project, last activity, duration, dominant
  *  model, turns, and tokens. Sortable on every column (client-side via sortSessions), defaulting to most
  *  recent activity first. The Tokens column follows the page's "Include cache" toggle, like the other
- *  breakdowns. Capped to the top N by the active sort with a "+N more" note. */
+ *  breakdowns. Reveals SESSION_BATCH rows at a time by the active sort, via a "Show N more" button. */
 export function SessionsCard({
   rows,
   includeCache,
@@ -84,6 +84,7 @@ export function SessionsCard({
   includeCache: boolean;
 }) {
   const [sort, setSort] = useState<SessionSort>(DEFAULT_SESSION_SORT);
+  const [visible, setVisible] = useState(SESSION_BATCH);
   // Guard on the full set so the panel never vanishes on a pure-zero window (matches the other breakdowns).
   if (!rows.some((r) => r.totalTokens > 0)) return null;
   const onSort = (key: SessionSortKey): void =>
@@ -93,7 +94,7 @@ export function SessionsCard({
         : { key, dir: defaultDirFor(key) },
     );
   const sorted = sortSessions(rows, sort, includeCache);
-  const top = sorted.slice(0, TOP_SESSIONS);
+  const top = sorted.slice(0, visible);
   const rest = sorted.length - top.length;
   const now = Date.now();
   return (
@@ -193,9 +194,13 @@ export function SessionsCard({
           </tbody>
         </table>
         {rest > 0 && (
-          <p className="mt-2 text-meta text-fg-faint">
-            +{rest} more {rest === 1 ? "session" : "sessions"}
-          </p>
+          <button
+            type="button"
+            onClick={() => setVisible((v) => v + SESSION_BATCH)}
+            className="mt-2 text-meta text-fg-faint transition-colors hover:text-fg-muted"
+          >
+            Show {Math.min(SESSION_BATCH, rest)} more
+          </button>
         )}
       </CardRegion>
     </StatsCard>

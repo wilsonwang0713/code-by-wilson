@@ -1,12 +1,12 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { type StatsByProject, tokensOf } from "@shared/stats";
 import { formatTokensShort } from "@shared/format";
 import { Swatch } from "../ui/atoms";
 import { StatsCard, CardRegion } from "./shared";
 
-/** Display cap for the full-width By-project card (#spec 2026-07-03: a whole card now, so deeper
- *  than the old side-by-side panel's 7). Rows past it roll into a "+N more" note. */
-const TOP_PROJECTS = 20;
+/** How many project rows the By-project card reveals per step: it shows this many, then a
+ *  "Show N more" button reveals another batch of this size on each click. */
+const PROJECT_BATCH = 7;
 
 /** One row of a Breakdown panel: an entity with its displayed-metric tokens and the color its bar (and
  *  optional swatch) take. The caller ranks the rows and assigns colors; the panel slices to `cap`, sizes
@@ -19,27 +19,27 @@ type BreakdownRow = {
   color: string;
 };
 
-/** The shared ranked-breakdown panel behind By model and By project (#111/#112): a titled table of entities,
- *  biggest first, each a row of name + Tokens with a full-width bar beneath. The two callers differ only in
- *  props: model rows carry a per-model swatch (`showSwatch`); both cap to `cap.n` rows with a "+N more
- *  {cap.noun}s" note. The count and its noun ride in one object so a cap can't be set without the note that
- *  discloses it. Bars size against the largest DISPLAYED row, so a cap changes the denominator; an all-zero
- *  window yields empty bars rather than a divide-by-zero. The bar is built inline (not the `Bar` atom)
- *  because its color is a dynamic CSS value, not a Tailwind class. */
+/** The ranked-breakdown table behind By project: a titled table of entities, biggest first, each a row of
+ *  name + Tokens with a full-width bar beneath. Shows `batch` rows, then a "Show N more" button reveals
+ *  another batch on each click (N is the batch, or the remainder on the last step). Bars size against the
+ *  largest DISPLAYED row, so revealing more rows can change the denominator; an all-zero window yields
+ *  empty bars rather than a divide-by-zero. The bar is built inline (not the `Bar` atom) because its color
+ *  is a dynamic CSS value, not a Tailwind class. */
 function Breakdown({
   title,
   nameLabel,
   rows,
   showSwatch = false,
-  cap,
+  batch,
 }: {
   title: string;
   nameLabel: string;
   rows: BreakdownRow[];
   showSwatch?: boolean;
-  cap: { n: number; noun: string };
+  batch: number;
 }) {
-  const shown = rows.slice(0, cap.n);
+  const [visible, setVisible] = useState(batch);
+  const shown = rows.slice(0, visible);
   const max = Math.max(...shown.map((r) => r.tokens), 0);
   const rest = rows.length - shown.length;
   return (
@@ -100,16 +100,20 @@ function Breakdown({
           </tbody>
         </table>
         {rest > 0 && (
-          <p className="mt-2 text-meta text-fg-faint">
-            +{rest} more {rest === 1 ? cap.noun : `${cap.noun}s`}
-          </p>
+          <button
+            type="button"
+            onClick={() => setVisible((v) => v + batch)}
+            className="mt-2 text-meta text-fg-faint transition-colors hover:text-fg-muted"
+          >
+            Show {Math.min(batch, rest)} more
+          </button>
         )}
       </CardRegion>
     </StatsCard>
   );
 }
 
-/** The per-project breakdown (#112) — the old panel, now a full-width card capped at TOP_PROJECTS. Keyed
+/** The per-project breakdown (#112) — a full-width card that reveals PROJECT_BATCH rows at a time. Keyed
  *  on the full cwd so two repos that share a basename stay separate (the cwd rides along as the row's
  *  hover title). Ranks by the displayed Tokens metric, so order follows the page's Include-cache toggle. */
 export function ProjectsCard({
@@ -139,7 +143,7 @@ export function ProjectsCard({
       title="By project"
       nameLabel="Project"
       rows={ranked}
-      cap={{ n: TOP_PROJECTS, noun: "project" }}
+      batch={PROJECT_BATCH}
     />
   );
 }
