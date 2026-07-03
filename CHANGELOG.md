@@ -6,6 +6,76 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-07-03
+
+### Added
+
+- Six activity metrics on the Stats page — active days, most active day, longest
+  session, and longest and current streak — computed store-side over the
+  existing turn history with no schema change or new IPC. Streaks are all-time;
+  the other metrics respect the page range, and unknown-time turns never bucket
+  onto a calendar day.
+- A Default option in the New session model picker, pre-selected, that spawns
+  `claude --model default` so a session inherits your configured default model.
+  It rides a spawn-time-only `ModelSelection` type, so a running session's model
+  still re-derives from its transcript as before.
+
+### Changed
+
+- Redesigned the whole interface around a three-full-height-column layout: a
+  collapsible left column (menu, search, project-grouped sessions), a middle
+  column with an in-column session header over the transcript/terminal and the
+  bottom dock, and a right column of session telemetry, above a full-width
+  status-bar footer. Columns resize by drag with per-pane widths persisted,
+  hover-reveal when collapsed, and auto-collapse on a narrow window. Replaces the
+  old global header plus two-pane shell.
+- Re-skinned to a neutral grayscale "Mono" palette with teal as the single
+  live/active accent — amber stays scoped to Waiting, red and green stay
+  functional — matching the hermes desktop app's Mono theme down to the 34px
+  titlebar, project-grouped 26px session rows, dither-dot section headers, and
+  thin scrollbars. Typography moves to the OS system sans for UI and a
+  JetBrains-first mono stack over a principled nine-tier type scale; the bundled
+  Inter and Cascadia Mono faces are dropped, and focus rings are retired app-wide
+  as a hermes-parity tradeoff.
+- Reworked the right sidebar into a live cockpit: **Pressure** (context fill plus
+  account rate-limit windows, each with a bar, percent, and countdown), **Spend**
+  (total tokens as the hero with Claude Code's own dollar figure and a
+  five-segment kind bar), **Throughput** (the token-speed panel, now always
+  rendered), **Duty** (new — API-in-flight time over session wall clock), and
+  **Session** (model, effort, a Git readout with PR review state, lines ±, and a
+  clock). Every field always renders, showing `-` when data is absent.
+- Redesigned the Stats page into a single scroll of four cards — Overview (an
+  8-tile KPI grid over the contributions heatmap), Models (a model-stacked
+  "Tokens per day" chart with the per-model breakdown merged in as its color
+  key), and full-width Projects and Sessions breakdowns that reveal rows in
+  batches. Page-global controls (Include cache, range presets, reset) scope every
+  card, and clicking a heatmap day drills the whole page to that date.
+- Redesigned the app logo as a "materializing cursor" mark — three fading
+  rectangles resolving into a solid block cursor, the `░▒▓█` shade ramp, on a
+  near-black tile — replacing the teal `>_` prompt glyph across the app icon, the
+  in-app and About wordmarks, and the README.
+- Slimmed the bottom dock to Tasks, Subagents, and Shells, flattening the
+  Subagents tab from a grouped Gantt timeline to a plain status list, and listing
+  Model and Effort on separate rows in the Session panel.
+- Simplified Settings to two sections, System and About, and aligned the left
+  sidebar's Sessions header, project folder, and rows on one shared glyph rail,
+  with new messages-square (Sessions) and scroll-text (Transcript) icons.
+
+### Removed
+
+- All cost, pricing, and "equivalent API value" features — the pricing editor and
+  its per-kind and per-model rate overrides, the cost headline and rate columns in
+  the Tokens panel, and the cost KPI and columns across the Stats tables. Every
+  token-tracking feature is preserved, and Claude Code's own `total_cost_usd`
+  still surfaces as a small dollar figure in the cockpit. No database migration —
+  cost was always derived at read time, never stored.
+- The left-sidebar account rail and the API-billing provider detection. A live
+  Claude subscription still surfaces its 5h/7d rate-limit windows in the cockpit's
+  Pressure panel; anything that isn't a live subscription reads as "API Usage
+  Billing".
+- The Turns tab from the dock, which now rests on Tasks when no fan-out is
+  running.
+
 ## [0.1.18] - 2026-06-26
 
 ### Added
@@ -399,7 +469,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.18...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.19...HEAD
+[0.1.19]: https://github.com/luojiahai/code-by-wire/compare/v0.1.18...v0.1.19
 [0.1.18]: https://github.com/luojiahai/code-by-wire/compare/v0.1.17...v0.1.18
 [0.1.17]: https://github.com/luojiahai/code-by-wire/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/luojiahai/code-by-wire/compare/v0.1.15...v0.1.16
