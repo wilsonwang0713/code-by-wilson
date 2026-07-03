@@ -46,6 +46,7 @@ export type IconName =
   | "pin"
   | "plus"
   | "rotate-ccw"
+  | "scroll-text"
   | "search"
   | "settings"
   | "sparkles"
