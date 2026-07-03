@@ -17,18 +17,19 @@ import {
 import { BarSeries, type DayColumn } from "../ui/charts";
 import { modelColorOf } from "../ui/meta";
 import { Swatch } from "../ui/atoms";
-import { StatsCard, CardDivider, CardRegion } from "./shared";
+import { StatsCard, CardRegion } from "./shared";
 
 /** The Map key for the null ("Unknown") model — a single space can't be a real model id. */
 const NULL_MODEL_KEY = " ";
 const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
 
 /**
- * Card 2 (#spec 2026-07-03): the daily time-series over the per-model breakdown, one border, hairline
- * between. The chart is ALWAYS stacked by model (the Kind/Model toggle and by-kind stacking are
- * retired). Per-day model buckets carry only full totals, so the chart deliberately ignores the
- * Include-cache pill (as the old by-model mode did); the breakdown list below re-ranks and
- * re-percentages under the pill via tokensOf.
+ * Card 2 (#spec 2026-07-03): the daily time-series with the per-model breakdown merged into the same
+ * "Tokens per day" region below it. The chart is ALWAYS stacked by model (the Kind/Model toggle and
+ * by-kind stacking are retired); it carries no separate legend — the breakdown list's swatches are the
+ * color key. Per-day model buckets carry only full totals, so the chart deliberately ignores the
+ * Include-cache pill (as the old by-model mode did); the breakdown list re-ranks and re-percentages
+ * under the pill via tokensOf.
  */
 export function ModelsCard({
   daily,
@@ -46,11 +47,18 @@ export function ModelsCard({
   if (!hasChart && !hasList) return null;
   return (
     <StatsCard>
-      {hasChart && (
-        <TokensPerDay daily={daily} byModel={byModel} range={range} />
-      )}
-      {hasChart && hasList && <CardDivider />}
-      {hasList && <ByModelList rows={byModel} includeCache={includeCache} />}
+      <CardRegion title="Tokens per day">
+        {hasChart && (
+          <TokensPerDay daily={daily} byModel={byModel} range={range} />
+        )}
+        {hasList && (
+          <ByModelList
+            rows={byModel}
+            includeCache={includeCache}
+            spaced={hasChart}
+          />
+        )}
+      </CardRegion>
     </StatsCard>
   );
 }
@@ -79,7 +87,7 @@ function TokensPerDay({
   const days = densifyDays(daily, startDay, endDay);
 
   // Model series in store order (tokens desc), dropping any model that never lands on a rendered day
-  // (an all-unknown-time model would otherwise sit in the legend with no bar).
+  // (its stack band would be all-zero across the range).
   const presentModels = new Set<string>();
   for (const d of days)
     for (const e of d.byModel) presentModels.add(modelKey(e.modelRaw));
@@ -145,42 +153,30 @@ function TokensPerDay({
   };
 
   return (
-    <CardRegion title="Tokens per day">
-      <BarSeries
-        columns={columns}
-        formatTick={formatTokensAxis}
-        xLabels={xLabels}
-        renderTooltip={renderTooltip}
-      />
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta">
-        {series.map((s) => (
-          <span
-            key={modelKey(s.modelRaw)}
-            className="flex items-center gap-1.5"
-          >
-            <Swatch color={s.color} />
-            <span className="truncate text-fg-muted">
-              {s.modelRaw ?? "Unknown"}
-            </span>
-          </span>
-        ))}
-      </div>
-    </CardRegion>
+    <BarSeries
+      columns={columns}
+      formatTick={formatTokensAxis}
+      xLabels={xLabels}
+      renderTooltip={renderTooltip}
+    />
   );
 }
 
 /**
  * The per-model breakdown (#111, redesigned): a two-column list — swatch, mono raw id, share % of the
- * window's tokens, and a dimmed In/Out line of always-fresh figures — replacing the ranked-bar panel.
- * Share % and order follow the page's Include-cache pill via tokensOf; every model is listed (the model
- * set is small, no cap or "+N more" needed).
+ * window's tokens, and a dimmed In/Out line of always-fresh figures. It sits directly under the daily
+ * chart in the same "Tokens per day" region, so its swatches double as the chart's color key (there is
+ * no separate legend). Share % and order follow the page's Include-cache pill via tokensOf; every model
+ * is listed (the model set is small, no cap needed). `spaced` adds top margin when it follows the chart.
  */
 function ByModelList({
   rows,
   includeCache,
+  spaced,
 }: {
   rows: StatsByModel[];
   includeCache: boolean;
+  spaced: boolean;
 }) {
   const total = rows.reduce((s, r) => s + tokensOf(r, includeCache), 0);
   const ranked = rows
@@ -191,27 +187,27 @@ function ByModelList({
         (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
     );
   return (
-    <CardRegion title="By model">
-      <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-        {/* NUL sentinel key: a real raw id can never collide with the null "Unknown" bucket. */}
-        {ranked.map((r) => (
-          <div key={r.modelRaw ?? "\u0000"} className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Swatch color={modelColorOf(r.modelRaw)} />
-              <span className="truncate font-mono text-aux text-fg">
-                {r.modelRaw ?? "Unknown"}
-              </span>
-              <span className="font-mono text-meta tabular-nums text-fg-faint">
-                {total > 0 ? `${((r.tokens / total) * 100).toFixed(1)}%` : "—"}
-              </span>
-            </div>
-            <div className="mt-0.5 pl-4 font-mono text-meta tabular-nums text-fg-faint">
-              In: {formatTokensShort(r.inputTokens)} · Out:{" "}
-              {formatTokensShort(r.outputTokens)}
-            </div>
+    <div
+      className={`grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 ${spaced ? "mt-4" : ""}`}
+    >
+      {/* NUL sentinel key: a real raw id can never collide with the null "Unknown" bucket. */}
+      {ranked.map((r) => (
+        <div key={r.modelRaw ?? "\u0000"} className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Swatch color={modelColorOf(r.modelRaw)} />
+            <span className="truncate font-mono text-aux text-fg">
+              {r.modelRaw ?? "Unknown"}
+            </span>
+            <span className="font-mono text-meta tabular-nums text-fg-faint">
+              {total > 0 ? `${((r.tokens / total) * 100).toFixed(1)}%` : "—"}
+            </span>
           </div>
-        ))}
-      </div>
-    </CardRegion>
+          <div className="mt-0.5 pl-4 font-mono text-meta tabular-nums text-fg-faint">
+            In: {formatTokensShort(r.inputTokens)} · Out:{" "}
+            {formatTokensShort(r.outputTokens)}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
