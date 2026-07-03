@@ -1,3 +1,5 @@
+![Code-by-wire — the cockpit for local Claude Code](docs/assets/cbw-hero.png)
+
 # <img src="docs/assets/logo.svg" alt="" height="64" align="center"> Code-by-wire
 
 English | [简体中文](README.zh-CN.md)
