@@ -106,7 +106,7 @@ export function LeftSidebar({
           outer container, so the wrapper carries both, keeping the icon flush with the nav
           icons above. */}
       <div className="shrink-0 px-4.5 pb-1 pt-1">
-        <div className="flex w-full items-center gap-1.5 border-b border-transparent px-0.5 transition-colors focus-within:border-(--ui-stroke-secondary)">
+        <div className="flex w-full items-center gap-1.5 border-b border-transparent transition-colors focus-within:border-(--ui-stroke-secondary)">
           <Icon
             name="search"
             size={14}
@@ -137,7 +137,7 @@ export function LeftSidebar({
         <SidebarPanelLabel icon="messages-square" className="pl-2">
           Sessions
         </SidebarPanelLabel>
-        <span className="text-[0.6875rem] font-medium leading-none text-(--ui-text-quaternary)">
+        <span className="pr-1 text-[0.6875rem] font-medium leading-none text-(--ui-text-quaternary)">
           {groups.reduce((n, g) => n + g.sessions.length, 0)}
         </span>
       </div>
