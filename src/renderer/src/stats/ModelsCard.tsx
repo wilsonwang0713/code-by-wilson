@@ -188,7 +188,7 @@ function ByModelList({
     );
   return (
     <div
-      className={`grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 ${spaced ? "mt-4" : ""}`}
+      className={`grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 ${spaced ? "mt-6" : ""}`}
     >
       {/* NUL sentinel key: a real raw id can never collide with the null "Unknown" bucket. */}
       {ranked.map((r) => (
