@@ -134,7 +134,9 @@ export function LeftSidebar({
       </div>
 
       <div className="flex shrink-0 items-center justify-between gap-1 px-2.5 pb-1 pt-1.5">
-        <SidebarPanelLabel className="pl-2">Sessions</SidebarPanelLabel>
+        <SidebarPanelLabel icon="messages-square" className="pl-2">
+          Sessions
+        </SidebarPanelLabel>
         <span className="text-[0.6875rem] font-medium leading-none text-(--ui-text-quaternary)">
           {groups.reduce((n, g) => n + g.sessions.length, 0)}
         </span>
