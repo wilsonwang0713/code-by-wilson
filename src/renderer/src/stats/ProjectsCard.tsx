@@ -9,8 +9,9 @@ import { StatsCard, CardRegion } from "./shared";
 const PROJECT_BATCH = 7;
 
 /** One row of a Breakdown panel: an entity with its displayed-metric tokens and the color its bar (and
- *  optional swatch) take. The caller ranks the rows and assigns colors; the panel slices to `cap`, sizes
- *  bars against the largest displayed value, and renders the header and "+N more" note. */
+ *  optional swatch) take. The caller ranks the rows and assigns colors; the panel reveals rows in
+ *  batches (see `Breakdown`), sizes bars against the largest displayed value, and renders the header and
+ *  the "Show N more" control. */
 type BreakdownRow = {
   key: string;
   label: string;
