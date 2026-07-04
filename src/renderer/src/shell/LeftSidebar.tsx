@@ -31,6 +31,7 @@ function loadActiveOnly(): boolean {
  */
 export function LeftSidebar({
   sessions,
+  homeDir,
   selectedId,
   onSelect,
   onNew,
@@ -39,6 +40,8 @@ export function LeftSidebar({
   onRoute,
 }: {
   sessions: Session[];
+  /** For ~-abbreviating group hints; '' before the first overview lands (hints then show raw parents). */
+  homeDir: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -51,9 +54,10 @@ export function LeftSidebar({
   const [activeOnly, setActiveOnly] = useState(loadActiveOnly);
   const groups = groupSessionsByProject(
     filterSessions(activeOnly ? filterActive(sessions) : sessions, query),
+    homeDir,
   );
   const allCollapsed =
-    groups.length > 0 && groups.every((g) => collapsed.has(g.project));
+    groups.length > 0 && groups.every((g) => collapsed.has(g.key));
   const toggleActiveOnly = () => {
     const next = !activeOnly;
     try {
@@ -171,9 +175,7 @@ export function LeftSidebar({
             type="button"
             onClick={() =>
               setCollapsed(
-                allCollapsed
-                  ? new Set()
-                  : new Set(groups.map((g) => g.project)),
+                allCollapsed ? new Set() : new Set(groups.map((g) => g.key)),
               )
             }
             title={allCollapsed ? "Expand all" : "Collapse all"}
@@ -212,34 +214,40 @@ export function LeftSidebar({
         ) : (
           <div className="flex flex-col gap-px">
             {groups.map((g) => (
-              <div key={g.project}>
+              <div key={g.key}>
                 <button
                   type="button"
-                  onClick={() => toggleGroup(g.project)}
-                  aria-expanded={!collapsed.has(g.project)}
+                  onClick={() => toggleGroup(g.key)}
+                  aria-expanded={!collapsed.has(g.key)}
+                  title={g.cwd}
                   className="group/project flex min-h-[1.625rem] w-full cursor-pointer items-center gap-1.5 rounded-md py-0.5 pl-2 pr-1 text-left transition-colors duration-100 ease-out hover:bg-(--ui-row-hover-background) hover:transition-none"
                 >
                   <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-tertiary)">
                     <Icon
-                      name={collapsed.has(g.project) ? "folder" : "folder-open"}
+                      name={collapsed.has(g.key) ? "folder" : "folder-open"}
                       size={14}
                     />
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-tertiary) group-hover/project:text-fg">
-                    {g.project}
+                  <span className="min-w-0 truncate text-[0.8125rem] leading-none text-(--ui-text-tertiary) group-hover/project:text-fg">
+                    {g.label}
                   </span>
-                  <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-quaternary)">
+                  {g.hint && (
+                    <span className="min-w-0 shrink-[2] truncate text-[0.72rem] leading-none text-(--ui-text-quaternary)">
+                      {g.hint}
+                    </span>
+                  )}
+                  <span className="ml-auto grid size-3.5 shrink-0 place-items-center text-(--ui-text-quaternary)">
                     <Icon
                       name="chevron-right"
                       size={13}
                       className={cx(
                         "transition-transform",
-                        !collapsed.has(g.project) && "rotate-90",
+                        !collapsed.has(g.key) && "rotate-90",
                       )}
                     />
                   </span>
                 </button>
-                {!collapsed.has(g.project) && (
+                {!collapsed.has(g.key) && (
                   <div className="flex flex-col gap-px pb-1">
                     {g.sessions.map((s) => (
                       <SessionRow
