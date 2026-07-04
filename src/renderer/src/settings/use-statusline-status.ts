@@ -6,7 +6,11 @@ const POLL_MS = 3000;
 /**
  * Polls the statusline status while mounted (the System section) on the app's standard 3s cadence.
  * Mutating actions apply the status the handler returns immediately instead of waiting for the next
- * tick; the shared in-flight guard keeps an overlapping poll from clobbering that fresher result.
+ * tick. Every request (poll or mutation) claims a monotonically increasing generation token; a
+ * request only applies its result if its generation is still the latest one issued, so a poll that
+ * was already in flight when a mutation fired can't clobber the mutation's fresher result. Polls are
+ * additionally deduped locally (skip if one is already in flight) purely to avoid pointless pile-up —
+ * mutations are never blocked by that.
  */
 export function useStatuslineStatus(): {
   status: StatuslineStatus | null;
@@ -15,20 +19,22 @@ export function useStatuslineStatus(): {
   repair: () => void;
 } {
   const [status, setStatus] = useState<StatuslineStatus | null>(null);
-  const busy = useRef(false);
+  const latest = useRef(0); // generation of the most-recently-issued request
 
   useEffect(() => {
     let alive = true;
+    let inFlight = false; // skip overlapping polls only; never blocks mutations
     async function tick(): Promise<void> {
-      if (busy.current) return;
-      busy.current = true;
+      if (inFlight) return;
+      inFlight = true;
+      const gen = ++latest.current;
       try {
         const s = await window.api.getStatuslineStatus();
-        if (alive) setStatus(s);
+        if (alive && gen === latest.current) setStatus(s);
       } catch {
         // main never rejects by design; a torn bridge just keeps the last readout
       } finally {
-        busy.current = false;
+        inFlight = false;
       }
     }
     void tick();
@@ -40,12 +46,10 @@ export function useStatuslineStatus(): {
   }, []);
 
   function apply(p: Promise<StatuslineStatus>): void {
-    busy.current = true;
-    p.then((s) => setStatus(s))
-      .catch(() => {})
-      .finally(() => {
-        busy.current = false;
-      });
+    const gen = ++latest.current; // this action is now the latest; older in-flight polls won't clobber
+    p.then((s) => {
+      if (gen === latest.current) setStatus(s);
+    }).catch(() => {});
   }
 
   return {
