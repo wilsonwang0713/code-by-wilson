@@ -169,7 +169,7 @@ export function overlaySessions(
       linesRemoved: sample.linesRemoved ?? undefined,
       effortLevel: sample.effortLevel ?? undefined,
       sessionClockMs: sample.sessionClockMs ?? undefined,
-      cwd: sample.cwd ?? undefined,
+      cwd: sample.cwd ?? s.cwd,
       costUsd: sample.costUsd ?? undefined,
       apiDurationMs: sample.apiDurationMs ?? undefined,
       pr: sample.pr ?? undefined,
