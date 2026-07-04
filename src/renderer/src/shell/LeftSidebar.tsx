@@ -2,11 +2,26 @@ import { useState } from "react";
 import type { Session } from "@shared/types";
 import { cx } from "../ui/atoms";
 import { Icon } from "../ui/icons";
-import { filterSessions, groupSessionsByProject } from "./session-list-model";
+import {
+  filterActive,
+  filterSessions,
+  groupSessionsByProject,
+} from "./session-list-model";
 import { SessionRow } from "./SessionRow";
 import { OVERVIEW_ID } from "../stats/sentinel";
 import { SETTINGS_ID } from "../settings/sentinel";
 import { SidebarPanelLabel } from "./SidebarPanelLabel";
+
+const ACTIVE_ONLY_KEY = "cbw.sessionsActiveOnly.v1";
+
+/** Reads the persisted active-only flag; missing, malformed, or unreadable → false. */
+function loadActiveOnly(): boolean {
+  try {
+    return window.localStorage.getItem(ACTIVE_ONLY_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The left sidebar's content (design spec §4): an empty draggable top strip — the traffic lights
@@ -33,7 +48,22 @@ export function LeftSidebar({
 }) {
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const groups = groupSessionsByProject(filterSessions(sessions, query));
+  const [activeOnly, setActiveOnly] = useState(loadActiveOnly);
+  const groups = groupSessionsByProject(
+    filterSessions(activeOnly ? filterActive(sessions) : sessions, query),
+  );
+  const allCollapsed =
+    groups.length > 0 && groups.every((g) => collapsed.has(g.project));
+  const toggleActiveOnly = () =>
+    setActiveOnly((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(ACTIVE_ONLY_KEY, String(next));
+      } catch {
+        // Storage failures are nonfatal — the toggle still works for this run.
+      }
+      return next;
+    });
   const toggleGroup = (project: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -137,14 +167,48 @@ export function LeftSidebar({
         <SidebarPanelLabel icon="messages-square" className="pl-2">
           Sessions
         </SidebarPanelLabel>
-        <span className="pr-1 text-[0.6875rem] font-medium leading-none text-(--ui-text-quaternary)">
-          {groups.reduce((n, g) => n + g.sessions.length, 0)}
-        </span>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() =>
+              setCollapsed(
+                allCollapsed
+                  ? new Set()
+                  : new Set(groups.map((g) => g.project)),
+              )
+            }
+            title={allCollapsed ? "Expand all" : "Collapse all"}
+            className="grid size-5 cursor-pointer place-items-center rounded-[5px] border border-transparent text-(--ui-text-quaternary) transition-colors duration-100 ease-out hover:bg-(--ui-control-hover-background) hover:text-fg hover:transition-none"
+          >
+            <Icon
+              name={allCollapsed ? "chevrons-up-down" : "chevrons-down-up"}
+              size={12}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={toggleActiveOnly}
+            aria-pressed={activeOnly}
+            title={
+              activeOnly ? "Show all sessions" : "Show active sessions only"
+            }
+            className={cx(
+              "grid size-5 cursor-pointer place-items-center rounded-[5px] border transition-colors duration-100 ease-out hover:transition-none",
+              activeOnly
+                ? "border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-fg"
+                : "border-transparent text-(--ui-text-quaternary) hover:bg-(--ui-control-hover-background) hover:text-fg",
+            )}
+          >
+            <Icon name="activity" size={12} />
+          </button>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-2">
         {groups.length === 0 ? (
           <p className="px-2 py-2 text-xs text-(--ui-text-quaternary)">
-            No sessions yet.
+            {activeOnly && sessions.length > 0
+              ? "No active sessions."
+              : "No sessions yet."}
           </p>
         ) : (
           <div className="flex flex-col gap-px">
