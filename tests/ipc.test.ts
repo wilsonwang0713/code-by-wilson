@@ -23,6 +23,7 @@ const seed: PersistedSession = {
   id: "seed",
   title: "Seeded",
   project: "p",
+  cwd: "/w/p",
   branch: undefined,
   state: "idle",
   management: "observed",

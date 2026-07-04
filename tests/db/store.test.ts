@@ -16,6 +16,7 @@ const snap = (over: Partial<PersistedSession> = {}): PersistedSession => ({
   id: "id-1",
   title: "Title",
   project: "proj",
+  cwd: "/work/proj",
   branch: "main",
   state: "idle",
   management: "observed",
@@ -45,7 +46,7 @@ describe("store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(7);
+    ).toBe(8);
   });
 
   it("round-trips a snapshot, coercing missing branch and the awaitingUser flag", () => {
@@ -114,6 +115,11 @@ describe("store", () => {
     expect(s.contextWindow).toBe(200_000); // every family defaults to the standard 200K
     expect(s.contextPct).toBe(50); // 100000 / 200000
     expect(s.usage.cacheReadTokens).toBe(400_000); // raw usage carries through untouched
+  });
+
+  it("hydrates cwd, mapping the empty sentinel to absent", () => {
+    expect(hydrate(snap()).cwd).toBe("/work/proj");
+    expect(hydrate(snap({ cwd: "" })).cwd).toBeUndefined();
   });
 
   it("derives the 200K default window for an uncaptured Opus session", () => {

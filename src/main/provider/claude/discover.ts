@@ -236,6 +236,7 @@ export function summarize(c: SessionCandidate): PersistedSession {
     id: c.id,
     title: t?.title ?? fallbackName,
     project: t?.project ?? fallbackName,
+    cwd: t?.cwd ?? c.cwd,
     branch: t?.branch,
     state: deriveSessionState({
       alive: c.alive,
