@@ -71,10 +71,20 @@ export interface InstallResult {
   healed: boolean;
 }
 
+/** The Settings-page readout of the wrapper install. */
+export interface WrapperStatus {
+  /** settings.json's statusLine currently points at our wrapper. */
+  installed: boolean;
+  /** The wrapped block's refreshInterval in seconds, or null when unset or not installed. */
+  refreshInterval: number | null;
+}
+
 export interface SettingsManager {
   isInstalled(): boolean;
   install(): InstallResult;
   uninstall(): void;
+  status(): WrapperStatus;
+  setRefreshInterval(seconds: number | null): void;
 }
 
 export function createSettingsManager(
@@ -422,5 +432,66 @@ export function createSettingsManager(
     rmSync(statePath, { force: true });
   }
 
-  return { isInstalled, install, uninstall };
+  /** The Settings-page readout. Never throws: an unreadable settings.json reads as not-installed —
+   *  the fault surfaces through install()/isInstalled() paths, not this display read. */
+  function status(): WrapperStatus {
+    let parsed: ClaudeSettings | null;
+    try {
+      parsed = readSettings().parsed;
+    } catch {
+      return { installed: false, refreshInterval: null };
+    }
+    const block = parsed?.statusLine;
+    if (block?.command !== appCommand)
+      return { installed: false, refreshInterval: null };
+    const ri = block.refreshInterval;
+    return {
+      installed: true,
+      refreshInterval:
+        typeof ri === "number" && Number.isFinite(ri) ? ri : null,
+    };
+  }
+
+  /** Write refreshInterval (seconds) into the wrapped block — Claude Code re-runs the statusline on
+   *  this timer, which is what keeps idle sessions' captures (and the app's duty/clock) ticking. null
+   *  deletes the key (events-only rendering). Only meaningful while installed; a no-op otherwise, and
+   *  on out-of-range values (UI enforces 1–60, this guards 1–3600 as the hard bound). The record's
+   *  wrappedExtras re-syncs in the same call so a later heal rebuilds the tuned block. */
+  function setRefreshInterval(seconds: number | null): void {
+    if (
+      seconds !== null &&
+      (!Number.isInteger(seconds) || seconds < 1 || seconds > 3600)
+    )
+      return;
+    const { parsed } = readSettings();
+    const block = parsed?.statusLine;
+    if (!parsed || block?.command !== appCommand) return;
+    const next: StatusLine = { ...block };
+    if (seconds === null) delete next.refreshInterval;
+    else next.refreshInterval = seconds;
+    let mode: number | undefined;
+    try {
+      mode = statSync(settingsPath).mode & 0o777;
+    } catch {
+      mode = undefined;
+    }
+    writeFileAtomic(
+      settingsPath,
+      JSON.stringify({ ...parsed, statusLine: next }, null, 2) + "\n",
+      mode,
+    );
+    const state = readState(); // throws on a corrupt record — same contract as install()
+    if (state !== null) {
+      writeFileAtomic(
+        statePath,
+        JSON.stringify(
+          { ...state, wrappedExtras: statusLineExtras(next) },
+          null,
+          2,
+        ) + "\n",
+      );
+    }
+  }
+
+  return { isInstalled, install, uninstall, status, setRefreshInterval };
 }

@@ -1134,3 +1134,129 @@ describe("install — carries upstream statusLine extras through the wrap", () =
     expect(readJson(home).statusLine).toEqual(wrapped.statusLine); // restored verbatim
   });
 });
+
+describe("status() and setRefreshInterval()", () => {
+  it("status reports not-installed before install, installed + interval after", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        {
+          statusLine: {
+            type: "command",
+            command: "mine",
+            refreshInterval: 10,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+
+    expect(mgr.status()).toEqual({ installed: false, refreshInterval: null });
+    mgr.install();
+    expect(mgr.status()).toEqual({ installed: true, refreshInterval: 10 });
+  });
+
+  it("status reads null interval when the wrapped block has none", () => {
+    const home = makeHome();
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+    expect(mgr.status()).toEqual({ installed: true, refreshInterval: null });
+  });
+
+  it("setRefreshInterval writes the block, preserves other keys, and re-syncs wrappedExtras", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        {
+          theme: "dark",
+          statusLine: { type: "command", command: "mine", padding: 2 },
+        },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    mgr.setRefreshInterval(10);
+
+    const block = readJson(home).statusLine;
+    expect(block.refreshInterval).toBe(10);
+    expect(block.command).toBe(appCommandFor(home)); // still wrapped
+    expect(block.padding).toBe(2); // carried extras untouched
+    expect(readJson(home).theme).toBe("dark"); // unrelated keys untouched
+    expect(readState(home).wrappedExtras).toEqual({
+      padding: 2,
+      refreshInterval: 10,
+    });
+  });
+
+  it("setRefreshInterval(null) deletes the key from block and record", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        {
+          statusLine: { type: "command", command: "mine", refreshInterval: 10 },
+        },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    mgr.setRefreshInterval(null);
+
+    expect("refreshInterval" in readJson(home).statusLine).toBe(false);
+    expect(readState(home).wrappedExtras).toEqual({});
+  });
+
+  it("setRefreshInterval is a no-op when not installed or on an invalid value", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+
+    const before = readRaw(home);
+    mgr.setRefreshInterval(10); // not installed → no write
+    expect(readRaw(home)).toBe(before);
+
+    mgr.install();
+    const wrapped = readRaw(home);
+    mgr.setRefreshInterval(0); // < 1
+    mgr.setRefreshInterval(2.5); // non-integer
+    mgr.setRefreshInterval(4000); // > 3600
+    expect(readRaw(home)).toBe(wrapped);
+  });
+});
