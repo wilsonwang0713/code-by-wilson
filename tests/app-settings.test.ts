@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAppSettingsStore } from "../src/main/app-settings";
@@ -54,5 +54,43 @@ describe("createAppSettingsStore", () => {
     store.setAutoCheckUpdates(false);
     expect(store.read().claudeBinPath).toBe("/custom/claude");
     expect(store.read().autoCheckUpdates).toBe(false);
+  });
+});
+
+describe("statuslineEnabled preference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  function tmp(): string {
+    const d = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("is absent by default (callers read ?? true), persists false, and round-trips", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+
+    expect(store.read().statuslineEnabled).toBeUndefined();
+
+    store.setStatuslineEnabled(false);
+    expect(store.read().statuslineEnabled).toBe(false);
+    // persisted, not just in memory
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))
+        .statuslineEnabled,
+    ).toBe(false);
+
+    store.setStatuslineEnabled(true);
+    expect(store.read().statuslineEnabled).toBe(true);
+  });
+
+  it("preserves other keys when toggling", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    store.setClaudeBinPath("/opt/claude");
+    store.setStatuslineEnabled(false);
+    expect(store.read().claudeBinPath).toBe("/opt/claude");
   });
 });

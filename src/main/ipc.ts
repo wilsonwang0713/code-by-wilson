@@ -145,6 +145,7 @@ export function registerIpc({
     read: () => ({}),
     setClaudeBinPath: () => {},
     setAutoCheckUpdates: () => {},
+    setStatuslineEnabled: () => {},
   };
 
   const sync = (): void => {
