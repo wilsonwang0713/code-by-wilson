@@ -1,13 +1,5 @@
 import type { Management, SessionState } from "@shared/types";
-import {
-  glyphClass,
-  glyphPulses,
-  glyphTitle,
-  glyphSpins,
-  glyphTone,
-  STATE_ICON,
-} from "./session-glyph";
-import { Icon } from "./icons";
+import { LAMP, glyphTitle } from "./session-glyph";
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -21,66 +13,23 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 export const focusRing = "";
 export const focusRingInset = "";
 
-/** The session glyph: color = state, fill = management. Pass `management` for a session dot (filled when
- *  managed, hollow ring when observed, with a "state · management" tooltip); omit it for the state-group
- *  headers, which are about state alone and stay filled. */
-export function Dot({
+/** The session lamp (2026-07-04 spec §1): filled = live, hollow = quiet. Shape, size and motion come
+ *  from the LAMP table; management is spoken only in the tooltip. Working layers a static core dot
+ *  inside its spinning arc, so the outer span is the positioning context. */
+export function Lamp({
   state,
   management,
-  sizeClass = "h-2 w-2",
-}: {
-  state: SessionState;
-  management?: Management;
-  sizeClass?: string;
-}) {
-  const cls = glyphClass(state, management ?? "managed");
-  return (
-    <span
-      title={management ? glyphTitle(state, management) : undefined}
-      className={cx("relative inline-flex rounded-full", sizeClass, cls)}
-    >
-      {glyphPulses(state) && (
-        <span
-          className={cx(
-            "absolute inset-0 rounded-full",
-            cls,
-            "animate-pulse-soft",
-          )}
-        />
-      )}
-    </span>
-  );
-}
-
-/** The session ROW indicator: a compact monochrome state icon. Shape = state (via STATE_ICON), tone =
- *  management (managed muted, observed faint) — or brightened to fg when the row is selected. Working
- *  spins; Waiting carries a single static amber corner dot. Top-aligned so it sits with the title, not
- *  centered across both lines. Color lives in the group headers' Dot, never here. */
-export function SessionTile({
-  state,
-  management,
-  selected,
 }: {
   state: SessionState;
   management: Management;
-  selected?: boolean;
 }) {
+  const lamp = LAMP[state];
   return (
     <span
       title={glyphTitle(state, management)}
-      className="relative mt-px flex h-4 w-4 shrink-0 items-center justify-center"
+      className={cx("relative inline-flex", lamp.outer)}
     >
-      <Icon
-        name={STATE_ICON[state]}
-        size={15}
-        className={cx(
-          selected ? "text-fg" : glyphTone(management),
-          glyphSpins(state) && "animate-spin",
-        )}
-      />
-      {state === "waiting" && (
-        <span className="absolute -right-[3px] -top-[3px] h-[7px] w-[7px] rounded-full bg-accent ring-2 ring-ink-925" />
-      )}
+      {lamp.core && <span className={lamp.core} />}
     </span>
   );
 }

@@ -1,71 +1,43 @@
 import { describe, it, expect } from "vitest";
-import {
-  glyphClass,
-  glyphTitle,
-  glyphPulses,
-  glyphSpins,
-  glyphTone,
-  STATE_ICON,
-} from "../../src/renderer/src/ui/session-glyph";
+import { LAMP, glyphTitle } from "../../src/renderer/src/ui/session-glyph";
 
-describe("glyphClass — color = state, fill = management", () => {
-  it("is a filled state dot for a managed session", () => {
-    expect(glyphClass("working", "managed")).toBe("bg-working");
-    expect(glyphClass("waiting", "managed")).toBe("bg-accent");
-    expect(glyphClass("idle", "managed")).toBe("bg-idle");
-    expect(glyphClass("ended", "managed")).toBe("bg-ink-600");
+describe("LAMP — filled = live, hollow = quiet", () => {
+  it("working is an 11px spinning arc with a static teal core", () => {
+    expect(LAMP.working.outer).toBe(
+      "h-[11px] w-[11px] rounded-full border-[1.5px] border-working/25 border-t-working animate-spin motion-reduce:animate-none",
+    );
+    expect(LAMP.working.core).toBe(
+      "absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-working",
+    );
   });
 
-  it("is a hollow ring in the same state color for an observed session", () => {
-    expect(glyphClass("waiting", "observed")).toBe(
-      "border-[1.5px] bg-transparent border-accent",
+  it("waiting is a filled amber dot breathing a halo", () => {
+    expect(LAMP.waiting.outer).toBe(
+      "h-1.5 w-1.5 rounded-full bg-accent animate-halo motion-reduce:animate-none",
     );
-    expect(glyphClass("working", "observed")).toBe(
-      "border-[1.5px] bg-transparent border-working",
+  });
+
+  it("idle is a hollow ring — quiet, not gone", () => {
+    expect(LAMP.idle.outer).toBe(
+      "h-1.5 w-1.5 rounded-full border-[1.5px] border-idle bg-transparent",
     );
-    expect(glyphClass("ended", "observed")).toBe(
-      "border-[1.5px] bg-transparent border-ink-600",
-    );
+  });
+
+  it("ended is a barely-there ember", () => {
+    expect(LAMP.ended.outer).toBe("h-1 w-1 rounded-full bg-ink-700");
+  });
+
+  it("only working carries a core layer", () => {
+    expect(LAMP.working.core).toBeDefined();
+    expect(LAMP.waiting.core).toBeUndefined();
+    expect(LAMP.idle.core).toBeUndefined();
+    expect(LAMP.ended.core).toBeUndefined();
   });
 });
 
-describe("glyphTitle — hover tooltip spells the glyph out", () => {
+describe("glyphTitle — hover tooltip spells the lamp out", () => {
   it('reads "state · management", lowercased', () => {
     expect(glyphTitle("waiting", "observed")).toBe("waiting · observed");
     expect(glyphTitle("working", "managed")).toBe("working · managed");
-  });
-});
-
-describe("glyphPulses — only the live states animate", () => {
-  it("pulses for working and waiting, not idle or ended", () => {
-    expect(glyphPulses("working")).toBe(true);
-    expect(glyphPulses("waiting")).toBe(true);
-    expect(glyphPulses("idle")).toBe(false);
-    expect(glyphPulses("ended")).toBe(false);
-  });
-});
-
-describe("STATE_ICON — shape carries state for the row tile", () => {
-  it("maps each state to its chosen lucide glyph", () => {
-    expect(STATE_ICON.working).toBe("loader-circle");
-    expect(STATE_ICON.waiting).toBe("messages-square");
-    expect(STATE_ICON.idle).toBe("clock");
-    expect(STATE_ICON.ended).toBe("archive");
-  });
-});
-
-describe("glyphTone — management sets the monochrome tone", () => {
-  it("is muted for managed, one step fainter for observed", () => {
-    expect(glyphTone("managed")).toBe("text-fg-muted");
-    expect(glyphTone("observed")).toBe("text-fg-faint");
-  });
-});
-
-describe("glyphSpins — only Working spins", () => {
-  it("spins for working, and nothing else", () => {
-    expect(glyphSpins("working")).toBe(true);
-    expect(glyphSpins("waiting")).toBe(false);
-    expect(glyphSpins("idle")).toBe(false);
-    expect(glyphSpins("ended")).toBe(false);
   });
 });
