@@ -386,10 +386,12 @@ body {
 @keyframes halo {
   0%,
   100% {
-    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--color-accent) 22%, transparent);
+    box-shadow: 0 0 0 2.5px
+      color-mix(in srgb, var(--color-accent) 22%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 4.5px color-mix(in srgb, var(--color-accent) 7%, transparent);
+    box-shadow: 0 0 0 4.5px
+      color-mix(in srgb, var(--color-accent) 7%, transparent);
   }
 }
 .animate-halo {
