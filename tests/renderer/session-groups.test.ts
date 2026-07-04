@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "../../src/shared/types";
 import {
   groupSessionsByProject,
+  parentHint,
   UNGROUPED_LABEL,
 } from "../../src/renderer/src/shell/session-list-model";
 
@@ -25,7 +26,7 @@ describe("groupSessionsByProject", () => {
     const b1 = mk({ project: "beta", lastActivityMs: 900 });
     const a2 = mk({ project: "alpha", lastActivityMs: 500 });
     const groups = groupSessionsByProject([a1, b1, a2]);
-    expect(groups.map((g) => g.project)).toEqual(["beta", "alpha"]);
+    expect(groups.map((g) => g.label)).toEqual(["beta", "alpha"]);
     expect(groups[1].sessions).toHaveLength(2);
   });
 
@@ -45,10 +46,60 @@ describe("groupSessionsByProject", () => {
     const none = mk({ project: "" });
     const groups = groupSessionsByProject([none]);
     expect(groups).toHaveLength(1);
-    expect(groups[0].project).toBe(UNGROUPED_LABEL);
+    expect(groups[0].label).toBe(UNGROUPED_LABEL);
+    expect(groups[0].key).toBe(UNGROUPED_LABEL);
+    expect(groups[0].cwd).toBeUndefined();
   });
 
   it("returns an empty array for no sessions", () => {
     expect(groupSessionsByProject([])).toEqual([]);
+  });
+
+  it("splits same-named folders at different paths, hinting each parent", () => {
+    const a = mk({ project: "test", cwd: "/Users/x/a/test" });
+    const b = mk({ project: "test", cwd: "/Users/x/b/test" });
+    const groups = groupSessionsByProject([a, b], "/Users/x");
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => [g.key, g.label, g.hint])).toEqual(
+      expect.arrayContaining([
+        ["/Users/x/a/test", "test", "~/a"],
+        ["/Users/x/b/test", "test", "~/b"],
+      ]),
+    );
+  });
+
+  it("same cwd stays one group; distinct names get no hint", () => {
+    const a1 = mk({ project: "app", cwd: "/Users/x/app" });
+    const a2 = mk({ project: "app", cwd: "/Users/x/app" });
+    const c = mk({ project: "cli", cwd: "/Users/x/cli" });
+    const groups = groupSessionsByProject([a1, a2, c], "/Users/x");
+    expect(groups).toHaveLength(2);
+    expect(groups.every((g) => g.hint === undefined)).toBe(true);
+  });
+
+  it("mixed collision: the path-keyed group hints, the cwd-less fallback doesn't", () => {
+    const pathed = mk({ project: "test", cwd: "/Users/x/a/test" });
+    const bare = mk({ project: "test", cwd: undefined });
+    const groups = groupSessionsByProject([pathed, bare], "/Users/x");
+    expect(groups).toHaveLength(2);
+    const withPath = groups.find((g) => g.cwd);
+    const without = groups.find((g) => !g.cwd);
+    expect(withPath?.hint).toBe("~/a");
+    expect(without?.hint).toBeUndefined();
+  });
+});
+
+describe("parentHint", () => {
+  it("abbreviates a parent under home", () => {
+    expect(parentHint("/Users/x/a/test", "/Users/x")).toBe("~/a");
+  });
+  it("returns ~ for a cwd directly under home", () => {
+    expect(parentHint("/Users/x/test", "/Users/x")).toBe("~");
+  });
+  it("keeps paths outside home absolute", () => {
+    expect(parentHint("/srv/deploys/test", "/Users/x")).toBe("/srv/deploys");
+  });
+  it("degrades to the raw parent when homeDir is unknown", () => {
+    expect(parentHint("/Users/x/a/test", "")).toBe("/Users/x/a");
   });
 });

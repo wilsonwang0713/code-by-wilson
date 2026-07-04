@@ -73,7 +73,7 @@ describe("session list model", () => {
     const a = mk({ id: "a", state: "working", project: "alpha" });
     const e1 = mk({ id: "e1", state: "ended", project: "beta" });
     expect(
-      groupSessionsByProject(filterActive([a, e1])).map((g) => g.project),
+      groupSessionsByProject(filterActive([a, e1])).map((g) => g.label),
     ).toEqual(["alpha"]);
   });
 });
