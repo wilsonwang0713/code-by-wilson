@@ -10,12 +10,16 @@ export interface AppSettings {
   /** Whether to check for app updates on launch. Missing means on; the launch check reads
    *  `read().autoCheckUpdates ?? true`. */
   autoCheckUpdates?: boolean;
+  /** Whether the statusLine capture wrapper is installed at launch and active. Missing means on;
+   *  callers read `read().statuslineEnabled ?? true`. */
+  statuslineEnabled?: boolean;
 }
 
 export interface AppSettingsStore {
   read(): AppSettings;
   setClaudeBinPath(path: string | null): void;
   setAutoCheckUpdates(enabled: boolean): void;
+  setStatuslineEnabled(enabled: boolean): void;
 }
 
 export interface AppSettingsDeps {
@@ -51,6 +55,9 @@ export function createAppSettingsStore(
     },
     setAutoCheckUpdates(enabled) {
       write({ ...read(), autoCheckUpdates: enabled });
+    },
+    setStatuslineEnabled(enabled) {
+      write({ ...read(), statuslineEnabled: enabled });
     },
   };
 }

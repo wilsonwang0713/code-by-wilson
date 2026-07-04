@@ -146,10 +146,12 @@ describe("install — wrap an existing statusLine (AC #1)", () => {
 
     const result = mgr.install();
 
-    // The app's command is now installed...
+    // The app's command is now installed (upstream knobs like padding ride along; see the
+    // carry-through describe at the bottom)...
     expect(readJson(home).statusLine).toEqual({
       type: "command",
       command: appCommandFor(home),
+      padding: 2,
     });
     // ...and the user's original is preserved for the wrapper (issue #11) to call through to.
     const state = readState(home);
@@ -409,6 +411,106 @@ describe("trust-safety — desync between settings.json and state.json", () => {
 
     mgr.uninstall();
     expect(readJson(home).statusLine.command).toBe("mine");
+  });
+
+  it("install re-wraps from the record when the statusLine entry was stripped externally", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" }, theme: "dark" },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    // An external tool strips the statusLine entry while our record survives — ccstatusline's
+    // uninstall deletes whichever statusLine is present, ours included.
+    const stripped = readJson(home);
+    delete stripped.statusLine;
+    writeFileSync(settingsPath(home), JSON.stringify(stripped, null, 2));
+    expect(mgr.isInstalled()).toBe(false);
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(healed.wrappedExisting).toBe(true);
+    expect(mgr.isInstalled()).toBe(true);
+
+    // The recorded command survives into the rebuilt state and the wrapper's call-through…
+    expect(readState(home).wrappedCommand).toBe("mine");
+    expect(
+      readFileSync(
+        join(home, ".code-by-wire", "statusline-wrapper.sh"),
+        "utf8",
+      ),
+    ).toContain("| mine");
+    // …the stripped file's other keys survive…
+    expect(readJson(home).theme).toBe("dark");
+    // …and the new backup holds the reconstructed original, so uninstall restores the user's prompt.
+    expect(
+      JSON.parse(readFileSync(healed.backupPath!, "utf8")).statusLine.command,
+    ).toBe("mine");
+    mgr.uninstall();
+    expect(readJson(home).statusLine.command).toBe("mine");
+  });
+
+  it("reinstall after an external strip stays capture-only when the record wrapped no command", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify({ theme: "dark" }, null, 2),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install(); // wrapped nothing — the user had no statusLine of their own
+
+    const stripped = readJson(home);
+    delete stripped.statusLine;
+    writeFileSync(settingsPath(home), JSON.stringify(stripped, null, 2));
+
+    const again = mgr.install();
+    expect(again.healed).toBe(false); // nothing recoverable — a plain reinstall, not a heal
+    expect(readState(home).wrappedCommand).toBeNull();
+    expect(mgr.isInstalled()).toBe(true);
+  });
+
+  it("recovers the wrapped command from the record even when settings.json was deleted wholesale", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    rmSync(settingsPath(home)); // the whole file vanishes while state.json survives
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(readState(home).wrappedCommand).toBe("mine"); // not clobbered to null
+    expect(
+      readFileSync(
+        join(home, ".code-by-wire", "statusline-wrapper.sh"),
+        "utf8",
+      ),
+    ).toContain("| mine");
   });
 
   it("install self-heals to a clean reinstall when the wrapper is also gone (nothing to recover)", () => {
@@ -884,5 +986,304 @@ describe("install — does not re-wrap a foreign code-by-wire wrapper", () => {
       JSON.parse(readFileSync(join(appDir, "state.json"), "utf8"))
         .wrappedCommand,
     ).toBeNull();
+  });
+});
+
+// Claude Code's statusLine block carries upstream knobs beyond the command — padding, and
+// refreshInterval (without which the statusLine only re-runs on conversation events, so an idle
+// session's live capture freezes). Wrapping must not silently degrade them: they ride along in the
+// wrapped block and in state.json, so every heal path can rebuild the block as the user tuned it.
+describe("install — carries upstream statusLine extras through the wrap", () => {
+  const wrapped = {
+    statusLine: {
+      type: "command",
+      command: "mine",
+      padding: 2,
+      refreshInterval: 10,
+    },
+  };
+
+  it("carries padding/refreshInterval into the wrapped block and records them in state.json", () => {
+    const home = makeHome();
+    writeFileSync(settingsPath(home), JSON.stringify(wrapped, null, 2));
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+
+    mgr.install();
+
+    expect(readJson(home).statusLine).toEqual({
+      type: "command",
+      command: appCommandFor(home),
+      padding: 2,
+      refreshInterval: 10,
+    });
+    expect(readState(home).wrappedExtras).toEqual({
+      padding: 2,
+      refreshInterval: 10,
+    });
+  });
+
+  it("restores the extras when healing a statusLine entry stripped externally", () => {
+    const home = makeHome();
+    writeFileSync(settingsPath(home), JSON.stringify(wrapped, null, 2));
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    const stripped = readJson(home);
+    delete stripped.statusLine;
+    writeFileSync(settingsPath(home), JSON.stringify(stripped, null, 2));
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(readJson(home).statusLine).toEqual({
+      type: "command",
+      command: appCommandFor(home),
+      padding: 2,
+      refreshInterval: 10,
+    });
+    // ...and the reconstructed backup carries them too, so uninstall restores the tuned original.
+    expect(
+      JSON.parse(readFileSync(healed.backupPath!, "utf8")).statusLine,
+    ).toEqual({
+      type: "command",
+      command: "mine",
+      padding: 2,
+      refreshInterval: 10,
+    });
+  });
+
+  it("keeps the extras when healing a vanished state.json from the wrapper script", () => {
+    const home = makeHome();
+    writeFileSync(settingsPath(home), JSON.stringify(wrapped, null, 2));
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    rmSync(join(home, ".code-by-wire", "state.json")); // record vanishes; the wrapped block survives
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(readJson(home).statusLine.refreshInterval).toBe(10); // recovered from the live block
+    expect(readState(home).wrappedExtras).toEqual({
+      padding: 2,
+      refreshInterval: 10,
+    });
+  });
+
+  it("re-syncs the record when the user hand-tunes the wrapped block (idempotent install)", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    // The user adds refreshInterval to the live wrapped block by hand…
+    const tuned = readJson(home);
+    tuned.statusLine.refreshInterval = 10;
+    writeFileSync(settingsPath(home), JSON.stringify(tuned, null, 2));
+
+    mgr.install(); // idempotent branch — must pick the tuning up into the record
+
+    expect(readState(home).wrappedExtras).toEqual({ refreshInterval: 10 });
+
+    // …so a later external strip heals back to the tuned block, not the first-wrapped one.
+    const stripped = readJson(home);
+    delete stripped.statusLine;
+    writeFileSync(settingsPath(home), JSON.stringify(stripped, null, 2));
+    mgr.install();
+    expect(readJson(home).statusLine.refreshInterval).toBe(10);
+  });
+
+  it("accepts a pre-extras state.json (older build) without treating it as corrupt", () => {
+    const home = makeHome();
+    writeFileSync(settingsPath(home), JSON.stringify(wrapped, null, 2));
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    const statePath = join(home, ".code-by-wire", "state.json");
+    const old = JSON.parse(readFileSync(statePath, "utf8"));
+    delete old.wrappedExtras; // a record written before this field existed
+    writeFileSync(statePath, JSON.stringify(old, null, 2));
+
+    expect(() => mgr.install()).not.toThrow(); // idempotent branch reads the old record fine
+    expect(() => mgr.uninstall()).not.toThrow();
+    expect(readJson(home).statusLine).toEqual(wrapped.statusLine); // restored verbatim
+  });
+});
+
+describe("status() and setRefreshInterval()", () => {
+  it("status reports not-installed before install, installed + interval after", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        {
+          statusLine: {
+            type: "command",
+            command: "mine",
+            refreshInterval: 10,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+
+    expect(mgr.status()).toEqual({ installed: false, refreshInterval: null });
+    mgr.install();
+    expect(mgr.status()).toEqual({ installed: true, refreshInterval: 10 });
+  });
+
+  it("status reads null interval when the wrapped block has none", () => {
+    const home = makeHome();
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+    expect(mgr.status()).toEqual({ installed: true, refreshInterval: null });
+  });
+
+  it("setRefreshInterval writes the block, preserves other keys, and re-syncs wrappedExtras", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        {
+          theme: "dark",
+          statusLine: { type: "command", command: "mine", padding: 2 },
+        },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    mgr.setRefreshInterval(10);
+
+    const block = readJson(home).statusLine;
+    expect(block.refreshInterval).toBe(10);
+    expect(block.command).toBe(appCommandFor(home)); // still wrapped
+    expect(block.padding).toBe(2); // carried extras untouched
+    expect(readJson(home).theme).toBe("dark"); // unrelated keys untouched
+    expect(readState(home).wrappedExtras).toEqual({
+      padding: 2,
+      refreshInterval: 10,
+    });
+  });
+
+  it("setRefreshInterval(null) deletes the key from block and record", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        {
+          statusLine: { type: "command", command: "mine", refreshInterval: 10 },
+        },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    mgr.setRefreshInterval(null);
+
+    expect("refreshInterval" in readJson(home).statusLine).toBe(false);
+    expect(readState(home).wrappedExtras).toEqual({});
+  });
+
+  it("setRefreshInterval is a no-op when not installed or on an invalid value", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+
+    const before = readRaw(home);
+    mgr.setRefreshInterval(10); // not installed → no write
+    expect(readRaw(home)).toBe(before);
+
+    mgr.install();
+    const wrapped = readRaw(home);
+    mgr.setRefreshInterval(0); // < 1
+    mgr.setRefreshInterval(2.5); // non-integer
+    mgr.setRefreshInterval(4000); // > 3600
+    expect(readRaw(home)).toBe(wrapped);
+  });
+
+  it("does not mutate settings.json when state.json is corrupt (read before write)", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    writeFileSync(
+      join(home, ".code-by-wire", "state.json"),
+      "{ corrupt not json",
+    ); // the record we rely on is broken
+
+    const before = readRaw(home);
+    expect(() => mgr.setRefreshInterval(10)).toThrow();
+    expect(readRaw(home)).toBe(before); // no half-applied write — settings.json untouched
   });
 });
