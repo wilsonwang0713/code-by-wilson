@@ -158,6 +158,15 @@ export function LeftSidebar({
                 >
                   <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-tertiary)">
                     <Icon
+                      name={collapsed.has(g.project) ? "folder" : "folder-open"}
+                      size={14}
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-tertiary) group-hover/project:text-fg">
+                    {g.project}
+                  </span>
+                  <span className="grid size-3.5 shrink-0 place-items-center text-(--ui-text-quaternary)">
+                    <Icon
                       name="chevron-right"
                       size={13}
                       className={cx(
@@ -165,12 +174,6 @@ export function LeftSidebar({
                         !collapsed.has(g.project) && "rotate-90",
                       )}
                     />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[0.8125rem] leading-none text-(--ui-text-tertiary) group-hover/project:text-fg">
-                    {g.project}
-                  </span>
-                  <span className="shrink-0 text-[0.6875rem] font-medium leading-none text-(--ui-text-quaternary)">
-                    {g.sessions.length}
                   </span>
                 </button>
                 {!collapsed.has(g.project) && (
