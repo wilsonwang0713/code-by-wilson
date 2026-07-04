@@ -1,8 +1,8 @@
 import type { Session } from "@shared/types";
-import { cx, Dot } from "../ui/atoms";
+import { cx, Lamp } from "../ui/atoms";
 
 /**
- * The hermes single-line sidebar row: a 26px-tall strip with a state `Dot` and the title — one
+ * The hermes single-line sidebar row: a 26px-tall strip with a state `Lamp` and the title — one
  * plain select button, no hover extras. The relative-time stamp moved to the right sidebar's
  * Session panel (Active row), and the copy-ID button is gone with it; no project·branch line and
  * no context-% chip either, which also live in the right sidebar now.
@@ -30,13 +30,7 @@ export function SessionRow({
       )}
     >
       <span className="grid size-3.5 shrink-0 place-items-center">
-        <Dot
-          state={session.state}
-          management={session.management}
-          sizeClass={
-            session.state === "idle" ? "h-1 w-1 opacity-80" : "h-1.5 w-1.5"
-          }
-        />
+        <Lamp state={session.state} management={session.management} />
       </span>
       <span
         className={cx(

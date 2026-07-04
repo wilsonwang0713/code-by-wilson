@@ -382,6 +382,20 @@ body {
   animation: pulse-soft 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
+/* The Waiting lamp's breathing halo — box-shadow spread swells as opacity falls. */
+@keyframes halo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4.5px color-mix(in srgb, var(--color-accent) 7%, transparent);
+  }
+}
+.animate-halo {
+  animation: halo 2s ease-in-out infinite;
+}
+
 @keyframes blink {
   0%,
   49% {
