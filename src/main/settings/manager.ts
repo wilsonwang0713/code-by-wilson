@@ -16,10 +16,11 @@ import { recoverWrappedCommand, wrapperScript } from "./wrapper";
 import { recoverWrappedCommandWin, wrapperScriptWin } from "./wrapper-win";
 
 /** The Claude Code statusLine block. `additionalProperties: false` upstream means we must not stash our
- *  own fields inside it — bookkeeping lives in our own state file instead. While installed we replace this
- *  block with just `{ type, command }`; the user's original (padding, refreshInterval, …) is preserved in
- *  the timestamped backup and restored verbatim on uninstall, not carried in the live config. The index
- *  signature only lets us parse a richer block without dropping the fields we don't model. */
+ *  own fields inside it — bookkeeping lives in our own state file instead. While installed we own `type`
+ *  and `command`; every other field of the user's block (padding, refreshInterval, …) is UPSTREAM
+ *  configuration and rides along in the wrapped block — dropping refreshInterval would silently stop the
+ *  statusLine re-running on idle sessions, freezing the app's live duty/clock. The index signature is how
+ *  those unmodeled fields are parsed and carried without being dropped. */
 interface StatusLine {
   type: string;
   command: string;
@@ -44,6 +45,9 @@ interface InstallState {
   /** Whether a statusLine existed at all (decoupled from wrappedCommand, which is null for a
    *  command-less or non-string statusLine). Persisted so an idempotent re-install reports it. */
   wrappedExisting: boolean;
+  /** The original block's upstream fields other than type/command (padding, refreshInterval, …), so the
+   *  heal paths rebuild the block as the user tuned it. Absent on records written by older builds. */
+  wrappedExtras?: Record<string, unknown>;
 }
 
 export interface SettingsManagerDeps {
@@ -128,7 +132,23 @@ export function createSettingsManager(
       (typeof s.backupPath === "string" || s.backupPath === null) &&
       typeof s.originalAbsent === "boolean" &&
       (typeof s.wrappedCommand === "string" || s.wrappedCommand === null) &&
-      typeof s.wrappedExisting === "boolean"
+      typeof s.wrappedExisting === "boolean" &&
+      // Optional so records written before this field existed still validate, never read as corrupt.
+      (s.wrappedExtras === undefined ||
+        (s.wrappedExtras !== null &&
+          typeof s.wrappedExtras === "object" &&
+          !Array.isArray(s.wrappedExtras)))
+    );
+  }
+
+  /** The upstream fields of a statusLine block minus the two we own — what rides along in the wrapped
+   *  block and in state.json. An absent block degrades to no extras. */
+  function statusLineExtras(
+    block: StatusLine | undefined,
+  ): Record<string, unknown> {
+    if (block === undefined) return {};
+    return Object.fromEntries(
+      Object.entries(block).filter(([k]) => k !== "type" && k !== "command"),
     );
   }
 
@@ -228,6 +248,7 @@ export function createSettingsManager(
     // A hand-edited file could hold a non-string command; only a real string is callable.
     const wrappedCommand =
       typeof original?.command === "string" ? original.command : null;
+    const wrappedExtras = statusLineExtras(original);
 
     const iso = new Date(now()).toISOString();
     ensureAppDir();
@@ -252,12 +273,15 @@ export function createSettingsManager(
       originalAbsent,
       wrappedCommand,
       wrappedExisting,
+      wrappedExtras,
     };
     writeFileAtomic(statePath, JSON.stringify(state, null, 2) + "\n");
 
+    // Extras first so our type/command always win; they can't collide (extras excludes both by
+    // construction), but the wrapped block's contract shouldn't hinge on that invariant at a distance.
     const next: ClaudeSettings = {
       ...(parsed ?? {}),
-      statusLine: { type: "command", command: appCommand },
+      statusLine: { ...wrappedExtras, type: "command", command: appCommand },
     };
     writeFileAtomic(settingsPath, JSON.stringify(next, null, 2) + "\n", mode); // mode preserved while wrapped
 
@@ -295,6 +319,18 @@ export function createSettingsManager(
       const state = readState(); // throws on a corrupt record
       if (state !== null) {
         writeWrapper(state.wrappedCommand);
+        // The user can hand-tune upstream knobs (padding, refreshInterval) on the wrapped block while
+        // installed. Keep the record in sync so a later heal rebuilds the block as tuned, not as it
+        // stood when first wrapped.
+        const extras = statusLineExtras(parsed?.statusLine);
+        if (
+          JSON.stringify(extras) !== JSON.stringify(state.wrappedExtras ?? {})
+        ) {
+          writeFileAtomic(
+            statePath,
+            JSON.stringify({ ...state, wrappedExtras: extras }, null, 2) + "\n",
+          );
+        }
         return {
           wrappedExisting: state.wrappedExisting,
           backupPath: state.backupPath,
@@ -313,9 +349,15 @@ export function createSettingsManager(
     if (own) {
       const wrapperSrc = readTextOrNull(own.path);
       const recovered = wrapperSrc === null ? null : own.recover(wrapperSrc);
+      // The script only bakes the command; the upstream extras still live on the wrapped block itself,
+      // so lift them from there into the reconstructed original.
       const statusLine =
         recovered !== null
-          ? { type: "command", command: recovered }
+          ? {
+              ...statusLineExtras(parsed?.statusLine),
+              type: "command",
+              command: recovered,
+            }
           : undefined;
       const healedSettings: ClaudeSettings = { ...parsed, statusLine };
       const healedRaw = JSON.stringify(healedSettings, null, 2) + "\n";
@@ -332,7 +374,11 @@ export function createSettingsManager(
       if (state !== null && state.wrappedCommand !== null) {
         const healedSettings: ClaudeSettings = {
           ...(parsed ?? {}),
-          statusLine: { type: "command", command: state.wrappedCommand },
+          statusLine: {
+            ...(state.wrappedExtras ?? {}),
+            type: "command",
+            command: state.wrappedCommand,
+          },
         };
         const healedRaw = JSON.stringify(healedSettings, null, 2) + "\n";
         return { ...freshInstall(healedRaw, healedSettings), healed: true };
