@@ -1,6 +1,7 @@
 import type { CliStatus } from "@shared/cli-status";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { CliCard } from "./CliCard";
+import { StatuslineCard } from "./StatuslineCard";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
 import type { IconName } from "../ui/icon-names";
@@ -130,6 +131,7 @@ function SystemSection({
         onRecheck={onRecheck}
         onSetBinPath={onSetBinPath}
       />
+      <StatuslineCard />
     </>
   );
 }
