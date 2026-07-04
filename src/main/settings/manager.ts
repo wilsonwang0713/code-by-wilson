@@ -60,8 +60,10 @@ export interface InstallResult {
   wrappedExisting: boolean;
   /** Absolute path of the timestamped backup, or null when there was no settings.json to back up. */
   backupPath: string | null;
-  /** True when this install self-healed a wrapped settings.json whose state.json had vanished:
-   *  the original command was recovered from the wrapper script and reinstalled from scratch. */
+  /** True when this install self-healed a desync between settings.json and our record: a wrapped
+   *  settings.json whose state.json had vanished (original recovered from the wrapper script), or a
+   *  surviving state.json whose statusLine entry an external edit stripped (original recovered from
+   *  the record). Either way the original command was reinstalled from scratch. */
   healed: boolean;
 }
 
@@ -318,6 +320,23 @@ export function createSettingsManager(
       const healedSettings: ClaudeSettings = { ...parsed, statusLine };
       const healedRaw = JSON.stringify(healedSettings, null, 2) + "\n";
       return { ...freshInstall(healedRaw, healedSettings), healed: true };
+    }
+
+    // The mirror desync: our record survived but the statusLine entry is gone — an external edit
+    // stripped it (ccstatusline's uninstall deletes whichever statusLine is present, ours included).
+    // Re-wrapping the stripped file as-is would record wrappedCommand=null, silently dropping the
+    // user's own prompt from the regenerated wrapper. Rebuild the settings as they stood before the
+    // strip and reinstall from that, so the new wrapper's call-through and backup carry the original.
+    if (parsed?.statusLine === undefined) {
+      const state = readState(); // throws on a corrupt record — same contract as the wrapped branch
+      if (state !== null && state.wrappedCommand !== null) {
+        const healedSettings: ClaudeSettings = {
+          ...(parsed ?? {}),
+          statusLine: { type: "command", command: state.wrappedCommand },
+        };
+        const healedRaw = JSON.stringify(healedSettings, null, 2) + "\n";
+        return { ...freshInstall(healedRaw, healedSettings), healed: true };
+      }
     }
 
     return { ...freshInstall(raw, parsed), healed: false };

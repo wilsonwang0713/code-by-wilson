@@ -411,6 +411,106 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     expect(readJson(home).statusLine.command).toBe("mine");
   });
 
+  it("install re-wraps from the record when the statusLine entry was stripped externally", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" }, theme: "dark" },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    // An external tool strips the statusLine entry while our record survives — ccstatusline's
+    // uninstall deletes whichever statusLine is present, ours included.
+    const stripped = readJson(home);
+    delete stripped.statusLine;
+    writeFileSync(settingsPath(home), JSON.stringify(stripped, null, 2));
+    expect(mgr.isInstalled()).toBe(false);
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(healed.wrappedExisting).toBe(true);
+    expect(mgr.isInstalled()).toBe(true);
+
+    // The recorded command survives into the rebuilt state and the wrapper's call-through…
+    expect(readState(home).wrappedCommand).toBe("mine");
+    expect(
+      readFileSync(
+        join(home, ".code-by-wire", "statusline-wrapper.sh"),
+        "utf8",
+      ),
+    ).toContain("| mine");
+    // …the stripped file's other keys survive…
+    expect(readJson(home).theme).toBe("dark");
+    // …and the new backup holds the reconstructed original, so uninstall restores the user's prompt.
+    expect(
+      JSON.parse(readFileSync(healed.backupPath!, "utf8")).statusLine.command,
+    ).toBe("mine");
+    mgr.uninstall();
+    expect(readJson(home).statusLine.command).toBe("mine");
+  });
+
+  it("reinstall after an external strip stays capture-only when the record wrapped no command", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify({ theme: "dark" }, null, 2),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install(); // wrapped nothing — the user had no statusLine of their own
+
+    const stripped = readJson(home);
+    delete stripped.statusLine;
+    writeFileSync(settingsPath(home), JSON.stringify(stripped, null, 2));
+
+    const again = mgr.install();
+    expect(again.healed).toBe(false); // nothing recoverable — a plain reinstall, not a heal
+    expect(readState(home).wrappedCommand).toBeNull();
+    expect(mgr.isInstalled()).toBe(true);
+  });
+
+  it("recovers the wrapped command from the record even when settings.json was deleted wholesale", () => {
+    const home = makeHome();
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify(
+        { statusLine: { type: "command", command: "mine" } },
+        null,
+        2,
+      ),
+    );
+    const mgr = createSettingsManager({
+      claudeDir: home,
+      now: () => NOW,
+      platform: "linux",
+    });
+    mgr.install();
+
+    rmSync(settingsPath(home)); // the whole file vanishes while state.json survives
+
+    const healed = mgr.install();
+    expect(healed.healed).toBe(true);
+    expect(readState(home).wrappedCommand).toBe("mine"); // not clobbered to null
+    expect(
+      readFileSync(
+        join(home, ".code-by-wire", "statusline-wrapper.sh"),
+        "utf8",
+      ),
+    ).toContain("| mine");
+  });
+
   it("install self-heals to a clean reinstall when the wrapper is also gone (nothing to recover)", () => {
     const home = makeHome();
     writeFileSync(

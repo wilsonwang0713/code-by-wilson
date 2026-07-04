@@ -229,7 +229,8 @@ app
       const result = createSettingsManager({ claudeDir }).install();
       if (result.healed) {
         console.warn(
-          "statusLine state.json was missing; recovered the original command from the wrapper and reinstalled",
+          "statusLine install was desynced (missing record or externally stripped entry); " +
+            "recovered the original command and reinstalled",
         );
       }
     } catch (err) {
