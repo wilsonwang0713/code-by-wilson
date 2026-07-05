@@ -515,14 +515,14 @@ export function App() {
           minHeight="8rem"
           maxHeight="80vh"
           resizable
-          divider
           disabled={!terminalOpen}
           bottomRow={terminalAsRow}
         >
           {/* A persistent left border anchors the pane against the workspace, matching the metrics
-              sidebar (its resize sash alone reads as no edge until hovered). As a column it's the
-              left edge; as a row inside the rail the sash moves to the top edge, so this same border
-              stays the row's left separator. */}
+              sidebar (its resize sash alone reads as no edge until hovered). The row-mode top seam
+              (against the metrics above) is drawn inside the chrome — on the body column AND the tab
+              rail — not here: the rail's opaque z-40 background would paint over a wrapper-level
+              top border, leaving the seam notched short of the rail. */}
           <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-(--ui-stroke-secondary) bg-(--ui-editor-surface-background)">
             {/* As a full-height column the terminal reaches the top of the window, so it must clear
                 the titlebar band (the fixed sidebar-toggle clusters float there) — the same
@@ -535,7 +535,7 @@ export function App() {
                 style={{ height: "var(--titlebar-height)" }}
               />
             )}
-            <TerminalPaneChrome />
+            <TerminalPaneChrome asRow={terminalAsRow} />
           </div>
         </Pane>
         <Pane
