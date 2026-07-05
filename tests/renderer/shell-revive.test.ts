@@ -13,6 +13,12 @@ describe("stripEscapeSequences", () => {
     expect(stripEscapeSequences("\x1b]0;title\x07text")).toBe("text");
     expect(stripEscapeSequences("\x1b(Bok")).toBe("ok"); // charset selector is 3 bytes
   });
+  it("OSC terminated by ST (ESC-backslash), not just BEL", () => {
+    expect(stripEscapeSequences("\x1b]0;title\x1b\\text")).toBe("text");
+  });
+  it("bare 2-byte ESC fallback", () => {
+    expect(stripEscapeSequences("\x1bctext")).toBe("text");
+  });
 });
 
 describe("keepEscapeSequences", () => {
@@ -39,6 +45,16 @@ describe("cleanReviveSnapshot", () => {
   });
   it("keeps a long tail — that's real output, not a prompt", () => {
     const tail = ["l1", "l2", "l3", "l4", "l5"].join("\r\n");
+    const snap = `before\r\n\r\n${tail}`;
+    expect(cleanReviveSnapshot(snap)).toBe(`before\r\n\r\n${tail}`);
+  });
+  it("boundary: 3-line tail after blank is trimmed", () => {
+    const tail = ["line1", "line2", "line3"].join("\r\n");
+    const snap = `before\r\n\r\n${tail}`;
+    expect(cleanReviveSnapshot(snap)).toBe("before");
+  });
+  it("boundary: 4-line tail after blank is kept", () => {
+    const tail = ["line1", "line2", "line3", "line4"].join("\r\n");
     const snap = `before\r\n\r\n${tail}`;
     expect(cleanReviveSnapshot(snap)).toBe(`before\r\n\r\n${tail}`);
   });
