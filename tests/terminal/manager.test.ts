@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { FLOW } from "../../src/shared/terminal";
 import { createTerminalManager } from "../../src/main/terminal/manager";
 import type {
@@ -494,6 +494,13 @@ describe("createTerminalManager", () => {
 });
 
 describe("launch (shell terminals)", () => {
+  // A developer's local CBW_CLAUDE_BIN would make buildClaudeCommand return an absolute,
+  // extensioned path instead of the bare `"claude"` fallback the shim tests below rely on —
+  // clear it so the bare-claude fallback (and hence the shim behavior under test) is deterministic.
+  beforeEach(() => {
+    delete process.env.CBW_CLAUDE_BIN;
+  });
+
   function shellHarness(platform: NodeJS.Platform = "darwin") {
     const ptys: ReturnType<typeof fakePty>[] = [];
     const recorders = recorderFactory();
@@ -522,15 +529,19 @@ describe("launch (shell terminals)", () => {
 
   it("spawns the literal argv — no Windows launchForm shim", () => {
     const h = shellHarness("win32");
+    // A bare command name — no directory separator, no extension — so launchForm (were it applied)
+    // would rewrite this to `cmd.exe /c pwsh -NoLogo`. Asserting the argv comes through unchanged
+    // actually discriminates a launch() that wrongly shims from one that doesn't; an already-absolute,
+    // extensioned path like `C:\pf\pwsh.exe` would be a launchForm no-op either way and prove nothing.
     h.manager.launch({
       id: "s1",
-      file: "C:\\pf\\pwsh.exe",
+      file: "pwsh",
       args: ["-NoLogo"],
       cwd: "/home",
       cols: 80,
       rows: 24,
     });
-    expect(h.ptys[0].state.spawnedWith?.file).toBe("C:\\pf\\pwsh.exe");
+    expect(h.ptys[0].state.spawnedWith?.file).toBe("pwsh");
     expect(h.ptys[0].state.spawnedWith?.args).toEqual(["-NoLogo"]);
   });
 
