@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   buildShellEnv,
@@ -126,25 +127,42 @@ describe("resolveShellCommand", () => {
 
 describe("safeShellCwd", () => {
   const home = "/Users/me";
+  // POSIX path ops so the expectations are deterministic on every CI OS (a bare node:path.resolve
+  // is platform-dependent — "/repo" → "/repo" on POSIX but "C:\repo" on Windows).
+  const pathDeps = {
+    resolve: (p: string) => posix.resolve(p),
+    dirname: (p: string) => posix.dirname(p),
+  };
   it("keeps a directory", () => {
-    expect(safeShellCwd({ requested: "/repo", home, stat: () => "dir" })).toBe(
-      "/repo",
-    );
+    expect(
+      safeShellCwd({
+        requested: "/repo",
+        home,
+        stat: () => "dir",
+        ...pathDeps,
+      }),
+    ).toBe("/repo");
   });
   it("uses a file's parent directory", () => {
     expect(
-      safeShellCwd({ requested: "/repo/readme.md", home, stat: () => "file" }),
+      safeShellCwd({
+        requested: "/repo/readme.md",
+        home,
+        stat: () => "file",
+        ...pathDeps,
+      }),
     ).toBe("/repo");
   });
   it("falls back to home for a missing path and for no request", () => {
-    expect(safeShellCwd({ requested: "/gone", home, stat: () => null })).toBe(
-      home,
-    );
+    expect(
+      safeShellCwd({ requested: "/gone", home, stat: () => null, ...pathDeps }),
+    ).toBe(home);
     expect(
       safeShellCwd({
         requested: undefined,
         home,
         stat: (p) => (p === home ? "dir" : null),
+        ...pathDeps,
       }),
     ).toBe(home);
   });

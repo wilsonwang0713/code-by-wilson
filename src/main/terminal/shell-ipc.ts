@@ -1,6 +1,6 @@
 import { app, ipcMain, type BrowserWindow, type IpcMainEvent } from "electron";
 import { accessSync, constants, statSync } from "node:fs";
-import { delimiter, isAbsolute, join, sep } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
   SHELL_TERMINAL,
@@ -123,6 +123,8 @@ export function registerShellTerminalIpc({
         requested: req.cwd,
         home: homedir(),
         stat: statKind,
+        resolve,
+        dirname,
       });
       manager.launch({
         id: req.id,

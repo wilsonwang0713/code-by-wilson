@@ -1,5 +1,3 @@
-import { dirname, resolve } from "node:path";
-
 /** How to spawn a shell: the executable, its interactive argv, and its basename (the tab label). */
 export interface ShellSpec {
   file: string;
@@ -87,11 +85,17 @@ export function safeShellCwd(opts: {
   requested: string | undefined;
   home: string;
   stat: (p: string) => "dir" | "file" | null;
+  /** Path ops, injected so the function stays pure and the platform's semantics are explicit — the
+   *  composition root passes node:path's (platform) resolve/dirname; tests pass node:path.posix's so
+   *  their expectations are deterministic across OSes (a bare node:path.resolve("/x") is "/x" on
+   *  POSIX but "C:\x" on Windows). */
+  resolve: (p: string) => string;
+  dirname: (p: string) => string;
 }): string {
-  const candidate = resolve(String(opts.requested || opts.home));
+  const candidate = opts.resolve(String(opts.requested || opts.home));
   const kind = opts.stat(candidate);
   if (kind === "dir") return candidate;
-  if (kind === "file") return dirname(candidate);
+  if (kind === "file") return opts.dirname(candidate);
   return opts.home;
 }
 
