@@ -22,6 +22,7 @@ const snapOf = (c: SessionCandidate): PersistedSession => ({
   id: c.id,
   title: c.id,
   project: c.id,
+  cwd: c.cwd,
   branch: undefined,
   state: c.alive ? "idle" : "ended",
   management: "observed",

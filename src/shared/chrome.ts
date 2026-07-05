@@ -9,11 +9,12 @@
  *  drop below the bar; the renderer applies it as the header height. Must stay in lockstep with --titlebar-height in src/renderer/src/index.css. */
 export const HEADER_HEIGHT_PX = 34;
 
-/** Where main parks the macOS traffic lights, in DIP. Hermes's WINDOW_BUTTON_POSITION verbatim
- *  (main.cjs): x 24, y = (34px band − 14px lights) / 2. The renderer derives the left cluster's
- *  inset from this (position.x + TITLEBAR_CONTROL_OFFSET_X in shell/titlebar.ts). */
+/** Where main parks the macOS traffic lights, in DIP. Deviates from hermes's x 24 deliberately:
+ *  x matches the 10px top inset (y = (34px band − 14px lights) / 2) so the corner spacing is equal
+ *  on both axes. The renderer derives the left cluster's inset from this
+ *  (position.x + TITLEBAR_CONTROL_OFFSET_X in shell/titlebar.ts). */
 export const MAC_TRAFFIC_LIGHT_POSITION: { x: number; y: number } = {
-  x: 24,
+  x: 10,
   y: 10,
 };
 

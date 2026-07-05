@@ -84,6 +84,7 @@ export function App() {
   // spawns two divergent forks. Keyed by source id; cleared when the attempt settles.
   const forkingRef = useRef<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
+  const [homeDir, setHomeDir] = useState("");
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
   // reopens wherever the user last was.
@@ -104,6 +105,7 @@ export function App() {
     setSessions(o.sessions);
     setAccount(o.account);
     setCliStatus(o.cliStatus);
+    setHomeDir(o.homeDir);
   }
 
   async function recheckCli(): Promise<void> {
@@ -476,6 +478,7 @@ export function App() {
         >
           <LeftSidebar
             sessions={all}
+            homeDir={homeDir}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onNew={() => setSelectedId(NEW_SESSION_ID)}

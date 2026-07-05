@@ -307,6 +307,18 @@ describe("overlaySessions", () => {
         .title,
     ).toBe("first prompt title");
   });
+
+  it("keeps the hydrated cwd when the sample lacks one", () => {
+    const byId = new Map([["s1", sample({ cwd: null })]]);
+    const [out] = overlaySessions([session({ cwd: "/work/app" })], byId);
+    expect(out.cwd).toBe("/work/app");
+  });
+
+  it("prefers the live sample's cwd when present", () => {
+    const byId = new Map([["s1", sample({ cwd: "/work/live" })]]);
+    const [out] = overlaySessions([session({ cwd: "/work/app" })], byId);
+    expect(out.cwd).toBe("/work/live");
+  });
 });
 
 describe("overlaySessions — effort, clock, cwd", () => {

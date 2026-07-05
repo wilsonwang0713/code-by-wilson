@@ -40,6 +40,7 @@ function draftSession(id: string, cwd: string, model: ModelSelection): Session {
     id,
     title: project,
     project,
+    cwd,
     branch: undefined,
     state: "working",
     management: "managed",

@@ -131,7 +131,8 @@ export interface Session {
   effortLevel?: string;
   /** Elapsed session wall-clock in ms (cost.total_duration_ms). Absent ⇒ no sample. */
   sessionClockMs?: number;
-  /** Working directory from the live capture, used to scope the lazy git/voice reads. Absent ⇒ no sample. */
+  /** Best-known working directory: the live statusLine capture when present, else the transcript's
+   *  persisted cwd. Keys the sidebar's project groups. Absent when neither source knows. */
   cwd?: string;
   /** Claude Code's own session cost (statusLine cost.total_cost_usd) — the Spend panel's small $
    *  readout. Display-only, never derived from a pricing table. Absent ⇒ no sample. */
@@ -159,6 +160,9 @@ export interface PersistedSession {
   id: string;
   title: string;
   project: string;
+  /** The session's working directory: the transcript's recorded cwd, else the registry
+   *  candidate's. '' when neither source knows. Keys the sidebar's path-keyed project groups. */
+  cwd: string;
   branch?: string;
   state: SessionState;
   management: Management;

@@ -63,6 +63,7 @@ describe("summarize", () => {
     );
     expect(s.title).toBe("Add a login form to the settings page");
     expect(s.project).toBe("code-by-wire");
+    expect(s.cwd).toBe("/work/code-by-wire"); // the fixture transcript's recorded cwd
     expect(s.branch).toBe("feature/login");
     expect(s.model).toBe("sonnet");
     expect(s.management).toBe("observed");
@@ -115,6 +116,7 @@ describe("summarize", () => {
     });
     expect(s.title).toBe("old-thing");
     expect(s.project).toBe("old-thing");
+    expect(s.cwd).toBe("/work/old-thing"); // registry candidate cwd — no transcript to prefer
     expect(s.branch).toBeUndefined();
     expect(s.lastActivityMs).toBe(1780950000000);
     expect(s.state).toBe("idle");
