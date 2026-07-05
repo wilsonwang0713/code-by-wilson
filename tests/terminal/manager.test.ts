@@ -492,3 +492,102 @@ describe("createTerminalManager", () => {
     await expect(h.manager.snapshot("nope")).resolves.toBeNull();
   });
 });
+
+describe("launch (shell terminals)", () => {
+  function shellHarness(platform: NodeJS.Platform = "darwin") {
+    const ptys: ReturnType<typeof fakePty>[] = [];
+    const recorders = recorderFactory();
+    const sent: Array<[string, string]> = [];
+    const exited: Array<[string, number]> = [];
+    const spawned: string[] = [];
+    const closed: string[] = [];
+    const manager = createTerminalManager({
+      send: (id, data) => sent.push([id, data]),
+      notifyExit: (id, code) => exited.push([id, code]),
+      onSpawned: (id) => spawned.push(id),
+      onClosed: (id) => closed.push(id),
+      createPty: (o: SpawnOptions) => {
+        const p = fakePty(2000 + ptys.length);
+        p.state.spawnedWith = o;
+        ptys.push(p);
+        return p.proc;
+      },
+      createBufferer: passthroughBufferer,
+      createRecorder: recorders.create,
+      platform,
+      statDir: () => true,
+    });
+    return { manager, ptys, sent, exited, spawned, closed };
+  }
+
+  it("spawns the literal argv — no Windows launchForm shim", () => {
+    const h = shellHarness("win32");
+    h.manager.launch({
+      id: "s1",
+      file: "C:\\pf\\pwsh.exe",
+      args: ["-NoLogo"],
+      cwd: "/home",
+      cols: 80,
+      rows: 24,
+    });
+    expect(h.ptys[0].state.spawnedWith?.file).toBe("C:\\pf\\pwsh.exe");
+    expect(h.ptys[0].state.spawnedWith?.args).toEqual(["-NoLogo"]);
+  });
+
+  it("still shims a bare claude spawn on win32 (launchForm moved, not dropped)", () => {
+    const h = shellHarness("win32");
+    h.manager.spawn({ id: "c1", cwd: "/p", model: "opus", cols: 80, rows: 24 });
+    expect(h.ptys[0].state.spawnedWith?.file).toBe("cmd.exe");
+    expect(h.ptys[0].state.spawnedWith?.args?.[0]).toBe("/c");
+  });
+
+  it("applies flow control to launched sessions", () => {
+    const h = shellHarness();
+    h.manager.launch({ id: "s1", file: "/bin/zsh", args: ["-il"], cwd: "/", cols: 80, rows: 24 });
+    h.ptys[0].emitData("x".repeat(FLOW.highWaterChars + 1));
+    expect(h.ptys[0].state.paused).toBe(true);
+    h.manager.ack("s1", FLOW.highWaterChars + 1);
+    expect(h.ptys[0].state.paused).toBe(false);
+  });
+
+  it("is idempotent per id and killed by disposeAll", () => {
+    const h = shellHarness();
+    const req = { id: "s1", file: "/bin/sh", args: ["-i"], cwd: "/", cols: 80, rows: 24 };
+    h.manager.launch(req);
+    h.manager.launch(req);
+    expect(h.ptys).toHaveLength(1);
+    h.manager.disposeAll();
+    expect(h.ptys[0].state.killed).toBe(true);
+  });
+
+  it("surfaces a bad cwd as an in-terminal error + exit, without a pty", () => {
+    const h = shellHarness();
+    // rebuild with a failing statDir
+    const bad = (() => {
+      const ptys: ReturnType<typeof fakePty>[] = [];
+      const sent: Array<[string, string]> = [];
+      const exited: Array<[string, number]> = [];
+      const manager = createTerminalManager({
+        send: (id, data) => sent.push([id, data]),
+        notifyExit: (id, code) => exited.push([id, code]),
+        onSpawned: () => {},
+        onClosed: () => {},
+        createPty: (o: SpawnOptions) => {
+          const p = fakePty();
+          p.state.spawnedWith = o;
+          ptys.push(p);
+          return p.proc;
+        },
+        createBufferer: passthroughBufferer,
+        createRecorder: recorderFactory().create,
+        statDir: () => false,
+      });
+      return { manager, ptys, sent, exited };
+    })();
+    void h;
+    bad.manager.launch({ id: "s1", file: "/bin/sh", args: ["-i"], cwd: "/gone", cols: 80, rows: 24 });
+    expect(bad.ptys).toHaveLength(0);
+    expect(bad.sent[0][1]).toContain("Starting directory does not exist");
+    expect(bad.exited).toEqual([["s1", 1]]);
+  });
+});

@@ -64,6 +64,18 @@ export interface ForkSpawn {
   bin?: string;
 }
 
+/** Launch an arbitrary command (the footer shell terminal) with a LITERAL argv. Unlike the claude
+ *  paths there is no launchForm shim — the shell resolver returns real executables, and wrapping
+ *  pwsh.exe in `cmd.exe /c` would be wrong — and no model / Managed semantics. */
+export interface LaunchRequest {
+  id: string;
+  file: string;
+  args: string[];
+  cwd: string;
+  cols: number;
+  rows: number;
+}
+
 export interface TerminalManagerDeps {
   /** Push a batched output chunk for `id` to the renderer. `offset` is the cumulative count of output
    *  chars through the end of this chunk, so a reattaching renderer can dedupe a snapshot against it. */
@@ -107,6 +119,9 @@ export interface TerminalManager {
   /** Re-key a live pty from its old session id to a new one (a `/clear` rotation), so its output, writes,
    *  and exit all flow under the new id. No-op if `from` isn't live or `to` is already taken. */
   rename(from: string, to: string): void;
+  /** Spawn a literal argv (shell terminals): same start() machinery — cwd guard, bufferer, flow
+   *  control, exit — no launchForm shim and no model. */
+  launch(req: LaunchRequest): void;
   write(id: string, data: string): void;
   resize(id: string, cols: number, rows: number): void;
   /** Credit `charCount` of consumed output back; resumes node-pty if the backlog drains enough. */
@@ -167,13 +182,9 @@ export function createTerminalManager(
     // (no COLORTERM), which is why this only bites the packaged build; dev and real terminals carry it.
     // Force it (not a default) because our WebGL terminal genuinely is 24-bit capable, so the declaration
     // is ours to make, not the launching shell's.
-    const launched = launchForm(
-      { file: command.file, args: command.args },
-      platform,
-    );
     const pty = createPty({
-      file: launched.file,
-      args: launched.args,
+      file: command.file,
+      args: command.args,
       cwd,
       env: { ...(deps.env?.() ?? process.env), COLORTERM: "truecolor" },
       cols,
@@ -228,7 +239,10 @@ export function createTerminalManager(
   function spawn(req: SpawnRequest): void {
     start(
       req.id,
-      buildClaudeCommand({ id: req.id, model: req.model, bin: req.bin }),
+      launchForm(
+        buildClaudeCommand({ id: req.id, model: req.model, bin: req.bin }),
+        platform,
+      ),
       req.cwd,
       req.cols,
       req.rows,
@@ -241,7 +255,7 @@ export function createTerminalManager(
   function adopt(req: AdoptSpawn): void {
     start(
       req.id,
-      buildResumeCommand({ id: req.id, bin: req.bin }),
+      launchForm(buildResumeCommand({ id: req.id, bin: req.bin }), platform),
       req.cwd,
       req.cols,
       req.rows,
@@ -256,12 +270,22 @@ export function createTerminalManager(
   function fork(req: ForkSpawn): void {
     start(
       req.id,
-      buildForkCommand({ sourceId: req.sourceId, newId: req.id, bin: req.bin }),
+      launchForm(
+        buildForkCommand({ sourceId: req.sourceId, newId: req.id, bin: req.bin }),
+        platform,
+      ),
       req.cwd,
       req.cols,
       req.rows,
       req.model,
     );
+  }
+
+  // Shell terminals (footer): spawn a LITERAL argv, reusing start()'s cwd guard, bufferer, flow control,
+  // and exit wiring — but with no launchForm shim (the shell resolver already returns real executables;
+  // shimming pwsh.exe through `cmd.exe /c` would be wrong) and no model / Managed alias.
+  function launch(req: LaunchRequest): void {
+    start(req.id, { file: req.file, args: req.args }, req.cwd, req.cols, req.rows);
   }
 
   function ack(id: string, charCount: number): void {
@@ -290,6 +314,7 @@ export function createTerminalManager(
     spawn,
     adopt,
     fork,
+    launch,
     rename,
     write: (id, data) => terms.get(id)?.pty.write(data),
     resize: (id, cols, rows) => {
