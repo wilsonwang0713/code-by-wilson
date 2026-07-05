@@ -24,7 +24,7 @@ const SUBJECT_TONE: Record<Task["status"], string> = {
 };
 
 /**
- * The Structure dock's Tasks tab: the session's task list with a status glyph and, for blocked tasks, the
+ * The Activity dock's Tasks tab: the session's task list with a status glyph and, for blocked tasks, the
  * blocking task IDs in the metric rack. Completion reads from the row glyphs, so there's no summary line.
  */
 export function DockTasks({ tasks }: { tasks: Task[] }) {

@@ -1,7 +1,7 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { cx, focusRingInset } from "../../ui/atoms";
 
-// Shared row grammar for the Structure dock tabs (Tasks / Subagents / Shells / Turns): a fixed status
+// Shared row grammar for the Activity dock tabs (Tasks / Subagents / Shells / Turns): a fixed status
 // gutter, a flex-1 truncating label, and a right-aligned mono metric rack. Each row is a listitem (the tab
 // wraps them in a role="list"). Rows are transparent and split by a hairline; interactive rows hover (but
 // an active row holds its background) and carry the inset focus ring. A `fill` node renders as a full-bleed

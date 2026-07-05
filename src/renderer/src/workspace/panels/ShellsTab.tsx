@@ -82,7 +82,7 @@ function ShellRow({
 }
 
 /**
- * The Structure dock's Shells tab: a compact list of every background bash shell the session spawned,
+ * The Activity dock's Shells tab: a compact list of every background bash shell the session spawned,
  * ordered by start time. View-only — clicking a row drills into its full log in the center pane (no
  * inline expand, no kill controls). Empty until the session backgrounds a command.
  */
