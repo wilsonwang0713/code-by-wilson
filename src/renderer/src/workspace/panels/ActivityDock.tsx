@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type { Subagent, Task, BackgroundShell } from "@shared/types";
 import { Icon } from "../../ui/icons";
 import { Tabs } from "../../ui/Tabs";
@@ -17,6 +22,9 @@ import {
   resolveDockCollapsed,
   subagentStats,
 } from "./dock-tabs";
+import { useStore } from "@nanostores/react";
+import { $paneHeightOverride, setPaneHeightOverride } from "../../shell/panes";
+import { DOCK_DEFAULT_HEIGHT, clampDockHeight } from "./dock-resize";
 
 /**
  * The Session workspace's bottom Activity dock: a single tabbed section (Tasks / Subagents / Shells)
@@ -75,6 +83,46 @@ export function ActivityDock({
           ? "subagents"
           : defaultDockTab(stats);
 
+  // Drag-to-resize the expanded dock, persisted like a sidebar (shell/panes.ts, id "activity-dock").
+  const heightOverride = useStore($paneHeightOverride("activity-dock"));
+  const height = heightOverride ?? DOCK_DEFAULT_HEIGHT;
+  const dockRef = useRef<HTMLDivElement>(null);
+  // Grows upward from the top edge: dragging the sash up (clientY down) increases height. Pointer-capture
+  // + window listeners mirror the pane-shell sash so a fast drag that leaves the strip still tracks.
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const base = dockRef.current?.getBoundingClientRect().height ?? 0;
+    if (base <= 0) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const { pointerId } = event;
+    const startY = event.clientY;
+    const restoreCursor = document.body.style.cursor;
+    const restoreSelect = document.body.style.userSelect;
+    handle.setPointerCapture?.(pointerId);
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    const onMove = (e: PointerEvent) => {
+      const next = base + (startY - e.clientY);
+      setPaneHeightOverride(
+        "activity-dock",
+        clampDockHeight(next, window.innerHeight),
+      );
+    };
+    const cleanup = () => {
+      document.body.style.cursor = restoreCursor;
+      document.body.style.userSelect = restoreSelect;
+      handle.releasePointerCapture?.(pointerId);
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", cleanup, true);
+      window.removeEventListener("pointercancel", cleanup, true);
+      window.removeEventListener("blur", cleanup);
+    };
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerup", cleanup, true);
+    window.addEventListener("pointercancel", cleanup, true);
+    window.addEventListener("blur", cleanup);
+  };
+
   if (collapsed)
     return (
       <DockTally
@@ -86,7 +134,21 @@ export function ActivityDock({
     );
 
   return (
-    <div className="hidden h-64 shrink-0 flex-col border-t border-(--ui-stroke-tertiary) bg-(--ui-surface-background) lg:flex">
+    <div
+      ref={dockRef}
+      style={{ height }}
+      className="relative hidden shrink-0 flex-col border-t border-(--ui-stroke-tertiary) bg-(--ui-surface-background) lg:flex"
+    >
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize activity dock"
+        tabIndex={0}
+        onPointerDown={startResize}
+        className="group absolute inset-x-0 top-0 z-20 h-1 -translate-y-1/2 cursor-row-resize [-webkit-app-region:no-drag]"
+      >
+        <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 bg-primary/40 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100" />
+      </div>
       <DockTabBar
         tab={tab}
         onChange={(t) => setPick({ tab: t, alive })}
