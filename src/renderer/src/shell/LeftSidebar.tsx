@@ -67,11 +67,11 @@ export function LeftSidebar({
     }
     setActiveOnly(next);
   };
-  const toggleGroup = (project: string) =>
+  const toggleGroup = (key: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(project)) next.delete(project);
-      else next.add(project);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 

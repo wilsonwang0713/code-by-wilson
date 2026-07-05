@@ -132,8 +132,7 @@ export interface Session {
   /** Elapsed session wall-clock in ms (cost.total_duration_ms). Absent ⇒ no sample. */
   sessionClockMs?: number;
   /** Best-known working directory: the live statusLine capture when present, else the transcript's
-   *  persisted cwd. Scopes the lazy git/voice reads and keys the sidebar's project groups. Absent
-   *  when neither source knows. */
+   *  persisted cwd. Keys the sidebar's project groups. Absent when neither source knows. */
   cwd?: string;
   /** Claude Code's own session cost (statusLine cost.total_cost_usd) — the Spend panel's small $
    *  readout. Display-only, never derived from a pricing table. Absent ⇒ no sample. */
