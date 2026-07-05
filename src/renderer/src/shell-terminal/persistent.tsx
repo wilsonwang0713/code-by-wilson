@@ -73,6 +73,14 @@ export function PersistentTerminal() {
       setRect(null);
       return;
     }
+    // Don't run the per-frame slot-chase until the terminal has been opened at least once
+    // (`mounted` latches on first open). The slot lives in the always-rendered Pane, so without
+    // this gate a user who never opens the terminal would pay a 60fps getBoundingClientRect layout
+    // loop for the whole session. Once mounted, keep chasing even while hidden (shells stay alive),
+    // matching the mount-latch design — `mounted` never un-latches, so the loop persists.
+    if (!terminalTakeover && !mounted) {
+      return;
+    }
     let prev: Rect | null = null;
     let frame = 0;
     const tick = (): void => {
@@ -96,7 +104,7 @@ export function PersistentTerminal() {
     };
     tick();
     return () => cancelAnimationFrame(frame);
-  }, [slot]);
+  }, [slot, terminalTakeover, mounted]);
 
   const visible = Boolean(rect && rect.width > 0 && rect.height > 0);
 
