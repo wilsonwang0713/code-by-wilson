@@ -554,7 +554,14 @@ describe("launch (shell terminals)", () => {
 
   it("applies flow control to launched sessions", () => {
     const h = shellHarness();
-    h.manager.launch({ id: "s1", file: "/bin/zsh", args: ["-il"], cwd: "/", cols: 80, rows: 24 });
+    h.manager.launch({
+      id: "s1",
+      file: "/bin/zsh",
+      args: ["-il"],
+      cwd: "/",
+      cols: 80,
+      rows: 24,
+    });
     h.ptys[0].emitData("x".repeat(FLOW.highWaterChars + 1));
     expect(h.ptys[0].state.paused).toBe(true);
     h.manager.ack("s1", FLOW.highWaterChars + 1);
@@ -563,7 +570,14 @@ describe("launch (shell terminals)", () => {
 
   it("is idempotent per id and killed by disposeAll", () => {
     const h = shellHarness();
-    const req = { id: "s1", file: "/bin/sh", args: ["-i"], cwd: "/", cols: 80, rows: 24 };
+    const req = {
+      id: "s1",
+      file: "/bin/sh",
+      args: ["-i"],
+      cwd: "/",
+      cols: 80,
+      rows: 24,
+    };
     h.manager.launch(req);
     h.manager.launch(req);
     expect(h.ptys).toHaveLength(1);
@@ -596,7 +610,14 @@ describe("launch (shell terminals)", () => {
       return { manager, ptys, sent, exited };
     })();
     void h;
-    bad.manager.launch({ id: "s1", file: "/bin/sh", args: ["-i"], cwd: "/gone", cols: 80, rows: 24 });
+    bad.manager.launch({
+      id: "s1",
+      file: "/bin/sh",
+      args: ["-i"],
+      cwd: "/gone",
+      cols: 80,
+      rows: 24,
+    });
     expect(bad.ptys).toHaveLength(0);
     expect(bad.sent[0][1]).toContain("Starting directory does not exist");
     expect(bad.exited).toEqual([["s1", 1]]);

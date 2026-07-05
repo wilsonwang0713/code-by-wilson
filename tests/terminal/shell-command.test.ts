@@ -76,7 +76,10 @@ describe("resolveShellCommand", () => {
 
   it("ignores $SHELL on Windows (stray MSYS/Git paths node-pty can't spawn)", () => {
     const spec = resolveShellCommand({
-      env: { SHELL: "/usr/bin/bash", COMSPEC: "C:\\Windows\\System32\\cmd.exe" },
+      env: {
+        SHELL: "/usr/bin/bash",
+        COMSPEC: "C:\\Windows\\System32\\cmd.exe",
+      },
       platform: "win32",
       ...none,
     });
@@ -102,9 +105,14 @@ describe("resolveShellCommand", () => {
       isExecutable: () => false,
       findOnPath: (n) => (n === "pwsh.exe" ? "C:\\pf\\pwsh.exe" : null),
     });
-    expect(pwsh).toEqual({ file: "C:\\pf\\pwsh.exe", args: ["-NoLogo"], name: "pwsh.exe" });
+    expect(pwsh).toEqual({
+      file: "C:\\pf\\pwsh.exe",
+      args: ["-NoLogo"],
+      name: "pwsh.exe",
+    });
 
-    const builtin = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+    const builtin =
+      "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
     const ps51 = resolveShellCommand({
       env: { SystemRoot: "C:\\Windows" },
       platform: "win32",
@@ -119,9 +127,9 @@ describe("resolveShellCommand", () => {
 describe("safeShellCwd", () => {
   const home = "/Users/me";
   it("keeps a directory", () => {
-    expect(
-      safeShellCwd({ requested: "/repo", home, stat: () => "dir" }),
-    ).toBe("/repo");
+    expect(safeShellCwd({ requested: "/repo", home, stat: () => "dir" })).toBe(
+      "/repo",
+    );
   });
   it("uses a file's parent directory", () => {
     expect(
@@ -129,9 +137,15 @@ describe("safeShellCwd", () => {
     ).toBe("/repo");
   });
   it("falls back to home for a missing path and for no request", () => {
-    expect(safeShellCwd({ requested: "/gone", home, stat: () => null })).toBe(home);
+    expect(safeShellCwd({ requested: "/gone", home, stat: () => null })).toBe(
+      home,
+    );
     expect(
-      safeShellCwd({ requested: undefined, home, stat: (p) => (p === home ? "dir" : null) }),
+      safeShellCwd({
+        requested: undefined,
+        home,
+        stat: (p) => (p === home ? "dir" : null),
+      }),
     ).toBe(home);
   });
 });

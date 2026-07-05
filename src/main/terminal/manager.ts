@@ -271,7 +271,11 @@ export function createTerminalManager(
     start(
       req.id,
       launchForm(
-        buildForkCommand({ sourceId: req.sourceId, newId: req.id, bin: req.bin }),
+        buildForkCommand({
+          sourceId: req.sourceId,
+          newId: req.id,
+          bin: req.bin,
+        }),
         platform,
       ),
       req.cwd,
@@ -285,7 +289,13 @@ export function createTerminalManager(
   // and exit wiring — but with no launchForm shim (the shell resolver already returns real executables;
   // shimming pwsh.exe through `cmd.exe /c` would be wrong) and no model / Managed alias.
   function launch(req: LaunchRequest): void {
-    start(req.id, { file: req.file, args: req.args }, req.cwd, req.cols, req.rows);
+    start(
+      req.id,
+      { file: req.file, args: req.args },
+      req.cwd,
+      req.cols,
+      req.rows,
+    );
   }
 
   function ack(id: string, charCount: number): void {

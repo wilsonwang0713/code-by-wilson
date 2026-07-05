@@ -9,7 +9,8 @@ export interface ShellSpec {
 
 // Platform-independent basename: shell paths cross platforms in tests (a win32 path on a darwin
 // host), and node:path.basename only splits the HOST's separator.
-const baseName = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
+const baseName = (p: string): string =>
+  p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 
 /** Interactive-flag spec for a POSIX shell (hermes posixShellSpec): zsh/bash get an interactive
  *  LOGIN shell so the user's full profile env loads; everything else plain interactive. */
@@ -64,7 +65,9 @@ export function resolveShellCommand(deps: ResolveShellDeps): ShellSpec {
     const command =
       deps.findOnPath("pwsh.exe") ??
       deps.findOnPath("pwsh") ??
-      (deps.isExecutable(builtin) ? builtin : deps.findOnPath("powershell.exe")) ??
+      (deps.isExecutable(builtin)
+        ? builtin
+        : deps.findOnPath("powershell.exe")) ??
       env.COMSPEC ??
       "cmd.exe";
     return shellSpecFor(command);
