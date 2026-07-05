@@ -12,6 +12,7 @@ import type {
   ToolResultDetail,
 } from "./transcript";
 import type { TerminalApi } from "./terminal";
+import type { ShellTerminalApi } from "./shell-terminal";
 import type { MetricsRead } from "./metrics";
 import type { ModelDefaults } from "./models";
 import type { StatsSnapshot, StatsRange } from "./stats";
@@ -215,6 +216,13 @@ export interface IpcApi {
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */
 export type AppApi = IpcApi & {
   terminal: TerminalApi;
+  /** The footer shell-terminal surface (a plain interactive shell per tab) — separate manager and
+   *  channels from the Managed `terminal` surface above. */
+  shellTerminal: ShellTerminalApi;
+  /** Electron webUtils.getPathForFile: the absolute filesystem path of a DOM File dragged from the
+   *  OS, for dropping paths into the terminal. Typed loosely (`object`) so this shared type stays
+   *  DOM-lib-free under tsconfig.node.json; renderer call sites pass a real File. */
+  getPathForFile(file: object): string;
   /** The host platform (`process.platform`), so the renderer can branch macOS-only chrome (the
    *  frameless title bar reserves space for the traffic lights only on darwin). */
   platform: string;
