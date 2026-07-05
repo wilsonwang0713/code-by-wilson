@@ -28,14 +28,14 @@ const VARIANT_CLASSES: Record<
   },
   underline: {
     base: "-mb-px border-b-2 px-3",
-    active: "border-primary font-medium text-fg",
-    idle: "border-transparent text-fg-faint hover:text-fg",
+    active: "border-(--ui-text-primary) font-medium text-(--ui-text-primary)",
+    idle: "border-transparent text-(--ui-text-tertiary) hover:text-(--ui-text-primary)",
   },
 };
 
 /**
  * The app's tab control. One primitive, two variants so the center column's Terminal/Transcript switch
- * and the Structure dock's tab bar share their icon/count/selection logic while reading distinct by role.
+ * and the Activity dock's tab bar share their icon/count/selection logic while reading distinct by role.
  * Each tab can carry a leading icon, a trailing count, or both.
  */
 export function Tabs<T extends string>({
@@ -76,7 +76,7 @@ export function Tabs<T extends string>({
             {t.icon && <Icon name={t.icon} size={13} />}
             {t.label}
             {t.count !== undefined && (
-              <span className="font-mono text-label tabular-nums text-fg-faint">
+              <span className="font-mono text-label tabular-nums text-(--ui-text-quaternary)">
                 {t.count}
               </span>
             )}
