@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-07-06
+
+### Added
+
+- A shell terminal pane, toggled from the footer or `Ctrl+\``: a tabbed rail of
+  background shells (new / switch / middle-click close), scrollback that
+  survives an app restart, drag-and-drop file paths, and clickable links. It
+  runs on its own IPC channel namespace, structurally isolated from managed
+  Claude sessions so a shell can never surface in session discovery.
+
+### Changed
+
+- Renamed the Structure dock to Activity and rebuilt its chrome: retoned onto
+  the app's `--ui-*` design tokens, an `ACTIVITY` overline label, underline-style
+  tabs, the collapse chevron pinned to the right in both the expanded and
+  collapsed states, and a drag-to-resize top edge (persisted, 140px–60vh).
+
+### Fixed
+
+- The left sidebar toggle no longer sits ~2px lower than the right panel
+  toggle — a stray downward nudge from the hermes ghost-button restyle had only
+  ever landed on the left cluster.
+
 ## [0.1.20] - 2026-07-05
 
 ### Added
@@ -513,7 +536,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.20...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.21...HEAD
+[0.1.21]: https://github.com/luojiahai/code-by-wire/compare/v0.1.20...v0.1.21
 [0.1.20]: https://github.com/luojiahai/code-by-wire/compare/v0.1.19...v0.1.20
 [0.1.19]: https://github.com/luojiahai/code-by-wire/compare/v0.1.18...v0.1.19
 [0.1.18]: https://github.com/luojiahai/code-by-wire/compare/v0.1.17...v0.1.18
