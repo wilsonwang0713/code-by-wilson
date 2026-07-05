@@ -21,7 +21,7 @@ export function TerminalPaneChrome({ asRow }: { asRow: boolean }) {
       <div
         className={cx(
           "relative flex min-h-0 min-w-0 flex-1 flex-col",
-          asRow && "border-t border-(--ui-stroke-secondary)",
+          asRow && "border-t border-t-(--ui-stroke-secondary)",
         )}
       >
         <TerminalSlot />

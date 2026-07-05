@@ -25,7 +25,7 @@ interface MenuState {
 
 /** Thin icon "bookmark" strip on the pane's outer edge, shown whenever a terminal exists. Each
  *  square is a tab; close via the shell's `exit`, middle-click, or the context menu. */
-export function TerminalRail({ asRow }: { asRow?: boolean }) {
+export function TerminalRail({ asRow }: { asRow: boolean }) {
   const terminals = useStore($terminals);
   const activeId = useStore($activeTerminalId);
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -106,7 +106,7 @@ function TerminalRailItem({
 }) {
   const label = `${index + 1}. ${term.title}`;
   return (
-    <li className="relative flex w-full justify-center [-webkit-app-region:no-drag]">
+    <li className="flex w-full justify-center [-webkit-app-region:no-drag]">
       <button
         aria-label={label}
         aria-selected={active}
