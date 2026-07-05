@@ -39,6 +39,7 @@ import { $paneOpen } from "./shell/panes";
 import {
   CBW_LEFT_PANE_ID,
   CBW_RIGHT_PANE_ID,
+  CBW_TERMINAL_PANE_ID,
   LEFT_DEFAULT_WIDTH,
   LEFT_MIN_WIDTH,
   LEFT_MAX_WIDTH,
@@ -46,6 +47,10 @@ import {
   RIGHT_MIN_WIDTH,
   RIGHT_MAX_WIDTH,
 } from "./shell/layout";
+import { TerminalPaneChrome } from "./shell-terminal/chrome";
+import { PersistentTerminal } from "./shell-terminal/persistent";
+import { installTerminalKeybind } from "./shell-terminal/keybinds";
+import { $activeSessionCwd, $terminalTakeover } from "./shell-terminal/store";
 
 /** The middle column's sentinel for the inline new-session view (design spec §5), alongside
  *  `OVERVIEW_ID`/`SETTINGS_ID`: not a real session id (real ids come from `newSessionId()`, which
@@ -388,6 +393,11 @@ export function App() {
   const narrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
   const leftOpen = useStore($paneOpen(CBW_LEFT_PANE_ID));
   const rightOpen = useStore($paneOpen(CBW_RIGHT_PANE_ID));
+  const terminalOpen = useStore($terminalTakeover);
+  // Hermes' railColumnOpen gate, cbw-translated: the terminal drops to a row inside the right
+  // rail only when the metrics sidebar is actually docked as a column (open, session selected,
+  // not narrow-collapsed to a hover-reveal overlay).
+  const terminalAsRow = terminalOpen && rightOpen && hasSession && !narrow;
   // The header's insets must clear the traffic lights / fixed toggle clusters whenever a pane
   // isn't actually docked next to it — whether the user closed it, or a narrow window
   // force-collapsed it — so both are driven by rendered state, not the stored preference alone.
@@ -416,6 +426,13 @@ export function App() {
       setSelectedId((ordered[0] ?? all[0]).id);
     }
   }, [ids]);
+
+  // The selected session's cwd feeds new-terminal creation (snapshotted per tab at creation).
+  useEffect(() => {
+    $activeSessionCwd.set(selected?.cwd);
+  }, [selected?.cwd]);
+
+  useEffect(() => installTerminalKeybind(), []);
 
   // The middle column's content, keyed on the current route: the inline new-session form, the
   // pinned Overview/Settings views (each wrapped in `MiddleNonSession` for its own plain-title
@@ -489,6 +506,39 @@ export function App() {
         </Pane>
         <PaneMain>{middle}</PaneMain>
         <Pane
+          id={CBW_TERMINAL_PANE_ID}
+          side="right"
+          width="42vw"
+          minWidth="22vw"
+          maxWidth="80vw"
+          height="38vh"
+          minHeight="8rem"
+          maxHeight="80vh"
+          resizable
+          disabled={!terminalOpen}
+          bottomRow={terminalAsRow}
+        >
+          {/* A persistent left border anchors the pane against the workspace, matching the metrics
+              sidebar (its resize sash alone reads as no edge until hovered). The row-mode top seam
+              (against the metrics above) is drawn inside the chrome — on the body column AND the tab
+              rail — not here: the rail's opaque z-40 background would paint over a wrapper-level
+              top border, leaving the seam notched short of the rail. */}
+          <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l border-(--ui-stroke-secondary) bg-(--ui-editor-surface-background)">
+            {/* As a full-height column the terminal reaches the top of the window, so it must clear
+                the titlebar band (the fixed sidebar-toggle clusters float there) — the same
+                --titlebar-height drag strip every other rail column reserves (see RightSidebar). As a
+                bottom row it sits beneath the already-cleared metrics column, so it needs no strip
+                (hermes' pt-(--titlebar-height) vs pt-0 on terminalAsRow). */}
+            {!terminalAsRow && (
+              <div
+                className="drag-region shrink-0 select-none"
+                style={{ height: "var(--titlebar-height)" }}
+              />
+            )}
+            <TerminalPaneChrome asRow={terminalAsRow} />
+          </div>
+        </Pane>
+        <Pane
           id={CBW_RIGHT_PANE_ID}
           side="right"
           width={RIGHT_DEFAULT_WIDTH}
@@ -509,6 +559,7 @@ export function App() {
           )}
         </Pane>
       </PaneShell>
+      <PersistentTerminal />
       {/* Must render AFTER PaneShell: Chromium builds the draggable region in DOM order
           (drag unions, then no-drag subtracts), so the clusters' no-drag must come after
           the sidebars'/header's full-width drag strips or the strips swallow their clicks. */}

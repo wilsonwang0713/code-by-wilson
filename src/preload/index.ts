@@ -2,10 +2,12 @@ import {
   contextBridge,
   ipcRenderer,
   webFrame,
+  webUtils,
   type IpcRendererEvent,
 } from "electron";
 import { IPC, type AppApi } from "@shared/ipc";
 import { TERMINAL } from "@shared/terminal";
+import { SHELL_TERMINAL } from "@shared/shell-terminal";
 
 const api: AppApi = {
   overview: () => ipcRenderer.invoke(IPC.overview),
@@ -105,6 +107,31 @@ const api: AppApi = {
       return () => ipcRenderer.removeListener(TERMINAL.rename, handler);
     },
   },
+  shellTerminal: {
+    spawn: (req) => ipcRenderer.invoke(SHELL_TERMINAL.spawn, req),
+    write: (id, data) => ipcRenderer.send(SHELL_TERMINAL.write, id, data),
+    resize: (id, cols, rows) =>
+      ipcRenderer.send(SHELL_TERMINAL.resize, id, cols, rows),
+    ack: (id, charCount) => ipcRenderer.send(SHELL_TERMINAL.ack, id, charCount),
+    kill: (id) => ipcRenderer.send(SHELL_TERMINAL.kill, id),
+    onData: (cb) => {
+      const handler = (
+        _e: IpcRendererEvent,
+        id: string,
+        data: string,
+        offset: number,
+      ) => cb(id, data, offset);
+      ipcRenderer.on(SHELL_TERMINAL.data, handler);
+      return () => ipcRenderer.removeListener(SHELL_TERMINAL.data, handler);
+    },
+    onExit: (cb) => {
+      const handler = (_e: IpcRendererEvent, id: string, code: number) =>
+        cb(id, code);
+      ipcRenderer.on(SHELL_TERMINAL.exit, handler);
+      return () => ipcRenderer.removeListener(SHELL_TERMINAL.exit, handler);
+    },
+  },
+  getPathForFile: (file) => webUtils.getPathForFile(file as File),
 };
 
 contextBridge.exposeInMainWorld("api", api);

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { FLOW } from "../../src/shared/terminal";
 import { createTerminalManager } from "../../src/main/terminal/manager";
 import type {
@@ -490,5 +490,136 @@ describe("createTerminalManager", () => {
   it("snapshot returns null for an unknown id", async () => {
     const h = harness();
     await expect(h.manager.snapshot("nope")).resolves.toBeNull();
+  });
+});
+
+describe("launch (shell terminals)", () => {
+  // A developer's local CBW_CLAUDE_BIN would make buildClaudeCommand return an absolute,
+  // extensioned path instead of the bare `"claude"` fallback the shim tests below rely on —
+  // clear it so the bare-claude fallback (and hence the shim behavior under test) is deterministic.
+  beforeEach(() => {
+    delete process.env.CBW_CLAUDE_BIN;
+  });
+
+  function shellHarness(platform: NodeJS.Platform = "darwin") {
+    const ptys: ReturnType<typeof fakePty>[] = [];
+    const recorders = recorderFactory();
+    const sent: Array<[string, string]> = [];
+    const exited: Array<[string, number]> = [];
+    const spawned: string[] = [];
+    const closed: string[] = [];
+    const manager = createTerminalManager({
+      send: (id, data) => sent.push([id, data]),
+      notifyExit: (id, code) => exited.push([id, code]),
+      onSpawned: (id) => spawned.push(id),
+      onClosed: (id) => closed.push(id),
+      createPty: (o: SpawnOptions) => {
+        const p = fakePty(2000 + ptys.length);
+        p.state.spawnedWith = o;
+        ptys.push(p);
+        return p.proc;
+      },
+      createBufferer: passthroughBufferer,
+      createRecorder: recorders.create,
+      platform,
+      statDir: () => true,
+    });
+    return { manager, ptys, sent, exited, spawned, closed };
+  }
+
+  it("spawns the literal argv — no Windows launchForm shim", () => {
+    const h = shellHarness("win32");
+    // A bare command name — no directory separator, no extension — so launchForm (were it applied)
+    // would rewrite this to `cmd.exe /c pwsh -NoLogo`. Asserting the argv comes through unchanged
+    // actually discriminates a launch() that wrongly shims from one that doesn't; an already-absolute,
+    // extensioned path like `C:\pf\pwsh.exe` would be a launchForm no-op either way and prove nothing.
+    h.manager.launch({
+      id: "s1",
+      file: "pwsh",
+      args: ["-NoLogo"],
+      cwd: "/home",
+      cols: 80,
+      rows: 24,
+    });
+    expect(h.ptys[0].state.spawnedWith?.file).toBe("pwsh");
+    expect(h.ptys[0].state.spawnedWith?.args).toEqual(["-NoLogo"]);
+  });
+
+  it("still shims a bare claude spawn on win32 (launchForm moved, not dropped)", () => {
+    const h = shellHarness("win32");
+    h.manager.spawn({ id: "c1", cwd: "/p", model: "opus", cols: 80, rows: 24 });
+    expect(h.ptys[0].state.spawnedWith?.file).toBe("cmd.exe");
+    expect(h.ptys[0].state.spawnedWith?.args?.[0]).toBe("/c");
+  });
+
+  it("applies flow control to launched sessions", () => {
+    const h = shellHarness();
+    h.manager.launch({
+      id: "s1",
+      file: "/bin/zsh",
+      args: ["-il"],
+      cwd: "/",
+      cols: 80,
+      rows: 24,
+    });
+    h.ptys[0].emitData("x".repeat(FLOW.highWaterChars + 1));
+    expect(h.ptys[0].state.paused).toBe(true);
+    h.manager.ack("s1", FLOW.highWaterChars + 1);
+    expect(h.ptys[0].state.paused).toBe(false);
+  });
+
+  it("is idempotent per id and killed by disposeAll", () => {
+    const h = shellHarness();
+    const req = {
+      id: "s1",
+      file: "/bin/sh",
+      args: ["-i"],
+      cwd: "/",
+      cols: 80,
+      rows: 24,
+    };
+    h.manager.launch(req);
+    h.manager.launch(req);
+    expect(h.ptys).toHaveLength(1);
+    h.manager.disposeAll();
+    expect(h.ptys[0].state.killed).toBe(true);
+  });
+
+  it("surfaces a bad cwd as an in-terminal error + exit, without a pty", () => {
+    const h = shellHarness();
+    // rebuild with a failing statDir
+    const bad = (() => {
+      const ptys: ReturnType<typeof fakePty>[] = [];
+      const sent: Array<[string, string]> = [];
+      const exited: Array<[string, number]> = [];
+      const manager = createTerminalManager({
+        send: (id, data) => sent.push([id, data]),
+        notifyExit: (id, code) => exited.push([id, code]),
+        onSpawned: () => {},
+        onClosed: () => {},
+        createPty: (o: SpawnOptions) => {
+          const p = fakePty();
+          p.state.spawnedWith = o;
+          ptys.push(p);
+          return p.proc;
+        },
+        createBufferer: passthroughBufferer,
+        createRecorder: recorderFactory().create,
+        statDir: () => false,
+      });
+      return { manager, ptys, sent, exited };
+    })();
+    void h;
+    bad.manager.launch({
+      id: "s1",
+      file: "/bin/sh",
+      args: ["-i"],
+      cwd: "/gone",
+      cols: 80,
+      rows: 24,
+    });
+    expect(bad.ptys).toHaveLength(0);
+    expect(bad.sent[0][1]).toContain("Starting directory does not exist");
+    expect(bad.exited).toEqual([["s1", 1]]);
   });
 });
