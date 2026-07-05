@@ -107,12 +107,6 @@ function TerminalRailItem({
   const label = `${index + 1}. ${term.title}`;
   return (
     <li className="relative flex w-full justify-center [-webkit-app-region:no-drag]">
-      {active && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0.5 right-0 w-0.5 rounded-l-sm bg-(--ui-stroke-primary)"
-        />
-      )}
       <button
         aria-label={label}
         aria-selected={active}
