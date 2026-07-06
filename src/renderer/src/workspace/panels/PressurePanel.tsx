@@ -101,9 +101,14 @@ export function PressurePanel({
               {view.pct}
               <span className="text-xs text-fg-faint">%</span>
             </div>
-            <div className="font-mono text-[0.625rem] text-(--ui-text-quaternary)">
-              {formatTokensShort(view.total)} /{" "}
-              {formatTokensShort(contextWindow)}
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-[0.625rem] text-(--ui-text-quaternary)">
+                context window
+              </span>
+              <span className="font-mono text-[0.625rem] text-(--ui-text-quaternary)">
+                {formatTokensShort(view.total)} /{" "}
+                {formatTokensShort(contextWindow)}
+              </span>
             </div>
           </div>
           <FillGauge
