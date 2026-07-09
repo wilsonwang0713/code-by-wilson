@@ -201,7 +201,7 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     mtimeMs: number,
     jsonl: string,
   ): TokenSpeed | null => {
-    const speed = computeTokenSpeed(parseJsonlRows(jsonl), SPEED_WINDOW_MS);
+    const speed = computeTokenSpeed([parseJsonlRows(jsonl)], SPEED_WINDOW_MS);
     speedById.set(id, { mtimeMs, speed });
     return speed;
   };
