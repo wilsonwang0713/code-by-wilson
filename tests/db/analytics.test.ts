@@ -450,7 +450,7 @@ describe("analytics store", () => {
       }),
     ]);
     upsertProcessedFile(db, "/a.jsonl", 111, 3);
-    db.exec("PRAGMA user_version = 3"); // pretend this store predates v4
+    db.exec("PRAGMA user_version = 3"); // pretend this store predates the current schema
 
     migrateAnalytics(db);
     // v5 forces the rescan for the last-entry-wins fix: high-water marks cleared even for a v3 origin.

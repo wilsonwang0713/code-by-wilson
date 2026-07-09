@@ -186,9 +186,9 @@ export function parseTranscript(
 
     const content = row.message?.content;
     if (row.type === "assistant") {
-      // Count each turn's usage once, keyed on message id (see countedTurns). contextTokens tracks
-      // the latest turn that actually holds context: its full prompt, which is input + both cache
-      // parts. A zero-usage turn like a '<synthetic>' placeholder leaves it untouched.
+      // Sum each turn's usage keyed on message id, last snapshot wins (see UsageAccumulator).
+      // contextTokens tracks the latest turn that actually holds context: its full prompt, which is
+      // input + both cache parts. A zero-usage turn like a '<synthetic>' placeholder leaves it untouched.
       const usage = row.message?.usage;
       if (usage && typeof usage === "object") {
         const id = typeof row.message?.id === "string" ? row.message.id : null;
