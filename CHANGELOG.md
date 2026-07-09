@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-07-09
+
+### Added
+
+- A **Caffeinate** keep-awake toggle in the footer, immediately left of the
+  Terminal button. While on, the computer won't idle-sleep (long-running
+  Claude Code sessions, terminals, and downloads keep going) via Electron's
+  cross-platform `powerSaveBlocker`; the display is still free to sleep. The
+  button shows hermes' working-session arc-border effect while active
+  (`prefers-reduced-motion` stops the motion), and state doesn't persist
+  across launches.
+
 ## [0.1.23] - 2026-07-09
 
 ### Added
@@ -582,7 +594,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.23...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.24...HEAD
+[0.1.24]: https://github.com/luojiahai/code-by-wire/compare/v0.1.23...v0.1.24
 [0.1.23]: https://github.com/luojiahai/code-by-wire/compare/v0.1.22...v0.1.23
 [0.1.22]: https://github.com/luojiahai/code-by-wire/compare/v0.1.21...v0.1.22
 [0.1.21]: https://github.com/luojiahai/code-by-wire/compare/v0.1.20...v0.1.21
