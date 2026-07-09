@@ -420,6 +420,23 @@ describe("parseTranscript", () => {
     expect(s.contextTokens).toBe(10900); // latest turn (msg_2): 1500 + 9000 + 400
   });
 
+  it("sums a repeated message id at its LAST usage snapshot (progressive streaming rows)", () => {
+    const snap = (out: number) =>
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-06-09T03:00:00.000Z",
+        message: {
+          id: "m-grow",
+          model: "claude-opus-4-8",
+          usage: { input_tokens: 7, output_tokens: out },
+          content: [{ type: "text", text: "…" }],
+        },
+      });
+    const s = parseTranscript([snap(0), snap(0), snap(764)].join("\n"));
+    expect(s.usage.outputTokens).toBe(764);
+    expect(s.usage.inputTokens).toBe(7);
+  });
+
   it("counts the just-written cache-creation tokens in the current context size", () => {
     // The latest turn's prompt = input + cache_read + cache_creation. A turn that just cached a big
     // new chunk holds it in context now, before it migrates to cache_read on the next turn.
