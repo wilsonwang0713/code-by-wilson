@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-07-09
+
+### Added
+
+- An amber dot badges the sidebar Settings gear and the Settings page's About
+  row while a software update is pending (available, downloading, or
+  downloaded), clearing once it installs.
+
+### Fixed
+
+- The Subagents tab's token count now matches the CLI's own count — the last
+  assistant message's usage across all four fields (input, output, cache
+  read, cache creation) — instead of undercounting by summing uncached
+  input/output alone. Its tool-count column also switches to the CLI's "N
+  tool uses" wording, and the collapsed Activity tally drops the redundant
+  done-count ("0/0 tasks" → just the count).
+- The right sidebar's 5h rate-limit percentage no longer flaps (e.g. 45% ↔
+  55%) between polls when multiple sessions run in parallel — each window
+  now derives independently across every fresh capture, taking the highest
+  used% within the latest reset generation instead of trusting whichever
+  session's capture file has the newest mtime.
+
 ## [0.1.24] - 2026-07-09
 
 ### Added
@@ -594,7 +616,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.24...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.25...HEAD
+[0.1.25]: https://github.com/luojiahai/code-by-wire/compare/v0.1.24...v0.1.25
 [0.1.24]: https://github.com/luojiahai/code-by-wire/compare/v0.1.23...v0.1.24
 [0.1.23]: https://github.com/luojiahai/code-by-wire/compare/v0.1.22...v0.1.23
 [0.1.22]: https://github.com/luojiahai/code-by-wire/compare/v0.1.21...v0.1.22
