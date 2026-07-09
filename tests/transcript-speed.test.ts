@@ -153,4 +153,40 @@ describe("computeTokenSpeed", () => {
     // 600 + 400 over the merged 0→10s window (concurrent intervals merge, m1 counted once).
     expect(s!.outputTps).toBeCloseTo(100, 5);
   });
+
+  it("does not pair a group's trailing user turn with the next group's assistant", () => {
+    const groupA = [
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:00:00.000Z",
+        message: { content: "hi" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:10.000Z",
+        message: { id: "a1", usage: { input_tokens: 0, output_tokens: 1000 } },
+      },
+      // Trailing user turn with NO following assistant in this group — leaves a dangling
+      // pendingUserTs ONLY if the pairing state wrongly persists across the group boundary.
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:01:40.000Z",
+        message: { content: "dangling" },
+      },
+    ];
+    const groupB = [
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:03:20.000Z",
+        message: { id: "b1", usage: { input_tokens: 0, output_tokens: 500 } },
+      },
+    ];
+    const s = computeTokenSpeed([groupA, groupB], 0);
+    expect(s).not.toBeNull();
+    // Correct (per-group reset): b1's interval is zero-length [200s, 200s]; total active duration is
+    // just groupA's [0s, 10s] = 10s, so outputTps = (1000 + 500) / 10 = 150.
+    // A broken reset would pair b1 with the 100s dangling user turn → interval [100s, 200s], inflating
+    // the denominator to 110s and giving a different (~13.6) tps.
+    expect(s!.outputTps).toBeCloseTo(150, 5);
+  });
 });

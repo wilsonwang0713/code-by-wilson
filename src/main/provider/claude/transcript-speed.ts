@@ -36,11 +36,12 @@ function mergedDurationMs(intervals: Interval[]): number {
  * Token throughput over the rolling window, across one or more transcripts (`rowGroups`: the main
  * transcript plus each subagent's). Pairs each user turn's timestamp with the following assistant
  * turn's timestamp WITHIN its own group to form an active interval; a repeated message id — within or
- * across groups — keeps its first interval start but takes the LAST row's usage and end timestamp
- * (the billed snapshot; see UsageAccumulator for the rule). Overlapping intervals merge in the
- * duration denominator, so concurrent subagent work isn't double-counted. With `windowMs > 0` only
- * requests whose assistant timestamp falls within `[latest - windowMs, latest]` count, and their
- * intervals are clipped to that window's start. `windowMs === 0` is the full-session average.
+ * across groups — keeps its first interval start; its usage and end advance to the latest-timestamp
+ * row for that id (a stale earlier duplicate is ignored; see UsageAccumulator for the last-wins
+ * rule). Overlapping intervals merge in the duration denominator, so concurrent subagent work isn't
+ * double-counted. With `windowMs > 0` only requests whose assistant timestamp falls within
+ * `[latest - windowMs, latest]` count, and their intervals are clipped to that window's start.
+ * `windowMs === 0` is the full-session average.
  * Returns null when no completed request remains or the merged active duration is zero.
  */
 export function computeTokenSpeed(
@@ -68,11 +69,15 @@ export function computeTokenSpeed(
         typeof row.message?.id === "string" ? row.message.id : undefined;
       const existing = id ? byId.get(id) : undefined;
       if (existing) {
-        // Last row wins: the final snapshot carries the billed usage, and its timestamp is the
-        // turn's true completion.
-        if (ts > existing.end) existing.end = ts;
-        existing.input = num(usage.input_tokens);
-        existing.output = num(usage.output_tokens);
+        // The latest-timestamp snapshot of a repeated id is the turn's true completion: adopt its
+        // usage AND end together (>= so a same-timestamp later row still wins the tie), and ignore a
+        // stale earlier-timestamped duplicate so end and usage never decouple. The first-seen start
+        // is kept untouched.
+        if (ts >= existing.end) {
+          existing.end = ts;
+          existing.input = num(usage.input_tokens);
+          existing.output = num(usage.output_tokens);
+        }
       } else {
         const iv: Interval = {
           start: pendingUserTs ?? ts,
