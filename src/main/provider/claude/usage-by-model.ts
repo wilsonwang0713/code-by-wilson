@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { ModelUsage } from "@shared/types";
 import type { AnalyticsTurn } from "../../db/analytics";
-import { extractTurns, foldTurnsByModel } from "./turns";
+import { extractTurns, foldTurnsByModel, dedupeTurnsById } from "./turns";
 import { subagentsDirFor, listSubagentFiles } from "./subagents";
 
 /**
@@ -29,5 +29,5 @@ export function usageByModelFor(
     }
     turns.push(...extractTurns(jsonl, sessionId, keyPrefix));
   }
-  return foldTurnsByModel(turns);
+  return foldTurnsByModel(dedupeTurnsById(turns));
 }

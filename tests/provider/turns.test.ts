@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { extractTurns } from "../../src/main/provider/claude/turns";
+import {
+  extractTurns,
+  dedupeTurnsById,
+} from "../../src/main/provider/claude/turns";
 
 /** One JSONL line. */
 const line = (o: unknown): string => JSON.stringify(o);
@@ -173,5 +176,61 @@ describe("extractTurns", () => {
     expect(tail).toHaveLength(1);
     expect(tail[0].messageId).toBe(full[1].messageId); // line 1's surrogate is identical either way
     expect(full[0].messageId).not.toBe(full[1].messageId); // lines 0 and 1 stay distinct
+  });
+
+  it("keeps the LAST usage snapshot for a repeated message id (progressive subagent rows)", () => {
+    // Subagent transcripts stream cumulative usage: early rows carry output≈0, the final row the
+    // billed number. First-wins recorded the ~0 row; the turn must carry the last snapshot.
+    const snap = (out: number) =>
+      assistant({
+        message: { usage: { input_tokens: 7, output_tokens: out } },
+      });
+    const jsonl = [snap(0), snap(0), snap(764)].join("\n") + "\n";
+    const turns = extractTurns(jsonl, "sess-1");
+    expect(turns).toHaveLength(1);
+    expect(turns[0].usage.outputTokens).toBe(764);
+    expect(turns[0].usage.inputTokens).toBe(7);
+  });
+
+  it("keeps first-seen ts and model when a later snapshot repeats the id", () => {
+    const early = assistant({
+      timestamp: "2026-06-09T03:00:00.000Z",
+      message: { usage: { input_tokens: 1, output_tokens: 0 } },
+    });
+    const late = assistant({
+      timestamp: "2026-06-09T03:00:09.000Z",
+      message: { usage: { input_tokens: 1, output_tokens: 50 } },
+    });
+    const [t] = extractTurns([early, late].join("\n"), "sess-1");
+    expect(t.ts).toBe(Date.parse("2026-06-09T03:00:00.000Z"));
+    expect(t.usage.outputTokens).toBe(50);
+  });
+});
+
+describe("dedupeTurnsById", () => {
+  it("collapses a message id repeated across files: first metadata, last usage", () => {
+    const a = extractTurns(assistant(), "sess-1"); // msg-a, output 10
+    const b = extractTurns(
+      assistant({
+        message: { usage: { input_tokens: 100, output_tokens: 90 } },
+      }),
+      "sess-1",
+      "sess-1/agent-x.jsonl",
+    ); // same msg-a id, later snapshot from a subagent file
+    const deduped = dedupeTurnsById([...a, ...b]);
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0].usage.outputTokens).toBe(90);
+    expect(deduped[0].ts).toBe(a[0].ts);
+  });
+
+  it("passes distinct ids through in order", () => {
+    const turns = extractTurns(
+      [assistant(), assistant({ message: { id: "msg-b" } })].join("\n"),
+      "sess-1",
+    );
+    expect(dedupeTurnsById(turns).map((t) => t.messageId)).toEqual([
+      "msg-a",
+      "msg-b",
+    ]);
   });
 });
