@@ -51,11 +51,15 @@ export function formatDuration(ms: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+/** The k branch shows one decimal, so 999,950+ would round to "1000.0k" — promote those to the M
+ *  branch instead ("1.00M"). */
+const K_TO_M_PROMOTION = 999_950;
+
 /** A token count abbreviated for the dense rail: 128400 → "128.4k", 2_480_000 → "2.48M". Under 1000 is
  *  the bare integer. Non-finite or ≤0 → "0". */
 export function formatTokensShort(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= K_TO_M_PROMOTION) return (n / 1_000_000).toFixed(2) + "M";
   if (n >= 1000) return (n / 1000).toFixed(1) + "k";
   return String(Math.round(n));
 }
@@ -67,7 +71,7 @@ export function formatTokensShort(n: number): string {
 export function formatTokensAxis(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "0";
   const trim = (s: string): string => s.replace(/\.?0+$/, "");
-  if (n >= 1_000_000) return trim((n / 1_000_000).toFixed(2)) + "M";
+  if (n >= K_TO_M_PROMOTION) return trim((n / 1_000_000).toFixed(2)) + "M";
   if (n >= 1000) return trim((n / 1000).toFixed(1)) + "k";
   return String(Math.round(n));
 }

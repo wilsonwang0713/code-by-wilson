@@ -33,45 +33,62 @@ function mergedDurationMs(intervals: Interval[]): number {
 }
 
 /**
- * Token throughput over the rolling window. Pairs each user turn's timestamp with the following
- * assistant turn's timestamp to form an active interval, summing that assistant turn's usage (deduped by
- * message id). With `windowMs > 0` only requests whose assistant timestamp falls within
+ * Token throughput over the rolling window, across one or more transcripts (`rowGroups`: the main
+ * transcript plus each subagent's). Pairs each user turn's timestamp with the following assistant
+ * turn's timestamp WITHIN its own group to form an active interval; a repeated message id — within or
+ * across groups — keeps its first interval start; its usage and end advance to the latest-timestamp
+ * row for that id (a stale earlier duplicate is ignored; see UsageAccumulator for the last-wins
+ * rule). Overlapping intervals merge in the duration denominator, so concurrent subagent work isn't
+ * double-counted. With `windowMs > 0` only requests whose assistant timestamp falls within
  * `[latest - windowMs, latest]` count, and their intervals are clipped to that window's start.
- * `windowMs === 0` is the full-session average. Returns null when no completed request remains or the
- * merged active duration is zero.
+ * `windowMs === 0` is the full-session average.
+ * Returns null when no completed request remains or the merged active duration is zero.
  */
 export function computeTokenSpeed(
-  rows: any[],
+  rowGroups: any[][],
   windowMs: number,
 ): TokenSpeed | null {
   const intervals: Interval[] = [];
-  const counted = new Set<string>();
-  let pendingUserTs: number | null = null;
+  const byId = new Map<string, Interval>();
   let latest = 0;
 
-  for (const row of rows) {
-    const ts =
-      typeof row?.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
-    if (Number.isNaN(ts)) continue;
-    if (row.type === "user" && !row.isMeta) {
-      pendingUserTs = ts;
-      continue;
-    }
-    if (row.type === "assistant") {
-      const id =
-        typeof row.message?.id === "string" ? row.message.id : undefined;
+  for (const rows of rowGroups) {
+    let pendingUserTs: number | null = null; // pairing state never crosses a group boundary
+    for (const row of rows) {
+      const ts =
+        typeof row?.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
+      if (Number.isNaN(ts)) continue;
+      if (row.type === "user" && !row.isMeta) {
+        pendingUserTs = ts;
+        continue;
+      }
+      if (row.type !== "assistant") continue;
       const usage = row.message?.usage;
       if (!usage || typeof usage !== "object") continue;
-      if (id && counted.has(id)) continue;
-      if (id) counted.add(id);
-      const start = pendingUserTs ?? ts;
-      intervals.push({
-        start,
-        end: ts,
-        input: num(usage.input_tokens),
-        output: num(usage.output_tokens),
-      });
-      pendingUserTs = null;
+      const id =
+        typeof row.message?.id === "string" ? row.message.id : undefined;
+      const existing = id ? byId.get(id) : undefined;
+      if (existing) {
+        // The latest-timestamp snapshot of a repeated id is the turn's true completion: adopt its
+        // usage AND end together (>= so a same-timestamp later row still wins the tie), and ignore a
+        // stale earlier-timestamped duplicate so end and usage never decouple. The first-seen start
+        // is kept untouched.
+        if (ts >= existing.end) {
+          existing.end = ts;
+          existing.input = num(usage.input_tokens);
+          existing.output = num(usage.output_tokens);
+        }
+      } else {
+        const iv: Interval = {
+          start: pendingUserTs ?? ts,
+          end: ts,
+          input: num(usage.input_tokens),
+          output: num(usage.output_tokens),
+        };
+        if (id) byId.set(id, iv);
+        intervals.push(iv);
+        pendingUserTs = null;
+      }
       if (ts > latest) latest = ts;
     }
   }

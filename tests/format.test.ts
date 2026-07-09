@@ -81,6 +81,12 @@ describe("formatTokensShort", () => {
     expect(formatTokensShort(950)).toBe("950");
     expect(formatTokensShort(0)).toBe("0");
   });
+
+  it("promotes the k→M rounding boundary instead of rendering '1000.0k'", () => {
+    expect(formatTokensShort(999_949)).toBe("999.9k");
+    expect(formatTokensShort(999_950)).toBe("1.00M");
+    expect(formatTokensShort(999_999)).toBe("1.00M");
+  });
 });
 
 describe("formatTokensAxis", () => {
@@ -94,6 +100,11 @@ describe("formatTokensAxis", () => {
     expect(formatTokensAxis(128_400)).toBe("128.4k");
     expect(formatTokensAxis(950)).toBe("950");
     expect(formatTokensAxis(0)).toBe("0");
+  });
+
+  it("promotes the k→M rounding boundary instead of rendering '1000k'", () => {
+    expect(formatTokensAxis(999_949)).toBe("999.9k");
+    expect(formatTokensAxis(999_950)).toBe("1M");
   });
 });
 

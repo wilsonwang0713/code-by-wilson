@@ -1,7 +1,8 @@
 import type { AnalyticsTurn } from "../../db/analytics";
 import { projectFromCwd } from "../../project-name";
-import { num, parseJsonlRowsAt, cacheCreationSplit } from "./transcript-row";
-import type { ModelUsage, Usage } from "@shared/types";
+import { parseJsonlRowsAt } from "./transcript-row";
+import { UsageAccumulator } from "./usage-accumulator";
+import type { ModelUsage } from "@shared/types";
 import { emptyUsage, tokenTotal } from "@shared/usage-by-model";
 
 /** Claude injects '<synthetic>' assistant turns (cancelled / over-limit placeholders) that carry zero
@@ -12,8 +13,9 @@ const SYNTHETIC_MODEL = "<synthetic>";
 
 /**
  * Project a Transcript's JSONL into one turn record per assistant turn. Mirrors parseTranscript's per-turn
- * dedup (a turn repeats across content-block lines under one message id; first sight wins) and counts
- * Subagent (isSidechain) turns — their usage is real, billed cost — but skips synthetic placeholders.
+ * dedup (a turn repeats across content-block lines under one message id; the LAST row's usage wins —
+ * see UsageAccumulator — while ts/model/cwd stay first-seen) and counts Subagent (isSidechain) turns —
+ * their usage is real, billed cost — but skips synthetic placeholders.
  *
  * An assistant turn with no message id (rare) gets a position-stable surrogate (`<keyPrefix>#<lineNo>`)
  * keyed on its ABSOLUTE raw line number, so the same physical line keys identically whether the file is
@@ -28,8 +30,7 @@ export function extractTurns(
   keyPrefix: string = sessionId,
   startLine = 0,
 ): AnalyticsTurn[] {
-  const out: AnalyticsTurn[] = [];
-  const counted = new Set<string>();
+  const acc = new UsageAccumulator<Omit<AnalyticsTurn, "usage">>();
   parseJsonlRowsAt(jsonl, startLine).forEach(({ row, line }) => {
     if (row?.type !== "assistant") return;
     const model = row.message?.model;
@@ -41,36 +42,37 @@ export function extractTurns(
       typeof row.message?.id === "string"
         ? row.message.id
         : `${keyPrefix}#${line}`;
-    if (counted.has(id)) return;
-    counted.add(id);
-
-    const cwd = typeof row.cwd === "string" ? row.cwd : "";
-    const tsMs =
-      typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
-    out.push({
-      messageId: id,
-      sessionId,
-      // 0 is the unknown-time sentinel: a missing/unparseable timestamp. readTotals' windowed ranges
-      // exclude ts=0 (no positive bound matches it) but all-time keeps it — see the note there.
-      ts: Number.isNaN(tsMs) ? 0 : tsMs,
-      modelRaw: typeof model === "string" ? model : undefined,
-      usage: ((): Usage => {
-        const split = cacheCreationSplit(usage);
-        return {
-          inputTokens: num(usage.input_tokens),
-          outputTokens: num(usage.output_tokens),
-          cacheReadTokens: num(usage.cache_read_input_tokens),
-          cacheCreationTokens: split.total,
-          cacheCreation5mTokens: split.fiveM,
-          cacheCreation1hTokens: split.oneH,
-        };
-      })(),
-      cwd,
-      project: projectFromCwd(cwd),
-      branch: typeof row.gitBranch === "string" ? row.gitBranch : undefined,
+    acc.add(id, usage, () => {
+      const cwd = typeof row.cwd === "string" ? row.cwd : "";
+      const tsMs =
+        typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
+      return {
+        messageId: id,
+        sessionId,
+        // 0 is the unknown-time sentinel: a missing/unparseable timestamp. readTotals' windowed ranges
+        // exclude ts=0 (no positive bound matches it) but all-time keeps it — see the note there.
+        ts: Number.isNaN(tsMs) ? 0 : tsMs,
+        modelRaw: typeof model === "string" ? model : undefined,
+        cwd,
+        project: projectFromCwd(cwd),
+        branch: typeof row.gitBranch === "string" ? row.gitBranch : undefined,
+      };
     });
   });
-  return out;
+  return acc.entries().map(({ usage, value }) => ({ ...value, usage }));
+}
+
+/** Collapse duplicate message ids ACROSS a session's files (main + each subagent transcript): the
+ *  first-seen turn keeps its metadata, the last usage wins — the same rule extractTurns applies within
+ *  one file. Guards usageByModelFor against a message mirrored in two files; the analytics scan gets
+ *  the equivalent protection from the turns table's message_id primary key. */
+export function dedupeTurnsById(turns: AnalyticsTurn[]): AnalyticsTurn[] {
+  const byId = new Map<string, AnalyticsTurn>();
+  for (const t of turns) {
+    const prev = byId.get(t.messageId);
+    byId.set(t.messageId, prev ? { ...prev, usage: t.usage } : t);
+  }
+  return [...byId.values()];
 }
 
 /** Fold a session's assistant turns into one ModelUsage per model, summing usage field by field and keying

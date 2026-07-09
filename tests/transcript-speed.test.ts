@@ -28,7 +28,7 @@ describe("computeTokenSpeed", () => {
       200,
       1000,
     );
-    const s = computeTokenSpeed(rows, 0); // window 0 = full session
+    const s = computeTokenSpeed([rows], 0); // window 0 = full session
     expect(s).not.toBeNull();
     expect(s!.outputTps).toBeCloseTo(100, 5); // 1000 / 10s
     expect(s!.inputTps).toBeCloseTo(20, 5);
@@ -59,7 +59,7 @@ describe("computeTokenSpeed", () => {
         },
       },
     ];
-    expect(computeTokenSpeed(rows, 0)!.outputTps).toBeCloseTo(100, 5);
+    expect(computeTokenSpeed([rows], 0)!.outputTps).toBeCloseTo(100, 5);
   });
 
   it("clips to the rolling window anchored at the last activity", () => {
@@ -80,11 +80,11 @@ describe("computeTokenSpeed", () => {
       ),
     ];
     // 60s window ending at 00:01:50 excludes the 'old' interval entirely → only the 'new' 500 over 10s.
-    expect(computeTokenSpeed(rows, 60_000)!.outputTps).toBeCloseTo(50, 5);
+    expect(computeTokenSpeed([rows], 60_000)!.outputTps).toBeCloseTo(50, 5);
   });
 
   it("returns null with no completed request or zero active duration", () => {
-    expect(computeTokenSpeed([], 0)).toBeNull();
+    expect(computeTokenSpeed([[]], 0)).toBeNull();
     const instant = turnRows(
       "2026-06-11T00:00:00.000Z",
       "2026-06-11T00:00:00.000Z",
@@ -92,6 +92,101 @@ describe("computeTokenSpeed", () => {
       10,
       10,
     );
-    expect(computeTokenSpeed(instant, 0)).toBeNull();
+    expect(computeTokenSpeed([instant], 0)).toBeNull();
+  });
+
+  it("takes the LAST snapshot of a repeated id: final usage, final end timestamp", () => {
+    const rows = [
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:00:00.000Z",
+        message: { content: "hi" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:05.000Z",
+        message: { id: "m1", usage: { input_tokens: 0, output_tokens: 0 } },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:10.000Z",
+        message: { id: "m1", usage: { input_tokens: 0, output_tokens: 1000 } },
+      },
+    ];
+    const s = computeTokenSpeed([rows], 0);
+    expect(s).not.toBeNull();
+    expect(s!.outputTps).toBeCloseTo(100, 5); // 1000 tokens over 0→10s, not 0 over 0→5s
+  });
+
+  it("dedups a message id across groups and merges concurrent intervals", () => {
+    const main = [
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:00:00.000Z",
+        message: { content: "hi" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:10.000Z",
+        message: { id: "m1", usage: { input_tokens: 0, output_tokens: 600 } },
+      },
+    ];
+    const sub = [
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:10.000Z",
+        message: { id: "m1", usage: { input_tokens: 0, output_tokens: 600 } },
+      }, // duplicate of main's m1 — counted once
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:00:00.000Z",
+        message: { content: "task" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:10.000Z",
+        message: { id: "s1", usage: { input_tokens: 0, output_tokens: 400 } },
+      },
+    ];
+    const s = computeTokenSpeed([main, sub], 0);
+    expect(s).not.toBeNull();
+    // 600 + 400 over the merged 0→10s window (concurrent intervals merge, m1 counted once).
+    expect(s!.outputTps).toBeCloseTo(100, 5);
+  });
+
+  it("does not pair a group's trailing user turn with the next group's assistant", () => {
+    const groupA = [
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:00:00.000Z",
+        message: { content: "hi" },
+      },
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:00:10.000Z",
+        message: { id: "a1", usage: { input_tokens: 0, output_tokens: 1000 } },
+      },
+      // Trailing user turn with NO following assistant in this group — leaves a dangling
+      // pendingUserTs ONLY if the pairing state wrongly persists across the group boundary.
+      {
+        type: "user",
+        timestamp: "2026-06-11T00:01:40.000Z",
+        message: { content: "dangling" },
+      },
+    ];
+    const groupB = [
+      {
+        type: "assistant",
+        timestamp: "2026-06-11T00:03:20.000Z",
+        message: { id: "b1", usage: { input_tokens: 0, output_tokens: 500 } },
+      },
+    ];
+    const s = computeTokenSpeed([groupA, groupB], 0);
+    expect(s).not.toBeNull();
+    // Correct (per-group reset): b1's interval is zero-length [200s, 200s]; total active duration is
+    // just groupA's [0s, 10s] = 10s, so outputTps = (1000 + 500) / 10 = 150.
+    // A broken reset would pair b1 with the 100s dangling user turn → interval [100s, 200s], inflating
+    // the denominator to 110s and giving a different (~13.6) tps.
+    expect(s!.outputTps).toBeCloseTo(150, 5);
   });
 });

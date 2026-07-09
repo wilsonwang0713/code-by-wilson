@@ -141,6 +141,57 @@ describe("usageByModelFor", () => {
     expect(folded).toHaveLength(1);
     expect(folded[0]).toMatchObject({ modelRaw: "claude-opus-4-8" });
   });
+
+  it("uses the last snapshot from a progressive subagent transcript", () => {
+    const home = makeHome();
+    const dir = join(home, "projects", "-proj");
+    mkdirSync(join(dir, "sess-p", "subagents"), { recursive: true });
+    const main = join(dir, "sess-p.jsonl");
+    writeFileSync(main, assistant("m-main", "claude-opus-4-8", 100) + "\n");
+    const snap = (out: number) =>
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-06-09T03:00:01.000Z",
+        message: {
+          role: "assistant",
+          id: "m-sub",
+          model: "claude-opus-4-8",
+          usage: { input_tokens: 2, output_tokens: out },
+        },
+      });
+    writeFileSync(
+      join(dir, "sess-p", "subagents", "agent-a1.jsonl"),
+      [snap(0), snap(0), snap(764)].join("\n") + "\n",
+    );
+    const byModel = usageByModelFor(readFileSync(main, "utf8"), main, "sess-p");
+    expect(byModel).toHaveLength(1);
+    expect(byModel[0].usage.outputTokens).toBe(764); // not 0 (first snapshot), not 764*3
+    expect(byModel[0].usage.inputTokens).toBe(102);
+  });
+
+  it("counts a message id mirrored in the main and a subagent file once (last wins)", () => {
+    const home = makeHome();
+    const dir = join(home, "projects", "-proj");
+    mkdirSync(join(dir, "sess-d", "subagents"), { recursive: true });
+    const main = join(dir, "sess-d.jsonl");
+    writeFileSync(main, assistant("m-dup", "claude-opus-4-8", 5) + "\n");
+    writeFileSync(
+      join(dir, "sess-d", "subagents", "agent-a1.jsonl"),
+      JSON.stringify({
+        type: "assistant",
+        timestamp: "2026-06-09T03:00:01.000Z",
+        message: {
+          role: "assistant",
+          id: "m-dup",
+          model: "claude-opus-4-8",
+          usage: { input_tokens: 5, output_tokens: 40 },
+        },
+      }) + "\n",
+    );
+    const byModel = usageByModelFor(readFileSync(main, "utf8"), main, "sess-d");
+    expect(byModel[0].usage.inputTokens).toBe(5); // once, not 10
+    expect(byModel[0].usage.outputTokens).toBe(40); // the later file's snapshot
+  });
 });
 
 describe("summarize includes the per-model breakdown", () => {

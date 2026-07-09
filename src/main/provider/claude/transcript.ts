@@ -4,8 +4,9 @@ import { normalizeModelId, type Family } from "@shared/models";
 import type { Usage } from "@shared/types";
 import { contextTotal } from "@shared/context";
 import { promptLabel } from "./command-envelope";
-import { num, userText, cacheCreationSplit } from "./transcript-row";
+import { userText } from "./transcript-row";
 import { createTailTracker } from "./transcript-tail";
+import { UsageAccumulator } from "./usage-accumulator";
 
 export interface TranscriptSummary {
   title: string;
@@ -147,17 +148,11 @@ export function parseTranscript(
   let createdMs = 0; // 0 = no parseable timestamp seen yet
   const userPrompts: string[] = [];
 
-  // Token usage summed over every assistant turn (cost is billed per turn).
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cacheReadTokens = 0;
-  let cacheCreationTokens = 0;
-  let cacheCreation5mTokens = 0;
-  let cacheCreation1hTokens = 0;
-  // Message ids whose usage we've already counted. Claude Code writes one assistant turn across
-  // several JSONL lines (one per content block), each repeating the same id and usage; counting
-  // per line would multiply the turn's tokens (2x-7x on real transcripts).
-  const countedTurns = new Set<string>();
+  // Token usage summed over every assistant turn (cost is billed per turn), deduped per message id
+  // with the LAST row's snapshot winning — Claude Code writes one turn across several JSONL lines,
+  // and subagent transcripts stream progressive usage where only the final row is the billed number
+  // (see UsageAccumulator).
+  const usageAcc = new UsageAccumulator();
   const tail = createTailTracker();
 
   for (const line of jsonl.split("\n")) {
@@ -191,23 +186,13 @@ export function parseTranscript(
 
     const content = row.message?.content;
     if (row.type === "assistant") {
-      // Count each turn's usage once, keyed on message id (see countedTurns). contextTokens tracks
-      // the latest turn that actually holds context: its full prompt, which is input + both cache
-      // parts. A zero-usage turn like a '<synthetic>' placeholder leaves it untouched.
+      // Sum each turn's usage keyed on message id, last snapshot wins (see UsageAccumulator).
+      // contextTokens tracks the latest turn that actually holds context: its full prompt, which is
+      // input + both cache parts. A zero-usage turn like a '<synthetic>' placeholder leaves it untouched.
       const usage = row.message?.usage;
       if (usage && typeof usage === "object") {
-        const id =
-          typeof row.message?.id === "string" ? row.message.id : undefined;
-        if (!id || !countedTurns.has(id)) {
-          if (id) countedTurns.add(id);
-          inputTokens += num(usage.input_tokens);
-          outputTokens += num(usage.output_tokens);
-          const split = cacheCreationSplit(usage);
-          cacheReadTokens += num(usage.cache_read_input_tokens);
-          cacheCreationTokens += split.total;
-          cacheCreation5mTokens += split.fiveM;
-          cacheCreation1hTokens += split.oneH;
-        }
+        const id = typeof row.message?.id === "string" ? row.message.id : null;
+        usageAcc.add(id, usage);
       }
       // The waiting signal and current-context split come from the shared tail tracker, one derivation
       // the render parser also drives, so they can't disagree. Feed it only the parent conversation's
@@ -218,7 +203,9 @@ export function parseTranscript(
         const turnId =
           typeof row.message?.id === "string" ? row.message.id : undefined;
         tail.beginAssistantTurn(turnId);
-        tail.noteUsage(usage);
+        // An API-error row can carry a partial usage block that is not the turn's real context —
+        // never let it become the current-context pick (its tokens still count toward usage totals).
+        if (!row.isApiErrorMessage) tail.noteUsage(usage);
         if (Array.isArray(content)) {
           for (const block of content) {
             if (block?.type === "tool_use" && typeof block.id === "string") {
@@ -269,14 +256,7 @@ export function parseTranscript(
     lastActivityMs,
     createdMs,
     awaitingUser: tail.awaitingUser,
-    usage: {
-      inputTokens,
-      outputTokens,
-      cacheReadTokens,
-      cacheCreationTokens,
-      cacheCreation5mTokens,
-      cacheCreation1hTokens,
-    },
+    usage: usageAcc.totals(),
     contextTokens: tail.context ? contextTotal(tail.context) : 0,
   };
 }
