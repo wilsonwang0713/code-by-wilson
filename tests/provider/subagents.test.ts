@@ -341,6 +341,26 @@ describe("buildSubagentForest", () => {
     expect(forest[0].tokens).toBe(15);
   });
 
+  it("drill tokens use the LAST usage snapshot of a repeated message id", () => {
+    // A subagent turn streamed as progressive snapshots: output grows [0, 0, 764]. The node's
+    // tokens must reflect the final billed row, not the first near-zero one.
+    const snap = (out: number) => ({
+      type: "assistant",
+      timestamp: "2026-06-04T03:00:00.000Z",
+      message: {
+        id: "m-grow",
+        model: SONNET,
+        usage: { input_tokens: 10, output_tokens: out },
+        content: [],
+      },
+    });
+    const forest = buildSubagentForest(main("tu-1", { is_error: false }), [
+      agent("a1", "tu-1", "Explore", [snap(0), snap(0), snap(764)]),
+    ]);
+    expect(forest).toHaveLength(1);
+    expect(forest[0].tokens).toBe(774); // 10 + 764, not 10 + 0
+  });
+
   it("leaves model unset for a subagent that reported no assistant model yet", () => {
     const forest = buildSubagentForest(main("tu-1"), [
       // a just-spawned agent: a row exists but carries no model.

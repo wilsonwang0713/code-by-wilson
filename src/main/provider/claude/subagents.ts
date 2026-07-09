@@ -2,8 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type { Family, Subagent } from "@shared/types";
 import { normalizeModelId } from "@shared/models";
-import { num, parseJsonlRows } from "./transcript-row";
+import { parseJsonlRows } from "./transcript-row";
 import { newestMtime } from "./dir-mtime";
+import { UsageAccumulator } from "./usage-accumulator";
 
 /** The `.meta.json` companion of a subagent transcript. */
 export interface SubagentMeta {
@@ -31,9 +32,9 @@ interface Scan {
   results: Map<string, boolean>;
   /** First raw model string seen on an assistant row, normalized later; undefined when none reported. */
   model: string | undefined;
-  /** Summed input + output tokens, counted once per assistant turn (keyed on message.id, since Claude
-   *  Code writes one turn across many rows that repeat the same usage). Cache excluded — the Cost panel
-   *  owns cache. */
+  /** Summed input + output tokens, counted at each turn's last usage snapshot (keyed on message.id,
+   *  since Claude Code writes one turn across many rows that repeat the same usage). Cache excluded —
+   *  the Cost panel owns cache. */
   tokens: number;
   /** Min / max parseable timestamp (ms); duration is their difference. */
   firstTs: number;
@@ -45,13 +46,12 @@ function scanRows(rows: any[]): Scan {
   const dispatchMsgOf = new Map<string, string>();
   const results = new Map<string, boolean>();
   let model: string | undefined;
-  let tokens = 0;
   let firstTs = Infinity;
   let lastTs = -Infinity;
-  // message ids whose usage is already counted: one assistant turn spans several rows that repeat the
-  // same id and usage, so counting per row would multiply the total (the summary parser dedups the same
-  // way; on real transcripts this is 2x–70x inflation).
-  const counted = new Set<string>();
+  // Usage deduped per message id, LAST row wins (see UsageAccumulator): one assistant turn spans
+  // several rows, and subagent transcripts stream progressive snapshots where only the final row
+  // carries the billed usage.
+  const acc = new UsageAccumulator();
   for (const row of rows) {
     const ts =
       typeof row?.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
@@ -64,11 +64,7 @@ function scanRows(rows: any[]): Scan {
       if (!model && typeof msg?.model === "string") model = msg.model;
       const u = msg?.usage;
       if (u && typeof u === "object") {
-        const id = typeof msg?.id === "string" ? msg.id : undefined;
-        if (!id || !counted.has(id)) {
-          if (id) counted.add(id);
-          tokens += num(u.input_tokens) + num(u.output_tokens);
-        }
+        acc.add(typeof msg?.id === "string" ? msg.id : null, u);
       }
     }
     const content = msg?.content;
@@ -83,7 +79,16 @@ function scanRows(rows: any[]): Scan {
       }
     }
   }
-  return { toolUseIds, dispatchMsgOf, results, model, tokens, firstTs, lastTs };
+  const totals = acc.totals();
+  return {
+    toolUseIds,
+    dispatchMsgOf,
+    results,
+    model,
+    tokens: totals.inputTokens + totals.outputTokens,
+    firstTs,
+    lastTs,
+  };
 }
 
 function cmp(a: string, b: string): number {
