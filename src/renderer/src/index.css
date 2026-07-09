@@ -417,10 +417,10 @@ body {
   animation: blink 1.1s step-end infinite;
 }
 
-/* hermes's working-session arc (styles.css:574-683): a masked 1.25px ring whose
-   ::before slides three faint comet arcs diagonally around the edge. Adapted for
-   code-by-wire: colors pinned to the dark-only theme (bright edge = --color-fg,
-   hermes's dark-mode choice; trail = the footer surface), and --arc-inset 0
+/* hermes's working-session arc (styles.css:574-683, reduced-motion rule at 698-702):
+   a masked 1.25px ring whose ::before slides three faint comet arcs diagonally around
+   the edge. Adapted for code-by-wire: colors pinned to the dark-only theme (bright edge
+   = --color-fg, hermes's dark-mode choice; trail = the footer surface), and --arc-inset 0
    instead of hermes's -0.125rem — the footer button sits flush against the
    window's bottom edge, so an outset ring would clip its bottom arc. */
 @keyframes arc-border {
