@@ -274,9 +274,14 @@ describe("scanStep (chunked incremental engine)", () => {
   });
 
   it("progressive usage snapshots converge to the final value at every chunk size", () => {
-    // A subagent-style turn written as three growing snapshots of one message id. Under
-    // first-entry-wins the stored row depended on WHERE the chunk boundary fell (nondeterministic
-    // output totals across restarts); last-entry-wins must land on the final snapshot always.
+    // Locks in chunk-boundary convergence for a progressively-streamed usage snapshot (output [0,0,764]
+    // under one message id). Two complementary layers keep the stored total deterministic regardless of
+    // where a chunk boundary falls:
+    //   - maxLines = 1_000_000: all three snapshots land in ONE extractTurns/UsageAccumulator call, so this
+    //     case exercises the last-entry-wins accumulator fix — under the old first-entry-wins rule it would
+    //     store outputTokens = 0. This is the load-bearing case; do NOT drop it.
+    //   - maxLines = 1 and 2: the snapshots split across separate extractTurns calls, so convergence here
+    //     comes from the ON CONFLICT(message_id) DO UPDATE upsert (a complementary, already-correct layer).
     const home = makeHome();
     const dir = join(home, "projects", "-p");
     mkdirSync(dir, { recursive: true });
@@ -305,8 +310,9 @@ describe("scanStep (chunked incremental engine)", () => {
     for (const maxLines of [1, 2, 1_000_000]) {
       const db = openTestDb();
       migrateAnalytics(db);
+      let guard = 0;
       while (!scanStep(db, home, maxLines).done) {
-        // drain the chunked scan
+        if (++guard > 10_000) throw new Error("scan did not converge");
       }
       const totals = readTotals(db);
       expect(totals.turns).toBe(1);
