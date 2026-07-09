@@ -90,4 +90,14 @@ describe("createCaffeinate", () => {
     expect(caff.set(true)).toBe(true); // starts a fresh one instead of trusting the stale id
     expect(blocker.started).toHaveLength(2);
   });
+
+  it("set(false) after external stop doesn't call stop again", () => {
+    const blocker = fakeBlocker();
+    const caff = createCaffeinate({ blocker });
+    caff.set(true);
+    blocker.stop(1); // the OS dropped it out from under us
+    expect(caff.set(false)).toBe(false);
+    expect(caff.isOn()).toBe(false);
+    expect(blocker.stopped).toEqual([1]); // stop was called only once
+  });
 });

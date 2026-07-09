@@ -1,7 +1,6 @@
 /** The footer's keep-awake toggle: holds one `prevent-app-suspension` power-save blocker while on
  *  (system idle-sleep is blocked; the display may still sleep). Deliberately not persisted — every
- *  launch starts off, and the OS releases the blocker when the process exits.
- *  Spec: docs/superpowers/specs/2026-07-09-caffeinate-design.md */
+ *  launch starts off, and the OS releases the blocker when the process exits. */
 export interface CaffeinateBlocker {
   start(type: "prevent-app-suspension"): number;
   stop(id: number): void;
