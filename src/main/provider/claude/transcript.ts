@@ -191,8 +191,7 @@ export function parseTranscript(
       // parts. A zero-usage turn like a '<synthetic>' placeholder leaves it untouched.
       const usage = row.message?.usage;
       if (usage && typeof usage === "object") {
-        const id =
-          typeof row.message?.id === "string" ? row.message.id : null;
+        const id = typeof row.message?.id === "string" ? row.message.id : null;
         usageAcc.add(id, usage);
       }
       // The waiting signal and current-context split come from the shared tail tracker, one derivation
