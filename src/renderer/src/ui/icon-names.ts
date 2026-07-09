@@ -20,6 +20,7 @@ export type IconName =
   | "circle-user"
   | "clock"
   | "code"
+  | "coffee"
   | "coins"
   | "copy"
   | "eye"
