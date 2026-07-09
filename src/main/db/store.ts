@@ -4,8 +4,11 @@ import type { IndexOverview } from "@shared/ipc";
 import { isResumable } from "@shared/resumable";
 import { transaction, type SqliteDb } from "./driver";
 
-/** Bump when the schema changes; `migrate` rebuilds the index (a disposable cache) to match. */
-const SCHEMA_VERSION = 8;
+/** Bump when the schema changes OR when summarize's math changes and cached rows must rebuild —
+ *  v9 forces the one-time re-summarize for the last-entry-wins usage dedup (usage_by_model rows
+ *  cached under first-entry-wins undercounted subagent output). `migrate` rebuilds the index (a
+ *  disposable cache) to match. */
+const SCHEMA_VERSION = 9;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
