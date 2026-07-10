@@ -524,33 +524,48 @@ body {
   display: none; /* Chromium / Electron */
 }
 
-/* The VSCode-style overlay scrollbar thumb (OverlayScroll.tsx). Absolutely positioned over the list, so it
-   reserves no width; size/position are written imperatively by the component. Slider colours are VSCode's
-   dark-theme defaults (scrollbarSlider.background / hover / active). Fade is asymmetric — 100ms in, 800ms
-   out — gated by the data-visible attribute, mirroring VSCode's reveal-on-scroll/hover, fade-on-idle. */
-.overlay-scroll-thumb {
+/* The VSCode-style overlay scrollbar thumbs (OverlayScroll.tsx; the vertical one is also attached
+   imperatively by terminal/overlay-scrollbar.ts). Absolutely positioned over the list, so they reserve
+   no space; size/position are written imperatively by the component. Slider colours are VSCode's
+   dark-theme defaults (scrollbarSlider.background / hover / active). Fade is asymmetric — 100ms in,
+   800ms out — gated by the data-visible attribute, mirroring VSCode's reveal-on-scroll/hover,
+   fade-on-idle. The 10px thickness is mirrored by BAR_SIZE in OverlayScroll.tsx (corner reservation). */
+.overlay-scroll-thumb,
+.overlay-scroll-thumb-x {
   position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 20; /* above the sticky group headers (z-10) so the thumb floats over them, not behind */
-  width: 10px;
-  height: 0;
-  transform: translateY(0);
+  z-index: 20; /* above the sticky group headers (z-10) so the thumbs float over them, not behind */
   background: rgba(121, 121, 121, 0.4);
   opacity: 0;
   pointer-events: none;
   transition: opacity 800ms linear;
   will-change: transform, opacity;
 }
-.overlay-scroll-thumb[data-visible="true"] {
+.overlay-scroll-thumb {
+  right: 0;
+  top: 0;
+  width: 10px;
+  height: 0;
+  transform: translateY(0);
+}
+.overlay-scroll-thumb-x {
+  left: 0;
+  bottom: 0;
+  height: 10px;
+  width: 0;
+  transform: translateX(0);
+}
+.overlay-scroll-thumb[data-visible="true"],
+.overlay-scroll-thumb-x[data-visible="true"] {
   opacity: 1;
   pointer-events: auto;
   transition: opacity 100ms linear;
 }
-.overlay-scroll-thumb:hover {
+.overlay-scroll-thumb:hover,
+.overlay-scroll-thumb-x:hover {
   background: rgba(100, 100, 100, 0.7);
 }
-.overlay-scroll-thumb[data-active="true"] {
+.overlay-scroll-thumb[data-active="true"],
+.overlay-scroll-thumb-x[data-active="true"] {
   background: rgba(191, 191, 191, 0.4);
 }
 
