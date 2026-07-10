@@ -15,7 +15,7 @@ import type { TerminalApi } from "./terminal";
 import type { ShellTerminalApi } from "./shell-terminal";
 import type { MetricsRead } from "./metrics";
 import type { ModelDefaults } from "./models";
-import type { StatsSnapshot, StatsRange } from "./stats";
+import type { StatsSnapshot, StatsRange, ScanProgress } from "./stats";
 import type { CliStatus } from "./cli-status";
 import type { UpdateState } from "./update";
 import type { StatuslineStatus } from "./statusline-status";
@@ -33,6 +33,8 @@ export const IPC = {
   fullscreen: "window:fullscreen",
   modelDefaults: "model:defaults",
   readStats: "stats:read",
+  pumpStats: "stats:pump",
+  statsDbInfo: "stats:dbinfo",
   recheckCli: "cli:recheck",
   setClaudeBinPath: "cli:setBinPath",
   resetAnalytics: "analytics:reset",
@@ -102,6 +104,17 @@ export type StatsRead =
   | { status: "changed"; token: string; snapshot: StatsSnapshot }
   | { status: "unchanged"; token: string };
 
+/** What the Settings "Stats database" card renders: where the durable analytics store lives, its size
+ *  on disk, and what it holds. `oldestTs` is the earliest ingested turn (epoch ms), null when the
+ *  store is empty — the History row's "no history yet" case. */
+export interface StatsDbInfo {
+  path: string;
+  sizeBytes: number;
+  turns: number;
+  sessions: number;
+  oldestTs: number | null;
+}
+
 /** A target for the header's "Open in" dropdown. The renderer sends one of these plus the session id;
  *  the main process resolves the folder and opens it. */
 export type OpenInTarget = "vscode" | "finder";
@@ -158,6 +171,15 @@ export interface IpcApi {
     calendarYear?: number,
     since?: string,
   ): Promise<StatsRead>;
+  /** Run one bounded, incremental analytics scan step and return how far the backfill has gotten —
+   *  the background pump's poll (spec 2026-07-10). No aggregates are computed, so a caught-up tick
+   *  costs one readdir+stat walk. Polled for the app's lifetime by useStatsPump; never rejects (a
+   *  scan failure or missing store serves a done progress, parking the pump at its idle cadence). */
+  pumpStats(): Promise<ScanProgress>;
+  /** The Settings "Stats database" card's readout, assembled in main so the renderer gets one shape.
+   *  Polled at the warm cadence while the card is mounted. Resolves null when no store is wired or
+   *  the read fails; never rejects. */
+  statsDbInfo(): Promise<StatsDbInfo | null>;
   /** Force a fresh CLI status check (the footer's Re-check button). */
   recheckCli(): Promise<CliStatus>;
   /** Persist an absolute binary-path override (null clears it) and re-check. */

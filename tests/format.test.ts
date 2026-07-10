@@ -10,6 +10,7 @@ import {
   formatClock,
   formatMonthShort,
   formatUsd,
+  formatBytes,
 } from "@shared/format";
 
 describe("formatRelativeTime", () => {
@@ -144,5 +145,20 @@ describe("formatUsd", () => {
     expect(formatUsd(0)).toBe("$0.00");
     expect(formatUsd(-3)).toBe("$0.00");
     expect(formatUsd(Number.NaN)).toBe("$0.00");
+  });
+});
+
+describe("formatBytes", () => {
+  it("renders bytes under 1 kB as-is", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(482)).toBe("482 B");
+  });
+
+  it("tapers precision across decimal units", () => {
+    expect(formatBytes(7_400)).toBe("7.4 kB");
+    expect(formatBytes(74_000)).toBe("74 kB");
+    expect(formatBytes(7_471_104)).toBe("7.5 MB");
+    expect(formatBytes(1_200_000_000)).toBe("1.2 GB");
+    expect(formatBytes(2_500_000_000_000)).toBe("2.5 TB");
   });
 });

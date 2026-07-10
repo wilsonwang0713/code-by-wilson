@@ -16,6 +16,8 @@ const api: AppApi = {
   modelDefaults: () => ipcRenderer.invoke(IPC.modelDefaults),
   readStats: (range, calendarYear, since) =>
     ipcRenderer.invoke(IPC.readStats, range, calendarYear, since),
+  pumpStats: () => ipcRenderer.invoke(IPC.pumpStats),
+  statsDbInfo: () => ipcRenderer.invoke(IPC.statsDbInfo),
   recheckCli: () => ipcRenderer.invoke(IPC.recheckCli),
   setClaudeBinPath: (path) => ipcRenderer.invoke(IPC.setClaudeBinPath, path),
   resetAnalytics: () => ipcRenderer.invoke(IPC.resetAnalytics),
