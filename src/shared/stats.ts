@@ -68,17 +68,14 @@ export function emptyRecords(): StatsRecords {
 /**
  * One row of the per-model breakdown (#111), keyed on the raw model id exactly as the transcript recorded
  * it (e.g. "claude-opus-4-8"), so one model version is distinct from the next. `totalTokens` sums all four
- * token kinds; `inputTokens + outputTokens` is the fresh subset. The donut and the table's Tokens column
- * both follow the page-level "Include cache" toggle (StatsView's `tokensOf`): on by default they read
- * `totalTokens`, so a cache-heavy model can dominate the donut; off they read the fresh subset, which keeps
- * cache-read volume from swamping the chart. A null `modelRaw` is a turn that recorded no model; it renders
- * as "Unknown".
+ * token kinds — the figure the By-model list ranks and percentages by. A null `modelRaw` is a turn that
+ * recorded no model; it renders as "Unknown".
  */
 export interface StatsByModel {
   modelRaw: string | null;
   totalTokens: number;
-  /** Input and output tokens (cache excluded): the fresh metric the donut and Tokens column show when the
-   *  page's "Include cache" toggle is off, kept apart from totalTokens. Mirrors StatsByProject/StatsByBranch. */
+  /** Input and output tokens (cache excluded): the fresh subset the By-model list's dimmed In/Out line
+   *  shows alongside the total. */
   inputTokens: number;
   outputTokens: number;
 }
@@ -95,10 +92,6 @@ export interface StatsByProject {
   /** The basename of `cwd` — the display label. */
   project: string;
   totalTokens: number;
-  /** Input and output tokens (cache excluded), mirroring StatsByModel, so the renderer can show the fresh
-   *  metric (input + output) when the page cache toggle is off. */
-  inputTokens: number;
-  outputTokens: number;
 }
 
 /**
@@ -113,10 +106,6 @@ export interface StatsByBranch {
   /** The git branch, or null when the turn recorded none. */
   branch: string | null;
   totalTokens: number;
-  /** Input and output tokens (cache excluded), mirroring StatsByModel, so the renderer can show the fresh
-   *  metric (input + output) when the page cache toggle is off. */
-  inputTokens: number;
-  outputTokens: number;
 }
 
 /**
@@ -127,8 +116,7 @@ export interface StatsByBranch {
  * turn's timestamp (the default sort key). `durationMs` is the span from the session's earliest to latest
  * KNOWN-time turn (unknown-time `ts=0` turns are excluded from the earliest bound, so an unparsed timestamp
  * can't stretch it back to the epoch); it's 0 when no turn has a known time, or for a single-turn session.
- * `totalTokens`/`inputTokens`/`outputTokens` follow the same fresh-vs-total split as the other rows so the
- * page cache toggle works here too.
+ * `totalTokens` sums all four token kinds — the table's Tokens column.
  */
 export interface StatsBySession {
   sessionId: string;
@@ -143,8 +131,6 @@ export interface StatsBySession {
   /** Assistant turns ingested for this session. */
   turns: number;
   totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
   /** Human-readable session name from the index (derived title or a user rename), merged in at the IPC
    *  handler. Null when the index has no row for this session (reaped / predates the index — the renderer
    *  then falls back to the project basename). */
@@ -174,20 +160,6 @@ export function withSessionTitles(
       null;
     return title === r.title ? r : { ...r, title };
   });
-}
-
-/**
- * The token figure shown for one breakdown row, governed by the page's "Include cache" pill: the full total
- * (all four kinds) when cache is included, or fresh tokens (input + output) when it's off. Read off the
- * { totalTokens, inputTokens, outputTokens } shape every breakdown row carries, so By model / By project /
- * By branch / By session — and the session table's SORT — share one definition and can't drift on what
- * "Tokens" means versus the number on screen.
- */
-export function tokensOf(
-  row: { totalTokens: number; inputTokens: number; outputTokens: number },
-  includeCache: boolean,
-): number {
-  return includeCache ? row.totalTokens : row.inputTokens + row.outputTokens;
 }
 
 /**
@@ -417,18 +389,13 @@ export interface DailyBucket {
 }
 
 /**
- * One local calendar day of the contributions calendar (#115), carrying the toggle metrics so the cell
- * intensity can switch between them with no re-fetch. `turns` is the day's assistant-turn count.
- * `totalTokens` sums all four token kinds; `inputTokens`/`outputTokens` ride along so the page's "Include
- * cache" pill can pick the Tokens metric via the shared `tokensOf` (all four kinds on, fresh input+output
- * off), exactly like the per-model/-project/-branch/-session rows.
+ * One local calendar day of the contributions calendar (#115). `turns` is the day's assistant-turn count;
+ * `totalTokens` sums all four token kinds — the heatmap's cell-intensity metric.
  */
 export interface CalendarDay {
   day: string;
   turns: number;
   totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
 }
 
 /** A zero-usage day bucket: the gap-fill the renderer inserts for a calendar day with no turns, and the

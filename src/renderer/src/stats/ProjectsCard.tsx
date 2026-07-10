@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { type StatsByProject, tokensOf } from "@shared/stats";
+import { type StatsByProject } from "@shared/stats";
 import { formatTokensShort } from "@shared/format";
 import { Swatch } from "../ui/atoms";
 import { StatsCard, CardRegion } from "./shared";
@@ -116,27 +116,17 @@ function Breakdown({
 
 /** The per-project breakdown (#112) — a full-width card that reveals PROJECT_BATCH rows at a time. Keyed
  *  on the full cwd so two repos that share a basename stay separate (the cwd rides along as the row's
- *  hover title). Ranks by the displayed Tokens metric, so order follows the page's Include-cache toggle. */
-export function ProjectsCard({
-  rows,
-  includeCache,
-}: {
-  rows: StatsByProject[];
-  includeCache: boolean;
-}) {
+ *  hover title). Ranks by total tokens, the displayed Tokens metric. */
+export function ProjectsCard({ rows }: { rows: StatsByProject[] }) {
   if (!rows.some((r) => r.totalTokens > 0)) return null;
   const ranked: BreakdownRow[] = rows
     .slice()
-    .sort(
-      (a, b) =>
-        tokensOf(b, includeCache) - tokensOf(a, includeCache) ||
-        a.cwd.localeCompare(b.cwd),
-    )
+    .sort((a, b) => b.totalTokens - a.totalTokens || a.cwd.localeCompare(b.cwd))
     .map((r) => ({
       key: r.cwd,
       label: r.project,
       title: r.cwd,
-      tokens: tokensOf(r, includeCache),
+      tokens: r.totalTokens,
       color: "var(--color-data-1)",
     }));
   return (

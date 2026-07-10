@@ -420,10 +420,10 @@ export function hasAnyTurns(db: SqliteDb): boolean {
 
 /**
  * The per-model breakdown (#111): one row per raw model id, scoped to the same range bound the totals use.
- * `totalTokens` sums all four kinds (the table's Tokens column); `inputTokens`/`outputTokens` ride along so
- * the donut can size on fresh tokens alone, since cache-read volume would otherwise swamp it. Rows order by
- * total tokens descending, then by raw id so ties stay stable across polls (SQLite's GROUP BY order is
- * otherwise unspecified, which would flicker the donut colors).
+ * `totalTokens` sums all four kinds (the By-model list's ranking figure); `inputTokens`/`outputTokens` ride
+ * along for the list's dimmed In/Out line. Rows order by total tokens descending, then by raw id so ties
+ * stay stable across polls (SQLite's GROUP BY order is otherwise unspecified, which would flicker the
+ * list's order and the chart's stacking).
  */
 export function readByModel(
   db: SqliteDb,
@@ -522,14 +522,12 @@ function groupByDimsAndModel(
     .all(...bind) as DimModelRow[];
 }
 
-/** A dimension group mid-fold: tokens summed across its models. */
+/** A dimension group mid-fold: total tokens summed across its models. */
 interface DimAgg {
   cwd: string;
   project: string;
   branch: string | null;
   totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
 }
 
 /**
@@ -550,8 +548,6 @@ function foldByDim(
         project: r.project,
         branch: r.branch ?? null,
         totalTokens: 0,
-        inputTokens: 0,
-        outputTokens: 0,
       };
       map.set(key, a);
     }
@@ -560,8 +556,6 @@ function foldByDim(
       r.output_tokens +
       r.cache_read_tokens +
       r.cache_creation_tokens;
-    a.inputTokens += r.input_tokens;
-    a.outputTokens += r.output_tokens;
   }
   return [...map.values()];
 }
@@ -584,8 +578,6 @@ function foldProjects(rows: DimModelRow[]): StatsByProject[] {
         cwd: a.cwd,
         project: a.project,
         totalTokens: a.totalTokens,
-        inputTokens: a.inputTokens,
-        outputTokens: a.outputTokens,
       }),
     )
     .sort(
@@ -608,8 +600,6 @@ function foldBranches(rows: DimModelRow[]): StatsByBranch[] {
         project: a.project,
         branch: a.branch,
         totalTokens: a.totalTokens,
-        inputTokens: a.inputTokens,
-        outputTokens: a.outputTokens,
       }),
     )
     .sort(
@@ -690,8 +680,6 @@ interface SessionAgg {
   lastActivityMs: number;
   turns: number;
   totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
   topModel: string | null;
   topModelTokens: number;
 }
@@ -717,8 +705,6 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
         lastActivityMs: 0,
         turns: 0,
         totalTokens: 0,
-        inputTokens: 0,
-        outputTokens: 0,
         topModel: null,
         topModelTokens: -1,
       };
@@ -736,8 +722,6 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
       r.cache_read_tokens +
       r.cache_creation_tokens;
     a.totalTokens += groupTokens;
-    a.inputTokens += r.input_tokens;
-    a.outputTokens += r.output_tokens;
     // Dominant model by tokens; on an exact token tie pick the lexicographically smaller raw id so the
     // choice is stable. A null model (the "Unknown" bucket) compares as the empty string, so on a tie it
     // wins over a named model — an extreme edge case (equal tokens, one named one not), deterministic.
@@ -761,8 +745,6 @@ function foldSessions(rows: SessionModelRow[]): StatsBySession[] {
         durationMs: a.earliestMs == null ? 0 : a.lastActivityMs - a.earliestMs,
         turns: a.turns,
         totalTokens: a.totalTokens,
-        inputTokens: a.inputTokens,
-        outputTokens: a.outputTokens,
         title: null,
       }),
     )
@@ -1001,14 +983,11 @@ export function readDaily(
   return foldDays(groupByDayAndModel(db, win));
 }
 
-/** A calendar day mid-fold: turns and tokens summed across the day's models (total plus the fresh input/
- *  output subset, so the renderer can honor the page's "Include cache" pill via tokensOf). */
+/** A calendar day mid-fold: turns and total tokens summed across the day's models. */
 interface CalAgg {
   day: string;
   turns: number;
   totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
 }
 
 /**
@@ -1024,8 +1003,6 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
         day: r.day,
         turns: 0,
         totalTokens: 0,
-        inputTokens: 0,
-        outputTokens: 0,
       };
       map.set(r.day, a);
     }
@@ -1035,8 +1012,6 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
       r.output_tokens +
       r.cache_read_tokens +
       r.cache_creation_tokens;
-    a.inputTokens += r.input_tokens;
-    a.outputTokens += r.output_tokens;
   }
   return [...map.values()]
     .map(
@@ -1044,8 +1019,6 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
         day: a.day,
         turns: a.turns,
         totalTokens: a.totalTokens,
-        inputTokens: a.inputTokens,
-        outputTokens: a.outputTokens,
       }),
     )
     .sort((a, b) => a.day.localeCompare(b.day));
@@ -1053,9 +1026,9 @@ function foldCalendar(rows: DayModelRow[]): CalendarDay[] {
 
 /**
  * The contributions calendar's per-day metrics (#115) over a bounded window [win.sinceMs, win.untilMs): one
- * row per local calendar day with activity, each carrying turns and token counts — the metrics the
- * cell-intensity toggle switches between. Sparse (only days with turns); the renderer densifies the grid.
- * Reuses the daily (day × model) scan, folded for the calendar's metrics rather than the by-kind split.
+ * row per local calendar day with activity, each carrying the day's turns and total tokens (the heatmap's
+ * cell-intensity metric). Sparse (only days with turns); the renderer densifies the grid. Reuses the daily
+ * (day × model) scan, folded for the calendar's metrics rather than the by-kind split.
  */
 export function readCalendar(
   db: SqliteDb,

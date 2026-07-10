@@ -856,7 +856,7 @@ describe("readByProject", () => {
     expect(readByProject(db)).toEqual([]);
   });
 
-  it("sums input and output tokens per project apart from the total (fresh-vs-total split)", () => {
+  it("sums all four token kinds into the total", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -886,13 +886,11 @@ describe("readByProject", () => {
       }),
     ]);
     const rows = readByProject(db);
-    expect(rows).toHaveLength(1);
-    // total sums all four kinds: (100+20+1000+5) + (200+30+2000+10) = 3365.
-    expect(rows[0].totalTokens).toBe(3365);
-    // input/output ride along apart from the total so the renderer can show fresh (input+output) when the
-    // cache toggle is off: 300 input + 50 output = 350 fresh, far below the 3365 total.
-    expect(rows[0].inputTokens).toBe(300);
-    expect(rows[0].outputTokens).toBe(50);
+    // total sums all four kinds: (100+20+1000+5) + (200+30+2000+10) = 3365. Exact-shape toEqual: the row
+    // carries ONLY the total — the fresh input/output subset left with the Include-cache toggle.
+    expect(rows).toEqual([
+      { cwd: "/w/proj", project: "proj", totalTokens: 3365 },
+    ]);
   });
 });
 
@@ -1032,7 +1030,7 @@ describe("readByBranch", () => {
     expect(readByBranch(db)).toEqual([]);
   });
 
-  it("sums input and output tokens per branch apart from the total (fresh-vs-total split)", () => {
+  it("sums all four token kinds into the total", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -1063,10 +1061,9 @@ describe("readByBranch", () => {
       }),
     ]);
     const rows = readByBranch(db);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].totalTokens).toBe(3365);
-    expect(rows[0].inputTokens).toBe(300);
-    expect(rows[0].outputTokens).toBe(50);
+    expect(rows).toEqual([
+      { cwd: "/w/proj", project: "proj", branch: "main", totalTokens: 3365 },
+    ]);
   });
 });
 
@@ -1653,15 +1650,12 @@ describe("readCalendar", () => {
       }),
     ]);
     const cal = readCalendar(db, { sinceMs: since, untilMs: until });
-    expect(cal).toHaveLength(1);
-    expect(cal[0].day).toBe("2026-06-14");
-    expect(cal[0].turns).toBe(2);
-    expect(cal[0].totalTokens).toBe(2_000_000);
-    expect(cal[0].inputTokens).toBe(1_000_000);
-    expect(cal[0].outputTokens).toBe(1_000_000);
+    expect(cal).toEqual([
+      { day: "2026-06-14", turns: 2, totalTokens: 2_000_000 },
+    ]);
   });
 
-  it("carries the fresh input/output subset apart from the total, so the cache toggle can pick either", () => {
+  it("counts cache reads and creations in the day's total", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertTurns(db, [
@@ -1678,9 +1672,7 @@ describe("readCalendar", () => {
       }),
     ]);
     const cal = readCalendar(db, { sinceMs: since, untilMs: until });
-    expect(cal[0].totalTokens).toBe(1515); // all four kinds (cache included)
-    expect(cal[0].inputTokens).toBe(10);
-    expect(cal[0].outputTokens).toBe(5); // fresh subset = 15, far below the total
+    expect(cal).toEqual([{ day: "2026-06-14", turns: 1, totalTokens: 1515 }]);
   });
 
   it("still counts tokens on a day whose only model is unrecognized", () => {

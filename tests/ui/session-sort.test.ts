@@ -15,8 +15,6 @@ const row = (over: Partial<StatsBySession> = {}): StatsBySession => ({
   durationMs: 0,
   turns: 0,
   totalTokens: 0,
-  inputTokens: 0,
-  outputTokens: 0,
   title: null,
   ...over,
 });
@@ -29,7 +27,7 @@ describe("sortSessions", () => {
       row({ sessionId: "new", lastActivityMs: 9000 }),
     ];
     expect(
-      sortSessions(rows, DEFAULT_SESSION_SORT, true).map((r) => r.sessionId),
+      sortSessions(rows, DEFAULT_SESSION_SORT).map((r) => r.sessionId),
     ).toEqual(["new", "old"]);
   });
 
@@ -39,7 +37,7 @@ describe("sortSessions", () => {
       row({ sessionId: "b", lastActivityMs: 2 }),
     ];
     const before = rows.map((r) => r.sessionId);
-    sortSessions(rows, { key: "lastActivity", dir: "asc" }, true);
+    sortSessions(rows, { key: "lastActivity", dir: "asc" });
     expect(rows.map((r) => r.sessionId)).toEqual(before);
   });
 
@@ -50,45 +48,29 @@ describe("sortSessions", () => {
       row({ sessionId: "c", durationMs: 200 }),
     ];
     expect(
-      sortSessions(rows, { key: "duration", dir: "desc" }, true).map(
+      sortSessions(rows, { key: "duration", dir: "desc" }).map(
         (r) => r.sessionId,
       ),
     ).toEqual(["b", "c", "a"]);
     expect(
-      sortSessions(rows, { key: "duration", dir: "asc" }, true).map(
+      sortSessions(rows, { key: "duration", dir: "asc" }).map(
         (r) => r.sessionId,
       ),
     ).toEqual(["a", "c", "b"]);
   });
 
-  it("sorts the tokens column by the cache toggle, matching the visible figure", () => {
-    // 'fresh' has more fresh tokens; 'cachey' has more total once cache is counted.
+  it("sorts the tokens column by totalTokens, matching the visible figure", () => {
+    // Ids chosen so the sessionId tie-break (ascending) would give the OPPOSITE order: the test
+    // fails unless totalTokens actually drives the comparison.
     const rows = [
-      row({
-        sessionId: "fresh",
-        inputTokens: 500,
-        outputTokens: 0,
-        totalTokens: 500,
-      }),
-      row({
-        sessionId: "cachey",
-        inputTokens: 100,
-        outputTokens: 0,
-        totalTokens: 9000,
-      }),
+      row({ sessionId: "a", totalTokens: 500 }),
+      row({ sessionId: "z", totalTokens: 9000 }),
     ];
-    // Include cache → cachey (9000) tops.
     expect(
-      sortSessions(rows, { key: "tokens", dir: "desc" }, true).map(
+      sortSessions(rows, { key: "tokens", dir: "desc" }).map(
         (r) => r.sessionId,
       ),
-    ).toEqual(["cachey", "fresh"]);
-    // Exclude cache → fresh (500) tops over cachey (100).
-    expect(
-      sortSessions(rows, { key: "tokens", dir: "desc" }, false).map(
-        (r) => r.sessionId,
-      ),
-    ).toEqual(["fresh", "cachey"]);
+    ).toEqual(["z", "a"]);
   });
 
   it("breaks ties by session id, stable across a direction flip", () => {
@@ -98,12 +80,12 @@ describe("sortSessions", () => {
     ];
     // Equal keys → session id ascending in both directions (a before b).
     expect(
-      sortSessions(rows, { key: "lastActivity", dir: "desc" }, true).map(
+      sortSessions(rows, { key: "lastActivity", dir: "desc" }).map(
         (r) => r.sessionId,
       ),
     ).toEqual(["a", "b"]);
     expect(
-      sortSessions(rows, { key: "lastActivity", dir: "asc" }, true).map(
+      sortSessions(rows, { key: "lastActivity", dir: "asc" }).map(
         (r) => r.sessionId,
       ),
     ).toEqual(["a", "b"]);
@@ -115,9 +97,7 @@ describe("sortSessions", () => {
       row({ sessionId: "2", modelRaw: "claude-opus-4-8" }),
     ];
     expect(
-      sortSessions(rows, { key: "model", dir: "asc" }, true).map(
-        (r) => r.modelRaw,
-      ),
+      sortSessions(rows, { key: "model", dir: "asc" }).map((r) => r.modelRaw),
     ).toEqual(["claude-opus-4-8", "claude-sonnet-4-6"]);
   });
 
@@ -128,9 +108,7 @@ describe("sortSessions", () => {
       row({ sessionId: "c", turns: 12 }),
     ];
     expect(
-      sortSessions(rows, { key: "turns", dir: "desc" }, true).map(
-        (r) => r.sessionId,
-      ),
+      sortSessions(rows, { key: "turns", dir: "desc" }).map((r) => r.sessionId),
     ).toEqual(["b", "c", "a"]);
   });
 
@@ -140,7 +118,7 @@ describe("sortSessions", () => {
       row({ sessionId: "2", title: null, project: "apple" }), // falls back to project
     ];
     expect(
-      sortSessions(rows, { key: "session", dir: "asc" }, true).map(
+      sortSessions(rows, { key: "session", dir: "asc" }).map(
         (r) => r.sessionId,
       ),
     ).toEqual(["2", "1"]); // "apple" < "Zebra task"

@@ -3,7 +3,6 @@ import {
   type DailyBucket,
   type StatsByModel,
   type StatsRange,
-  tokensOf,
   rangeWindow,
   localDayKey,
   densifyDays,
@@ -27,20 +26,16 @@ const modelKey = (raw: string | null): string => raw ?? NULL_MODEL_KEY;
  * Card 2 (#spec 2026-07-03): the daily time-series with the per-model breakdown merged into the same
  * "Tokens per day" region below it. The chart is ALWAYS stacked by model (the Kind/Model toggle and
  * by-kind stacking are retired); it carries no separate legend — the breakdown list's swatches are the
- * color key. Per-day model buckets carry only full totals, so the chart deliberately ignores the
- * Include-cache pill (as the old by-model mode did); the breakdown list re-ranks and re-percentages
- * under the pill via tokensOf.
+ * color key. Chart and list both work in full totals (all four token kinds).
  */
 export function ModelsCard({
   daily,
   byModel,
   range,
-  includeCache,
 }: {
   daily: DailyBucket[];
   byModel: StatsByModel[];
   range: StatsRange;
-  includeCache: boolean;
 }) {
   const hasChart = daily.length > 0;
   const hasList = byModel.some((r) => r.totalTokens > 0);
@@ -51,13 +46,7 @@ export function ModelsCard({
         {hasChart && (
           <TokensPerDay daily={daily} byModel={byModel} range={range} />
         )}
-        {hasList && (
-          <ByModelList
-            rows={byModel}
-            includeCache={includeCache}
-            spaced={hasChart}
-          />
-        )}
+        {hasList && <ByModelList rows={byModel} spaced={hasChart} />}
       </CardRegion>
     </StatsCard>
   );
@@ -164,26 +153,24 @@ function TokensPerDay({
 
 /**
  * The per-model breakdown (#111, redesigned): a two-column list — swatch, mono raw id, share % of the
- * window's tokens, and a dimmed In/Out line of always-fresh figures. It sits directly under the daily
- * chart in the same "Tokens per day" region, so its swatches double as the chart's color key (there is
- * no separate legend). Share % and order follow the page's Include-cache pill via tokensOf; every model
- * is listed (the model set is small, no cap needed). `spaced` adds top margin when it follows the chart.
+ * window's total tokens, and a dimmed In/Out line of fresh input/output figures. It sits directly under
+ * the daily chart in the same "Tokens per day" region, so its swatches double as the chart's color key
+ * (there is no separate legend). Every model is listed (the model set is small, no cap needed). `spaced`
+ * adds top margin when it follows the chart.
  */
 function ByModelList({
   rows,
-  includeCache,
   spaced,
 }: {
   rows: StatsByModel[];
-  includeCache: boolean;
   spaced: boolean;
 }) {
-  const total = rows.reduce((s, r) => s + tokensOf(r, includeCache), 0);
+  const total = rows.reduce((s, r) => s + r.totalTokens, 0);
   const ranked = rows
-    .map((r) => ({ ...r, tokens: tokensOf(r, includeCache) }))
+    .slice()
     .sort(
       (a, b) =>
-        b.tokens - a.tokens ||
+        b.totalTokens - a.totalTokens ||
         (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
     );
   return (
@@ -199,7 +186,9 @@ function ByModelList({
               {r.modelRaw ?? "Unknown"}
             </span>
             <span className="font-mono text-meta tabular-nums text-fg-faint">
-              {total > 0 ? `${((r.tokens / total) * 100).toFixed(1)}%` : "—"}
+              {total > 0
+                ? `${((r.totalTokens / total) * 100).toFixed(1)}%`
+                : "—"}
             </span>
           </div>
           <div className="mt-0.5 pl-4 font-mono text-meta tabular-nums text-fg-faint">

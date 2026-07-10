@@ -10,7 +10,7 @@ import {
 } from "@shared/stats";
 import { formatDayShort } from "@shared/format";
 import { Icon } from "../ui/icons";
-import { RangeFilter, CacheToggle } from "./shared";
+import { RangeFilter } from "./shared";
 import { OverviewCard } from "./OverviewCard";
 import { ModelsCard } from "./ModelsCard";
 import { ProjectsCard } from "./ProjectsCard";
@@ -23,7 +23,7 @@ const WARM_POLL_MS = 1500;
 
 /**
  * The Overall Stats view: a shell around four cards (Overview, Models, Projects, Sessions), plus the
- * header's range/cache controls and a "building history" progress banner on a first cold run. Polls
+ * header's range controls and a "building history" progress banner on a first cold run. Polls
  * stats:read while mounted — each poll runs one bounded scan step in the main process — fast until the
  * backfill is done, then at the warm cadence so turns from other Sessions appear on their own. The effect's
  * cleanup stops the poll on unmount, so selecting any Session ends all scan work; the main process does
@@ -32,7 +32,6 @@ const WARM_POLL_MS = 1500;
 export function StatsView() {
   const [snap, setSnap] = useState<StatsSnapshot | null>(null);
   const [range, setRange] = useState<StatsRange>(DEFAULT_RANGE);
-  const [includeCache, setIncludeCache] = useState(true);
   // The calendar's window selector: null = trailing twelve months, a number = that local year. Independent
   // of `range` — it drives only the calendar query, not the page totals.
   const [calendarYear, setCalendarYear] = useState<number | null>(null);
@@ -126,7 +125,6 @@ export function StatsView() {
               </span>
             </button>
           )}
-          <CacheToggle on={includeCache} onChange={setIncludeCache} />
           <RangeFilter value={range} onChange={setRange} />
         </div>
         {/* null = first poll in flight: blank below the header (matches EmptyDetail's loading). */}
@@ -149,7 +147,6 @@ export function StatsView() {
                   totals={snap.totals}
                   records={snap.records}
                   byModel={snap.byModel}
-                  includeCache={includeCache}
                   calendar={snap.calendar}
                   calendarStart={snap.calendarStart}
                   calendarEnd={snap.calendarEnd}
@@ -163,16 +160,9 @@ export function StatsView() {
                   daily={snap.daily}
                   byModel={snap.byModel}
                   range={range}
-                  includeCache={includeCache}
                 />
-                <ProjectsCard
-                  rows={snap.byProject}
-                  includeCache={includeCache}
-                />
-                <SessionsCard
-                  rows={snap.bySession}
-                  includeCache={includeCache}
-                />
+                <ProjectsCard rows={snap.byProject} />
+                <SessionsCard rows={snap.bySession} />
               </>
             )}
           </>
