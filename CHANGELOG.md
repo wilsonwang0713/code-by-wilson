@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-07-10
+
+### Added
+
+- A background analytics scan pump ingests new Claude Code sessions
+  continuously for the app's lifetime, so stats stay accurate even if
+  Claude Code's automatic session cleanup deletes old transcripts before the
+  Stats view is opened.
+- A **Stats database** card in Settings shows the analytics database's
+  location, size, and session history, and now hosts the **Reset** action
+  (moved out of the Stats header); resetting wakes the background pump so
+  it immediately resumes scanning.
+
 ## [0.1.25] - 2026-07-09
 
 ### Added
@@ -616,7 +629,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.25...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.26...HEAD
+[0.1.26]: https://github.com/luojiahai/code-by-wire/compare/v0.1.25...v0.1.26
 [0.1.25]: https://github.com/luojiahai/code-by-wire/compare/v0.1.24...v0.1.25
 [0.1.24]: https://github.com/luojiahai/code-by-wire/compare/v0.1.23...v0.1.24
 [0.1.23]: https://github.com/luojiahai/code-by-wire/compare/v0.1.22...v0.1.23
