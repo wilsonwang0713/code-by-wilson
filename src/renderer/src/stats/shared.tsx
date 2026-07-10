@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { type StatsRange, type RangePreset } from "@shared/stats";
-import { Icon } from "../ui/icons";
 
 /** The merged-card shell (#spec 2026-07-03 Visual language): one border, ink-925 surface — the
  *  page-primitives Card treatment without its mandatory title strip. Deliberately NOT overflow-clipped:
@@ -119,36 +118,5 @@ export function RangeFilter({
         </button>
       ))}
     </div>
-  );
-}
-
-/** The page-level "Include cache" checkbox: toggles whether cache-read/cache-creation tokens count
- *  toward the token figures shown across the page's cards. */
-export function CacheToggle({
-  on,
-  onChange,
-}: {
-  on: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      aria-pressed={on}
-      title="Count cache-read and cache-creation tokens in the token figures"
-      className="flex items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-meta text-fg-muted transition-colors hover:border-ink-700"
-    >
-      <span
-        className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border transition-colors ${
-          on
-            ? "border-primary bg-primary text-ink-950"
-            : "border-ink-700 text-transparent"
-        }`}
-      >
-        <Icon name="check" size={10} />
-      </span>
-      Include cache
-    </button>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { type StatsBySession, tokensOf } from "@shared/stats";
+import { type StatsBySession } from "@shared/stats";
 import {
   formatTokensShort,
   formatDuration,
@@ -74,15 +74,9 @@ function SortHeader({
 
 /** The per-Session table (#113): one row per Session with its project, last activity, duration, dominant
  *  model, turns, and tokens. Sortable on every column (client-side via sortSessions), defaulting to most
- *  recent activity first. The Tokens column follows the page's "Include cache" toggle, like the other
- *  breakdowns. Reveals SESSION_BATCH rows at a time by the active sort, via a "Show N more" button. */
-export function SessionsCard({
-  rows,
-  includeCache,
-}: {
-  rows: StatsBySession[];
-  includeCache: boolean;
-}) {
+ *  recent activity first. The Tokens column shows totalTokens (all four kinds). Reveals SESSION_BATCH
+ *  rows at a time by the active sort, via a "Show N more" button. */
+export function SessionsCard({ rows }: { rows: StatsBySession[] }) {
   const [sort, setSort] = useState<SessionSort>(DEFAULT_SESSION_SORT);
   const [visible, setVisible] = useState(SESSION_BATCH);
   // Guard on the full set so the panel never vanishes on a pure-zero window (matches the other breakdowns).
@@ -93,7 +87,7 @@ export function SessionsCard({
         ? { key, dir: s.dir === "asc" ? "desc" : "asc" }
         : { key, dir: defaultDirFor(key) },
     );
-  const sorted = sortSessions(rows, sort, includeCache);
+  const sorted = sortSessions(rows, sort);
   const top = sorted.slice(0, visible);
   const rest = sorted.length - top.length;
   const now = Date.now();
@@ -187,7 +181,7 @@ export function SessionsCard({
                   {r.turns.toLocaleString("en-US")}
                 </td>
                 <td className="py-1 pl-2 text-right font-mono tabular-nums text-fg-muted">
-                  {formatTokensShort(tokensOf(r, includeCache))}
+                  {formatTokensShort(r.totalTokens)}
                 </td>
               </tr>
             ))}

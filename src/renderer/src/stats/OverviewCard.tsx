@@ -4,7 +4,6 @@ import {
   type StatsByModel,
   type StatsRecords,
   type StatsTotals,
-  tokensOf,
 } from "@shared/stats";
 import {
   formatTokensShort,
@@ -37,7 +36,6 @@ export function OverviewCard({
   totals,
   records,
   byModel,
-  includeCache,
   calendar,
   calendarStart,
   calendarEnd,
@@ -50,7 +48,6 @@ export function OverviewCard({
   totals: StatsTotals;
   records: StatsRecords;
   byModel: StatsByModel[];
-  includeCache: boolean;
   calendar: CalendarDay[];
   calendarStart: string;
   calendarEnd: string;
@@ -62,28 +59,26 @@ export function OverviewCard({
 }) {
   const empty = totals.turns === 0;
 
-  // Favorite model: the top byModel row by the displayed metric — recomputed under the cache toggle so
-  // the tile always agrees with the By-model list's order. Ties break by raw id, like the old panel.
+  // Favorite model: the top byModel row by total tokens, so the tile always agrees with the By-model
+  // list's order. Ties break by raw id, like the old panel.
   const favorite = useMemo(() => {
     if (empty || byModel.length === 0) return null;
     const top = byModel
       .slice()
       .sort(
         (a, b) =>
-          tokensOf(b, includeCache) - tokensOf(a, includeCache) ||
+          b.totalTokens - a.totalTokens ||
           (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
       )[0];
     return top.modelRaw ?? "Unknown";
-  }, [empty, byModel, includeCache]);
+  }, [empty, byModel]);
 
-  // The Tokens tile figure: all four kinds when cache counts, fresh input+output otherwise — matching
-  // the rest of the page's Include-cache behavior.
-  const tokenTotal = includeCache
-    ? totals.inputTokens +
-      totals.outputTokens +
-      totals.cacheReadTokens +
-      totals.cacheCreationTokens
-    : totals.inputTokens + totals.outputTokens;
+  // The Tokens tile figure: all four token kinds, matching every other token figure on the page.
+  const tokenTotal =
+    totals.inputTokens +
+    totals.outputTokens +
+    totals.cacheReadTokens +
+    totals.cacheCreationTokens;
 
   // Cell hairlines for a fixed 4×2 grid: every cell draws right+bottom, the 4th column drops right,
   // the second row drops bottom. Index-driven so the markup stays a flat list.
@@ -146,7 +141,6 @@ export function OverviewCard({
             years={calendarYears}
             year={calendarYear}
             onYear={onCalendarYear}
-            includeCache={includeCache}
             selectedDay={selectedDay}
             onSelectDay={onSelectDay}
           />
@@ -158,9 +152,8 @@ export function OverviewCard({
 
 /**
  * The contributions region (#115, revised by #spec 2026-07-03): the year-windowed heatmap, intensity
- * ALWAYS by tokens (the Turns/Tokens metric toggle is retired) via the shared tokensOf, so the cells
- * follow the page's Include-cache pill like every other token figure. Clicking a day drives the page
- * range to that date; the calendar window itself stays independent of the page range.
+ * ALWAYS by total tokens (all four kinds; the Turns/Tokens metric toggle is retired). Clicking a day
+ * drives the page range to that date; the calendar window itself stays independent of the page range.
  */
 function Contributions({
   days,
@@ -169,7 +162,6 @@ function Contributions({
   years,
   year,
   onYear,
-  includeCache,
   selectedDay,
   onSelectDay,
 }: {
@@ -179,17 +171,13 @@ function Contributions({
   years: number[];
   year: number | null;
   onYear: (y: number | null) => void;
-  includeCache: boolean;
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
 }) {
   const byDay = useMemo(() => new Map(days.map((d) => [d.day, d])), [days]);
   const valueOf = useCallback(
-    (day: string): number => {
-      const d = byDay.get(day);
-      return d ? tokensOf(d, includeCache) : 0;
-    },
-    [byDay, includeCache],
+    (day: string): number => byDay.get(day)?.totalTokens ?? 0,
+    [byDay],
   );
 
   const weeks = useMemo(

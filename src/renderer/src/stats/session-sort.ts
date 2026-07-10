@@ -1,7 +1,6 @@
-import { tokensOf, type StatsBySession } from "@shared/stats";
+import type { StatsBySession } from "@shared/stats";
 
-/** The per-Session table's sortable columns. `tokens` follows the page's "Include cache" toggle (via
- *  tokensOf), so it sorts on the figure shown. */
+/** The per-Session table's sortable columns. `tokens` sorts on totalTokens, the figure the column shows. */
 export type SessionSortKey =
   | "session"
   | "model"
@@ -31,15 +30,13 @@ export function defaultDirFor(key: SessionSortKey): SortDir {
 
 /**
  * Sort the per-Session rows by the chosen column and direction, returning a NEW array (never mutating the
- * store's order). The tokens column reads the same fresh-vs-total figure the page's "Include cache" toggle
- * shows (via tokensOf), so the sort key always matches the visible number. A null model sorts as the
- * smallest value. Every comparison falls back to sessionId — kept ascending regardless of direction — so
- * equal rows hold a stable order and don't reshuffle when you flip direction.
+ * store's order). The tokens column compares totalTokens, the figure the column shows. A null model sorts
+ * as the smallest value. Every comparison falls back to sessionId — kept ascending regardless of direction
+ * — so equal rows hold a stable order and don't reshuffle when you flip direction.
  */
 export function sortSessions(
   rows: readonly StatsBySession[],
   sort: SessionSort,
-  includeCache: boolean,
 ): StatsBySession[] {
   const cmp = (a: StatsBySession, b: StatsBySession): number => {
     // Exhaustive over SessionSortKey with no default branch on purpose: adding a column without a case
@@ -58,7 +55,7 @@ export function sortSessions(
       case "turns":
         return a.turns - b.turns;
       case "tokens":
-        return tokensOf(a, includeCache) - tokensOf(b, includeCache);
+        return a.totalTokens - b.totalTokens;
     }
   };
   return [...rows].sort((a, b) => {
