@@ -1,4 +1,11 @@
-import type { Account, RateLimit, Session, SessionPr } from "./types";
+import type {
+  Account,
+  ExtraUsage,
+  RateLimit,
+  RateLimitWindows,
+  Session,
+  SessionPr,
+} from "./types";
 import type { ContextBreakdown } from "./transcript";
 import { contextTotal } from "./context";
 
@@ -41,12 +48,7 @@ export interface StatusLineSample {
    *  API response). null when absent: a subscription before that response, or a session whose billing the
    *  app can't determine. Each window may be independently absent. The two weekly sub-buckets join the
    *  existing five_hour / seven_day windows. */
-  rateLimits: {
-    fiveHour?: RateLimit;
-    sevenDay?: RateLimit;
-    sevenDaySonnet?: RateLimit;
-    sevenDayOpus?: RateLimit;
-  } | null;
+  rateLimits: RateLimitWindows | null;
 }
 
 /** The seam ipc.ts depends on: the live captures the wrapper writes. Implemented in main by a file reader. */
@@ -79,6 +81,24 @@ function liveWindow(
   now: number,
 ): RateLimit | undefined {
   return w && w.resetsAt > now ? w : undefined;
+}
+
+/** The usage API's account-wide answer: the four windows plus extra-usage credits. The fill side of
+ *  the per-session merge — the panel never renders it without first consulting the selected session. */
+export interface AccountUsage extends RateLimitWindows {
+  extraUsage?: ExtraUsage;
+}
+
+/** ccstatusline's mergeUsageData, per window: the selected session's own capture window wins, the
+ *  API-fetched window fills an absent (or expired) one, both absent → undefined (a dashed row).
+ *  Granularity note (audit): ccs merges per FIELD; ours is per window because RateLimit requires both
+ *  fields and parseWindow discards half-formed capture windows — documented micro-deviation. */
+export function pickWindow(
+  session: RateLimit | undefined,
+  api: RateLimit | undefined,
+  now: number,
+): RateLimit | undefined {
+  return liveWindow(session, now) ?? liveWindow(api, now);
 }
 
 /** The best live view of one window across every fresh with-limits sample: the latest resetsAt wins

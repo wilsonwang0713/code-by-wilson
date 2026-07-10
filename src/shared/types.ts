@@ -160,6 +160,11 @@ export interface Session {
   /** The capture's pr block. Preferred over the gh-polled PrInfo (fresher, carries review state);
    *  gh remains the fallback when there is no capture. Absent ⇒ no sample or no PR. */
   pr?: SessionPr;
+  /** The session's own capture rate_limits — its latest statusLine stdin payload on disk, the true
+   *  per-session analogue of ccstatusline's stdin. The Pressure panel merges these with the account's
+   *  API-fetched windows (capture wins per window). Absent when the session has no capture or the
+   *  capture carried none. */
+  rateLimits?: RateLimitWindows;
   lastActivityMs: number;
   /** Session creation time (epoch ms); see PersistedSession.createdMs. The rail orders Active
    *  sessions by this, newest first. */
@@ -235,6 +240,25 @@ export interface RateLimit {
   resetsAt: number;
 }
 
+/** The four rate-limit windows a capture's `rate_limits` block or the usage API can carry. Shared by
+ *  both sides of the per-session merge (see statusline.ts pickWindow). */
+export interface RateLimitWindows {
+  fiveHour?: RateLimit;
+  sevenDay?: RateLimit;
+  sevenDaySonnet?: RateLimit;
+  sevenDayOpus?: RateLimit;
+}
+
+/** Paid extra-usage credits from the usage API's `extra_usage` block. `limit` (monthly_limit) and
+ *  `used` (used_credits) arrive in CENTS — divide by 100 for display. `utilization` is 0–100. */
+export interface ExtraUsage {
+  enabled: boolean;
+  limit?: number;
+  used?: number;
+  utilization?: number;
+  currency?: string;
+}
+
 /** The session's pull request as the statusLine capture reports it (`pr` block). `reviewState` is
  *  the raw review_state string ("pending" / "approved" / "changes_requested" / anything newer), or
  *  null when the capture omitted it. Fresher than the gh-polled PrInfo and carries state. */
@@ -255,6 +279,8 @@ export interface Account {
   /** Weekly per-model sub-buckets, present only when the capture's rate_limits carried them. */
   sevenDaySonnet?: RateLimit;
   sevenDayOpus?: RateLimit;
+  /** Paid extra-usage credits, from the usage API only (captures never carry it). */
+  extraUsage?: ExtraUsage;
   /** Claude Code CLI version from the freshest live capture. Absent when no capture reported it. */
   version?: string;
   /** Logged-in account email, read from ~/.claude.json by the ipc layer (not derived from samples). */
