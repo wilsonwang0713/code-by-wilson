@@ -77,4 +77,13 @@ describe("shortened track (corner reservation for a second bar)", () => {
   it("keeps reporting overflow from the viewport, not the track", () => {
     expect(thumbMetrics(0, 200, 200, 190).overflow).toBe(false);
   });
+
+  it("reports no overflow when the track has no room", () => {
+    // A container ≤ the other bar's thickness leaves trackLength ≤ 0 — guard, don't NaN.
+    expect(thumbMetrics(0, 1000, 200, 0)).toEqual({
+      height: 0,
+      top: 0,
+      overflow: false,
+    });
+  });
 });
