@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import type { ContextBreakdown } from "./transcript";
 import { contextTotal } from "./context";
+import { parseContextWindowSize } from "./models";
 
 /** One normalized statusLine capture for a Session, parsed from a side-channel file. Plain data so it
  *  crosses IPC cleanly. `null` fields are "the statusLine didn't report this", distinct from 0. */
@@ -160,7 +161,10 @@ export function overlaySessions(
   return sessions.map((s) => {
     const sample = byId.get(s.id);
     if (!sample) return s;
-    const window = sample.contextWindow ?? s.contextWindow;
+    const window =
+      sample.contextWindow ??
+      parseContextWindowSize(sample.modelId, sample.modelDisplayName) ??
+      s.contextWindow;
     // When the capture carries a live split but no used_percentage, fill from those exact tokens over
     // the window rather than the stale transcript %. The Context panel shows the live split's total/window
     // beside this %, so a transcript number there would visibly contradict the tokens next to it.

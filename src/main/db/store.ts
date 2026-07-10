@@ -1,5 +1,9 @@
 import type { Session, PersistedSession, ModelUsage } from "@shared/types";
-import { contextWindowFor, normalizeModelId } from "@shared/models";
+import {
+  contextWindowFor,
+  normalizeModelId,
+  parseContextWindowSize,
+} from "@shared/models";
 import type { IndexOverview } from "@shared/ipc";
 import { isResumable } from "@shared/resumable";
 import { transaction, type SqliteDb } from "./driver";
@@ -130,7 +134,10 @@ function pctOfWindow(tokens: number, window: number): number {
  * live. The window is a fixed per-family property of the model, so it's derived here, not stored.
  */
 export function hydrate(p: PersistedSession): Session {
-  const contextWindow = contextWindowFor(p.model);
+  // A1: a window tag in the stored raw model id (`[1m]`) beats the flat family default, so an
+  // uncaptured 1M session's % isn't measured against 200k.
+  const contextWindow =
+    parseContextWindowSize(p.modelRaw) ?? contextWindowFor(p.model);
   // The panel reads usageByModel for everything. A session summarized with the column carries its real
   // per-model breakdown; an old cached row (pre-column) or an empty transcript falls back to a single
   // main-thread entry, so the panel still renders main-only until the next re-summarize. The fallback's
