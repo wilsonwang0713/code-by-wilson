@@ -132,3 +132,17 @@ export function formatUsd(n: number): string {
   if (n >= 1000) return "$" + Math.round(n).toLocaleString("en-US");
   return "$" + n.toFixed(2);
 }
+
+/** Bytes → a compact decimal size for the Settings readouts: "482 B", "7.4 kB", "7.5 MB", "1.2 GB".
+ *  One decimal below 10 of a unit, whole numbers above — the same precision taper as formatTokens. */
+export function formatBytes(n: number): string {
+  if (n < 1000) return `${Math.max(0, Math.round(n))} B`;
+  const units = ["kB", "MB", "GB", "TB"] as const;
+  let v = n;
+  let u = -1;
+  do {
+    v /= 1000;
+    u++;
+  } while (v >= 1000 && u < units.length - 1);
+  return `${v < 10 ? v.toFixed(1) : String(Math.round(v))} ${units[u]}`;
+}
