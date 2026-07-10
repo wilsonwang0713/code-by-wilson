@@ -10,7 +10,7 @@ import {
   type LampTone,
 } from "./system-primitives";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { $scanProgress } from "../stats/use-stats-pump";
+import { $scanProgress, kickStatsPump } from "../stats/use-stats-pump";
 
 /** The dbinfo poll cadence while the System section is open — the stats warm cadence, so a running
  *  backfill's size/counts tick along with the lamp. */
@@ -73,6 +73,14 @@ export function StatsDbCard() {
     try {
       const r = await window.api.resetAnalytics();
       setResetError(!r.ok);
+      if (r.ok) {
+        // The store is now empty. Optimistically flip the lamp to BACKFILLING (and disable Reset)
+        // this frame so the card never reads a stale "MIRRORED" over a just-cleared store, then wake
+        // the pump to run the rebuild now — with the Stats view closed it may be parked at the 5-min
+        // idle cadence, and its own tick is the only other writer of $scanProgress.
+        $scanProgress.set({ filesTotal: 0, filesDone: 0, done: false });
+        kickStatsPump();
+      }
     } catch {
       setResetError(true);
     }
