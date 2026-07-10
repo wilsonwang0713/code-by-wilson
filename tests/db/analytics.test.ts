@@ -20,6 +20,7 @@ import {
   clearAnalytics,
   readWorktrees,
   upsertWorktree,
+  readDbCounts,
 } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
 import { usage as mkUsage } from "../helpers/usage";
@@ -1921,5 +1922,32 @@ describe("readRecords", () => {
     const r = readRecords(db, win, NOW);
     expect(r.windowDays).toBe(1);
     expect(r.activeDays).toBe(1);
+  });
+});
+
+describe("readDbCounts", () => {
+  it("counts turns and distinct sessions and finds the earliest ts", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    upsertTurns(db, [
+      turn({ messageId: "a", sessionId: "s1", ts: 3000 }),
+      turn({ messageId: "b", sessionId: "s1", ts: 1000 }),
+      turn({ messageId: "c", sessionId: "s2", ts: 2000 }),
+    ]);
+    expect(readDbCounts(db)).toEqual({
+      turns: 3,
+      sessions: 2,
+      oldestTs: 1000,
+    });
+  });
+
+  it("serves zeros and a null oldestTs on an empty store", () => {
+    const db = openTestDb();
+    migrateAnalytics(db);
+    expect(readDbCounts(db)).toEqual({
+      turns: 0,
+      sessions: 0,
+      oldestTs: null,
+    });
   });
 });

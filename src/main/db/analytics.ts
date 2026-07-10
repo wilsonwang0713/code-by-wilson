@@ -207,6 +207,22 @@ export function clearAnalytics(db: SqliteDb): void {
   });
 }
 
+/** What the durable store holds, for the Settings "Stats database" card's readout: row and distinct
+ *  session counts plus the earliest ingested turn's ts. `oldestTs` is null on an empty store —
+ *  SQL MIN() over no rows is NULL — which the card renders as "no history yet". */
+export function readDbCounts(db: SqliteDb): {
+  turns: number;
+  sessions: number;
+  oldestTs: number | null;
+} {
+  const row = db
+    .prepare(
+      "SELECT COUNT(*) AS turns, COUNT(DISTINCT session_id) AS sessions, MIN(ts) AS oldest FROM turns",
+    )
+    .get() as { turns: number; sessions: number; oldest: number | null };
+  return { turns: row.turns, sessions: row.sessions, oldestTs: row.oldest };
+}
+
 /** A file's incremental high-water mark: the mtime at which it was last fully processed (or the partial
  *  sentinel mid-file — see scan.ts), and the count of newline-terminated lines already ingested. */
 export interface ProcessedFile {
