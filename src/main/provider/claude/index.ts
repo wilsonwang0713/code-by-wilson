@@ -83,10 +83,13 @@ function gitTokenStr(git: GitInfo | null): string {
     : "nogit";
 }
 
-/** The PR portion of the metrics change token: the PR number, or 'nopr'. Folded into metricsToken so the
- *  Git cell re-renders the poll after a background `gh` fetch resolves. */
+/** The PR portion of the metrics change token: the PR number plus the fields the SessionPanel PR row
+ *  now renders (review state / gh state / title). Folded into metricsToken so a background `gh` fetch
+ *  that changes only the review state — number and url unchanged — still re-renders the PR cell. */
 function prTokenStr(pr: PrInfo | null): string {
-  return pr ? `pr:${pr.number}` : "nopr";
+  return pr
+    ? `pr:${pr.number}:${pr.state ?? ""}:${pr.reviewDecision ?? ""}:${pr.title ?? ""}`
+    : "nopr";
 }
 
 /** The lazy metric sources read before the change token: the git glance, voice flag, and remote-control

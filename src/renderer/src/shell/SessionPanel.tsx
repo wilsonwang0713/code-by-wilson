@@ -30,6 +30,10 @@ export function SessionPanel({
   const clock = s.sessionClockMs != null ? formatClock(s.sessionClockMs) : null;
   const hasLines = s.linesAdded != null || s.linesRemoved != null;
   const prView = s.pr ?? pr ?? null;
+  const prStatus =
+    ((s.pr?.reviewState ?? pr?.reviewDecision) || pr?.state)
+      ?.toLowerCase()
+      .replace(/_/g, " ") ?? null;
   return (
     <PanelSection>
       <PanelHeading icon="id-card">Session</PanelHeading>
@@ -44,13 +48,19 @@ export function SessionPanel({
       </SessionRow>
       <SessionRow label="PR">
         {prView ? (
-          <button
-            type="button"
-            onClick={() => void window.api.openExternal(prView.url)}
-            className="cursor-pointer text-fg hover:underline"
-          >
-            #{prView.number}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => void window.api.openExternal(prView.url)}
+              className="cursor-pointer text-fg hover:underline"
+              title={pr?.title ?? prView.url}
+            >
+              #{prView.number}
+            </button>
+            {prStatus && (
+              <span className="text-(--ui-text-quaternary)">{prStatus}</span>
+            )}
+          </>
         ) : (
           "-"
         )}
