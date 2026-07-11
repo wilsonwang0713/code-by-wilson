@@ -36,6 +36,8 @@ interface Scan {
   asyncLaunched: Set<string>;
   /** Task-notifications recorded in this transcript (user + queue-operation rows). */
   notifications: TaskNotification[];
+  /** Successful SendMessage deliveries recorded in this transcript — each resumes its target. */
+  resumes: SendResume[];
   /** First raw model string seen on an assistant row, normalized later; undefined when none reported. */
   model: string | undefined;
   /** The Claude Code CLI's per-agent token count: the LAST assistant usage snapshot's input + output
@@ -88,12 +90,24 @@ function pushNotifications(
   }
 }
 
+/** A successful SendMessage delivery, which resumes an at-rest agent. `to` is the tool input's
+ *  target (an agent id, or a name); `resolvedId` is the agent id the CLI echoed back in its
+ *  result message ("Agent \"<id>\" …"), which resolves a by-name send. */
+interface SendResume {
+  to: string;
+  resolvedId?: string;
+  ts: number;
+}
+
 function scanRows(rows: any[]): Scan {
   const toolUseIds = new Set<string>();
   const dispatchMsgOf = new Map<string, string>();
   const results = new Map<string, { isError: boolean; ts: number }>();
   const asyncLaunched = new Set<string>();
   const notifications: TaskNotification[] = [];
+  const resumes: SendResume[] = [];
+  // tool_use id → SendMessage target, awaiting its result row later in the file.
+  const sendTargets = new Map<string, string>();
   let model: string | undefined;
   let firstTs = Infinity;
   let lastTs = -Infinity;
@@ -130,6 +144,8 @@ function scanRows(rows: any[]): Scan {
         if (b?.type === "tool_use" && typeof b.id === "string") {
           toolUseIds.add(b.id);
           if (typeof msg?.id === "string") dispatchMsgOf.set(b.id, msg.id);
+          if (b.name === "SendMessage" && typeof b.input?.to === "string")
+            sendTargets.set(b.id, b.input.to);
         }
         if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
           results.set(b.tool_use_id, { isError: !!b.is_error, ts: evTs });
@@ -145,14 +161,25 @@ function scanRows(rows: any[]): Scan {
       }
       // toolUseResult is row-level, so it can only be attributed to a single-result row.
       const tur = row?.toolUseResult;
-      if (
-        resultBlocks === 1 &&
-        firstResultId !== undefined &&
-        tur &&
-        typeof tur === "object" &&
-        tur.status === "async_launched"
-      )
-        asyncLaunched.add(firstResultId);
+      const turObj = tur && typeof tur === "object" ? tur : undefined;
+      if (resultBlocks === 1 && firstResultId !== undefined) {
+        if (turObj?.status === "async_launched")
+          asyncLaunched.add(firstResultId);
+        const to = sendTargets.get(firstResultId);
+        if (
+          to !== undefined &&
+          !results.get(firstResultId)!.isError &&
+          turObj?.success !== false
+        ) {
+          const m =
+            typeof turObj?.message === "string"
+              ? /^Agent "([^"]+)"/.exec(turObj.message)
+              : null;
+          const resume: SendResume = { to, ts: evTs };
+          if (m) resume.resolvedId = m[1];
+          resumes.push(resume);
+        }
+      }
     }
   }
   // readUsage of an absent block is all zeros, so a usage-less agent scans to tokens: 0.
@@ -163,6 +190,7 @@ function scanRows(rows: any[]): Scan {
     results,
     asyncLaunched,
     notifications,
+    resumes,
     model,
     tokens:
       last.inputTokens +
@@ -202,7 +230,8 @@ function reaches(
  * parent agent's transcript. Status folds the agent's lifecycle events in timestamp order (last wins):
  * the dispatch's tool_result (is_error ⇒ failed, else done — but a background launch ack, toolUseResult
  * "async_launched", is a receipt and contributes nothing), and its <task-notification> stop signals
- * (completed ⇒ done, failed/killed ⇒ failed, others no-op); no events ⇒ working. The output is always an
+ * (completed ⇒ done, failed/killed ⇒ failed, others no-op), and successful SendMessage deliveries
+ * (⇒ working again until the next stop); no events ⇒ working. The output is always an
  * acyclic forest, even on malformed input. Pure: same input,
  * same output.
  */
@@ -241,6 +270,11 @@ export function buildSubagentForest(
     notifications.push(...scans.get(a.agentId)!.notifications);
   notifications.push(...mainScan.notifications);
 
+  // Successful SendMessage deliveries merged across every transcript, the same way as notifications.
+  const resumes: SendResume[] = [];
+  for (const a of agents) resumes.push(...scans.get(a.agentId)!.resumes);
+  resumes.push(...mainScan.resumes);
+
   // tool_use id → its dispatching assistant message id, merged across every transcript (main wins).
   // Message ids are globally unique, so a collision is not expected; main-wins keeps the rule uniform.
   const dispatchMsgOf = new Map<string, string>();
@@ -248,6 +282,8 @@ export function buildSubagentForest(
     for (const [id, mid] of scans.get(a.agentId)!.dispatchMsgOf)
       dispatchMsgOf.set(id, mid);
   for (const [id, mid] of mainScan.dispatchMsgOf) dispatchMsgOf.set(id, mid);
+
+  const knownIds = new Set(agents.map((a) => a.agentId));
 
   // An agent's status folds its lifecycle events in timestamp order; the last event wins. The
   // dispatch's tool_result is one event (is_error ⇒ failed, else done) — EXCEPT the background
@@ -264,6 +300,10 @@ export function buildSubagentForest(
       else if (n.status === "failed" || n.status === "killed")
         events.push({ ts: n.ts, status: "failed" });
       // Any other status value is a no-op: a future CLI status can't wrongly settle an agent.
+    }
+    for (const rs of resumes) {
+      const target = knownIds.has(rs.to) ? rs.to : rs.resolvedId;
+      if (target === agentId) events.push({ ts: rs.ts, status: "working" });
     }
     if (events.length === 0) return "working";
     events.sort((x, y) => x.ts - y.ts);

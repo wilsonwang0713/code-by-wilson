@@ -114,6 +114,50 @@ function queueNotificationRow(taskId: string, status: string, ts: string): any {
   };
 }
 
+// A SendMessage dispatch (input.to = `to`) plus its successful delivery result. The CLI echoes
+// the resolved agent id in toolUseResult.message, which covers SendMessage-by-name.
+function sendMessageRows(
+  toolUseId: string,
+  to: string,
+  resolvedId: string,
+  ts: string,
+  opts: { isError?: boolean; success?: boolean } = {},
+): any[] {
+  return [
+    {
+      type: "assistant",
+      timestamp: ts,
+      message: {
+        content: [
+          {
+            type: "tool_use",
+            id: toolUseId,
+            name: "SendMessage",
+            input: { to },
+          },
+        ],
+      },
+    },
+    {
+      type: "user",
+      timestamp: ts,
+      message: {
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            is_error: opts.isError ?? false,
+          },
+        ],
+      },
+      toolUseResult: {
+        success: opts.success ?? true,
+        message: `Agent "${resolvedId}" had no active task; resumed from transcript in the background with your message.`,
+      },
+    },
+  ];
+}
+
 // A minimal positioned assistant row for a subagent transcript.
 const ar = (ts: string): any => ({
   type: "assistant",
@@ -766,6 +810,85 @@ describe("buildSubagentForest", () => {
             ],
           },
         },
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("flips a done agent back to working on a SendMessage resume", () => {
+    // The second bug shape: a genuinely-completed agent is resumed and works again while the
+    // panel still shows done.
+    const forest = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("settles a resumed agent done on its next completed notification", () => {
+    const forest = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z"),
+        notificationRow("a1", "completed", "2026-06-04T03:12:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("done");
+  });
+
+  it("resolves a SendMessage-by-name resume via the echoed agent id", () => {
+    // input.to is a name, not an agent id; the toolUseResult.message prefix names the real id.
+    const forest = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows(
+          "sm-1",
+          "reviewer",
+          "a1",
+          "2026-06-04T03:10:00.000Z",
+        ),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("ignores a failed SendMessage delivery", () => {
+    const errored = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z", {
+          isError: true,
+        }),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(errored[0].status).toBe("done");
+    const unsuccessful = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z", {
+          success: false,
+        }),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(unsuccessful[0].status).toBe("done");
+  });
+
+  it("folds a full background lifecycle: launch → notify → resume", () => {
+    // Ends mid-resume so the test discriminates: without resume parsing the completed
+    // notification would (wrongly) leave this agent done.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "completed", "2026-06-04T03:05:00.000Z"),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z"),
       ],
       [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
     );
