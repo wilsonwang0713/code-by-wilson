@@ -185,7 +185,7 @@ export function overlaySessions(
       modelDisplayName: sample.modelDisplayName ?? undefined,
       linesAdded: sample.linesAdded ?? undefined,
       linesRemoved: sample.linesRemoved ?? undefined,
-      effortLevel: sample.effortLevel ?? undefined,
+      effortLevel: sample.effortLevel ?? s.effortLevel,
       sessionClockMs: sample.sessionClockMs ?? s.sessionClockMs,
       cwd: sample.cwd ?? s.cwd,
       costUsd: sample.costUsd ?? undefined,

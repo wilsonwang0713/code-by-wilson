@@ -11,8 +11,8 @@ import { transaction, type SqliteDb } from "./driver";
 /** Bump when the schema changes OR when summarize's math changes and cached rows must rebuild —
  *  v9 forces the one-time re-summarize for the last-entry-wins usage dedup (usage_by_model rows
  *  cached under first-entry-wins undercounted subagent output). `migrate` rebuilds the index (a
- *  disposable cache) to match. */
-const SCHEMA_VERSION = 9;
+ *  disposable cache) to match — v10 adds effort_level (A6 transcript scan). */
+const SCHEMA_VERSION = 10;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -49,6 +49,7 @@ export function migrate(db: SqliteDb): void {
         cache_creation_5m_tokens INTEGER NOT NULL DEFAULT 0,
         cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0,
         usage_by_model TEXT,
+        effort_level TEXT,
         context_tokens INTEGER NOT NULL DEFAULT 0
       );
       PRAGMA user_version = ${SCHEMA_VERSION};
@@ -78,6 +79,7 @@ interface Row {
   cache_creation_1h_tokens: number;
   usage_by_model: string | null;
   context_tokens: number;
+  effort_level: string | null;
 }
 
 /** Parse the persisted usageByModel JSON column into ModelUsage[], or [] when the column is null (an old
@@ -119,6 +121,7 @@ function rowToPersisted(r: Row): PersistedSession {
     },
     usageByModel: parseUsageByModel(r.usage_by_model),
     contextTokens: r.context_tokens,
+    effortLevel: r.effort_level ?? undefined,
   };
 }
 
@@ -173,16 +176,17 @@ export function hydrate(p: PersistedSession): Session {
     lastActivityMs: p.lastActivityMs,
     createdMs: p.createdMs,
     sessionClockMs,
+    effortLevel: p.effortLevel,
   };
 }
 
 const UPSERT = `
   INSERT INTO sessions
     (id, title, project, cwd, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
-     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens)
+     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens, effort_level)
   VALUES
     (@id, @title, @project, @cwd, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
-     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens)
+     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens, @effort_level)
   ON CONFLICT(id) DO UPDATE SET
     title = excluded.title,
     project = excluded.project,
@@ -207,7 +211,8 @@ const UPSERT = `
     cache_creation_5m_tokens = excluded.cache_creation_5m_tokens,
     cache_creation_1h_tokens = excluded.cache_creation_1h_tokens,
     usage_by_model = excluded.usage_by_model,
-    context_tokens = excluded.context_tokens
+    context_tokens = excluded.context_tokens,
+    effort_level = excluded.effort_level
 `;
 
 /**
@@ -244,6 +249,7 @@ export function upsertSessions(
         cache_creation_1h_tokens: s.usage.cacheCreation1hTokens,
         usage_by_model: JSON.stringify(s.usageByModel ?? []),
         context_tokens: s.contextTokens,
+        effort_level: s.effortLevel ?? null,
       });
     }
   });

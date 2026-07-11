@@ -210,6 +210,8 @@ export interface PersistedSession {
   usageByModel?: ModelUsage[];
   /** Latest turn's full prompt (input + cache-read + cache-creation): the current context size, for context %. */
   contextTokens: number;
+  /** Transcript-scanned effort level (A6); the live capture's effort overlays it. */
+  effortLevel?: string;
 }
 
 /**

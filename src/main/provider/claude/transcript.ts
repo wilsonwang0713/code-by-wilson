@@ -27,6 +27,9 @@ export interface TranscriptSummary {
   usage: Usage;
   /** Latest turn's full prompt (input + cache-read + cache-creation): the current context size, for context %. */
   contextTokens: number;
+  /** Thinking effort scanned from `/effort` / `/model` stdout markers, newest wins (A6). Absent
+   *  when the transcript carries none — the capture, then settings.json, layer above/below this. */
+  effortLevel?: string;
 }
 
 /** First non-empty user prompt (slash commands shown by name), else the project basename. */
@@ -132,6 +135,14 @@ export function transcriptSessionKind(path: string): string | undefined {
  *  carry a zero usage block. They're not a real model and don't represent the session's context. */
 const SYNTHETIC_MODEL = "<synthetic>";
 
+// A6 (ccstatusline jsonl-metadata.ts:17-19): the two stdout markers a /effort or /model command
+// leaves in the transcript. Forward scan latches the LAST match — same answer as ccs's
+// scan-from-the-end, one pass.
+const EFFORT_STDOUT_RE =
+  /^<local-command-stdout>Set effort level to ([a-zA-Z0-9-]+)\b/i;
+const MODEL_STDOUT_EFFORT_RE =
+  /^<local-command-stdout>Set model to[\s\S]*? with ([a-zA-Z0-9-]+) effort<\/local-command-stdout>$/i;
+
 /**
  * Reduce a transcript's JSONL into a normalized summary. Parses line by line and
  * skips any unparseable line, so a transcript being appended to right now (a
@@ -146,6 +157,7 @@ export function parseTranscript(
   let lastModelRaw: string | undefined;
   let lastActivityMs = 0;
   let createdMs = 0; // 0 = no parseable timestamp seen yet
+  let effortLevel: string | undefined;
   const userPrompts: string[] = [];
 
   // Token usage summed over every assistant turn (cost is billed per turn), deduped per message id
@@ -238,11 +250,16 @@ export function parseTranscript(
           }
         }
       }
-      // Only real (non-meta) user turns are prompts that can title the session.
-      if (!row.isMeta) {
-        const text = userText(content);
-        if (text) userPrompts.push(text);
+      // A6: the /effort and /model stdout markers land in meta rows, so this scan must run before
+      // the non-meta guard below (marker rows ARE meta and would otherwise be skipped entirely).
+      const text = userText(content);
+      if (text) {
+        const m =
+          EFFORT_STDOUT_RE.exec(text) ?? MODEL_STDOUT_EFFORT_RE.exec(text);
+        if (m?.[1]) effortLevel = m[1].toLowerCase();
       }
+      // Only real (non-meta) user turns are prompts that can title the session.
+      if (!row.isMeta && text) userPrompts.push(text);
     }
   }
 
@@ -258,5 +275,6 @@ export function parseTranscript(
     awaitingUser: tail.awaitingUser,
     usage: usageAcc.totals(),
     contextTokens: tail.context ? contextTotal(tail.context) : 0,
+    effortLevel,
   };
 }

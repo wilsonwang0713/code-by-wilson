@@ -260,6 +260,7 @@ export function summarize(c: SessionCandidate): PersistedSession {
     },
     usageByModel,
     contextTokens: t?.contextTokens ?? 0,
+    effortLevel: t?.effortLevel,
   };
 }
 
