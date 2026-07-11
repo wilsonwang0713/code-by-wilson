@@ -163,4 +163,18 @@ describe("overlaySessions rateLimits", () => {
   it("absent when the session has no capture", () => {
     expect(overlaySessions([base], new Map())[0].rateLimits).toBeUndefined();
   });
+
+  it("A5: a capture-less clock keeps the transcript fallback; a capture clock wins", () => {
+    const withFallback = { ...base, sessionClockMs: 60_000 };
+    const noClockSample = sample({ sessionClockMs: null });
+    expect(
+      overlaySessions([withFallback], new Map([["s1", noClockSample]]))[0]
+        .sessionClockMs,
+    ).toBe(60_000);
+    const clockSample = sample({ sessionClockMs: 99_000 });
+    expect(
+      overlaySessions([withFallback], new Map([["s1", clockSample]]))[0]
+        .sessionClockMs,
+    ).toBe(99_000);
+  });
 });

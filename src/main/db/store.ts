@@ -148,6 +148,13 @@ export function hydrate(p: PersistedSession): Session {
     p.usageByModel?.length && p.usageByModel.some((mu) => mu.modelRaw !== null)
       ? p.usageByModel
       : [{ modelRaw: p.modelRaw ?? p.model, usage: p.usage }];
+  // A5 (ccstatusline getSessionDuration): with no capture clock, the transcript's first→last
+  // timestamp delta IS the session clock — Ended/Observed sessions get a Clock row instead of "-".
+  // Guarded: both timestamps positive, delta non-negative.
+  const sessionClockMs =
+    p.createdMs > 0 && p.lastActivityMs > 0 && p.lastActivityMs >= p.createdMs
+      ? p.lastActivityMs - p.createdMs
+      : undefined;
   return {
     id: p.id,
     title: p.title,
@@ -165,6 +172,7 @@ export function hydrate(p: PersistedSession): Session {
     usageByModel: models,
     lastActivityMs: p.lastActivityMs,
     createdMs: p.createdMs,
+    sessionClockMs,
   };
 }
 
