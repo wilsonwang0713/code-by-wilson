@@ -215,8 +215,9 @@ function WorkspaceBody({
 /** The center column's live view. Every session gets the Claude Code ⇄ Transcript switcher in `MiddleHeader`;
  *  `transcriptOn` (lifted to `Workspace`, threaded down here) drives which side shows: off is the Terminal
  *  — the live xterm for a running Managed session, else the ObservedTerminal panel (Fork always, Adopt once
- *  Ended) — on is the Transcript, or the drilled Subagent/Shell surface when the drill-stack is non-empty.
- *  Drilling a lane or shell auto-selects the Transcript side. */
+ *  Ended) — on is the Transcript, or the drilled Subagent surface when the drill-stack is non-empty.
+ *  Drilling a lane auto-selects the Transcript side. A background shell opens in a modal instead (see
+ *  WorkspaceBody), so it never touches this toggle. */
 function CenterView({
   session: s,
   doc,
