@@ -28,8 +28,12 @@ interface Scan {
   toolUseIds: Set<string>;
   /** tool_use id → the assistant message.id that carried it; the dispatch-batch key for grouping. */
   dispatchMsgOf: Map<string, string>;
-  /** tool_use_id → is_error, for the tool_results recorded in this transcript. */
-  results: Map<string, boolean>;
+  /** tool_use_id → its result's is_error + row timestamp (epoch ms; 0 when the row carried none),
+   *  for the tool_results recorded in this transcript. */
+  results: Map<string, { isError: boolean; ts: number }>;
+  /** tool_use ids whose result was the background-launch acknowledgment (row-level
+   *  toolUseResult.status === "async_launched") — a launch receipt, not a completion. */
+  asyncLaunched: Set<string>;
   /** First raw model string seen on an assistant row, normalized later; undefined when none reported. */
   model: string | undefined;
   /** The Claude Code CLI's per-agent token count: the LAST assistant usage snapshot's input + output
@@ -43,10 +47,18 @@ interface Scan {
   lastTs: number;
 }
 
+/** One status-changing lifecycle occurrence for an agent; the per-agent fold sorts these by
+ *  timestamp (stable — ties keep insertion order) and takes the last one. */
+interface StatusEvent {
+  ts: number;
+  status: Subagent["status"];
+}
+
 function scanRows(rows: any[]): Scan {
   const toolUseIds = new Set<string>();
   const dispatchMsgOf = new Map<string, string>();
-  const results = new Map<string, boolean>();
+  const results = new Map<string, { isError: boolean; ts: number }>();
+  const asyncLaunched = new Set<string>();
   let model: string | undefined;
   let firstTs = Infinity;
   let lastTs = -Infinity;
@@ -63,6 +75,7 @@ function scanRows(rows: any[]): Scan {
       if (ts < firstTs) firstTs = ts;
       if (ts > lastTs) lastTs = ts;
     }
+    const evTs = Number.isNaN(ts) ? 0 : ts;
     const msg = row?.message;
     if (row?.type === "assistant") {
       if (!model && typeof msg?.model === "string") model = msg.model;
@@ -71,14 +84,29 @@ function scanRows(rows: any[]): Scan {
     }
     const content = msg?.content;
     if (Array.isArray(content)) {
+      let resultBlocks = 0;
+      let firstResultId: string | undefined;
       for (const b of content) {
         if (b?.type === "tool_use" && typeof b.id === "string") {
           toolUseIds.add(b.id);
           if (typeof msg?.id === "string") dispatchMsgOf.set(b.id, msg.id);
         }
-        if (b?.type === "tool_result" && typeof b.tool_use_id === "string")
-          results.set(b.tool_use_id, !!b.is_error);
+        if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
+          results.set(b.tool_use_id, { isError: !!b.is_error, ts: evTs });
+          resultBlocks += 1;
+          if (resultBlocks === 1) firstResultId = b.tool_use_id;
+        }
       }
+      // toolUseResult is row-level, so it can only be attributed to a single-result row.
+      const tur = row?.toolUseResult;
+      if (
+        resultBlocks === 1 &&
+        firstResultId !== undefined &&
+        tur &&
+        typeof tur === "object" &&
+        tur.status === "async_launched"
+      )
+        asyncLaunched.add(firstResultId);
     }
   }
   // readUsage of an absent block is all zeros, so a usage-less agent scans to tokens: 0.
@@ -87,6 +115,7 @@ function scanRows(rows: any[]): Scan {
     toolUseIds,
     dispatchMsgOf,
     results,
+    asyncLaunched,
     model,
     tokens:
       last.inputTokens +
@@ -123,8 +152,10 @@ function reaches(
 /**
  * Reconstruct the subagent forest from the main transcript's rows and each subagent's rows + meta. A
  * root subagent is dispatched from the main transcript; a nested one is dispatched from inside its
- * parent agent's transcript. Status comes from the dispatch's tool_result (absent ⇒ working, is_error ⇒
- * failed, else done). The output is always an acyclic forest, even on malformed input. Pure: same input,
+ * parent agent's transcript. Status folds the agent's lifecycle events in timestamp order (last wins):
+ * the dispatch's tool_result (is_error ⇒ failed, else done — but a background launch ack, toolUseResult
+ * "async_launched", is a receipt and contributes nothing); no events ⇒ working. The output is always an
+ * acyclic forest, even on malformed input. Pure: same input,
  * same output.
  */
 export function buildSubagentForest(
@@ -143,11 +174,17 @@ export function buildSubagentForest(
       dispatcher.set(id, a.agentId);
   for (const id of mainScan.toolUseIds) dispatcher.set(id, null);
 
-  // tool_use_id → is_error of its result, merged once across every transcript (main wins a collision).
-  const results = new Map<string, boolean>();
-  for (const a of agents)
-    for (const [id, err] of scans.get(a.agentId)!.results) results.set(id, err);
-  for (const [id, err] of mainScan.results) results.set(id, err);
+  // tool_use_id → its result (is_error + ts), merged once across every transcript (main wins a
+  // collision). asyncLaunched merges the launch-ack ids the same way (a Set union has no collisions).
+  const results = new Map<string, { isError: boolean; ts: number }>();
+  const asyncLaunched = new Set<string>();
+  for (const a of agents) {
+    const s = scans.get(a.agentId)!;
+    for (const [id, r] of s.results) results.set(id, r);
+    for (const id of s.asyncLaunched) asyncLaunched.add(id);
+  }
+  for (const [id, r] of mainScan.results) results.set(id, r);
+  for (const id of mainScan.asyncLaunched) asyncLaunched.add(id);
 
   // tool_use id → its dispatching assistant message id, merged across every transcript (main wins).
   // Message ids are globally unique, so a collision is not expected; main-wins keeps the rule uniform.
@@ -157,14 +194,24 @@ export function buildSubagentForest(
       dispatchMsgOf.set(id, mid);
   for (const [id, mid] of mainScan.dispatchMsgOf) dispatchMsgOf.set(id, mid);
 
+  // An agent's status folds its lifecycle events in timestamp order; the last event wins. The
+  // dispatch's tool_result is one event (is_error ⇒ failed, else done) — EXCEPT the background
+  // launch ack, which is a receipt, not a completion, and contributes nothing. An agent with no
+  // events is still working. Sort is stable, so same-ts events keep insertion order.
+  const statusOf = (toolUseId: string): Subagent["status"] => {
+    const events: StatusEvent[] = [];
+    const r = results.get(toolUseId);
+    if (r && !asyncLaunched.has(toolUseId))
+      events.push({ ts: r.ts, status: r.isError ? "failed" : "done" });
+    if (events.length === 0) return "working";
+    events.sort((x, y) => x.ts - y.ts);
+    return events[events.length - 1].status;
+  };
+
   const nodeById = new Map<string, Subagent>();
   for (const a of agents) {
     const s = scans.get(a.agentId)!;
-    const status: Subagent["status"] = !results.has(a.meta.toolUseId)
-      ? "working"
-      : results.get(a.meta.toolUseId)
-        ? "failed"
-        : "done";
+    const status = statusOf(a.meta.toolUseId);
     // No assistant row reported a model yet (e.g. a just-spawned agent): leave it unset rather than
     // asserting the Opus normalize-fallback as a real label.
     const model: Family | undefined =

@@ -31,6 +31,30 @@ function main(toolUseId: string, result?: { is_error: boolean }): any[] {
   return rows;
 }
 
+// A main transcript that dispatches `toolUseId` in the background: the dispatch's tool_result is
+// the CLI's immediate "async_launched" acknowledgment, not a completion — the agent is still running.
+function asyncMain(toolUseId: string, agentId: string): any[] {
+  return [
+    {
+      type: "assistant",
+      timestamp: "2026-06-04T03:00:00.000Z",
+      message: {
+        content: [{ type: "tool_use", id: toolUseId, name: "Agent" }],
+      },
+    },
+    {
+      type: "user",
+      timestamp: "2026-06-04T03:00:01.000Z",
+      message: {
+        content: [
+          { type: "tool_result", tool_use_id: toolUseId, is_error: false },
+        ],
+      },
+      toolUseResult: { isAsync: true, status: "async_launched", agentId },
+    },
+  ];
+}
+
 function agent(
   agentId: string,
   toolUseId: string,
@@ -372,6 +396,15 @@ describe("buildSubagentForest", () => {
       ]),
     ]);
     expect(forest[0].status).toBe("failed");
+  });
+
+  it("keeps a background-launched agent working despite the launch-ack result", () => {
+    // A background dispatch gets an immediate non-error tool_result (toolUseResult.status
+    // "async_launched") while the agent keeps running. That ack must not read as completion.
+    const forest = buildSubagentForest(asyncMain("tu-1", "a1"), [
+      agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")]),
+    ]);
+    expect(forest[0].status).toBe("working");
   });
 
   it("counts a streamed turn once (no per-row inflation)", () => {
