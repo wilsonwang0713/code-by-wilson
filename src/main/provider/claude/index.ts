@@ -24,10 +24,10 @@ import {
 import { readTasksForSession, tasksNewestMtime } from "./tasks";
 import {
   reconstructShells,
-  tailOutput,
   stitchSnapshots,
   toBackgroundShell,
 } from "./shells";
+import { tailOutput } from "./task-notifications";
 import { resolveAdoptTarget, resolveSessionCwd } from "./adopt-target";
 import { computeTokenSpeed, SPEED_WINDOW_MS } from "./transcript-speed";
 import { firstTranscriptCwd } from "./transcript";
