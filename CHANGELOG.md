@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.29] - 2026-07-12
+
+### Added
+
+- The Activity dock gains a fourth **Monitors** tab that mirrors Shells:
+  harness `Monitor` runs reconstructed from the transcript with a status
+  pill, live output tail, and a details modal.
+- Dropping a file onto the Claude Code (Managed) terminal inserts its
+  shell-quoted path at the cursor.
+
 ## [0.1.28] - 2026-07-11
 
 ### Added
@@ -683,7 +693,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.28...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.29...HEAD
+[0.1.29]: https://github.com/luojiahai/code-by-wire/compare/v0.1.28...v0.1.29
 [0.1.28]: https://github.com/luojiahai/code-by-wire/compare/v0.1.27...v0.1.28
 [0.1.27]: https://github.com/luojiahai/code-by-wire/compare/v0.1.26...v0.1.27
 [0.1.26]: https://github.com/luojiahai/code-by-wire/compare/v0.1.25...v0.1.26
