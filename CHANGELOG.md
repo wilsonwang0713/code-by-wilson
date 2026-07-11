@@ -6,6 +6,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-07-11
+
+### Added
+
+- A compaction counter row appears in the session panel, derived from
+  transcript boundaries.
+- The Pressure panel's rate-limit windows gain an "Extra" row for paid
+  usage-based credit, alongside the existing windows.
+
+### Changed
+
+- Background shell details now open in a centered "Shell details" modal
+  instead of drilling into the center view; the drill-stack is subagent-only,
+  and opening a shell from the Activity dock no longer force-switches the
+  view.
+- Scrollbars are visually consistent everywhere: both sidebars and the
+  tool-result/diff/shell-log modals now use the overlay-thumb style already
+  used elsewhere, and `OverlayScroll` gains horizontal-axis support for the
+  modals that scroll both ways.
+- Session metadata adopted several accuracy improvements from ccstatusline
+  parity work: context-window size now parses `[1m]` model variants correctly
+  (1M instead of a flat 200k), effort level falls back through a transcript
+  scan and `settings.json` when the capture doesn't have it, Ended and
+  renamed sessions keep a session clock and their custom title, the PR row
+  renders review state from a richer, 30s-cached query even without a live
+  capture, and git branch detection now reads `symbolic-ref --short HEAD`.
+
+### Fixed
+
+- The right sidebar's rate-limit windows — including the 7-day percentage
+  that could latch onto a stale weekly high (e.g. showing 38% when the true
+  value was 22%) — are now computed per-session from Claude Code's own usage
+  API instead of aggregated across sessions.
+- The main terminal's doubled scrollbar — a Chromium 121 regression where
+  setting `scrollbar-color` silently disabled every `::-webkit-scrollbar-*`
+  rule — is fixed, and the footer shell-terminal now shows a scrollbar at
+  all.
+- The Activity dock's Subagents tab no longer marks a background-launched
+  agent done immediately after dispatch, and a completed agent resumed via
+  SendMessage correctly flips back to working instead of staying stuck on
+  done.
+- Subagent discovery no longer miscounts in transcript layouts where
+  multiple sessions share a subagent directory, and token-speed totals no
+  longer include API-error rows or main-transcript sidechains.
+
 ## [0.1.27] - 2026-07-10
 
 ### Changed
@@ -638,7 +683,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.27...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.28...HEAD
+[0.1.28]: https://github.com/luojiahai/code-by-wire/compare/v0.1.27...v0.1.28
 [0.1.27]: https://github.com/luojiahai/code-by-wire/compare/v0.1.26...v0.1.27
 [0.1.26]: https://github.com/luojiahai/code-by-wire/compare/v0.1.25...v0.1.26
 [0.1.25]: https://github.com/luojiahai/code-by-wire/compare/v0.1.24...v0.1.25
