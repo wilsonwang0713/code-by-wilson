@@ -56,6 +56,34 @@ export interface BackgroundShell {
   trigger: "explicit" | "auto" | "user";
 }
 
+/** A monitor's lifecycle status. running until its terminal <status> notification lands. */
+export type MonitorStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "killed"
+  | "stopped";
+
+/** A harness Monitor run: a background until-loop the agent uses to watch an external condition. */
+export interface Monitor {
+  /** The Monitor taskId (e.g. "b00xlwyxk"); stable id + drill key. */
+  id: string;
+  /** The until-loop command line the monitor runs. */
+  command: string;
+  /** The Monitor tool's `description` arg, when one was given. */
+  description?: string;
+  /** running until a terminal <status> notification lands. */
+  status: MonitorStatus;
+  /** toolUseResult.persistent — true ⇒ runs until killed/stopped (timeoutMs 0). */
+  persistent: boolean;
+  /** toolUseResult.timeoutMs — the non-persistent timeout; 0 when persistent. */
+  timeoutMs: number;
+  /** Start wall-clock (epoch ms): the start tool_result's timestamp. */
+  startMs?: number;
+  /** end − start once a terminal status lands; absent while running. */
+  durationMs?: number;
+}
+
 /** The drilled-in view of one shell's output: the (byte-bounded) log text, where it came from, and how
  *  many leading bytes were dropped (0 when whole). */
 export interface ShellOutput {

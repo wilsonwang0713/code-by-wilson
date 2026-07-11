@@ -2,9 +2,9 @@
 import { describe, it, expect } from "vitest";
 import {
   reconstructShells,
-  tailOutput,
   stitchSnapshots,
 } from "../../src/main/provider/claude/shells";
+import { tailOutput } from "../../src/main/provider/claude/task-notifications";
 
 const TASKS = "/tmp/claude/proj/sess/tasks";
 

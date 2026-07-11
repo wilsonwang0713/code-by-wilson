@@ -1,37 +1,36 @@
-import type { BackgroundShell } from "@shared/types";
+import type { Monitor } from "@shared/types";
 import { ModalShell } from "../ui/ModalShell";
 import { cx } from "../ui/atoms";
-import { shellDetailMeta } from "./panels/shell-view";
+import { monitorDetailMeta } from "./panels/monitor-view";
 import type { ShellOutputState } from "./use-shell-output";
 import { OutputBox } from "./OutputBox";
 
-/** The Shell details modal: a "Shell details" title over Status / Runtime / Command / Output rows. A pure
- *  renderer — the live shell and its output poll are lifted to WorkspaceBody (like ShellDrill was), so this
- *  is a dumb view built on ModalShell's chrome, exactly like ToolResultModal / DiffModal. Escape,
- *  overlay-click, and the focus-trap come from ModalShell. Always read-only; cbw never controls a shell. */
-export function ShellDetailModal({
-  shell,
+/** The Monitor details modal: a "Monitor details" title over Status / Runtime / Script / Output rows. A
+ *  pure renderer — the live monitor and its output poll are lifted to Workspace (like the shell modal), so
+ *  this is a dumb view on ModalShell's chrome. Always read-only; cbw never controls a monitor. */
+export function MonitorDetailModal({
+  monitor,
   output,
   now,
   onClose,
 }: {
-  shell: BackgroundShell;
+  monitor: Monitor;
   output: ShellOutputState;
   now: number;
   onClose: () => void;
 }) {
-  const meta = shellDetailMeta(shell, now);
+  const meta = monitorDetailMeta(monitor, now);
   return (
     <ModalShell
-      labelledBy="shell-detail-title"
+      labelledBy="monitor-detail-title"
       widthClass="w-[40rem] max-w-[92vw]"
       onClose={onClose}
     >
       <div
-        id="shell-detail-title"
+        id="monitor-detail-title"
         className="mb-4 text-subhead font-semibold text-fg"
       >
-        Shell details
+        Monitor details
       </div>
 
       <div className="grid grid-cols-[max-content_1fr] items-start gap-x-4 gap-y-3">
@@ -45,11 +44,9 @@ export function ShellDetailModal({
           {meta.runtime}
         </div>
 
-        <div className="text-meta text-fg-muted">Command</div>
+        <div className="text-meta text-fg-muted">Script</div>
         <div className="max-h-40 overflow-auto rounded-md border border-ink-800 bg-well px-3 py-2 font-mono text-meta">
-          <span className="break-all text-fg">
-            <span className="text-primary">$</span> {shell.command}
-          </span>
+          <span className="break-all text-fg">{monitor.command}</span>
         </div>
 
         <div className="text-meta text-fg-muted">Output</div>
