@@ -5,8 +5,6 @@ import {
   truncLabel,
   ansiClass,
   shellStatusPill,
-  triggerLabel,
-  shellMetaSegments,
   shellDetailMeta,
 } from "../../src/renderer/src/workspace/panels/shell-view";
 
@@ -90,54 +88,6 @@ describe("shellStatusPill", () => {
       label: "killed",
       tone: "text-fg-faint",
     });
-  });
-});
-
-describe("triggerLabel", () => {
-  it("maps each trigger to its human string", () => {
-    expect(triggerLabel("explicit")).toBe("run in background");
-    expect(triggerLabel("auto")).toBe("auto-backgrounded");
-    expect(triggerLabel("user")).toBe("Ctrl-B");
-  });
-});
-
-describe("shellMetaSegments", () => {
-  it("a clean completed shell: exit, duration, trigger", () => {
-    expect(
-      shellMetaSegments(
-        {
-          status: "completed",
-          exitCode: 0,
-          durationMs: 0,
-          trigger: "explicit",
-        },
-        1000,
-      ),
-    ).toEqual(["exit 0", "0s", "run in background"]);
-  });
-  it("a failed shell keeps the non-zero exit and duration", () => {
-    expect(
-      shellMetaSegments(
-        { status: "completed", exitCode: 1, durationMs: 2400, trigger: "auto" },
-        1000,
-      ),
-    ).toEqual(["exit 1", "2s", "auto-backgrounded"]);
-  });
-  it("a running shell shows elapsed from now and drops exit/duration", () => {
-    expect(
-      shellMetaSegments(
-        { status: "running", startMs: 82_000, trigger: "explicit" },
-        100_000,
-      ),
-    ).toEqual(["elapsed 18s", "run in background"]);
-  });
-  it("a killed shell omits its signal-derived exit code, matching the row", () => {
-    expect(
-      shellMetaSegments(
-        { status: "killed", exitCode: 137, durationMs: 5000, trigger: "user" },
-        1000,
-      ),
-    ).toEqual(["5s", "Ctrl-B"]);
   });
 });
 

@@ -72,40 +72,6 @@ export function shellDetailMeta(
   };
 }
 
-/** The Bash-background trigger in words, for the header meta row. */
-export function triggerLabel(trigger: BackgroundShell["trigger"]): string {
-  switch (trigger) {
-    case "auto":
-      return "auto-backgrounded";
-    case "user":
-      return "Ctrl-B";
-    default:
-      return "run in background";
-  }
-}
-
-/** The header meta segments, in order: exit code (completed shells only, matching the list row — a killed
- *  shell reads "killed", never its signal-derived code), duration — or `elapsed <n>` while still running —
- *  then the human trigger. Each is dropped when its field is absent, so a running shell with no duration
- *  yields just `elapsed …` + trigger and no dangling separator. The caller joins with " · ". */
-export function shellMetaSegments(
-  shell: Pick<
-    BackgroundShell,
-    "status" | "exitCode" | "durationMs" | "startMs" | "trigger"
-  >,
-  now: number,
-): string[] {
-  const segs: string[] = [];
-  if (shell.status === "completed" && shell.exitCode !== undefined)
-    segs.push(`exit ${shell.exitCode}`);
-  if (shell.status === "running" && shell.startMs !== undefined)
-    segs.push(`elapsed ${formatDuration(now - shell.startMs)}`);
-  else if (shell.durationMs !== undefined)
-    segs.push(formatDuration(shell.durationMs));
-  segs.push(triggerLabel(shell.trigger));
-  return segs;
-}
-
 /** A human label for dropped leading bytes, or "" when nothing was truncated. */
 export function truncLabel(bytes: number): string {
   if (bytes <= 0) return "";
