@@ -90,6 +90,30 @@ function batch(msgId: string, toolUseIds: string[]): any[] {
   ];
 }
 
+// The dequeued user row of a <task-notification>: the CLI's real stop signal for a background
+// agent. taskId is the agentId; the row's message.content is the raw notification string.
+function notificationRow(taskId: string, status: string, ts: string): any {
+  return {
+    type: "user",
+    timestamp: ts,
+    message: {
+      role: "user",
+      content: `<task-notification>\n<task-id>${taskId}</task-id>\n<tool-use-id>tu-x</tool-use-id>\n<output-file>/tmp/${taskId}.output</output-file>\n<status>${status}</status>\n<summary>Agent finished</summary>\n</task-notification>`,
+    },
+  };
+}
+
+// The queue-operation twin, written at enqueue time (top-level string content, no message).
+// A mid-turn parent can hold the user row back for minutes; this row is immediate.
+function queueNotificationRow(taskId: string, status: string, ts: string): any {
+  return {
+    type: "queue-operation",
+    operation: "enqueue",
+    timestamp: ts,
+    content: `<task-notification>\n<task-id>${taskId}</task-id>\n<status>${status}</status>\n</task-notification>`,
+  };
+}
+
 // A minimal positioned assistant row for a subagent transcript.
 const ar = (ts: string): any => ({
   type: "assistant",
@@ -625,5 +649,97 @@ describe("buildSubagentForest", () => {
       agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:00.000Z")]),
     ]);
     expect(forest[0].batchId).toBeUndefined();
+  });
+
+  it("settles a background agent done on its completed task-notification", () => {
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "completed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("done");
+  });
+
+  it("settles a background agent failed on a failed notification", () => {
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "failed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("failed");
+  });
+
+  it("maps a killed notification to failed", () => {
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "killed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("failed");
+  });
+
+  it("reads a notification present only as a queue-operation row", () => {
+    // The parent was mid-turn: the user row never landed, only the enqueue row did.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        queueNotificationRow("a1", "completed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("done");
+  });
+
+  it("ignores a notification whose task-id matches no known agent", () => {
+    // Background Bash tasks and workflows notify too — foreign task-ids must not touch agents.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("bash-task-9", "completed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("treats an unknown notification status as a no-op", () => {
+    // A future CLI status value must never wrongly finish or fail an agent.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "running", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("does not parse notification text quoted inside an assistant row", () => {
+    // An assistant echoing notification text (e.g. discussing one) is not a real stop signal.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        {
+          type: "assistant",
+          timestamp: "2026-06-04T03:05:00.000Z",
+          message: {
+            content: [
+              {
+                type: "text",
+                text: "<task-notification>\n<task-id>a1</task-id>\n<status>completed</status>\n</task-notification>",
+              },
+            ],
+          },
+        },
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
   });
 });

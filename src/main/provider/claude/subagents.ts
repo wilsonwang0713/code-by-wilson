@@ -34,6 +34,8 @@ interface Scan {
   /** tool_use ids whose result was the background-launch acknowledgment (row-level
    *  toolUseResult.status === "async_launched") — a launch receipt, not a completion. */
   asyncLaunched: Set<string>;
+  /** Task-notifications recorded in this transcript (user + queue-operation rows). */
+  notifications: TaskNotification[];
   /** First raw model string seen on an assistant row, normalized later; undefined when none reported. */
   model: string | undefined;
   /** The Claude Code CLI's per-agent token count: the LAST assistant usage snapshot's input + output
@@ -54,11 +56,37 @@ interface StatusEvent {
   status: Subagent["status"];
 }
 
+/** A <task-notification> parsed from a user or queue-operation row: the stop signal for a
+ *  background agent. `taskId` is the agent's id; `status` is the raw <status> text —
+ *  "completed" | "failed" | "killed" today, folded conservatively so future values are no-ops. */
+interface TaskNotification {
+  taskId: string;
+  status: string;
+  ts: number;
+}
+
+const NOTIFICATION_RE =
+  /<task-notification>[\s\S]*?<task-id>([^<]+)<\/task-id>[\s\S]*?<status>([^<]+)<\/status>/g;
+
+/** Parse every <task-notification> block in `text`. The CLI writes each notification twice — a
+ *  queue-operation row at enqueue, a user row at dequeue — and the status fold is idempotent, so
+ *  parsing duplicates is harmless. */
+function pushNotifications(
+  text: string,
+  ts: number,
+  out: TaskNotification[],
+): void {
+  if (!text.includes("<task-notification>")) return;
+  for (const m of text.matchAll(NOTIFICATION_RE))
+    out.push({ taskId: m[1].trim(), status: m[2].trim(), ts });
+}
+
 function scanRows(rows: any[]): Scan {
   const toolUseIds = new Set<string>();
   const dispatchMsgOf = new Map<string, string>();
   const results = new Map<string, { isError: boolean; ts: number }>();
   const asyncLaunched = new Set<string>();
+  const notifications: TaskNotification[] = [];
   let model: string | undefined;
   let firstTs = Infinity;
   let lastTs = -Infinity;
@@ -76,6 +104,9 @@ function scanRows(rows: any[]): Scan {
       if (ts > lastTs) lastTs = ts;
     }
     const evTs = Number.isNaN(ts) ? 0 : ts;
+    // The enqueue twin of a notification lives at the row's top level, before any message exists.
+    if (row?.type === "queue-operation" && typeof row.content === "string")
+      pushNotifications(row.content, evTs, notifications);
     const msg = row?.message;
     if (row?.type === "assistant") {
       if (!model && typeof msg?.model === "string") model = msg.model;
@@ -83,6 +114,8 @@ function scanRows(rows: any[]): Scan {
       if (u && typeof u === "object") lastUsage = u;
     }
     const content = msg?.content;
+    if (row?.type === "user" && typeof content === "string")
+      pushNotifications(content, evTs, notifications);
     if (Array.isArray(content)) {
       let resultBlocks = 0;
       let firstResultId: string | undefined;
@@ -96,6 +129,12 @@ function scanRows(rows: any[]): Scan {
           resultBlocks += 1;
           if (resultBlocks === 1) firstResultId = b.tool_use_id;
         }
+        if (
+          row?.type === "user" &&
+          b?.type === "text" &&
+          typeof b.text === "string"
+        )
+          pushNotifications(b.text, evTs, notifications);
       }
       // toolUseResult is row-level, so it can only be attributed to a single-result row.
       const tur = row?.toolUseResult;
@@ -116,6 +155,7 @@ function scanRows(rows: any[]): Scan {
     dispatchMsgOf,
     results,
     asyncLaunched,
+    notifications,
     model,
     tokens:
       last.inputTokens +
@@ -154,7 +194,8 @@ function reaches(
  * root subagent is dispatched from the main transcript; a nested one is dispatched from inside its
  * parent agent's transcript. Status folds the agent's lifecycle events in timestamp order (last wins):
  * the dispatch's tool_result (is_error ⇒ failed, else done — but a background launch ack, toolUseResult
- * "async_launched", is a receipt and contributes nothing); no events ⇒ working. The output is always an
+ * "async_launched", is a receipt and contributes nothing), and its <task-notification> stop signals
+ * (completed ⇒ done, failed/killed ⇒ failed, others no-op); no events ⇒ working. The output is always an
  * acyclic forest, even on malformed input. Pure: same input,
  * same output.
  */
@@ -186,6 +227,13 @@ export function buildSubagentForest(
   for (const [id, r] of mainScan.results) results.set(id, r);
   for (const id of mainScan.asyncLaunched) asyncLaunched.add(id);
 
+  // Task-notifications merged across every transcript; order matters only via each event's ts (the
+  // stable sort in statusOf keeps agents-then-main insertion order on ties).
+  const notifications: TaskNotification[] = [];
+  for (const a of agents)
+    notifications.push(...scans.get(a.agentId)!.notifications);
+  notifications.push(...mainScan.notifications);
+
   // tool_use id → its dispatching assistant message id, merged across every transcript (main wins).
   // Message ids are globally unique, so a collision is not expected; main-wins keeps the rule uniform.
   const dispatchMsgOf = new Map<string, string>();
@@ -198,11 +246,18 @@ export function buildSubagentForest(
   // dispatch's tool_result is one event (is_error ⇒ failed, else done) — EXCEPT the background
   // launch ack, which is a receipt, not a completion, and contributes nothing. An agent with no
   // events is still working. Sort is stable, so same-ts events keep insertion order.
-  const statusOf = (toolUseId: string): Subagent["status"] => {
+  const statusOf = (agentId: string, toolUseId: string): Subagent["status"] => {
     const events: StatusEvent[] = [];
     const r = results.get(toolUseId);
     if (r && !asyncLaunched.has(toolUseId))
       events.push({ ts: r.ts, status: r.isError ? "failed" : "done" });
+    for (const n of notifications) {
+      if (n.taskId !== agentId) continue;
+      if (n.status === "completed") events.push({ ts: n.ts, status: "done" });
+      else if (n.status === "failed" || n.status === "killed")
+        events.push({ ts: n.ts, status: "failed" });
+      // Any other status value is a no-op: a future CLI status can't wrongly settle an agent.
+    }
     if (events.length === 0) return "working";
     events.sort((x, y) => x.ts - y.ts);
     return events[events.length - 1].status;
@@ -211,7 +266,7 @@ export function buildSubagentForest(
   const nodeById = new Map<string, Subagent>();
   for (const a of agents) {
     const s = scans.get(a.agentId)!;
-    const status = statusOf(a.meta.toolUseId);
+    const status = statusOf(a.agentId, a.meta.toolUseId);
     // No assistant row reported a model yet (e.g. a just-spawned agent): leave it unset rather than
     // asserting the Opus normalize-fallback as a real label.
     const model: Family | undefined =
