@@ -28,8 +28,16 @@ interface Scan {
   toolUseIds: Set<string>;
   /** tool_use id → the assistant message.id that carried it; the dispatch-batch key for grouping. */
   dispatchMsgOf: Map<string, string>;
-  /** tool_use_id → is_error, for the tool_results recorded in this transcript. */
-  results: Map<string, boolean>;
+  /** tool_use_id → its result's is_error + row timestamp (epoch ms; 0 when the row carried none),
+   *  for the tool_results recorded in this transcript. */
+  results: Map<string, { isError: boolean; ts: number }>;
+  /** tool_use ids whose result was the background-launch acknowledgment (row-level
+   *  toolUseResult.status === "async_launched") — a launch receipt, not a completion. */
+  asyncLaunched: Set<string>;
+  /** Task-notifications recorded in this transcript (user + queue-operation rows). */
+  notifications: TaskNotification[];
+  /** Successful SendMessage deliveries recorded in this transcript — each resumes its target. */
+  resumes: SendResume[];
   /** First raw model string seen on an assistant row, normalized later; undefined when none reported. */
   model: string | undefined;
   /** The Claude Code CLI's per-agent token count: the LAST assistant usage snapshot's input + output
@@ -43,10 +51,63 @@ interface Scan {
   lastTs: number;
 }
 
+/** One status-changing lifecycle occurrence for an agent; the per-agent fold sorts these by
+ *  timestamp (stable — ties keep insertion order) and takes the last one. */
+interface StatusEvent {
+  ts: number;
+  status: Subagent["status"];
+}
+
+/** A <task-notification> parsed from a user or queue-operation row: the stop signal for a
+ *  background agent. `taskId` is the agent's id; `status` is the raw <status> text —
+ *  "completed" | "failed" | "killed" today, folded conservatively so future values are no-ops. */
+interface TaskNotification {
+  taskId: string;
+  status: string;
+  ts: number;
+}
+
+const NOTIFICATION_BLOCK_RE =
+  /<task-notification>([\s\S]*?)<\/task-notification>/g;
+const NOTIFICATION_FIELDS_RE =
+  /<task-id>([^<]+)<\/task-id>[\s\S]*?<status>([^<]+)<\/status>/;
+
+/** Parse every <task-notification> block in `text`. Each block is isolated by its own closing tag
+ *  before <task-id>/<status> are extracted, so a malformed block (missing one of the two fields)
+ *  can never bleed into its neighbor's fields. The CLI writes each notification twice — a
+ *  queue-operation row at enqueue, a user row at dequeue — and the status fold is idempotent, so
+ *  parsing duplicates is harmless. */
+function pushNotifications(
+  text: string,
+  ts: number,
+  out: TaskNotification[],
+): void {
+  if (!text.includes("<task-notification>")) return;
+  for (const block of text.matchAll(NOTIFICATION_BLOCK_RE)) {
+    const fields = NOTIFICATION_FIELDS_RE.exec(block[1]);
+    if (fields)
+      out.push({ taskId: fields[1].trim(), status: fields[2].trim(), ts });
+  }
+}
+
+/** A successful SendMessage delivery, which resumes an at-rest agent. `to` is the tool input's
+ *  target (an agent id, or a name); `resolvedId` is the agent id the CLI echoed back in its
+ *  result message ("Agent \"<id>\" …"), which resolves a by-name send. */
+interface SendResume {
+  to: string;
+  resolvedId?: string;
+  ts: number;
+}
+
 function scanRows(rows: any[]): Scan {
   const toolUseIds = new Set<string>();
   const dispatchMsgOf = new Map<string, string>();
-  const results = new Map<string, boolean>();
+  const results = new Map<string, { isError: boolean; ts: number }>();
+  const asyncLaunched = new Set<string>();
+  const notifications: TaskNotification[] = [];
+  const resumes: SendResume[] = [];
+  // tool_use id → SendMessage target, awaiting its result row later in the file.
+  const sendTargets = new Map<string, string>();
   let model: string | undefined;
   let firstTs = Infinity;
   let lastTs = -Infinity;
@@ -63,6 +124,10 @@ function scanRows(rows: any[]): Scan {
       if (ts < firstTs) firstTs = ts;
       if (ts > lastTs) lastTs = ts;
     }
+    const evTs = Number.isNaN(ts) ? 0 : ts;
+    // The enqueue twin of a notification lives at the row's top level, before any message exists.
+    if (row?.type === "queue-operation" && typeof row.content === "string")
+      pushNotifications(row.content, evTs, notifications);
     const msg = row?.message;
     if (row?.type === "assistant") {
       if (!model && typeof msg?.model === "string") model = msg.model;
@@ -70,14 +135,50 @@ function scanRows(rows: any[]): Scan {
       if (u && typeof u === "object") lastUsage = u;
     }
     const content = msg?.content;
+    if (row?.type === "user" && typeof content === "string")
+      pushNotifications(content, evTs, notifications);
     if (Array.isArray(content)) {
+      let resultBlocks = 0;
+      let firstResultId: string | undefined;
       for (const b of content) {
         if (b?.type === "tool_use" && typeof b.id === "string") {
           toolUseIds.add(b.id);
           if (typeof msg?.id === "string") dispatchMsgOf.set(b.id, msg.id);
+          if (b.name === "SendMessage" && typeof b.input?.to === "string")
+            sendTargets.set(b.id, b.input.to);
         }
-        if (b?.type === "tool_result" && typeof b.tool_use_id === "string")
-          results.set(b.tool_use_id, !!b.is_error);
+        if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
+          results.set(b.tool_use_id, { isError: !!b.is_error, ts: evTs });
+          resultBlocks += 1;
+          if (resultBlocks === 1) firstResultId = b.tool_use_id;
+        }
+        if (
+          row?.type === "user" &&
+          b?.type === "text" &&
+          typeof b.text === "string"
+        )
+          pushNotifications(b.text, evTs, notifications);
+      }
+      // toolUseResult is row-level, so it can only be attributed to a single-result row.
+      const tur = row?.toolUseResult;
+      const turObj = tur && typeof tur === "object" ? tur : undefined;
+      if (resultBlocks === 1 && firstResultId !== undefined) {
+        if (turObj?.status === "async_launched")
+          asyncLaunched.add(firstResultId);
+        const to = sendTargets.get(firstResultId);
+        if (
+          to !== undefined &&
+          !results.get(firstResultId)!.isError &&
+          turObj?.success !== false
+        ) {
+          const m =
+            typeof turObj?.message === "string"
+              ? /^Agent "([^"]+)"/.exec(turObj.message)
+              : null;
+          const resume: SendResume = { to, ts: evTs };
+          if (m) resume.resolvedId = m[1];
+          resumes.push(resume);
+        }
       }
     }
   }
@@ -87,6 +188,9 @@ function scanRows(rows: any[]): Scan {
     toolUseIds,
     dispatchMsgOf,
     results,
+    asyncLaunched,
+    notifications,
+    resumes,
     model,
     tokens:
       last.inputTokens +
@@ -123,8 +227,12 @@ function reaches(
 /**
  * Reconstruct the subagent forest from the main transcript's rows and each subagent's rows + meta. A
  * root subagent is dispatched from the main transcript; a nested one is dispatched from inside its
- * parent agent's transcript. Status comes from the dispatch's tool_result (absent ⇒ working, is_error ⇒
- * failed, else done). The output is always an acyclic forest, even on malformed input. Pure: same input,
+ * parent agent's transcript. Status folds the agent's lifecycle events in timestamp order (last wins):
+ * the dispatch's tool_result (is_error ⇒ failed, else done — but a background launch ack, toolUseResult
+ * "async_launched", is a receipt and contributes nothing), and its <task-notification> stop signals
+ * (completed ⇒ done, failed/killed ⇒ failed, others no-op), and successful SendMessage deliveries
+ * (⇒ working again until the next stop); no events ⇒ working. The output is always an
+ * acyclic forest, even on malformed input. Pure: same input,
  * same output.
  */
 export function buildSubagentForest(
@@ -143,11 +251,29 @@ export function buildSubagentForest(
       dispatcher.set(id, a.agentId);
   for (const id of mainScan.toolUseIds) dispatcher.set(id, null);
 
-  // tool_use_id → is_error of its result, merged once across every transcript (main wins a collision).
-  const results = new Map<string, boolean>();
+  // tool_use_id → its result (is_error + ts), merged once across every transcript (main wins a
+  // collision). asyncLaunched merges the launch-ack ids the same way (a Set union has no collisions).
+  const results = new Map<string, { isError: boolean; ts: number }>();
+  const asyncLaunched = new Set<string>();
+  for (const a of agents) {
+    const s = scans.get(a.agentId)!;
+    for (const [id, r] of s.results) results.set(id, r);
+    for (const id of s.asyncLaunched) asyncLaunched.add(id);
+  }
+  for (const [id, r] of mainScan.results) results.set(id, r);
+  for (const id of mainScan.asyncLaunched) asyncLaunched.add(id);
+
+  // Task-notifications merged across every transcript; order matters only via each event's ts (the
+  // stable sort in statusOf keeps agents-then-main insertion order on ties).
+  const notifications: TaskNotification[] = [];
   for (const a of agents)
-    for (const [id, err] of scans.get(a.agentId)!.results) results.set(id, err);
-  for (const [id, err] of mainScan.results) results.set(id, err);
+    notifications.push(...scans.get(a.agentId)!.notifications);
+  notifications.push(...mainScan.notifications);
+
+  // Successful SendMessage deliveries merged across every transcript, the same way as notifications.
+  const resumes: SendResume[] = [];
+  for (const a of agents) resumes.push(...scans.get(a.agentId)!.resumes);
+  resumes.push(...mainScan.resumes);
 
   // tool_use id → its dispatching assistant message id, merged across every transcript (main wins).
   // Message ids are globally unique, so a collision is not expected; main-wins keeps the rule uniform.
@@ -157,14 +283,37 @@ export function buildSubagentForest(
       dispatchMsgOf.set(id, mid);
   for (const [id, mid] of mainScan.dispatchMsgOf) dispatchMsgOf.set(id, mid);
 
+  const knownIds = new Set(agents.map((a) => a.agentId));
+
+  // An agent's status folds its lifecycle events in timestamp order; the last event wins. The
+  // dispatch's tool_result is one event (is_error ⇒ failed, else done) — EXCEPT the background
+  // launch ack, which is a receipt, not a completion, and contributes nothing. An agent with no
+  // events is still working. Sort is stable, so same-ts events keep insertion order.
+  const statusOf = (agentId: string, toolUseId: string): Subagent["status"] => {
+    const events: StatusEvent[] = [];
+    const r = results.get(toolUseId);
+    if (r && !asyncLaunched.has(toolUseId))
+      events.push({ ts: r.ts, status: r.isError ? "failed" : "done" });
+    for (const n of notifications) {
+      if (n.taskId !== agentId) continue;
+      if (n.status === "completed") events.push({ ts: n.ts, status: "done" });
+      else if (n.status === "failed" || n.status === "killed")
+        events.push({ ts: n.ts, status: "failed" });
+      // Any other status value is a no-op: a future CLI status can't wrongly settle an agent.
+    }
+    for (const rs of resumes) {
+      const target = knownIds.has(rs.to) ? rs.to : rs.resolvedId;
+      if (target === agentId) events.push({ ts: rs.ts, status: "working" });
+    }
+    if (events.length === 0) return "working";
+    events.sort((x, y) => x.ts - y.ts);
+    return events[events.length - 1].status;
+  };
+
   const nodeById = new Map<string, Subagent>();
   for (const a of agents) {
     const s = scans.get(a.agentId)!;
-    const status: Subagent["status"] = !results.has(a.meta.toolUseId)
-      ? "working"
-      : results.get(a.meta.toolUseId)
-        ? "failed"
-        : "done";
+    const status = statusOf(a.agentId, a.meta.toolUseId);
     // No assistant row reported a model yet (e.g. a just-spawned agent): leave it unset rather than
     // asserting the Opus normalize-fallback as a real label.
     const model: Family | undefined =

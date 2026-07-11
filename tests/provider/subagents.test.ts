@@ -31,6 +31,30 @@ function main(toolUseId: string, result?: { is_error: boolean }): any[] {
   return rows;
 }
 
+// A main transcript that dispatches `toolUseId` in the background: the dispatch's tool_result is
+// the CLI's immediate "async_launched" acknowledgment, not a completion — the agent is still running.
+function asyncMain(toolUseId: string, agentId: string): any[] {
+  return [
+    {
+      type: "assistant",
+      timestamp: "2026-06-04T03:00:00.000Z",
+      message: {
+        content: [{ type: "tool_use", id: toolUseId, name: "Agent" }],
+      },
+    },
+    {
+      type: "user",
+      timestamp: "2026-06-04T03:00:01.000Z",
+      message: {
+        content: [
+          { type: "tool_result", tool_use_id: toolUseId, is_error: false },
+        ],
+      },
+      toolUseResult: { isAsync: true, status: "async_launched", agentId },
+    },
+  ];
+}
+
 function agent(
   agentId: string,
   toolUseId: string,
@@ -63,6 +87,74 @@ function batch(msgId: string, toolUseIds: string[]): any[] {
         content: [{ type: "tool_result", tool_use_id: id, is_error: false }],
       },
     })),
+  ];
+}
+
+// The dequeued user row of a <task-notification>: the CLI's real stop signal for a background
+// agent. taskId is the agentId; the row's message.content is the raw notification string.
+function notificationRow(taskId: string, status: string, ts: string): any {
+  return {
+    type: "user",
+    timestamp: ts,
+    message: {
+      role: "user",
+      content: `<task-notification>\n<task-id>${taskId}</task-id>\n<tool-use-id>tu-x</tool-use-id>\n<output-file>/tmp/${taskId}.output</output-file>\n<status>${status}</status>\n<summary>Agent finished</summary>\n</task-notification>`,
+    },
+  };
+}
+
+// The queue-operation twin, written at enqueue time (top-level string content, no message).
+// A mid-turn parent can hold the user row back for minutes; this row is immediate.
+function queueNotificationRow(taskId: string, status: string, ts: string): any {
+  return {
+    type: "queue-operation",
+    operation: "enqueue",
+    timestamp: ts,
+    content: `<task-notification>\n<task-id>${taskId}</task-id>\n<status>${status}</status>\n</task-notification>`,
+  };
+}
+
+// A SendMessage dispatch (input.to = `to`) plus its successful delivery result. The CLI echoes
+// the resolved agent id in toolUseResult.message, which covers SendMessage-by-name.
+function sendMessageRows(
+  toolUseId: string,
+  to: string,
+  resolvedId: string,
+  ts: string,
+  opts: { isError?: boolean; success?: boolean } = {},
+): any[] {
+  return [
+    {
+      type: "assistant",
+      timestamp: ts,
+      message: {
+        content: [
+          {
+            type: "tool_use",
+            id: toolUseId,
+            name: "SendMessage",
+            input: { to },
+          },
+        ],
+      },
+    },
+    {
+      type: "user",
+      timestamp: ts,
+      message: {
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            is_error: opts.isError ?? false,
+          },
+        ],
+      },
+      toolUseResult: {
+        success: opts.success ?? true,
+        message: `Agent "${resolvedId}" had no active task; resumed from transcript in the background with your message.`,
+      },
+    },
   ];
 }
 
@@ -374,6 +466,15 @@ describe("buildSubagentForest", () => {
     expect(forest[0].status).toBe("failed");
   });
 
+  it("keeps a background-launched agent working despite the launch-ack result", () => {
+    // A background dispatch gets an immediate non-error tool_result (toolUseResult.status
+    // "async_launched") while the agent keeps running. That ack must not read as completion.
+    const forest = buildSubagentForest(asyncMain("tu-1", "a1"), [
+      agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")]),
+    ]);
+    expect(forest[0].status).toBe("working");
+  });
+
   it("counts a streamed turn once (no per-row inflation)", () => {
     const forest = buildSubagentForest(main("tu-1", { is_error: false }), [
       // 5 rows, same id + usage {3, 12}: the turn's tokens are 15, not 75.
@@ -592,5 +693,205 @@ describe("buildSubagentForest", () => {
       agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:00.000Z")]),
     ]);
     expect(forest[0].batchId).toBeUndefined();
+  });
+
+  it("settles a background agent done on its completed task-notification", () => {
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "completed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("done");
+  });
+
+  it("settles a background agent failed on a failed notification", () => {
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "failed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("failed");
+  });
+
+  it("maps a killed notification to failed", () => {
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "killed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("failed");
+  });
+
+  it("reads a notification present only as a queue-operation row", () => {
+    // The parent was mid-turn: the user row never landed, only the enqueue row did.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        queueNotificationRow("a1", "completed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("done");
+  });
+
+  it("ignores a notification whose task-id matches no known agent", () => {
+    // Background Bash tasks and workflows notify too — foreign task-ids must not touch agents.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("bash-task-9", "completed", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("treats an unknown notification status as a no-op", () => {
+    // A future CLI status value must never wrongly finish or fail an agent.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "running", "2026-06-04T03:05:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("does not let a malformed block (missing <status>) steal the next block's status, nor lose the next block's own notification", () => {
+    // Two <task-notification> blocks in ONE row's text: the first is malformed (no <status>), the
+    // second is well-formed for a DIFFERENT agent. A regex that isn't scoped per-block can let its
+    // lazy match skip past the first block's own closing tag and grab the second block's <status> —
+    // misattributing it to the first agent's task-id, and losing the second block's own notification
+    // (matchAll resumes scanning past it). Each block must be isolated by its own closing tag first.
+    const malformedThenWellFormed =
+      "<task-notification>\n<task-id>a1</task-id>\n<tool-use-id>tu-x</tool-use-id>\n<output-file>/tmp/a1.output</output-file>\n<summary>Agent finished</summary>\n</task-notification>\n" +
+      "<task-notification>\n<task-id>a2</task-id>\n<tool-use-id>tu-y</tool-use-id>\n<output-file>/tmp/a2.output</output-file>\n<status>completed</status>\n<summary>Agent finished</summary>\n</task-notification>";
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        ...asyncMain("tu-2", "a2"),
+        {
+          type: "user",
+          timestamp: "2026-06-04T03:05:00.000Z",
+          message: { role: "user", content: malformedThenWellFormed },
+        },
+      ],
+      [
+        agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")]),
+        agent("a2", "tu-2", "Explore", [ar("2026-06-04T03:00:03.000Z")]),
+      ],
+    );
+    const byId = Object.fromEntries(forest.map((n) => [n.id, n]));
+    expect(byId.a1.status).toBe("working"); // malformed block must not falsely settle a1
+    expect(byId.a2.status).toBe("done"); // a2's own well-formed notification must not be lost
+  });
+
+  it("does not parse notification text quoted inside an assistant row", () => {
+    // An assistant echoing notification text (e.g. discussing one) is not a real stop signal.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        {
+          type: "assistant",
+          timestamp: "2026-06-04T03:05:00.000Z",
+          message: {
+            content: [
+              {
+                type: "text",
+                text: "<task-notification>\n<task-id>a1</task-id>\n<status>completed</status>\n</task-notification>",
+              },
+            ],
+          },
+        },
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("flips a done agent back to working on a SendMessage resume", () => {
+    // The second bug shape: a genuinely-completed agent is resumed and works again while the
+    // panel still shows done.
+    const forest = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("settles a resumed agent done on its next completed notification", () => {
+    const forest = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z"),
+        notificationRow("a1", "completed", "2026-06-04T03:12:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("done");
+  });
+
+  it("resolves a SendMessage-by-name resume via the echoed agent id", () => {
+    // input.to is a name, not an agent id; the toolUseResult.message prefix names the real id.
+    const forest = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows(
+          "sm-1",
+          "reviewer",
+          "a1",
+          "2026-06-04T03:10:00.000Z",
+        ),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
+  });
+
+  it("ignores a failed SendMessage delivery", () => {
+    const errored = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z", {
+          isError: true,
+        }),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(errored[0].status).toBe("done");
+    const unsuccessful = buildSubagentForest(
+      [
+        ...main("tu-1", { is_error: false }),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z", {
+          success: false,
+        }),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(unsuccessful[0].status).toBe("done");
+  });
+
+  it("folds a full background lifecycle: launch → notify → resume", () => {
+    // Ends mid-resume so the test discriminates: without resume parsing the completed
+    // notification would (wrongly) leave this agent done.
+    const forest = buildSubagentForest(
+      [
+        ...asyncMain("tu-1", "a1"),
+        notificationRow("a1", "completed", "2026-06-04T03:05:00.000Z"),
+        ...sendMessageRows("sm-1", "a1", "a1", "2026-06-04T03:10:00.000Z"),
+      ],
+      [agent("a1", "tu-1", "Explore", [ar("2026-06-04T03:00:02.000Z")])],
+    );
+    expect(forest[0].status).toBe("working");
   });
 });
