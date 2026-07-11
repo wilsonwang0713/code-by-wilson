@@ -61,9 +61,11 @@ function RateRow({
 
 /**
  * The cockpit's headroom instrument (cockpit spec §Pressure): live context fill (capture preferred,
- * transcript fallback — contextView unchanged) toward the window, then one row per account
- * rate-limit window. 5h and 7d always render (dashed off a capture-less or API-billed account);
- * the weekly per-model buckets appear only when the account carries them.
+ * transcript fallback — contextView unchanged) toward the window, then one row per rate-limit
+ * window, each merged per-session (spec §1.4): the selected session's own capture window wins,
+ * the account API window fills what it's missing. 5h and 7d always render (dashed off a
+ * capture-less or API-billed account); the weekly per-model buckets appear only when either side
+ * carries them.
  */
 export function PressurePanel({
   live,

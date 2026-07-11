@@ -55,7 +55,7 @@ describe("readPr", () => {
     await flush();
     expect(readPr("/repo", "main", now)).toEqual({ number: 1, url: "u" });
 
-    clock += 60_001; // past the 60s TTL
+    clock += 60_001; // past the 30s TTL
     expect(readPr("/repo", "main", now)).toEqual({ number: 1, url: "u" }); // stale value served
     await flush();
     expect(calls).toBe(2);

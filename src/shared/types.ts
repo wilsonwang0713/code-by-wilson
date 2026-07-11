@@ -141,7 +141,8 @@ export interface Session {
   /** Lines added/removed this session, from the statusLine `cost` block. Absent ⇒ no sample. */
   linesAdded?: number;
   linesRemoved?: number;
-  /** Thinking effort level from the live capture (effort.level). Absent ⇒ no sample / not reported. */
+  /** Thinking effort level: live capture (effort.level), else the transcript-scanned level, else
+   *  the settings.json default (A6) — first of that chain that's known. Absent ⇒ none known. */
   effortLevel?: string;
   /** Elapsed session wall-clock in ms (cost.total_duration_ms). Absent ⇒ no sample. */
   sessionClockMs?: number;

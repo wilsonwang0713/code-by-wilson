@@ -141,7 +141,8 @@ function pctOfWindow(tokens: number, window: number): number {
 /**
  * Turn a persisted snapshot into a renderer-facing Session, computing the derived display values
  * (context window, context %) from the stored raw numbers + model — the single place those formulas
- * live. The window is a fixed per-family property of the model, so it's derived here, not stored.
+ * live. The window is derived here, never stored: a window tag parsed off the stored model id
+ * (`[1m]`, A1) wins when present, else the flat per-family default.
  */
 export function hydrate(p: PersistedSession): Session {
   // A1: a window tag in the stored raw model id (`[1m]`) beats the flat family default, so an
