@@ -14,7 +14,8 @@ import { extractToolResult } from "./tool-result";
 import { parseJsonlRows } from "./transcript-row";
 import {
   buildSubagentForest,
-  listSubagentFiles,
+  collectReferencedAgentIds,
+  listSessionSubagentFiles,
   readSubagentSources,
   subagentFileFor,
   subagentsDirFor,
@@ -205,9 +206,8 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
     path: string,
   ): TokenSpeed | null => {
     const groups = [parseJsonlRows(jsonl)];
-    for (const { path: subPath } of listSubagentFiles(
-      subagentsDirFor(path),
-      id,
+    for (const { path: subPath } of listSessionSubagentFiles(path, id, () =>
+      collectReferencedAgentIds(jsonl),
     )) {
       const sub = readTextOrNull(subPath);
       if (sub !== null) groups.push(parseJsonlRows(sub));
