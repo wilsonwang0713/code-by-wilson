@@ -7,10 +7,10 @@ import { useTranscript, type DocState } from "./use-transcript";
 import { ActivityDock } from "./panels/ActivityDock";
 import { SubagentDrill, type DrillCrumb } from "./SubagentDrill";
 import { indexByDispatch, type DispatchDrill } from "./drill-index";
-import { ShellDrill } from "./ShellDrill";
+import { ShellDetailModal } from "./ShellDetailModal";
 import { useSubagentTranscript } from "./use-subagent-transcript";
 import { useShells } from "./use-shells";
-import { useShellOutput, type ShellOutputState } from "./use-shell-output";
+import { useShellOutput } from "./use-shell-output";
 import { useTasks } from "./use-tasks";
 import { ObservedTerminal } from "./ObservedTerminal";
 import { OverlayScroll } from "../ui/OverlayScroll";
@@ -120,20 +120,23 @@ function WorkspaceBody({
   const doc = useTranscript(s.id);
   const tasks = useTasks(s.id);
   const shells = useShells(s.id);
-  // The drill-stack: empty = the Session transcript; one crumb = drilled into a Subagent or a shell.
+  // The drill-stack is subagent-only: empty = the Session transcript; a crumb = a drilled Subagent.
   const [drill, setDrill] = useState<DrillCrumb[]>([]);
   const top = drill[drill.length - 1];
-  const activeAgentId = top?.kind === "subagent" ? top.agentId : undefined;
-  const activeShellId = top?.kind === "shell" ? top.shellId : undefined;
+  const activeAgentId = top?.agentId;
+  // A background shell opens in a modal, not the drill-stack. Hold the whole shell object so the modal
+  // never blanks if the shell is later reaped from the list; the id drives the lifted output poll and the
+  // dock's row highlight / tab hold.
+  const [modalShell, setModalShell] = useState<BackgroundShell | null>(null);
+  const activeShellId = modalShell?.id;
   // Both polls lifted here (always mounted) and gated on their active id, so they survive the Managed
-  // Terminal ⇄ Transcript toggle. Each is a no-op until something of its kind is drilled.
+  // Terminal ⇄ Transcript toggle. Each is a no-op until a Subagent is drilled / a shell modal is open.
   const subagentDoc = useSubagentTranscript(s.id, activeAgentId);
   const shellOutput = useShellOutput(s.id, activeShellId);
-  // The live BackgroundShell behind the drilled id, re-resolved each poll so the header's status/exit/
-  // duration stay fresh while drilled (a running shell flips to completed on its own). undefined when
-  // nothing is drilled, or when the shell was reaped from the list.
+  // The live BackgroundShell behind the open modal, re-resolved each poll so status/runtime stay fresh
+  // (a running shell flips to completed on its own); falls back to the stored snapshot if it was reaped.
   const activeShell = activeShellId
-    ? shells?.find((sh) => sh.id === activeShellId)
+    ? (shells?.find((sh) => sh.id === activeShellId) ?? modalShell ?? undefined)
     : undefined;
   // Resolve an inline dispatch by its tool_use_id against the session's full nested forest, rebuilt each
   // poll. A dispatch is drillable iff it's a key; clicking PUSHES the resolved subagent (deep), unlike a
@@ -168,9 +171,6 @@ function WorkspaceBody({
           session={s}
           doc={doc}
           subagentDoc={subagentDoc}
-          shellOutput={shellOutput}
-          shell={activeShell}
-          now={now}
           drill={drill}
           onNavigate={(depth) => setDrill((d) => d.slice(0, depth))}
           dispatchDrill={dispatchDrill}
@@ -198,10 +198,16 @@ function WorkspaceBody({
             },
           ])
         }
-        onDrillShell={(shell: BackgroundShell) =>
-          setDrill([{ kind: "shell", shellId: shell.id, label: shell.command }])
-        }
+        onDrillShell={(shell: BackgroundShell) => setModalShell(shell)}
       />
+      {activeShell && (
+        <ShellDetailModal
+          shell={activeShell}
+          output={shellOutput}
+          now={now}
+          onClose={() => setModalShell(null)}
+        />
+      )}
     </div>
   );
 }
@@ -209,15 +215,13 @@ function WorkspaceBody({
 /** The center column's live view. Every session gets the Claude Code ⇄ Transcript switcher in `MiddleHeader`;
  *  `transcriptOn` (lifted to `Workspace`, threaded down here) drives which side shows: off is the Terminal
  *  — the live xterm for a running Managed session, else the ObservedTerminal panel (Fork always, Adopt once
- *  Ended) — on is the Transcript, or the drilled Subagent/Shell surface when the drill-stack is non-empty.
- *  Drilling a lane or shell auto-selects the Transcript side. */
+ *  Ended) — on is the Transcript, or the drilled Subagent surface when the drill-stack is non-empty.
+ *  Drilling a lane auto-selects the Transcript side. A background shell opens in a modal instead (see
+ *  WorkspaceBody), so it never touches this toggle. */
 function CenterView({
   session: s,
   doc,
   subagentDoc,
-  shellOutput,
-  shell,
-  now,
   drill,
   onNavigate,
   dispatchDrill,
@@ -230,9 +234,6 @@ function CenterView({
   session: Session;
   doc: DocState;
   subagentDoc: DocState;
-  shellOutput: ShellOutputState;
-  shell: BackgroundShell | undefined;
-  now: number;
   drill: DrillCrumb[];
   onNavigate: (depth: number) => void;
   dispatchDrill: DispatchDrill;
@@ -244,45 +245,24 @@ function CenterView({
 }) {
   const top = drill[drill.length - 1];
   // The full subagent path, so the breadcrumb shows Session › A › B … instead of just the top.
-  const subagentCrumbs = drill
-    .filter(
-      (c): c is Extract<DrillCrumb, { kind: "subagent" }> =>
-        c.kind === "subagent",
-    )
-    .map((c) => ({
-      agentId: c.agentId,
-      type: c.type,
-      description: c.description,
-    }));
-  const drilledView =
-    top?.kind === "shell" ? (
-      // Keyed by shell id so switching shells remounts the drill: CommandBlock's expand state and the
-      // log scroll reset instead of bleeding from the previous shell.
-      <ShellDrill
-        key={top.shellId}
-        shell={shell}
-        label={top.label}
-        now={now}
-        onBack={() => onNavigate(0)}
-        output={shellOutput}
-      />
-    ) : top?.kind === "subagent" ? (
-      <SubagentDrill
-        crumbs={subagentCrumbs}
-        onNavigate={onNavigate}
-        doc={subagentDoc}
-        dispatchDrill={dispatchDrill}
-        sessionId={s.id}
-      />
-    ) : null;
+  const subagentCrumbs = drill.map((c) => ({
+    agentId: c.agentId,
+    type: c.type,
+    description: c.description,
+  }));
+  const drilledView = top ? (
+    <SubagentDrill
+      crumbs={subagentCrumbs}
+      onNavigate={onNavigate}
+      doc={subagentDoc}
+      dispatchDrill={dispatchDrill}
+      sessionId={s.id}
+    />
+  ) : null;
   const drilled = drill.length > 0;
-  const drilledKey = top
-    ? top.kind === "shell"
-      ? top.shellId
-      : top.agentId
-    : undefined;
+  const drilledKey = top?.agentId;
 
-  // Drilling into a lane or shell always surfaces its content in the Transcript side of the toggle.
+  // Drilling into a Subagent always surfaces its transcript in the Transcript side of the toggle.
   useEffect(() => {
     if (drilledKey) setTranscriptOn(true);
   }, [drilledKey, setTranscriptOn]);

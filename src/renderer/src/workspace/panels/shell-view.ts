@@ -37,38 +37,39 @@ export function shellStatusPill(
   return { glyph: char, label, tone };
 }
 
-/** The Bash-background trigger in words, for the header meta row. */
-export function triggerLabel(trigger: BackgroundShell["trigger"]): string {
-  switch (trigger) {
-    case "auto":
-      return "auto-backgrounded";
-    case "user":
-      return "Ctrl-B";
-    default:
-      return "run in background";
-  }
-}
-
-/** The header meta segments, in order: exit code (completed shells only, matching the list row — a killed
- *  shell reads "killed", never its signal-derived code), duration — or `elapsed <n>` while still running —
- *  then the human trigger. Each is dropped when its field is absent, so a running shell with no duration
- *  yields just `elapsed …` + trigger and no dangling separator. The caller joins with " · ". */
-export function shellMetaSegments(
+/** The Status + Runtime display strings for the Shell details modal. Pure so the modal's only real logic
+ *  is unit-testable without a component-render harness. Status reuses shellStatusPill's glyph/word/tone,
+ *  appending " (exit N)" on a non-zero exit; Runtime is the elapsed time while running, the final duration
+ *  once done, or an em dash when no timestamp is known. */
+export function shellDetailMeta(
   shell: Pick<
     BackgroundShell,
-    "status" | "exitCode" | "durationMs" | "startMs" | "trigger"
+    "status" | "exitCode" | "durationMs" | "startMs"
   >,
   now: number,
-): string[] {
-  const segs: string[] = [];
-  if (shell.status === "completed" && shell.exitCode !== undefined)
-    segs.push(`exit ${shell.exitCode}`);
-  if (shell.status === "running" && shell.startMs !== undefined)
-    segs.push(`elapsed ${formatDuration(now - shell.startMs)}`);
-  else if (shell.durationMs !== undefined)
-    segs.push(formatDuration(shell.durationMs));
-  segs.push(triggerLabel(shell.trigger));
-  return segs;
+): {
+  statusGlyph: string;
+  statusText: string;
+  statusTone: string;
+  runtime: string;
+} {
+  const pill = shellStatusPill(shell);
+  const statusText =
+    shell.status === "completed" && shell.exitCode
+      ? `${pill.label} (exit ${shell.exitCode})`
+      : pill.label;
+  const runtime =
+    shell.status === "running" && shell.startMs !== undefined
+      ? formatDuration(now - shell.startMs)
+      : shell.durationMs !== undefined
+        ? formatDuration(shell.durationMs)
+        : "—";
+  return {
+    statusGlyph: pill.glyph,
+    statusText,
+    statusTone: pill.tone,
+    runtime,
+  };
 }
 
 /** A human label for dropped leading bytes, or "" when nothing was truncated. */
