@@ -11,8 +11,9 @@ import { transaction, type SqliteDb } from "./driver";
 /** Bump when the schema changes OR when summarize's math changes and cached rows must rebuild —
  *  v9 forces the one-time re-summarize for the last-entry-wins usage dedup (usage_by_model rows
  *  cached under first-entry-wins undercounted subagent output). `migrate` rebuilds the index (a
- *  disposable cache) to match — v10 adds effort_level (A6 transcript scan). */
-const SCHEMA_VERSION = 10;
+ *  disposable cache) to match — v10 adds effort_level (A6 transcript scan) — v11 adds the A9
+ *  compaction columns. */
+const SCHEMA_VERSION = 11;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -50,7 +51,9 @@ export function migrate(db: SqliteDb): void {
         cache_creation_1h_tokens INTEGER NOT NULL DEFAULT 0,
         usage_by_model TEXT,
         effort_level TEXT,
-        context_tokens INTEGER NOT NULL DEFAULT 0
+        context_tokens INTEGER NOT NULL DEFAULT 0,
+        compaction_count INTEGER NOT NULL DEFAULT 0,
+        compaction_reclaimed_tokens INTEGER NOT NULL DEFAULT 0
       );
       PRAGMA user_version = ${SCHEMA_VERSION};
     `);
@@ -80,6 +83,8 @@ interface Row {
   usage_by_model: string | null;
   context_tokens: number;
   effort_level: string | null;
+  compaction_count: number;
+  compaction_reclaimed_tokens: number;
 }
 
 /** Parse the persisted usageByModel JSON column into ModelUsage[], or [] when the column is null (an old
@@ -122,6 +127,8 @@ function rowToPersisted(r: Row): PersistedSession {
     usageByModel: parseUsageByModel(r.usage_by_model),
     contextTokens: r.context_tokens,
     effortLevel: r.effort_level ?? undefined,
+    compactionCount: r.compaction_count,
+    compactionTokensReclaimed: r.compaction_reclaimed_tokens,
   };
 }
 
@@ -177,16 +184,20 @@ export function hydrate(p: PersistedSession): Session {
     createdMs: p.createdMs,
     sessionClockMs,
     effortLevel: p.effortLevel,
+    compactionCount: p.compactionCount,
+    compactionTokensReclaimed: p.compactionTokensReclaimed,
   };
 }
 
 const UPSERT = `
   INSERT INTO sessions
     (id, title, project, cwd, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
-     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens, effort_level)
+     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens, effort_level,
+     compaction_count, compaction_reclaimed_tokens)
   VALUES
     (@id, @title, @project, @cwd, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
-     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens, @effort_level)
+     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens, @effort_level,
+     @compaction_count, @compaction_reclaimed_tokens)
   ON CONFLICT(id) DO UPDATE SET
     title = excluded.title,
     project = excluded.project,
@@ -212,7 +223,9 @@ const UPSERT = `
     cache_creation_1h_tokens = excluded.cache_creation_1h_tokens,
     usage_by_model = excluded.usage_by_model,
     context_tokens = excluded.context_tokens,
-    effort_level = excluded.effort_level
+    effort_level = excluded.effort_level,
+    compaction_count = excluded.compaction_count,
+    compaction_reclaimed_tokens = excluded.compaction_reclaimed_tokens
 `;
 
 /**
@@ -250,6 +263,8 @@ export function upsertSessions(
         usage_by_model: JSON.stringify(s.usageByModel ?? []),
         context_tokens: s.contextTokens,
         effort_level: s.effortLevel ?? null,
+        compaction_count: s.compactionCount ?? 0,
+        compaction_reclaimed_tokens: s.compactionTokensReclaimed ?? 0,
       });
     }
   });

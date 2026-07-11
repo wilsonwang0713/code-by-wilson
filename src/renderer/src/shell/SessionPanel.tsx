@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 import type { Session } from "@shared/types";
 import type { GitInfo, PrInfo } from "@shared/metrics";
-import { formatClock, formatRelativeTime } from "@shared/format";
+import {
+  formatClock,
+  formatRelativeTime,
+  formatTokensShort,
+} from "@shared/format";
 import { modelLabel } from "../ui/meta";
 import { PanelSection, PanelHeading } from "../workspace/panels/chrome";
 import { GitReadout } from "./GitReadout";
@@ -76,6 +80,19 @@ export function SessionPanel({
         )}
       </SessionRow>
       <SessionRow label="Clock">{clock ?? "-"}</SessionRow>
+      {(s.compactionCount ?? 0) > 0 && (
+        <SessionRow label="Compactions">
+          <span
+            title={
+              s.compactionTokensReclaimed
+                ? `${formatTokensShort(s.compactionTokensReclaimed)} tokens reclaimed`
+                : undefined
+            }
+          >
+            {s.compactionCount}
+          </span>
+        </SessionRow>
+      )}
       <SessionRow label="Active">
         {formatRelativeTime(s.lastActivityMs, Date.now())}
       </SessionRow>

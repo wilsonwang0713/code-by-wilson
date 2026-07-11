@@ -165,6 +165,10 @@ export interface Session {
    *  API-fetched windows (capture wins per window). Absent when the session has no capture or the
    *  capture carried none. */
   rateLimits?: RateLimitWindows;
+  /** Times this session compacted (transcript compact_boundary rows, A9). Absent/0 hides the row. */
+  compactionCount?: number;
+  /** Tokens reclaimed across those compactions; the row's tooltip. */
+  compactionTokensReclaimed?: number;
   lastActivityMs: number;
   /** Session creation time (epoch ms); see PersistedSession.createdMs. The rail orders Active
    *  sessions by this, newest first. */
@@ -212,6 +216,10 @@ export interface PersistedSession {
   contextTokens: number;
   /** Transcript-scanned effort level (A6); the live capture's effort overlays it. */
   effortLevel?: string;
+  /** Times this session compacted (transcript compact_boundary rows, A9). Absent/0 hides the row. */
+  compactionCount?: number;
+  /** Tokens reclaimed across those compactions; the row's tooltip. */
+  compactionTokensReclaimed?: number;
 }
 
 /**

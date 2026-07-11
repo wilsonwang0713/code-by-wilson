@@ -30,6 +30,10 @@ export interface TranscriptSummary {
   /** Thinking effort scanned from `/effort` / `/model` stdout markers, newest wins (A6). Absent
    *  when the transcript carries none — the capture, then settings.json, layer above/below this. */
   effortLevel?: string;
+  /** Non-sidechain compact_boundary rows (A9): how many times this session compacted. */
+  compactionCount: number;
+  /** Σ max(0, preTokens − postTokens) across boundaries whose compactMetadata carried both. */
+  compactionTokensReclaimed: number;
 }
 
 /** The transcript-derived title: the newest `custom-title` entry (a `/rename` persisted into the
@@ -167,6 +171,8 @@ export function parseTranscript(
   let createdMs = 0; // 0 = no parseable timestamp seen yet
   let effortLevel: string | undefined;
   let customTitle: string | undefined;
+  let compactionCount = 0;
+  let compactionTokensReclaimed = 0;
   const userPrompts: string[] = [];
 
   // Token usage summed over every assistant turn (cost is billed per turn), deduped per message id
@@ -192,6 +198,28 @@ export function parseTranscript(
     // A7: a /rename writes a custom-title row; the newest one is the transcript's own title tier.
     if (row.type === "custom-title" && typeof row.customTitle === "string")
       customTitle = row.customTitle;
+
+    // A9 (ccstatusline compaction.ts:35-70): a compact boundary is a system row; sidechain
+    // boundaries are a subagent's own compactions, not this session's.
+    if (
+      row.type === "system" &&
+      row.subtype === "compact_boundary" &&
+      !row.isSidechain
+    ) {
+      compactionCount++;
+      const meta = row.compactMetadata;
+      if (meta && typeof meta === "object") {
+        const pre = (meta as Record<string, unknown>).preTokens;
+        const post = (meta as Record<string, unknown>).postTokens;
+        if (
+          typeof pre === "number" &&
+          Number.isFinite(pre) &&
+          typeof post === "number" &&
+          Number.isFinite(post)
+        )
+          compactionTokensReclaimed += Math.max(0, pre - post);
+      }
+    }
 
     if (typeof row.timestamp === "string") {
       const ms = Date.parse(row.timestamp);
@@ -288,5 +316,7 @@ export function parseTranscript(
     usage: usageAcc.totals(),
     contextTokens: tail.context ? contextTotal(tail.context) : 0,
     effortLevel,
+    compactionCount,
+    compactionTokensReclaimed,
   };
 }
