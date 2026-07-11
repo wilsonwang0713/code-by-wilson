@@ -28,8 +28,8 @@ import { $paneHeightOverride, setPaneHeightOverride } from "../../shell/panes";
 import { DOCK_DEFAULT_HEIGHT, clampDockHeight } from "./dock-resize";
 
 /**
- * The Session workspace's bottom Activity dock: a single tabbed section (Tasks / Subagents / Shells)
- * spanning the center column below the live view. Collapses to a thin tally bar so the Transcript
+ * The Session workspace's bottom Activity dock: a single tabbed section (Tasks / Subagents / Shells /
+ * Monitors) spanning the center column below the live view. Collapses to a thin tally bar so the Transcript
  * can take the full height, and width-gates with the rail (hidden below `lg`) so a narrow window degrades
  * cleanly to just the live view.
  */
@@ -199,8 +199,8 @@ export function ActivityDock({
   );
 }
 
-/** The dock's header bar: an ACTIVITY overline label, the underline Tabs of Tasks / Subagents / Shells
- *  (each with a count), and a collapse chevron pinned to the right edge. */
+/** The dock's header bar: an ACTIVITY overline label, the underline Tabs of Tasks / Subagents / Shells /
+ *  Monitors (each with a count), and a collapse chevron pinned to the right edge. */
 function DockTabBar({
   tab,
   onChange,
