@@ -17,7 +17,7 @@ const changelogHtml = renderChangelog(changelogRaw.replace(/^# Changelog\n+/, ''
 ---
 <NarrowLayout title="Changelog — Code-by-wire" description="Every notable change to Code-by-wire.">
   <h1>Changelog</h1>
-  <div class="changelog-body" set:html={changelogHtml} />
+  <div class="prose" set:html={changelogHtml} />
 </NarrowLayout>
 
 <style>
@@ -26,45 +26,20 @@ const changelogHtml = renderChangelog(changelogRaw.replace(/^# Changelog\n+/, ''
     font-size: 40px;
     margin-bottom: 40px;
   }
-  .changelog-body :global(h2) {
-    font-weight: 600;
+  .prose :global(h2) {
     font-size: 24px;
     margin: 48px 0 16px;
   }
-  .changelog-body :global(h2:first-child) {
+  .prose :global(h2:first-child) {
     margin-top: 0;
   }
-  .changelog-body :global(h3) {
+  .prose :global(h3) {
     font-family: 'JetBrains Mono Variable', monospace;
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-faint);
     margin: 24px 0 12px;
-  }
-  .changelog-body :global(p) {
-    color: var(--text-dim);
-    line-height: 1.7;
-    margin-bottom: 16px;
-  }
-  .changelog-body :global(ul) {
-    padding-left: 20px;
-    margin-bottom: 16px;
-  }
-  .changelog-body :global(li) {
-    color: var(--text-dim);
-    margin-bottom: 8px;
-    line-height: 1.7;
-  }
-  .changelog-body :global(a) {
-    text-decoration: underline;
-  }
-  .changelog-body :global(code) {
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 0.9em;
-    background: var(--bg-raised);
-    padding: 2px 6px;
-    border-radius: 4px;
   }
   @media (max-width: 640px) {
     h1 {
