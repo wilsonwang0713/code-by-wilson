@@ -1,8 +1,7 @@
 {
   "name": "code-by-wire-website",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Marketing site for code-by-wire.",
   "scripts": {
     "test": "vitest run",
     "dev": "astro dev",
@@ -10,9 +9,8 @@
     "preview": "astro preview",
     "check": "astro check"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "luojiahai",
+  "license": "MIT",
   "type": "module",
   "private": true,
   "dependencies": {
