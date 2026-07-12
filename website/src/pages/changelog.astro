@@ -10,7 +10,10 @@ import { renderChangelog } from '../lib/changelog';
 // this file's, since Rollup emits it under a different directory depth).
 import changelogRaw from '../../../CHANGELOG.md?raw';
 
-const changelogHtml = renderChangelog(changelogRaw);
+// The real CHANGELOG.md's own leading "# Changelog" line would otherwise
+// duplicate this page's own <h1> above — strip just that line, keep
+// everything else (the intro paragraph, then every version section).
+const changelogHtml = renderChangelog(changelogRaw.replace(/^# Changelog\n+/, ''));
 ---
 <BaseLayout title="Changelog — Code-by-wire" description="Every notable change to Code-by-wire.">
   <main class="changelog">
@@ -45,6 +48,11 @@ const changelogHtml = renderChangelog(changelogRaw);
     letter-spacing: 0.08em;
     color: var(--text-faint);
     margin: 24px 0 12px;
+  }
+  .changelog-body :global(p) {
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 16px;
   }
   .changelog-body :global(ul) {
     padding-left: 20px;
