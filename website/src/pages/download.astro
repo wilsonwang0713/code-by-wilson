@@ -63,18 +63,6 @@ const groups = [
         ))
       }
     </div>
-
-    <h2 id="source" class="source-heading">Build from source</h2>
-    <pre><code>pnpm install
-pnpm rebuild:native
-pnpm dist       # macOS
-pnpm dist:win   # Windows</code></pre>
-    <p class="note">
-      A locally built app is unsigned: on macOS the first launch may need a right-click → Open,
-      or clearing the quarantine flag with
-      <code>xattr -dr com.apple.quarantine /Applications/Code-by-wire.app</code>; on Windows,
-      SmartScreen may warn — click More info → Run anyway.
-    </p>
   </main>
 </BaseLayout>
 
@@ -139,33 +127,6 @@ pnpm dist:win   # Windows</code></pre>
     font-family: 'JetBrains Mono Variable', monospace;
     font-size: 12px;
     color: var(--text-dim);
-  }
-  .source-heading {
-    font-weight: 600;
-    font-size: 22px;
-    margin: 40px 0 16px;
-  }
-  pre {
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    overflow-x: auto;
-    margin-bottom: 20px;
-  }
-  code {
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 13px;
-  }
-  .note {
-    color: var(--text-dim);
-    font-size: 14px;
-    line-height: 1.7;
-  }
-  .note code {
-    background: var(--bg-raised);
-    padding: 2px 6px;
-    border-radius: 4px;
   }
   @media (max-width: 640px) {
     .download {
