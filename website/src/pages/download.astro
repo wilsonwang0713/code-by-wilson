@@ -146,13 +146,17 @@ const groups = [
 <script>
   import { detectPrimaryPlatform } from '../lib/detect-os';
 
-  const platform = detectPrimaryPlatform(navigator.userAgent);
-  if (platform === 'windows') {
-    const container = document.getElementById('platform-groups');
-    const macos = document.getElementById('macos');
-    const windows = document.getElementById('windows');
-    if (container && macos && windows) {
-      container.insertBefore(windows, macos);
+  function applyPlatformOrder() {
+    const platform = detectPrimaryPlatform(navigator.userAgent);
+    if (platform === 'windows') {
+      const container = document.getElementById('platform-groups');
+      const macos = document.getElementById('macos');
+      const windows = document.getElementById('windows');
+      if (container && macos && windows) {
+        container.insertBefore(windows, macos);
+      }
     }
   }
+
+  document.addEventListener('astro:page-load', applyPlatformOrder);
 </script>
