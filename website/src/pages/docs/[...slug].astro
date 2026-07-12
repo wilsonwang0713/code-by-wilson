@@ -1,7 +1,7 @@
 ---
 // website/src/pages/docs/[...slug].astro
 import { getCollection, render } from 'astro:content';
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import DocsLayout from '../../layouts/DocsLayout.astro';
 
 export async function getStaticPaths() {
   const pages = await getCollection('docs');
@@ -12,27 +12,22 @@ export async function getStaticPaths() {
 }
 
 const { page } = Astro.props;
-const { Content } = await render(page);
+const { Content, headings } = await render(page);
 ---
-<BaseLayout
+<DocsLayout
   title={`${page.data.title} — Code-by-wire docs`}
   description={page.data.description}
+  currentId={page.id}
+  headings={headings}
 >
-  <main class="content-page">
-    <h1>{page.data.title}</h1>
-    <div class="content-body">
-      <Content />
-    </div>
-  </main>
-</BaseLayout>
+  <h1>{page.data.title}</h1>
+  <div class="content-body">
+    <Content />
+  </div>
+</DocsLayout>
 
 <style>
-  .content-page {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 96px 48px;
-  }
-  .content-page h1 {
+  h1 {
     font-weight: 600;
     font-size: 36px;
     margin-bottom: 40px;
@@ -70,10 +65,7 @@ const { Content } = await render(page);
     border-radius: 4px;
   }
   @media (max-width: 640px) {
-    .content-page {
-      padding: 64px 20px;
-    }
-    .content-page h1 {
+    h1 {
       font-size: 30px;
     }
   }
