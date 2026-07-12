@@ -190,14 +190,12 @@ describe("createTerminalManager", () => {
     ]);
   });
 
-  it("spawns --model default and fronts no family for a default selection", () => {
+  it("spawns with no --model flag and fronts no family for a default selection", () => {
     const h = harness();
     h.manager.spawn({ ...REQ, model: "default" });
     expect(h.ptys[0].state.spawnedWith!.args).toEqual([
       "--session-id",
       "sess-1",
-      "--model",
-      "default",
     ]);
     // A default spawn has no known family yet — the registry fronts nothing until the
     // first transcript turn lands (same as Adopt).
