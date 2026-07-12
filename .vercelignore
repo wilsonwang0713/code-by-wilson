@@ -1,0 +1,12 @@
+node_modules
+website/node_modules
+website/dist
+website/.astro
+out
+dist-electron
+release
+.git
+.superpowers
+docs/superpowers
+.agents
+docs/deck
