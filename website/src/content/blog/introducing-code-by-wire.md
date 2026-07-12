@@ -1,10 +1,10 @@
 ---
 title: "Introducing Code-by-wire"
-description: "Pilot every Claude Code session, watch its full transcript, and monitor the telemetry, in one interface."
+description: "Pilot every Claude Code session, view its enriched transcript, and monitor the telemetry, in one interface."
 publishDate: "2026-07-12"
 ---
 
-Pilot every Claude Code session, watch its full transcript, and monitor the
+Pilot every Claude Code session, view its enriched transcript, and monitor the
 telemetry, in one interface.
 
 Needs Claude Code installed locally. Open the app and every session already
