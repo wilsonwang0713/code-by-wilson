@@ -9,9 +9,11 @@ export interface ClaudeCommand {
  * Argv to spawn a fresh Managed session: `claude` pinned to `id` (so the app can correlate the process
  * to its Transcript at `projects/<cwd-slug>/<id>.jsonl`) on `model`. The `--model` flag is the family
  * alias (`opus`/`sonnet`/`haiku`/`fable`) the picker chose — an alias, not a dated string, so it keeps
- * working as versions roll; the session's real model is re-derived from the transcript. The executable
- * is the `CBW_CLAUDE_BIN` override else `claude` on PATH, resolved by node-pty. cwd and env are spawn
- * options, not argv, so this stays a pure function of its inputs.
+ * working as versions roll; the session's real model is re-derived from the transcript. `"default"`
+ * omits `--model` entirely rather than passing the literal alias, so the CLI's own configured default
+ * applies exactly as if the flag were never given. The executable is the `CBW_CLAUDE_BIN` override else
+ * `claude` on PATH, resolved by node-pty. cwd and env are spawn options, not argv, so this stays a pure
+ * function of its inputs.
  */
 export function buildClaudeCommand(opts: {
   id: string;
@@ -20,7 +22,11 @@ export function buildClaudeCommand(opts: {
 }): ClaudeCommand {
   return {
     file: opts.bin ?? process.env.CBW_CLAUDE_BIN ?? "claude",
-    args: ["--session-id", opts.id, "--model", opts.model],
+    args: [
+      "--session-id",
+      opts.id,
+      ...(opts.model === "default" ? [] : ["--model", opts.model]),
+    ],
   };
 }
 

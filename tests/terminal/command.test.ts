@@ -48,12 +48,10 @@ describe("buildClaudeCommand", () => {
     expect(cmd.args[0]).toBe("--session-id");
   });
 
-  it("passes the literal 'default' alias straight through to --model", () => {
+  it("omits --model entirely for the 'default' selection", () => {
     expect(buildClaudeCommand({ id: "sid-d", model: "default" }).args).toEqual([
       "--session-id",
       "sid-d",
-      "--model",
-      "default",
     ]);
   });
 });
