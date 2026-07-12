@@ -1,0 +1,109 @@
+---
+// website/src/components/DocsPager.astro
+const base = import.meta.env.BASE_URL;
+
+interface Props {
+  prev: { id: string; data: { title: string } } | null;
+  next: { id: string; data: { title: string } } | null;
+}
+
+const { prev, next } = Astro.props;
+---
+{
+  (prev || next) && (
+    <nav class="docs-pager" aria-label="Docs pager">
+      <div class="docs-pager-side">
+        {prev && (
+          <a href={`${base}docs/${prev.id}/`} class="docs-pager-link prev">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <span>
+              <small>Previous</small>
+              <strong>{prev.data.title}</strong>
+            </span>
+          </a>
+        )}
+      </div>
+      <div class="docs-pager-side">
+        {next && (
+          <a href={`${base}docs/${next.id}/`} class="docs-pager-link next">
+            <span>
+              <small>Next</small>
+              <strong>{next.data.title}</strong>
+            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </a>
+        )}
+      </div>
+    </nav>
+  )
+}
+
+<style>
+  .docs-pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 56px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+  }
+  .docs-pager-side {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+  }
+  .docs-pager-side:last-child {
+    justify-content: flex-end;
+  }
+  .docs-pager-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-dim);
+    max-width: 100%;
+    min-width: 0;
+  }
+  .docs-pager-link:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .docs-pager-link span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .docs-pager-link.next span {
+    text-align: right;
+  }
+  .docs-pager-link small {
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .docs-pager-link strong {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @media (max-width: 640px) {
+    .docs-pager {
+      flex-direction: column;
+    }
+    .docs-pager-side:last-child {
+      justify-content: flex-start;
+    }
+  }
+</style>

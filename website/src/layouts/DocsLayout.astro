@@ -1,0 +1,81 @@
+---
+// website/src/layouts/DocsLayout.astro
+import { getCollection } from 'astro:content';
+import BaseLayout from './BaseLayout.astro';
+import DocsSidebar from '../components/DocsSidebar.astro';
+import DocsToc from '../components/DocsToc.astro';
+import DocsPager from '../components/DocsPager.astro';
+import { getPrevNext, sortDocsNav } from '../lib/docs-nav';
+
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  title: string;
+  description: string;
+  currentId: string;
+  headings: Heading[];
+}
+
+const { title, description, currentId, headings } = Astro.props;
+
+const docs = sortDocsNav(await getCollection('docs'));
+const { prev, next } = getPrevNext(docs, currentId);
+const tocItems = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+---
+<BaseLayout title={title} description={description}>
+  <div class:list={['docs-shell', { 'no-toc': tocItems.length === 0 }]}>
+    <DocsSidebar docs={docs} currentId={currentId} />
+    <main class="docs-content">
+      <slot />
+      <DocsPager prev={prev} next={next} />
+    </main>
+    {tocItems.length > 0 && <DocsToc items={tocItems} />}
+  </div>
+</BaseLayout>
+
+<style>
+  .docs-shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 220px;
+    grid-template-areas: 'sidebar content toc';
+    gap: 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 64px 48px;
+    align-items: start;
+  }
+  .docs-shell.no-toc {
+    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-areas: 'sidebar content';
+  }
+  .docs-content {
+    grid-area: content;
+    min-width: 0;
+  }
+  @media (max-width: 1024px) {
+    .docs-shell,
+    .docs-shell.no-toc {
+      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-areas: 'sidebar content';
+    }
+  }
+  @media (max-width: 768px) {
+    .docs-shell,
+    .docs-shell.no-toc {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: 'sidebar' 'content';
+      padding: 32px 20px;
+      gap: 0;
+    }
+  }
+  @media (max-width: 640px) {
+    .docs-shell,
+    .docs-shell.no-toc {
+      padding: 24px 20px;
+    }
+  }
+</style>

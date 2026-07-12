@@ -1,0 +1,72 @@
+---
+// website/src/components/DocsToc.astro
+export interface TocItem {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  items: TocItem[];
+}
+
+const { items } = Astro.props;
+---
+<div class="docs-toc-root">
+  <aside class="docs-toc">
+    <p class="docs-toc-label">On this page</p>
+    <nav>
+      <ul>
+        {
+          items.map((item) => (
+            <li class={`depth-${item.depth}`}>
+              <a href={`#${item.slug}`}>{item.text}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </aside>
+</div>
+
+<style>
+  .docs-toc-root {
+    grid-area: toc;
+  }
+  .docs-toc {
+    position: sticky;
+    top: 32px;
+  }
+  .docs-toc-label {
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 16px;
+  }
+  .docs-toc ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .docs-toc li {
+    margin-bottom: 10px;
+  }
+  .docs-toc li.depth-3 {
+    padding-left: 14px;
+  }
+  .docs-toc a {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .docs-toc a:hover {
+    color: var(--text);
+  }
+  @media (max-width: 1024px) {
+    .docs-toc-root {
+      display: none;
+    }
+  }
+</style>
