@@ -2,6 +2,37 @@
 // website/src/pages/index.astro
 import BaseLayout from '../layouts/BaseLayout.astro';
 const base = import.meta.env.BASE_URL;
+const features = [
+  {
+    title: 'Every session in one rail',
+    description:
+      'Grouped by project, searchable, each row flagging its live state — working, waiting, idle, or ended.',
+  },
+  {
+    title: 'Drive, fork, or just watch',
+    description:
+      'Spawn a session in an embedded terminal, fork a live one, adopt one you started elsewhere, or observe it read-only.',
+  },
+  {
+    title: 'The full transcript',
+    description: 'Every message, tool call, and result, reconstructed from disk and rendered cleanly.',
+  },
+  {
+    title: 'The telemetry the CLI hides',
+    description:
+      'Context pressure, spend, token throughput, duty cycle, git, tasks, subagents, and background shells — live, per session.',
+  },
+  {
+    title: 'The whole story',
+    description:
+      'A cross-session Stats view with a year-long contributions calendar and exact, never-estimated totals.',
+  },
+  {
+    title: 'Your rate limits in view',
+    description:
+      "Your account's rate-limit windows, read straight from disk, with live reset countdowns.",
+  },
+];
 ---
 <BaseLayout
   title="Code-by-wire — Pilot Claude Code from your desktop"
@@ -18,6 +49,34 @@ const base = import.meta.env.BASE_URL;
       <a id="secondary-download" href={`${base}download/#windows`} class="btn-secondary">
         Windows &amp; other platforms →
       </a>
+    </div>
+  </section>
+
+  <section class="screenshot-section">
+    <div class="screenshot-frame">
+      <div class="chrome"><span></span><span></span><span></span></div>
+      <img
+        src={`${base}screenshot.png`}
+        alt="Code-by-wire showing a live Claude Code session with the session rail, transcript, and telemetry panels"
+      />
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="section-head">
+      <h2>Nothing to set up</h2>
+      <p>Open the app and every session already running on your machine is there.</p>
+    </div>
+    <div class="feature-grid">
+      {
+        features.map((feature, i) => (
+          <div class="feature">
+            <div class="num mono">{String(i + 1).padStart(2, '0')}</div>
+            <h3>{feature.title}</h3>
+            <p>{feature.description}</p>
+          </div>
+        ))
+      }
     </div>
   </section>
 </BaseLayout>
@@ -71,6 +130,82 @@ const base = import.meta.env.BASE_URL;
   }
   .btn-secondary:hover {
     color: var(--text);
+  }
+</style>
+
+<style>
+  .screenshot-section {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 48px 96px;
+  }
+  .screenshot-frame {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg-raised);
+  }
+  .screenshot-frame .chrome {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .screenshot-frame .chrome span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+  .screenshot-frame img {
+    width: 100%;
+    display: block;
+  }
+  .features {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 48px 120px;
+  }
+  .section-head {
+    margin-bottom: 56px;
+  }
+  .section-head h2 {
+    font-size: 30px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+  .section-head p {
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .feature {
+    background: var(--bg);
+    padding: 32px;
+  }
+  .feature .num {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-bottom: 16px;
+  }
+  .feature h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .feature p {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.6;
   }
 </style>
 
