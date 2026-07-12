@@ -1,0 +1,5 @@
+{
+  "installCommand": "pnpm --dir website install",
+  "buildCommand": "pnpm --dir website build",
+  "outputDirectory": "website/dist"
+}
