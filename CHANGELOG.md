@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.30] - 2026-07-12
+
+### Fixed
+
+- Quick-add per-folder session launches omit the `--model` flag when the
+  selection is the default model, letting the CLI use its own configured
+  default instead of passing `--model default`.
+
 ## [0.1.29] - 2026-07-12
 
 ### Added
@@ -693,7 +701,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   served from an embedded SQLite index.
 - Unsigned `.dmg` published to GitHub Releases.
 
-[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.29...HEAD
+[Unreleased]: https://github.com/luojiahai/code-by-wire/compare/v0.1.30...HEAD
+[0.1.30]: https://github.com/luojiahai/code-by-wire/compare/v0.1.29...v0.1.30
 [0.1.29]: https://github.com/luojiahai/code-by-wire/compare/v0.1.28...v0.1.29
 [0.1.28]: https://github.com/luojiahai/code-by-wire/compare/v0.1.27...v0.1.28
 [0.1.27]: https://github.com/luojiahai/code-by-wire/compare/v0.1.26...v0.1.27
