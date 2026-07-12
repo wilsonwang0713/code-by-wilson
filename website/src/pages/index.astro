@@ -209,6 +209,30 @@ const features = [
   }
 </style>
 
+<style>
+  @media (max-width: 640px) {
+    .hero {
+      padding: 64px 20px 48px;
+    }
+    h1 {
+      font-size: 34px;
+      max-width: 100%;
+    }
+    .hero-sub {
+      font-size: 16px;
+    }
+    .screenshot-section {
+      padding: 0 20px 64px;
+    }
+    .features {
+      padding: 0 20px 64px;
+    }
+    .feature-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
 <script>
   import { detectPrimaryPlatform } from '../lib/detect-os';
 

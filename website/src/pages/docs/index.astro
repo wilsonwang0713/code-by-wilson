@@ -57,4 +57,12 @@ const pages = (await getCollection('docs')).sort((a, b) => a.data.order - b.data
     font-size: 14px;
     margin-top: 6px;
   }
+  @media (max-width: 640px) {
+    .index-page {
+      padding: 64px 20px;
+    }
+    .index-page h1 {
+      font-size: 32px;
+    }
+  }
 </style>

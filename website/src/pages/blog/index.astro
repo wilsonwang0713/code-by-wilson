@@ -66,4 +66,12 @@ const posts = (await getCollection('blog')).sort(
     display: block;
     margin-top: 10px;
   }
+  @media (max-width: 640px) {
+    .index-page {
+      padding: 64px 20px;
+    }
+    .index-page h1 {
+      font-size: 32px;
+    }
+  }
 </style>

@@ -73,4 +73,17 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     color: var(--text-dim);
     font-size: 14px;
   }
+  @media (max-width: 640px) {
+    .sponsor {
+      padding: 64px 20px;
+    }
+    .sponsor h1 {
+      font-size: 32px;
+    }
+    .sponsor-card {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+  }
 </style>
