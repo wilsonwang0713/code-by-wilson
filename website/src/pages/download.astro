@@ -43,12 +43,9 @@ const groups = [
 
     <div id="platform-groups">
       {
-        groups.map((group, i) => (
-          <section id={group.id} data-os={group.id} class:list={['platform-group', { 'is-primary': i === 0 }]}>
-            <h2>
-              {group.label}
-              <span class="badge">Recommended for your system</span>
-            </h2>
+        groups.map((group) => (
+          <section id={group.id} data-os={group.id} class="platform-group">
+            <h2>{group.label}</h2>
             <div class="download-buttons">
               {group.platforms.map((p) => (
                 <a href={`${releaseBase}/${p.file}`} class="download-btn">
@@ -124,24 +121,6 @@ pnpm dist:win   # Windows</code></pre>
     font-weight: 600;
     font-size: 22px;
     margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .badge {
-    display: none;
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    color: var(--text-faint);
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 4px 10px;
-  }
-  .is-primary .badge {
-    display: inline-block;
   }
   .download-buttons {
     display: flex;
@@ -236,8 +215,6 @@ pnpm dist:win   # Windows</code></pre>
     const windows = document.getElementById('windows');
     if (container && macos && windows) {
       container.insertBefore(windows, macos);
-      macos.classList.remove('is-primary');
-      windows.classList.add('is-primary');
     }
   }
 </script>
