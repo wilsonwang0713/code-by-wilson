@@ -1,0 +1,284 @@
+---
+// website/src/pages/index.astro
+import BaseLayout from '../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
+const features = [
+  {
+    title: 'Every session in one rail',
+    description:
+      'Grouped by project, searchable, each row flagging its live state — working, waiting, idle, or ended.',
+  },
+  {
+    title: 'Drive, fork, or just watch',
+    description:
+      'Spawn a session in an embedded terminal, fork a live one, adopt one you started elsewhere, or observe it read-only.',
+  },
+  {
+    title: 'The full transcript',
+    description: 'Every message, tool call, and result, reconstructed from disk and rendered cleanly.',
+  },
+  {
+    title: 'The telemetry the CLI hides',
+    description:
+      'Context pressure, spend, token throughput, duty cycle, git, tasks, subagents, and background shells — live, per session.',
+  },
+  {
+    title: 'The whole story',
+    description:
+      'A cross-session Stats view with a year-long contributions calendar and exact, never-estimated totals.',
+  },
+  {
+    title: 'Your rate limits in view',
+    description:
+      "Your account's rate-limit windows, read straight from disk, with live reset countdowns.",
+  },
+];
+---
+<BaseLayout
+  title="Code-by-wire — Pilot local Claude Code from this desktop app with telemetry"
+  description="One live dashboard for every Claude Code session on your machine — transcript, terminal, and the telemetry the CLI hides."
+>
+  <section class="hero">
+    <h1>Pilot local Claude Code from this desktop app with <span class="dim">telemetry</span>.</h1>
+    <p class="hero-sub">
+      One live dashboard for every session on your machine — transcript, terminal, and the
+      telemetry the CLI hides.
+    </p>
+    <div class="hero-ctas">
+      <a id="primary-download" href={`${base}download/#macos`} class="btn-primary">
+        <svg id="primary-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zm3.415-3.132c.845-1.026 1.4-2.454 1.245-3.882-1.207.052-2.662.805-3.532 1.831-.78.907-1.454 2.36-1.273 3.75 1.375.104 2.715-.688 3.56-1.7z" />
+        </svg>
+        <span id="primary-label">Download for macOS</span>
+      </a>
+      <a id="secondary-download" href={`${base}download/#windows`} class="btn-secondary">
+        <svg id="secondary-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.851" />
+        </svg>
+        <span id="secondary-label">Download for Windows</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="screenshot-section">
+    <div class="screenshot-frame">
+      <div class="chrome"><span></span><span></span><span></span></div>
+      <img
+        src={`${base}screenshot.png`}
+        alt="Code-by-wire showing a live Claude Code session with the session rail, transcript, and telemetry panels"
+      />
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="section-head">
+      <h2>Nothing to set up</h2>
+      <p>Open the app and every session already running on your machine is there.</p>
+    </div>
+    <div class="feature-grid">
+      {
+        features.map((feature, i) => (
+          <div class="feature">
+            <div class="num mono">{String(i + 1).padStart(2, '0')}</div>
+            <h3>{feature.title}</h3>
+            <p>{feature.description}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 120px 48px 96px;
+  }
+  h1 {
+    font-weight: 600;
+    font-size: 54px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 28px;
+    max-width: 24ch;
+  }
+  h1 .dim {
+    color: var(--text-dim);
+  }
+  .hero-sub {
+    font-size: 19px;
+    color: var(--text-dim);
+    max-width: 46ch;
+    margin-bottom: 40px;
+  }
+  .hero-ctas {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+  .btn-primary {
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1;
+    background: #fff;
+    color: #0a0a0c;
+    padding: 14px 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .btn-secondary {
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    padding: 14px 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .btn-secondary:hover {
+    border-color: var(--text-dim);
+    background: var(--bg-raised);
+  }
+  .btn-primary svg,
+  .btn-secondary svg {
+    display: block;
+    flex-shrink: 0;
+  }
+</style>
+
+<style>
+  .screenshot-section {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 48px 96px;
+  }
+  .screenshot-frame {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg-raised);
+  }
+  .screenshot-frame .chrome {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .screenshot-frame .chrome span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+  .screenshot-frame img {
+    width: 100%;
+    display: block;
+  }
+  .features {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 48px 120px;
+  }
+  .section-head {
+    margin-bottom: 56px;
+  }
+  .section-head h2 {
+    font-size: 30px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+  .section-head p {
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .feature {
+    background: var(--bg);
+    padding: 32px;
+  }
+  .feature .num {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-bottom: 16px;
+  }
+  .feature h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .feature p {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+</style>
+
+<style>
+  @media (max-width: 640px) {
+    .hero {
+      padding: 64px 20px 48px;
+    }
+    h1 {
+      font-size: 34px;
+      max-width: 100%;
+    }
+    .hero-sub {
+      font-size: 16px;
+    }
+    .screenshot-section {
+      padding: 0 20px 64px;
+    }
+    .features {
+      padding: 0 20px 64px;
+    }
+    .feature-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  import { detectPrimaryPlatform } from '../lib/detect-os';
+
+  const APPLE_PATH =
+    'M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zm3.415-3.132c.845-1.026 1.4-2.454 1.245-3.882-1.207.052-2.662.805-3.532 1.831-.78.907-1.454 2.36-1.273 3.75 1.375.104 2.715-.688 3.56-1.7z';
+  const WINDOWS_PATH =
+    'M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.851';
+
+  const base = import.meta.env.BASE_URL;
+  const platform = detectPrimaryPlatform(navigator.userAgent);
+  const primary = document.getElementById('primary-download');
+  const secondary = document.getElementById('secondary-download');
+  const primaryIcon = document.getElementById('primary-icon');
+  const primaryLabel = document.getElementById('primary-label');
+  const secondaryIcon = document.getElementById('secondary-icon');
+  const secondaryLabel = document.getElementById('secondary-label');
+
+  if (platform === 'windows' && primary && secondary && primaryIcon && primaryLabel && secondaryIcon && secondaryLabel) {
+    primary.setAttribute('href', `${base}download/#windows`);
+    primaryLabel.textContent = 'Download for Windows';
+    primaryIcon.innerHTML = `<path d="${WINDOWS_PATH}" />`;
+
+    secondary.setAttribute('href', `${base}download/#macos`);
+    secondaryLabel.textContent = 'Download for macOS';
+    secondaryIcon.innerHTML = `<path d="${APPLE_PATH}" />`;
+  }
+</script>

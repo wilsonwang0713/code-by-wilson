@@ -1,0 +1,158 @@
+---
+// website/src/pages/download.astro
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const APPLE_PATH =
+  'M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zm3.415-3.132c.845-1.026 1.4-2.454 1.245-3.882-1.207.052-2.662.805-3.532 1.831-.78.907-1.454 2.36-1.273 3.75 1.375.104 2.715-.688 3.56-1.7z';
+const WINDOWS_PATH =
+  'M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.851';
+
+const releaseBase = 'https://github.com/luojiahai/code-by-wire/releases/latest/download';
+const groups = [
+  {
+    id: 'macos',
+    label: 'macOS',
+    iconPath: APPLE_PATH,
+    platforms: [
+      { name: 'Apple Silicon', file: 'Code-by-wire-arm64.dmg' },
+      { name: 'Intel', file: 'Code-by-wire-x64.dmg' },
+    ],
+  },
+  {
+    id: 'windows',
+    label: 'Windows',
+    iconPath: WINDOWS_PATH,
+    platforms: [
+      { name: 'x64', file: 'Code-by-wire-Setup-x64.exe' },
+      { name: 'ARM64', file: 'Code-by-wire-Setup-arm64.exe' },
+    ],
+  },
+];
+---
+<BaseLayout
+  title="Download — Code-by-wire"
+  description="Download Code-by-wire for macOS or Windows."
+>
+  <main class="download">
+    <h1>Download</h1>
+    <p class="lead">
+      One click starts the download — always the latest release. You'll need{' '}
+      <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> installed locally,
+      so there are sessions to observe and control.
+    </p>
+
+    <div id="platform-groups">
+      {
+        groups.map((group) => (
+          <section id={group.id} class="platform-group">
+            <h2>{group.label}</h2>
+            <div class="download-buttons">
+              {group.platforms.map((p) => (
+                <a href={`${releaseBase}/${p.file}`} class="download-btn">
+                  <svg class="download-btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d={group.iconPath} />
+                  </svg>
+                  <span class="download-btn-text">
+                    <strong>{p.name}</strong>
+                    <span class="file-name">{p.file}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </section>
+        ))
+      }
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .download {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 96px 48px;
+  }
+  .download h1 {
+    font-weight: 600;
+    font-size: 40px;
+    margin-bottom: 24px;
+  }
+  .lead {
+    color: var(--text-dim);
+    font-size: 17px;
+    line-height: 1.6;
+    margin-bottom: 48px;
+  }
+  .lead a {
+    text-decoration: underline;
+  }
+  .platform-group {
+    margin-bottom: 40px;
+  }
+  .platform-group h2 {
+    font-weight: 600;
+    font-size: 22px;
+    margin-bottom: 16px;
+  }
+  .download-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .download-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .download-btn:hover {
+    border-color: var(--border-strong);
+  }
+  .download-btn-icon {
+    flex-shrink: 0;
+    color: var(--text-dim);
+  }
+  .download-btn-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .download-btn-text strong {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .download-btn-text .file-name {
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  @media (max-width: 640px) {
+    .download {
+      padding: 64px 20px;
+    }
+    .download h1 {
+      font-size: 32px;
+    }
+    .download-btn {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+  }
+</style>
+
+<script>
+  import { detectPrimaryPlatform } from '../lib/detect-os';
+
+  const platform = detectPrimaryPlatform(navigator.userAgent);
+  if (platform === 'windows') {
+    const container = document.getElementById('platform-groups');
+    const macos = document.getElementById('macos');
+    const windows = document.getElementById('windows');
+    if (container && macos && windows) {
+      container.insertBefore(windows, macos);
+    }
+  }
+</script>

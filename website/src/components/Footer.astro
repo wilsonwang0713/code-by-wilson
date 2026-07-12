@@ -1,0 +1,93 @@
+---
+// website/src/components/Footer.astro
+const base = import.meta.env.BASE_URL;
+---
+<footer>
+  <a href={base} class="brand">
+    <img src={`${base}mark.svg`} alt="" class="brand-mark" width="35" height="20" />
+    <span class="brand-name">Code-by-wire</span>
+  </a>
+  <div class="footer-cols">
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href={`${base}download/`}>Download</a>
+      <a href={`${base}docs/`}>Docs</a>
+      <a href={`${base}changelog/`}>Changelog</a>
+    </div>
+    <div class="footer-col">
+      <h4>Community</h4>
+      <a href={`${base}blog/`}>Blog</a>
+      <a href="https://github.com/luojiahai/code-by-wire">GitHub</a>
+      <a href={`${base}sponsor/`}>Sponsor</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="https://github.com/luojiahai/code-by-wire/blob/main/LICENSE">MIT License</a>
+    </div>
+  </div>
+  <div class="footer-meta">© 2026 luojiahai</div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 56px 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-mark {
+    display: block;
+  }
+  .brand-name {
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .footer-cols {
+    display: flex;
+    gap: 64px;
+    flex-wrap: wrap;
+  }
+  .footer-col h4 {
+    font-family: 'JetBrains Mono Variable', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 16px;
+  }
+  .footer-col a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .footer-col a:hover {
+    color: var(--text);
+  }
+  .footer-meta {
+    color: var(--text-faint);
+    font-size: 13px;
+    font-family: 'JetBrains Mono Variable', monospace;
+  }
+  @media (max-width: 640px) {
+    footer {
+      padding: 40px 20px;
+    }
+    .footer-cols {
+      gap: 32px;
+    }
+  }
+</style>

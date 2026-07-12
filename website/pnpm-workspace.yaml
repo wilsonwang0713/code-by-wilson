@@ -1,0 +1,6 @@
+# This file's presence marks website/ as its own pnpm workspace root,
+# isolating its install and lockfile from the repo-root pnpm-workspace.yaml
+# (which governs the separate Electron app).
+allowBuilds:
+  # esbuild is pulled in by astro/vite; its postinstall fetches the native binary.
+  esbuild: true
