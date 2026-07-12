@@ -1,10 +1,91 @@
 ---
 // website/src/pages/index.astro
 import BaseLayout from '../layouts/BaseLayout.astro';
+const base = import.meta.env.BASE_URL;
 ---
 <BaseLayout
   title="Code-by-wire — Pilot Claude Code from your desktop"
   description="One live dashboard for every Claude Code session on your machine — transcript, terminal, and the telemetry the CLI hides."
 >
-  <p>Coming soon.</p>
+  <section class="hero">
+    <h1>Pilot Claude Code from your <span class="dim">desktop</span>.</h1>
+    <p class="hero-sub">
+      One live dashboard for every session on your machine — transcript, terminal, and the
+      telemetry the CLI hides.
+    </p>
+    <div class="hero-ctas">
+      <a id="primary-download" href={`${base}download/#macos`} class="btn-primary">Download for macOS</a>
+      <a id="secondary-download" href={`${base}download/#windows`} class="btn-secondary">
+        Windows &amp; other platforms →
+      </a>
+    </div>
+  </section>
 </BaseLayout>
+
+<style>
+  .hero {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 120px 48px 96px;
+  }
+  h1 {
+    font-weight: 600;
+    font-size: 54px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin-bottom: 28px;
+    max-width: 16ch;
+  }
+  h1 .dim {
+    color: var(--text-dim);
+  }
+  .hero-sub {
+    font-size: 19px;
+    color: var(--text-dim);
+    max-width: 46ch;
+    margin-bottom: 40px;
+  }
+  .hero-ctas {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .btn-primary {
+    font-weight: 600;
+    font-size: 15px;
+    background: #fff;
+    color: #0a0a0c;
+    padding: 14px 24px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn-secondary {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-dim);
+    border-bottom: 1px dashed var(--border-strong);
+    padding-bottom: 2px;
+  }
+  .btn-secondary:hover {
+    color: var(--text);
+  }
+</style>
+
+<script>
+  import { detectPrimaryPlatform } from '../lib/detect-os';
+
+  const base = import.meta.env.BASE_URL;
+  const platform = detectPrimaryPlatform(navigator.userAgent);
+  const primary = document.getElementById('primary-download');
+  const secondary = document.getElementById('secondary-download');
+
+  if (platform === 'windows' && primary && secondary) {
+    primary.textContent = 'Download for Windows';
+    primary.setAttribute('href', `${base}download/#windows`);
+    secondary.textContent = 'macOS & other platforms →';
+    secondary.setAttribute('href', `${base}download/#macos`);
+  }
+</script>
