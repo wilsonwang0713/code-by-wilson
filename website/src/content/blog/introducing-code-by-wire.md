@@ -1,11 +1,11 @@
 ---
 title: "Introducing Code-by-wire"
-description: "Pilot every Claude Code session on your machine, its full transcript, and the telemetry (context window, token usage), in one interface."
+description: "Pilot every Claude Code session, watch its full transcript, and monitor the telemetry, in one interface."
 publishDate: "2026-07-12"
 ---
 
-Pilot every Claude Code session on your machine, its full transcript, and
-the telemetry (context window, token usage), in one interface.
+Pilot every Claude Code session, watch its full transcript, and monitor the
+telemetry, in one interface.
 
 Needs Claude Code installed locally. Open the app and every session already
 running on your machine is there.

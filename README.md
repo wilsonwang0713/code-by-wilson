@@ -8,8 +8,8 @@ English | [简体中文](README.zh-CN.md)
 
 [![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=luojiahai&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/luojiahai)
 
-**Pilot every Claude Code session on your machine, its full transcript, and
-the telemetry (context window, token usage), in one interface.**
+**Pilot every Claude Code session, watch its full transcript, and monitor
+the telemetry, in one interface.**
 
 ![Code-by-wire: a live Claude Code session with the session rail, transcript, and telemetry panels](docs/assets/cbw-screenshot.png)
 

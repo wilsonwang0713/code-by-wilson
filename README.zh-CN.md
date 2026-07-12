@@ -8,8 +8,7 @@
 
 [![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=luojiahai&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/luojiahai)
 
-**驾驭你机器上的每一个 Claude Code 会话、完整的会话记录，以及遥测（上下文窗口、token 用量），
-尽在一个界面。**
+**驾驭每一个 Claude Code 会话，追踪其完整的会话记录，监控遥测数据，尽在一个界面。**
 
 ![Code-by-wire：一个实时 Claude Code 会话，含会话侧栏、会话记录与遥测面板](docs/assets/cbw-screenshot.png)
 
