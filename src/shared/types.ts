@@ -136,6 +136,10 @@ export interface SessionWorktree {
 
 export interface Session {
   id: string;
+  /** Which provider owns this session (see @shared/providers). Absent means Claude — the only
+   *  provider before the field existed — so old cached rows and old tests read unchanged. The
+   *  renderer resolves per-session capabilities from this via capabilitiesOf. */
+  providerId?: string;
   title: string;
   project: string;
   branch?: string;
@@ -213,6 +217,9 @@ export interface Session {
  */
 export interface PersistedSession {
   id: string;
+  /** Which provider produced this snapshot (stamped by createMultiProvider, persisted so ownership
+   *  survives the SQLite round trip). Absent means Claude, matching rows cached before the field. */
+  providerId?: string;
   title: string;
   project: string;
   /** The session's working directory: the transcript's recorded cwd, else the registry
@@ -243,6 +250,11 @@ export interface PersistedSession {
   usageByModel?: ModelUsage[];
   /** Latest turn's full prompt (input + cache-read + cache-creation): the current context size, for context %. */
   contextTokens: number;
+  /** The provider-reported context window (Codex rollouts record model_context_window). When set it
+   *  beats hydrate's model-derived fallbacks, so a non-Claude model's context %% isn't measured
+   *  against a Claude family default. Absent for Claude sessions — their window derives from the
+   *  model id / capture as before. */
+  contextWindow?: number;
   /** Transcript-scanned effort level (A6); the live capture's effort overlays it. */
   effortLevel?: string;
   /** Times this session compacted (transcript compact_boundary rows, A9). Absent/0 hides the row. */

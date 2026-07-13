@@ -6,6 +6,8 @@ import type { SqliteDb } from "./db/driver";
 import { migrate } from "./db/store";
 import { migrateAnalytics } from "./db/analytics";
 import { createClaudeProvider } from "./provider/claude";
+import { createCodexProvider } from "./provider/codex";
+import { createMultiProvider } from "./provider/multi";
 import { createManagedRegistry } from "./managed-registry";
 import type { ManagedRegistry } from "./managed-registry";
 import { applyRotations } from "./provider/claude/rotation";
@@ -182,7 +184,7 @@ app
     // later spawn/adopt (never during createWindow), so a holder populated a few lines down is enough —
     // and it lets the window open before claudeDir, which needs the synchronous login-shell probe.
     const services: {
-      provider?: ReturnType<typeof createClaudeProvider>;
+      provider?: import("./provider/types").Provider;
       cliStatus?: ReturnType<typeof createCliStatusController>;
     } = {};
     // Stand the window up FIRST, before the synchronous login-shell probe + claudeDir-dependent wiring
@@ -274,11 +276,21 @@ app
       }
     }
     const statusLine = createStatusLineReader({ claudeDir });
-    const provider = createClaudeProvider({
-      managed,
-      claudeDir,
-      recentWindowMs: readSessionWindowMs(claudeDir),
-    });
+    // The app-facing provider is the aggregate: Claude first (the primary — its capabilities remain
+    // the app-level IPC.capabilities contract, and per-session reads for pre-multi cached rows fall
+    // back to it), then the read-only Codex observer, which contributes zero sessions and zero
+    // errors when ~/.codex doesn't exist. Per-session dispatch and the providerId stamp live in
+    // createMultiProvider.
+    const provider = createMultiProvider([
+      createClaudeProvider({
+        managed,
+        claudeDir,
+        recentWindowMs: readSessionWindowMs(claudeDir),
+      }),
+      createCodexProvider({
+        recentWindowMs: readSessionWindowMs(claudeDir),
+      }),
+    ]);
     services.provider = provider;
     const sessionTitles = createSessionTitleStore({
       dir: app.getPath("userData"),
