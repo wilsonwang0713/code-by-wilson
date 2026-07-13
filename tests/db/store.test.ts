@@ -14,6 +14,7 @@ import { openTestDb } from "../helpers/sqlite";
 
 const snap = (over: Partial<PersistedSession> = {}): PersistedSession => ({
   id: "id-1",
+  providerId: "claude",
   title: "Title",
   project: "proj",
   cwd: "/work/proj",
@@ -48,7 +49,7 @@ describe("store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(11);
+    ).toBe(12);
   });
 
   it("round-trips a snapshot, coercing missing branch and the awaitingUser flag", () => {

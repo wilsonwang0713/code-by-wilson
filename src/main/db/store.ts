@@ -5,6 +5,7 @@ import {
   parseContextWindowSize,
 } from "@shared/models";
 import type { IndexOverview } from "@shared/ipc";
+import { capabilitiesOf, DEFAULT_PROVIDER_ID } from "@shared/providers";
 import { isResumable } from "@shared/resumable";
 import { transaction, type SqliteDb } from "./driver";
 
@@ -12,8 +13,8 @@ import { transaction, type SqliteDb } from "./driver";
  *  v9 forces the one-time re-summarize for the last-entry-wins usage dedup (usage_by_model rows
  *  cached under first-entry-wins undercounted subagent output). `migrate` rebuilds the index (a
  *  disposable cache) to match — v10 adds effort_level (A6 transcript scan) — v11 adds the A9
- *  compaction columns. */
-const SCHEMA_VERSION = 11;
+ *  compaction columns — v12 adds provider_id (multi-provider ownership). */
+const SCHEMA_VERSION = 12;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -31,6 +32,7 @@ export function migrate(db: SqliteDb): void {
       DROP TABLE IF EXISTS sessions;
       CREATE TABLE sessions (
         id TEXT PRIMARY KEY,
+        provider_id TEXT NOT NULL DEFAULT 'claude',
         title TEXT NOT NULL,
         project TEXT NOT NULL,
         cwd TEXT NOT NULL DEFAULT '',
@@ -62,6 +64,7 @@ export function migrate(db: SqliteDb): void {
 
 interface Row {
   id: string;
+  provider_id: string;
   title: string;
   project: string;
   cwd: string;
@@ -104,6 +107,7 @@ function parseUsageByModel(json: string | null): ModelUsage[] {
 function rowToPersisted(r: Row): PersistedSession {
   return {
     id: r.id,
+    providerId: r.provider_id,
     title: r.title,
     project: r.project,
     cwd: r.cwd,
@@ -168,13 +172,19 @@ export function hydrate(p: PersistedSession): Session {
       : undefined;
   return {
     id: p.id,
+    providerId: p.providerId,
     title: p.title,
     project: p.project,
     cwd: p.cwd || undefined,
     branch: p.branch,
     state: p.state,
     management: p.management,
-    resumable: isResumable(p.transcriptMtimeMs),
+    // Both resume paths (`claude --resume` / `--fork-session`) read a *Claude* transcript, so a
+    // saved conversation only makes a session resumable when its provider can be controlled at
+    // all — a Codex rollout has a positive mtime but nothing `claude` could resume.
+    resumable:
+      isResumable(p.transcriptMtimeMs) &&
+      capabilitiesOf(p.providerId).canControl,
     model: p.model,
     modelRaw: p.modelRaw,
     contextPct: pctOfWindow(p.contextTokens, contextWindow),
@@ -192,14 +202,15 @@ export function hydrate(p: PersistedSession): Session {
 
 const UPSERT = `
   INSERT INTO sessions
-    (id, title, project, cwd, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
+    (id, provider_id, title, project, cwd, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
      input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens, effort_level,
      compaction_count, compaction_reclaimed_tokens)
   VALUES
-    (@id, @title, @project, @cwd, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
+    (@id, @provider_id, @title, @project, @cwd, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
      @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens, @effort_level,
      @compaction_count, @compaction_reclaimed_tokens)
   ON CONFLICT(id) DO UPDATE SET
+    provider_id = excluded.provider_id,
     title = excluded.title,
     project = excluded.project,
     cwd = excluded.cwd,
@@ -243,6 +254,7 @@ export function upsertSessions(
     for (const s of snapshots) {
       stmt.run({
         id: s.id,
+        provider_id: s.providerId ?? DEFAULT_PROVIDER_ID,
         title: s.title,
         project: s.project,
         cwd: s.cwd,
