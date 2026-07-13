@@ -58,7 +58,9 @@ describe("mergeManifests", () => {
     };
     const winArm: UpdateManifest = {
       version: "0.1.12",
-      files: [{ url: "Code-by-wilson-0.1.12-arm64.exe", sha512: "WA", size: 1 }],
+      files: [
+        { url: "Code-by-wilson-0.1.12-arm64.exe", sha512: "WA", size: 1 },
+      ],
       path: "Code-by-wilson-0.1.12-arm64.exe",
       sha512: "WA",
       releaseDate: "2026-06-23T01:00:00.000Z",

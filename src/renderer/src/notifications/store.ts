@@ -23,5 +23,5 @@ export async function initNotifyOnAwaiting(): Promise<void> {
  *  Fire-and-forget on the write — a failed persist costs durability, not this run's behavior. */
 export function setNotifyOnAwaiting(enabled: boolean): void {
   $notifyOnAwaiting.set(enabled);
-  void window.api.setNotifyOnAwaiting(enabled);
+  void window.api.setNotifyOnAwaiting(enabled).catch(() => {});
 }

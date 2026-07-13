@@ -25,7 +25,9 @@ export interface DecideInput {
   enabled: boolean;
   /** Whether the app window has OS focus (document.hasFocus() at poll time). */
   windowFocused: boolean;
-  /** The currently open session id (null for the pinned Overview/Settings/New-session routes). */
+  /** The current selection: a real session id, or a pinned-route sentinel (Overview/Settings/
+   *  New-session). Sentinels never equal a session id, so they never suppress — only having the
+   *  awaiting session itself open does. */
   selectedId: string | null;
 }
 

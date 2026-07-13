@@ -892,8 +892,9 @@ describe("install — win32 platform selection", () => {
     expect(healed.healed).toBe(true);
     expect(healed.wrappedExisting).toBe(true);
     expect(
-      JSON.parse(readFileSync(join(dir, ".code-by-wilson", "state.json"), "utf8"))
-        .wrappedCommand,
+      JSON.parse(
+        readFileSync(join(dir, ".code-by-wilson", "state.json"), "utf8"),
+      ).wrappedCommand,
     ).toBe("mine");
 
     mgr.uninstall();

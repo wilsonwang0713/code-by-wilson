@@ -72,7 +72,11 @@ describe.skipIf(process.platform === "win32")(
       const mgr = createSettingsManager({ claudeDir: home, now: () => NOW });
       mgr.install();
 
-      const wrapperPath = join(home, ".code-by-wilson", "statusline-wrapper.sh");
+      const wrapperPath = join(
+        home,
+        ".code-by-wilson",
+        "statusline-wrapper.sh",
+      );
       const stdout = execFileSync("sh", [wrapperPath], {
         input: SAMPLE,
         encoding: "utf8",
@@ -81,7 +85,12 @@ describe.skipIf(process.platform === "win32")(
       // (a) the prompt rendered: the wrapped `cat` echoed the JSON back
       expect(stdout).toBe(SAMPLE);
       // (b) the side-channel capture landed, keyed by session_id
-      const capture = join(home, ".code-by-wilson", "statusline", "abc-123.json");
+      const capture = join(
+        home,
+        ".code-by-wilson",
+        "statusline",
+        "abc-123.json",
+      );
       expect(existsSync(capture)).toBe(true);
       expect(readFileSync(capture, "utf8")).toBe(SAMPLE);
     });
@@ -91,7 +100,11 @@ describe.skipIf(process.platform === "win32")(
       const mgr = createSettingsManager({ claudeDir: home, now: () => NOW }); // no settings.json → no original
       mgr.install();
 
-      const wrapperPath = join(home, ".code-by-wilson", "statusline-wrapper.sh");
+      const wrapperPath = join(
+        home,
+        ".code-by-wilson",
+        "statusline-wrapper.sh",
+      );
       const stdout = execFileSync("sh", [wrapperPath], {
         input: SAMPLE,
         encoding: "utf8",
@@ -111,7 +124,11 @@ describe.skipIf(process.platform === "win32")(
       );
       createSettingsManager({ claudeDir: home, now: () => NOW }).install();
 
-      const wrapperPath = join(home, ".code-by-wilson", "statusline-wrapper.sh");
+      const wrapperPath = join(
+        home,
+        ".code-by-wilson",
+        "statusline-wrapper.sh",
+      );
       const withNewline = SAMPLE + "\n";
       const stdout = execFileSync("sh", [wrapperPath], {
         input: withNewline,
@@ -135,7 +152,11 @@ describe.skipIf(process.platform === "win32")(
       );
       createSettingsManager({ claudeDir: home, now: () => NOW }).install();
 
-      const wrapperPath = join(home, ".code-by-wilson", "statusline-wrapper.sh");
+      const wrapperPath = join(
+        home,
+        ".code-by-wilson",
+        "statusline-wrapper.sh",
+      );
       const stdout = execFileSync("sh", [wrapperPath], {
         input: '{"session_id":"../../escape"}',
         encoding: "utf8",

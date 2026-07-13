@@ -47,7 +47,10 @@ export function useAwaitingNotifications({
       selectedId,
     });
     baselineRef.current = baseline;
-    for (const req of notify) void window.api.showNotification(req);
+    // .catch: if main's show ever rejects, an un-caught fire-and-forget invoke would surface as
+    // an unhandled rejection; a lost notification is the acceptable outcome.
+    for (const req of notify)
+      void window.api.showNotification(req).catch(() => {});
   }, [sessions, enabled, selectedId]);
 
   // Notification click → select that session. The push arrives only after main focused the window.

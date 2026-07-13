@@ -9,7 +9,9 @@ describe("normalizeRemoteUrl", () => {
   });
   it("converts an ssh:// URL to https", () => {
     expect(
-      normalizeRemoteUrl("ssh://git@github.com/wilsonwang0713/code-by-wilson.git"),
+      normalizeRemoteUrl(
+        "ssh://git@github.com/wilsonwang0713/code-by-wilson.git",
+      ),
     ).toBe("https://github.com/wilsonwang0713/code-by-wilson");
   });
   it("drops an ssh port and host-agnostically normalizes", () => {
@@ -19,7 +21,9 @@ describe("normalizeRemoteUrl", () => {
   });
   it("strips a trailing .git from an https remote", () => {
     expect(
-      normalizeRemoteUrl("https://github.com/wilsonwang0713/code-by-wilson.git"),
+      normalizeRemoteUrl(
+        "https://github.com/wilsonwang0713/code-by-wilson.git",
+      ),
     ).toBe("https://github.com/wilsonwang0713/code-by-wilson");
   });
   it("leaves a nested https path without .git unchanged", () => {

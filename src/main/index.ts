@@ -332,8 +332,9 @@ app
     const caffeinate = createCaffeinate({ blocker: powerSaveBlocker });
     // Session notifications: shown on the renderer's request only (its poll detects the
     // awaiting-input transition), so the request/response invariant holds. A click resolves the
-    // window at click time and pushes the session id back (IPC.notifyActivate).
-    const notifier = createNotifier();
+    // window at click time and pushes the session id back (IPC.notifyActivate); openWindow lets
+    // it recreate the window when a click arrives with all windows closed (macOS dock-only state).
+    const notifier = createNotifier(openWindow);
     const { sync } = registerIpc({
       db,
       provider,
