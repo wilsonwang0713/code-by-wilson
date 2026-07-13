@@ -25,7 +25,7 @@ describe("initialUpdateState", () => {
 describe("releaseNotesUrl", () => {
   it("builds the GitHub tag URL", () => {
     expect(releaseNotesUrl("0.1.17")).toBe(
-      "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+      "https://github.com/wilsonwang0713/code-by-wilson/releases/tag/v0.1.17",
     );
   });
 });
@@ -57,7 +57,7 @@ describe("nextUpdateState", () => {
         version: "0.1.17",
         releaseDate: "2026-06-24",
         notesUrl:
-          "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+          "https://github.com/wilsonwang0713/code-by-wilson/releases/tag/v0.1.17",
       },
     });
   });
@@ -140,7 +140,7 @@ describe("isUpdatePending", () => {
         kind: "available",
         version: "0.1.17",
         notesUrl:
-          "https://github.com/luojiahai/code-by-wire/releases/tag/v0.1.17",
+          "https://github.com/wilsonwang0713/code-by-wilson/releases/tag/v0.1.17",
       }),
     ).toBe(true);
     expect(

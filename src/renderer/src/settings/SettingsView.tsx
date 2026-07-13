@@ -150,7 +150,7 @@ function AboutSection({ update }: { update?: UpdateControls }) {
   return (
     <>
       <PageHeader title="About" />
-      <Card title="Code-by-wire">
+      <Card title="Code-by-wilson">
         <div className="flex flex-col gap-3 px-4 py-4">
           <Wordmark />
           <p className="max-w-[54ch] text-body leading-relaxed text-fg-muted">
@@ -158,7 +158,7 @@ function AboutSection({ update }: { update?: UpdateControls }) {
             manage, and review every run from one instrument panel.
           </p>
           <div className="font-mono text-meta text-fg-faint">
-            github.com/luojiahai/code-by-wire
+            github.com/wilsonwang0713/code-by-wilson
           </div>
         </div>
       </Card>

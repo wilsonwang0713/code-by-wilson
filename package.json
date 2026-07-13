@@ -1,17 +1,17 @@
 {
-  "name": "code-by-wire",
+  "name": "code-by-wilson",
   "private": true,
   "version": "0.1.30",
   "description": "Pilot every Claude Code session on your machine.",
-  "author": "luojiahai",
+  "author": "wilsonwang0713",
   "license": "MIT",
-  "homepage": "https://github.com/luojiahai/code-by-wire",
+  "homepage": "https://github.com/wilsonwang0713/code-by-wilson",
   "repository": {
     "type": "git",
-    "url": "https://github.com/luojiahai/code-by-wire.git"
+    "url": "https://github.com/wilsonwang0713/code-by-wilson.git"
   },
   "bugs": {
-    "url": "https://github.com/luojiahai/code-by-wire/issues"
+    "url": "https://github.com/wilsonwang0713/code-by-wilson/issues"
   },
   "engines": {
     "node": ">=24"

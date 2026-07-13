@@ -507,7 +507,7 @@ export function App() {
       rightEdgeExposed={rightEdgeExposed}
     />
   ) : (
-    <MiddleNonSession title="code-by-wire" leftEdgeExposed={leftEdgeExposed}>
+    <MiddleNonSession title="code-by-wilson" leftEdgeExposed={leftEdgeExposed}>
       <EmptyDetail empty={all.length === 0} loading={loading} />
     </MiddleNonSession>
   );

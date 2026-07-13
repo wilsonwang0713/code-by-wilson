@@ -27,12 +27,12 @@ const settingsPath = (home: string) => join(home, "settings.json");
 const readRaw = (home: string) => readFileSync(settingsPath(home), "utf8");
 const readJson = (home: string) => JSON.parse(readRaw(home));
 const readState = (home: string) =>
-  JSON.parse(readFileSync(join(home, ".code-by-wire", "state.json"), "utf8"));
+  JSON.parse(readFileSync(join(home, ".code-by-wilson", "state.json"), "utf8"));
 
 // The exact command install writes — the contract the wrapper script (issue #11) will live behind.
 // Uses "linux" as the injected platform so these POSIX tests exercise the sh path on all host OSes.
 const appCommandFor = (home: string) =>
-  `"${join(home, ".code-by-wire", "statusline-wrapper.sh")}"`;
+  `"${join(home, ".code-by-wilson", "statusline-wrapper.sh")}"`;
 
 describe("install — clean (AC #2)", () => {
   it("adds the app statusLine and preserves every other key when none exists", () => {
@@ -237,7 +237,7 @@ describe("uninstall — restore byte-for-byte (AC #4)", () => {
 
     expect(() => mgr.uninstall()).toThrow(/backup missing/);
     expect(mgr.isInstalled()).toBe(true); // still wrapped — we did NOT silently clear it
-    expect(existsSync(join(home, ".code-by-wire", "state.json"))).toBe(true); // record kept so a retry can restore
+    expect(existsSync(join(home, ".code-by-wilson", "state.json"))).toBe(true); // record kept so a retry can restore
   });
 });
 
@@ -284,7 +284,7 @@ describe("trust-safety", () => {
 
     expect(() => mgr.install()).toThrow();
     expect(readRaw(home)).toBe(malformed); // untouched
-    expect(existsSync(join(home, ".code-by-wire", "state.json"))).toBe(false); // no state written
+    expect(existsSync(join(home, ".code-by-wilson", "state.json"))).toBe(false); // no state written
     expect(readdirSync(home).filter((f) => f.endsWith(".bak"))).toHaveLength(0); // no backup written
   });
 
@@ -344,13 +344,13 @@ describe("trust-safety", () => {
     mgr.install();
 
     writeFileSync(
-      join(home, ".code-by-wire", "state.json"),
+      join(home, ".code-by-wilson", "state.json"),
       "{ corrupt not json",
     ); // the record we rely on is broken
 
     expect(() => mgr.uninstall()).toThrow();
     expect(mgr.isInstalled()).toBe(true); // still wrapped — we did NOT silently pretend to uninstall
-    expect(existsSync(join(home, ".code-by-wire", "state.json"))).toBe(true); // broken record kept, not deleted
+    expect(existsSync(join(home, ".code-by-wilson", "state.json"))).toBe(true); // broken record kept, not deleted
   });
 });
 
@@ -372,7 +372,7 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     });
     mgr.install();
 
-    rmSync(join(home, ".code-by-wire", "state.json")); // the record we rely on vanishes while still wrapped
+    rmSync(join(home, ".code-by-wilson", "state.json")); // the record we rely on vanishes while still wrapped
 
     expect(() => mgr.uninstall()).toThrow(/install record|wrapped/i);
     expect(mgr.isInstalled()).toBe(true); // still wrapped — a missing record must not read as "not installed"
@@ -395,7 +395,7 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     });
     mgr.install();
 
-    rmSync(join(home, ".code-by-wire", "state.json")); // the record vanishes while the wrapper survives
+    rmSync(join(home, ".code-by-wilson", "state.json")); // the record vanishes while the wrapper survives
 
     const healed = mgr.install();
     expect(healed.healed).toBe(true);
@@ -446,7 +446,7 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     expect(readState(home).wrappedCommand).toBe("mine");
     expect(
       readFileSync(
-        join(home, ".code-by-wire", "statusline-wrapper.sh"),
+        join(home, ".code-by-wilson", "statusline-wrapper.sh"),
         "utf8",
       ),
     ).toContain("| mine");
@@ -507,7 +507,7 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     expect(readState(home).wrappedCommand).toBe("mine"); // not clobbered to null
     expect(
       readFileSync(
-        join(home, ".code-by-wire", "statusline-wrapper.sh"),
+        join(home, ".code-by-wilson", "statusline-wrapper.sh"),
         "utf8",
       ),
     ).toContain("| mine");
@@ -530,7 +530,7 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     });
     mgr.install();
 
-    rmSync(join(home, ".code-by-wire"), { recursive: true }); // state.json AND wrapper both wiped
+    rmSync(join(home, ".code-by-wilson"), { recursive: true }); // state.json AND wrapper both wiped
 
     const healed = mgr.install();
     expect(healed.healed).toBe(true);
@@ -556,7 +556,7 @@ describe("trust-safety — desync between settings.json and state.json", () => {
     });
     mgr.install();
 
-    writeFileSync(join(home, ".code-by-wire", "state.json"), "{}"); // valid JSON, wrong shape
+    writeFileSync(join(home, ".code-by-wilson", "state.json"), "{}"); // valid JSON, wrong shape
 
     expect(() => mgr.uninstall()).toThrow(/corrupt|invalid/i);
     expect(mgr.isInstalled()).toBe(true); // still wrapped — wrong-shape state must not strand the user
@@ -575,7 +575,7 @@ describe("trust-safety — valid-but-non-object settings.json", () => {
 
     expect(() => mgr.install()).toThrow(/not a JSON object/i);
     expect(readRaw(home)).toBe("[]"); // untouched
-    expect(existsSync(join(home, ".code-by-wire", "state.json"))).toBe(false); // no state written
+    expect(existsSync(join(home, ".code-by-wilson", "state.json"))).toBe(false); // no state written
     expect(readdirSync(home).filter((f) => f.endsWith(".bak"))).toHaveLength(0); // no backup written
   });
 
@@ -688,7 +688,7 @@ describe.skipIf(process.platform === "win32")(
 
 describe("install — materializes the wrapper script (issue #11)", () => {
   const wrapperPath = (home: string) =>
-    join(home, ".code-by-wire", "statusline-wrapper.sh");
+    join(home, ".code-by-wilson", "statusline-wrapper.sh");
 
   it("writes an executable wrapper that calls through to the wrapped command", () => {
     const home = makeHome();
@@ -776,7 +776,7 @@ describe("install — materializes the wrapper script (issue #11)", () => {
     mgr.uninstall();
 
     expect(existsSync(wrapperPath(home))).toBe(false);
-    expect(existsSync(join(home, ".code-by-wire", "statusline"))).toBe(false);
+    expect(existsSync(join(home, ".code-by-wilson", "statusline"))).toBe(false);
   });
 
   it("writes no wrapper when it refuses a malformed settings.json", () => {
@@ -809,7 +809,7 @@ describe("install — win32 platform selection", () => {
       /powershell.*statusline-wrapper\.ps1/i,
     );
     expect(
-      existsSync(join(dir, ".code-by-wire", "statusline-wrapper.ps1")),
+      existsSync(join(dir, ".code-by-wilson", "statusline-wrapper.ps1")),
     ).toBe(true);
   });
 
@@ -822,7 +822,7 @@ describe("install — win32 platform selection", () => {
     });
     mgr.install();
     expect(
-      existsSync(join(dir, ".code-by-wire", "statusline-wrapper.sh")),
+      existsSync(join(dir, ".code-by-wilson", "statusline-wrapper.sh")),
     ).toBe(false);
   });
 
@@ -857,7 +857,7 @@ describe("install — win32 platform selection", () => {
     mgr.install();
 
     const ps1 = readFileSync(
-      join(dir, ".code-by-wire", "statusline-wrapper.ps1"),
+      join(dir, ".code-by-wilson", "statusline-wrapper.ps1"),
       "utf8",
     );
     expect(ps1).toContain("my-prompt"); // call-through baked
@@ -886,13 +886,13 @@ describe("install — win32 platform selection", () => {
       platform: "win32",
     });
     mgr.install();
-    rmSync(join(dir, ".code-by-wire", "state.json"));
+    rmSync(join(dir, ".code-by-wilson", "state.json"));
 
     const healed = mgr.install();
     expect(healed.healed).toBe(true);
     expect(healed.wrappedExisting).toBe(true);
     expect(
-      JSON.parse(readFileSync(join(dir, ".code-by-wire", "state.json"), "utf8"))
+      JSON.parse(readFileSync(join(dir, ".code-by-wilson", "state.json"), "utf8"))
         .wrappedCommand,
     ).toBe("mine");
 
@@ -911,9 +911,9 @@ describe("install — win32 platform selection", () => {
       platform: "win32",
     });
     mgr.install();
-    const appDir = join(dir, ".code-by-wire");
+    const appDir = join(dir, ".code-by-wilson");
     // A stale .sh from an earlier POSIX install on the same shared ~/.claude. uninstall must remove
-    // every code-by-wire wrapper, not just the current platform's, or the foreign one is orphaned.
+    // every code-by-wilson wrapper, not just the current platform's, or the foreign one is orphaned.
     writeFileSync(join(appDir, "statusline-wrapper.sh"), "#!/bin/sh\n");
 
     mgr.uninstall();
@@ -923,12 +923,12 @@ describe("install — win32 platform selection", () => {
   });
 });
 
-// A statusLine left pointing at a code-by-wire wrapper from a different platform/older build (e.g. a POSIX
+// A statusLine left pointing at a code-by-wilson wrapper from a different platform/older build (e.g. a POSIX
 // .sh wrapper still referenced on a Windows box) must not be treated as the user's own command and wrapped
 // again — that buries it behind cmd.exe /c "<...>wrapper.sh" and loses the real original.
-describe("install — does not re-wrap a foreign code-by-wire wrapper", () => {
+describe("install — does not re-wrap a foreign code-by-wilson wrapper", () => {
   function seedForeignShWrapper(dir: string, wrappedCommand: string | null) {
-    const appDir = join(dir, ".code-by-wire");
+    const appDir = join(dir, ".code-by-wilson");
     mkdirSync(appDir, { recursive: true });
     const shPath = join(appDir, "statusline-wrapper.sh");
     writeFileSync(shPath, wrapperScript({ wrappedCommand }));
@@ -1069,7 +1069,7 @@ describe("install — carries upstream statusLine extras through the wrap", () =
     });
     mgr.install();
 
-    rmSync(join(home, ".code-by-wire", "state.json")); // record vanishes; the wrapped block survives
+    rmSync(join(home, ".code-by-wilson", "state.json")); // record vanishes; the wrapped block survives
 
     const healed = mgr.install();
     expect(healed.healed).toBe(true);
@@ -1124,7 +1124,7 @@ describe("install — carries upstream statusLine extras through the wrap", () =
     });
     mgr.install();
 
-    const statePath = join(home, ".code-by-wire", "state.json");
+    const statePath = join(home, ".code-by-wilson", "state.json");
     const old = JSON.parse(readFileSync(statePath, "utf8"));
     delete old.wrappedExtras; // a record written before this field existed
     writeFileSync(statePath, JSON.stringify(old, null, 2));
@@ -1278,7 +1278,7 @@ describe("status() and setRefreshInterval()", () => {
     mgr.install();
 
     writeFileSync(
-      join(home, ".code-by-wire", "state.json"),
+      join(home, ".code-by-wilson", "state.json"),
       "{ corrupt not json",
     ); // the record we rely on is broken
 

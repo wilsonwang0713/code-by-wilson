@@ -1,5 +1,5 @@
 /** The repo whose GitHub releases electron-updater reads; used to build the release-notes link. */
-const RELEASES_BASE = "https://github.com/luojiahai/code-by-wire/releases/tag";
+const RELEASES_BASE = "https://github.com/wilsonwang0713/code-by-wilson/releases/tag";
 
 /** The update lifecycle, as a discriminated union the renderer renders directly.
  *  `unsupported` is the dev/unpacked state (electron-updater can't run unpacked). */

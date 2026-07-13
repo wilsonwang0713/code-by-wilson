@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
 
-/** code-by-wire's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
+/** code-by-wilson's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
 export interface AppSettings {
   /** Absolute path to a claude binary, overriding PATH resolution. Works for Finder launches,
    *  unlike the CBW_CLAUDE_BIN env var. */
