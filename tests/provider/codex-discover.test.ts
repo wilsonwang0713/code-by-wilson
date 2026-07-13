@@ -93,6 +93,8 @@ describe("codex discovery", () => {
     const now = Date.now();
     expect(isRolloutLive(now - 5_000, now)).toBe(true);
     expect(isRolloutLive(now - DEFAULT_LIVE_WINDOW_MS - 1, now)).toBe(false);
+    // A future-dated mtime (clock skew) reads as ended — a negative age must not pin "working".
+    expect(isRolloutLive(now + 60 * 60_000, now)).toBe(false);
 
     const home = makeHome();
     writeRollout(home, dayDirOf(now), A, now - 5_000);

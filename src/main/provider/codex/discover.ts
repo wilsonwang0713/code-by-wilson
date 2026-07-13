@@ -13,13 +13,17 @@ export const DEFAULT_RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export const DEFAULT_LIVE_WINDOW_MS = 60_000;
 
-/** The liveness heuristic in one place (see DEFAULT_LIVE_WINDOW_MS for the rationale). */
+/** The liveness heuristic in one place (see DEFAULT_LIVE_WINDOW_MS for the rationale). A
+ *  future-dated mtime (clock skew on a network filesystem, a wall clock that rolled back) reads as
+ *  ended, not live: a negative age would otherwise stay under the window FOREVER, pinning the
+ *  session to "working" until real time catches up to the bogus stamp. */
 export function isRolloutLive(
   mtimeMs: number,
   nowMs: number,
   liveWindowMs = DEFAULT_LIVE_WINDOW_MS,
 ): boolean {
-  return nowMs - mtimeMs < liveWindowMs;
+  const age = nowMs - mtimeMs;
+  return age >= 0 && age < liveWindowMs;
 }
 
 /** `rollout-<timestamp>-<uuid>.jsonl` — the uuid is the session id. */

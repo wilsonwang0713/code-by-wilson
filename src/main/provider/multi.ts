@@ -39,7 +39,25 @@ export function createMultiProvider(providers: readonly Provider[]): Provider {
     listCandidates: (): SessionCandidate[] => {
       const out: SessionCandidate[] = [];
       for (const provider of providers) {
-        for (const candidate of provider.listCandidates()) {
+        let candidates: SessionCandidate[];
+        try {
+          candidates = provider.listCandidates();
+        } catch (err) {
+          // Per-provider isolation: only the primary's throw propagates (its throw-on-EACCES is a
+          // deliberate prune-guard for its own index — see claude/discover). A SECONDARY provider's
+          // disk fault (root-owned ~/.codex after a sudo run, EIO on a network home) must never
+          // blank the primary's sessions with it: sync would abort, and on a fresh index (the
+          // schema-bump relaunch rebuilds from empty) the user would see NO sessions at all until
+          // they fixed a foreign provider's permissions. Skipping the pass prunes only that
+          // provider's rows, which restore themselves once it reads again.
+          if (provider === primary) throw err;
+          console.error(
+            `provider ${provider.id}: listCandidates failed; skipping this pass`,
+            err,
+          );
+          continue;
+        }
+        for (const candidate of candidates) {
           // First claimant wins a (theoretical) cross-provider id collision, so one session id can
           // never flip owners between passes and double-appear in the index.
           const claimed = ownerById.get(candidate.id);

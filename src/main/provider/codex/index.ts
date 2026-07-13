@@ -61,8 +61,14 @@ export function createCodexProvider(deps: CodexProviderDeps = {}): Provider {
 
   // Last-resolved rollout path per session id, so a steady Observed-view poll stats ONE file
   // instead of re-walking the dated tree each tick — the same cache discipline as the Claude
-  // provider's pathById. The full (bounded) sweep runs only on a cold miss or a vanished file.
+  // provider's pathById. listCandidates seeds it from the sweep it already ran, so opening a
+  // session never pays a cold walk of its own; the in-resolve sweep is only the fallback for a
+  // read that beats the first pass or a file that moved between polls.
   const pathById = new Map<string, string>();
+  // Ids a sweep failed to resolve (a DB row lingering after its rollout aged out of the window).
+  // Without this, every ~3s poll of such a session re-walks the whole dated tree until the row is
+  // pruned. Cleared each discovery pass — that's when the answer could genuinely change.
+  const unresolved = new Set<string>();
   const resolveRollout = (
     id: string,
   ): { path: string; mtimeMs: number } | null => {
@@ -74,8 +80,12 @@ export function createCodexProvider(deps: CodexProviderDeps = {}): Provider {
         pathById.delete(id); // moved/deleted — fall through to a fresh sweep
       }
     }
+    if (unresolved.has(id)) return null;
     const hit = indexRollouts(codexDir, now(), recentWindowMs).get(id);
-    if (!hit) return null;
+    if (!hit) {
+      unresolved.add(id);
+      return null;
+    }
     pathById.set(id, hit.path);
     return hit;
   };
@@ -134,12 +144,20 @@ export function createCodexProvider(deps: CodexProviderDeps = {}): Provider {
     capabilities: PROVIDER_CAPABILITIES[CODEX_PROVIDER_ID],
     listCandidates: () => {
       titles = readIndexTitles(codexDir);
-      return listCodexCandidates({
+      const candidates = listCodexCandidates({
         codexDir,
         now: now(),
         recentWindowMs,
         liveWindowMs,
       });
+      // Seed the path cache from the walk this pass already paid for, and re-arm the unresolved
+      // set — a rollout that just appeared (or aged back in via a window change) resolves again.
+      unresolved.clear();
+      for (const c of candidates) {
+        if (c.transcriptPath !== undefined)
+          pathById.set(c.id, c.transcriptPath);
+      }
+      return candidates;
     },
     summarize,
     restate: (c, prev) => ({ ...prev, state: stateOf(c.alive) }),

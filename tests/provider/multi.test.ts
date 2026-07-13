@@ -152,6 +152,34 @@ describe("createMultiProvider", () => {
     expect(claude.calls).toEqual(["readTranscript:dup"]);
     expect(codex.calls).toEqual([]);
   });
+
+  it("isolates a secondary provider's discovery fault instead of blanking the pass", () => {
+    // The regression this guards: an unreadable ~/.codex (EACCES after a sudo run) must cost only
+    // the Codex rows — never abort the aggregate pass and prune the primary's sessions with it.
+    const claude = fakeProvider("claude", ["a1"], CLAUDE_CAPS);
+    const codex = fakeProvider("codex", ["b1"], CODEX_CAPS);
+    const throwing: Provider = {
+      ...codex,
+      listCandidates: () => {
+        throw new Error("EACCES");
+      },
+    };
+    const multi = createMultiProvider([claude, throwing]);
+    expect(multi.listCandidates().map((c) => c.id)).toEqual(["a1"]);
+  });
+
+  it("lets the primary's discovery fault propagate (its prune-guard semantics)", () => {
+    const claude = fakeProvider("claude", [], CLAUDE_CAPS);
+    const throwing: Provider = {
+      ...claude,
+      listCandidates: () => {
+        throw new Error("EACCES");
+      },
+    };
+    const codex = fakeProvider("codex", ["b1"], CODEX_CAPS);
+    const multi = createMultiProvider([throwing, codex]);
+    expect(() => multi.listCandidates()).toThrow("EACCES");
+  });
 });
 
 describe("hydrate provider plumbing", () => {
