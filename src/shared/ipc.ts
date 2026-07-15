@@ -20,6 +20,7 @@ import type { StatsSnapshot, StatsRange, ScanProgress } from "./stats";
 import type { CliStatus } from "./cli-status";
 import type { UpdateState } from "./update";
 import type { StatuslineStatus } from "./statusline-status";
+import type { ThemePreference } from "./theme";
 export { type UpdateState };
 export const IPC = {
   overview: "overview:get",
@@ -58,6 +59,8 @@ export const IPC = {
   statuslineRepair: "statusline:repair",
   caffeinateGet: "caffeinate:get",
   caffeinateSet: "caffeinate:set",
+  themeGet: "theme:get",
+  themeSet: "theme:set",
   notifyShow: "notify:show",
   notifyGetOnAwaiting: "notify:getOnAwaiting",
   notifySetOnAwaiting: "notify:setOnAwaiting",
@@ -292,6 +295,10 @@ export interface IpcApi {
   /** Turn keep-awake on or off. Resolves to the resulting state — main is the source of truth,
    *  so the footer renders the response rather than assuming the toggle took. */
   setCaffeinate(on: boolean): Promise<boolean>;
+  /** The persisted theme preference (missing reads as "system"). */
+  getThemePreference(): Promise<ThemePreference>;
+  /** Persist the theme preference and apply it to nativeTheme.themeSource immediately. */
+  setThemePreference(pref: ThemePreference): Promise<void>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */

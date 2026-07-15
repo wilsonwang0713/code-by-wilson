@@ -1,4 +1,4 @@
-import { ipcMain, shell, clipboard } from "electron";
+import { ipcMain, shell, clipboard, nativeTheme } from "electron";
 import { homedir } from "node:os";
 import { statSync } from "node:fs";
 import {
@@ -15,6 +15,7 @@ import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
 import type { ModelDefaults } from "@shared/models";
 import type { CliStatus } from "@shared/cli-status";
+import { normalizeThemePreference } from "@shared/theme";
 import type { CliStatusController } from "./cli-check";
 import type { Updater } from "./updater";
 import type { AppSettingsStore } from "./app-settings";
@@ -185,6 +186,7 @@ export function registerIpc({
     setAutoCheckUpdates: () => {},
     setStatuslineEnabled: () => {},
     setNotifyOnAwaiting: () => {},
+    setThemePreference: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,
@@ -438,6 +440,15 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.caffeinateGet, (): boolean => caff.isOn());
   ipcMain.handle(IPC.caffeinateSet, (_e, on: boolean): boolean => caff.set(on));
+  ipcMain.handle(
+    IPC.themeGet,
+    () => settings.read().themePreference ?? "system",
+  );
+  ipcMain.handle(IPC.themeSet, (_e, raw: unknown): void => {
+    const pref = normalizeThemePreference(raw);
+    settings.setThemePreference(pref);
+    nativeTheme.themeSource = pref;
+  });
   ipcMain.handle(IPC.notifyShow, (_e, req: NotifyShowRequest): void =>
     notifier?.show(req),
   );
