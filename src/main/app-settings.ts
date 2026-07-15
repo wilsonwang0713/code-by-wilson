@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
+import type { ThemePreference } from "@shared/theme";
 
 /** code-by-wilson's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
 export interface AppSettings {
@@ -16,6 +17,8 @@ export interface AppSettings {
   /** Whether to fire a native notification when a session starts awaiting input. Missing means on;
    *  callers read `read().notifyOnAwaiting ?? true`. */
   notifyOnAwaiting?: boolean;
+  /** The theme choice. Missing means "system"; callers read `read().themePreference ?? "system"`. */
+  themePreference?: ThemePreference;
 }
 
 export interface AppSettingsStore {
@@ -24,6 +27,7 @@ export interface AppSettingsStore {
   setAutoCheckUpdates(enabled: boolean): void;
   setStatuslineEnabled(enabled: boolean): void;
   setNotifyOnAwaiting(enabled: boolean): void;
+  setThemePreference(pref: ThemePreference): void;
 }
 
 export interface AppSettingsDeps {
@@ -65,6 +69,9 @@ export function createAppSettingsStore(
     },
     setNotifyOnAwaiting(enabled) {
       write({ ...read(), notifyOnAwaiting: enabled });
+    },
+    setThemePreference(pref) {
+      write({ ...read(), themePreference: pref });
     },
   };
 }
