@@ -1,4 +1,10 @@
-import { app, BrowserWindow, net, powerSaveBlocker } from "electron";
+import {
+  app,
+  BrowserWindow,
+  nativeTheme,
+  net,
+  powerSaveBlocker,
+} from "electron";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { openDb } from "./db/sqlite";
@@ -39,6 +45,7 @@ import {
 } from "./terminal/shell-path";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
+import { normalizeThemePreference } from "@shared/theme";
 
 // Pin the whole app to the sRGB color profile. Without this, the packaged build inherits the
 // display's profile (Display P3 on modern Macs) and Chromium stretches our sRGB-authored palette
@@ -192,6 +199,15 @@ app
     // overview() invoke just queues until registerIpc runs a few lines down — but the window has already
     // painted, so a slow login shell no longer blanks the screen on launch. Mirrors the lazy childEnv above
     // and the setTimeout'd CLI check below.
+    // Create app settings early so the persisted theme can be applied before first paint. nativeTheme
+    // drives prefers-color-scheme in the renderer, so setting it here makes the window paint in the
+    // right theme with no flash. Reused by the statusline/notify wiring below.
+    const appSettings = createAppSettingsStore({
+      dir: app.getPath("userData"),
+    });
+    nativeTheme.themeSource = normalizeThemePreference(
+      appSettings.read().themePreference,
+    );
     const openWindow = (): void =>
       createWindow(
         managed,
@@ -250,9 +266,6 @@ app
           })
         : null,
     };
-    const appSettings = createAppSettingsStore({
-      dir: app.getPath("userData"),
-    });
     // Wrap the user's statusLine so live cost/context and account rate limits flow to the app.
     // Idempotent and reversible; a failure must never cost the user a window. Gated on the user's
     // durable preference — a Settings-page Disable must survive relaunch, not silently re-install.
