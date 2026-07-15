@@ -5,7 +5,7 @@
    red/green for failed/done. Token names kept, values re-mapped to the hermes --ui-* layer below. */
 @theme {
   /* Surface stack (neutral grayscale). */
-  --color-well: #080808; /* sunken: terminal, inputs, code blocks */
+  --color-well: #080808; /* dark-island sunken: code blocks, diffs, tool/shell output */
   --color-field: #080808; /* form-input surface; follows theme (light branch overrides) */
   --color-ink-950: #0e0e0e; /* app canvas / middle */
   --color-ink-925: #141414; /* cards, rails, panels */

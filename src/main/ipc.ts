@@ -440,9 +440,8 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.caffeinateGet, (): boolean => caff.isOn());
   ipcMain.handle(IPC.caffeinateSet, (_e, on: boolean): boolean => caff.set(on));
-  ipcMain.handle(
-    IPC.themeGet,
-    () => settings.read().themePreference ?? "system",
+  ipcMain.handle(IPC.themeGet, () =>
+    normalizeThemePreference(settings.read().themePreference),
   );
   ipcMain.handle(IPC.themeSet, (_e, raw: unknown): void => {
     const pref = normalizeThemePreference(raw);
