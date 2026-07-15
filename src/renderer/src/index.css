@@ -616,3 +616,62 @@ body:has([data-suppress-pane-reveal]:hover) [data-pane-reveal-trigger] {
 .title-bar {
   zoom: calc(1 / var(--zoom-factor, 1));
 }
+
+/* Light theme — override-only branch. nativeTheme.themeSource (main) drives prefers-color-scheme,
+   so this covers both "follow system" and a forced Light choice. Dark stays the default above. */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Seeds that feed the --ui-* layer (foreground dark, neutrals light). */
+    --theme-foreground: #1a1a1a;
+    --theme-primary: #1a1a1a;
+    --theme-midground: #6b6b6b;
+    --theme-neutral-chrome: #f4f4f5;
+    --theme-neutral-sidebar: #ececed;
+    --theme-neutral-card: #ffffff;
+
+    /* Surface stack — canvas grayish, raised whiter (raised stays lighter than canvas). */
+    --color-ink-950: #f4f4f5; /* app canvas / middle */
+    --color-ink-925: #fafafa; /* cards, rails, panels */
+    --color-ink-900: #ffffff; /* raised: headers, chips, menus, popover */
+    --color-ink-850: #eeeeef; /* subtle hover / faint divider */
+    --color-ink-800: #e3e3e5; /* default hairline border */
+    --color-ink-750: #e8e8ea; /* hover on raised surfaces */
+    --color-ink-700: #d4d4d7; /* strong border */
+    --color-ink-600: #9a9a9f; /* Ended state, dim glyphs */
+
+    /* Text tiers — dark ink on light ground. */
+    --color-fg: color-mix(in srgb, #1a1a1a 92%, transparent);
+    --color-fg-muted: color-mix(in srgb, #1a1a1a 62%, transparent);
+    --color-fg-faint: color-mix(in srgb, #1a1a1a 42%, transparent);
+
+    /* Primary = foreground (grayscale). */
+    --color-primary: #1a1a1a;
+    --color-primary-bright: #000000;
+    --color-primary-deep: #3a3a3a;
+
+    /* Status hues — deepened for contrast on light. */
+    --color-working: #0d9488;
+    --color-working-bright: #14b8a6;
+    --color-accent: #b45309;
+    --color-accent-bright: #d97706;
+    --color-idle: #8a8a8a;
+    --color-danger: #dc2626;
+    --color-ok: #16a34a;
+
+    /* Data / telemetry neutrals. */
+    --color-steel: #6b6b6b;
+    --color-token-input: #5a5a5a;
+    --color-token-output: #9a9a9a;
+
+    /* Magnitude ramp — dark bars on light bg. */
+    --color-data-1: #3a3a3a;
+    --color-data-2: #6a6a6a;
+    --color-data-3: #8a8a8a;
+    --color-data-4: #b0b0b0;
+    --color-data-5: #d0d0d0;
+
+    /* Recessed sidebar surfaces. */
+    --color-sidebar: #ececed;
+    --color-sidebar-border: #dcdce0;
+  }
+}
