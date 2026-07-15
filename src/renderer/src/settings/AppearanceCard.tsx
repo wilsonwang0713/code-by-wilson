@@ -26,7 +26,11 @@ export function AppearanceCard() {
             Follow the system setting, or force light or dark
           </div>
         </div>
-        <div className="flex shrink-0 gap-0.5 rounded-md border border-ink-700 p-0.5">
+        <div
+          className="flex shrink-0 gap-0.5 rounded-md border border-ink-700 p-0.5"
+          role="group"
+          aria-label="Theme"
+        >
           {THEME_PREFERENCES.map((p) => (
             <button
               key={p}
@@ -36,7 +40,7 @@ export function AppearanceCard() {
               className={cx(
                 "rounded-[5px] px-2.5 py-1 text-meta transition-colors",
                 pref === p
-                  ? "bg-primary text-ink-900"
+                  ? "bg-primary text-ink-950"
                   : "text-fg-muted hover:text-fg",
               )}
             >
