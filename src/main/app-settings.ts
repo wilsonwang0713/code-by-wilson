@@ -19,6 +19,9 @@ export interface AppSettings {
   notifyOnAwaiting?: boolean;
   /** The theme choice. Missing means "system"; callers read `read().themePreference ?? "system"`. */
   themePreference?: ThemePreference;
+  /** Whether the macOS notch overlay ("island") is shown. Missing means OFF — the island is
+   *  opt-in (spec US-5 AC4), so callers read `read().islandEnabled ?? false`. */
+  islandEnabled?: boolean;
 }
 
 export interface AppSettingsStore {
@@ -28,6 +31,7 @@ export interface AppSettingsStore {
   setStatuslineEnabled(enabled: boolean): void;
   setNotifyOnAwaiting(enabled: boolean): void;
   setThemePreference(pref: ThemePreference): void;
+  setIslandEnabled(enabled: boolean): void;
 }
 
 export interface AppSettingsDeps {
@@ -72,6 +76,9 @@ export function createAppSettingsStore(
     },
     setThemePreference(pref) {
       write({ ...read(), themePreference: pref });
+    },
+    setIslandEnabled(enabled) {
+      write({ ...read(), islandEnabled: enabled });
     },
   };
 }

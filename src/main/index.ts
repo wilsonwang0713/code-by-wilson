@@ -33,6 +33,7 @@ import { resolveClaudeDir } from "./claude-config";
 import { createAppSettingsStore } from "./app-settings";
 import { createCaffeinate } from "./caffeinate";
 import { createNotifier } from "./notify";
+import { createIslandController } from "./island/controller";
 import { createSessionTitleStore } from "./session-titles";
 import { createCliStatusController } from "./cli-check";
 import { createUpdater } from "./updater";
@@ -61,7 +62,7 @@ function createWindow(
   childEnv: (() => NodeJS.ProcessEnv) | undefined,
   resolveBin: (() => string | null) | undefined,
   shellEnv: () => NodeJS.ProcessEnv,
-): void {
+): BrowserWindow {
   // The renderer header is a fixed HEADER_HEIGHT_PX tall and doubles as the title bar. On macOS we hide
   // the native title bar but KEEP the traffic lights (titleBarStyle 'hidden', never frame:false — the
   // same choice VS Code makes), float them into the header, and offset native sheets (the directory
@@ -120,11 +121,17 @@ function createWindow(
   } else {
     void win.loadFile(join(__dirname, "../renderer/index.html"));
   }
+  return win;
 }
 
 app
   .whenReady()
   .then(() => {
+    // Test seam: E2E runs point userData at an isolated temp dir, so settings/db/caches never
+    // touch the real profile. Must run before the first getPath("userData") read below. Unset in
+    // normal launches — the default path is untouched.
+    if (process.env.FLIGHTDECK_USER_DATA_DIR)
+      app.setPath("userData", process.env.FLIGHTDECK_USER_DATA_DIR);
     const db = openDb(join(app.getPath("userData"), "index.db"));
     migrate(db); // bring the index schema up to date before the first sync
     // The durable, non-pruned analytics store (#107). A separate file with its own user_version, so a
@@ -208,8 +215,14 @@ app
     nativeTheme.themeSource = normalizeThemePreference(
       appSettings.read().themePreference,
     );
-    const openWindow = (): void =>
-      createWindow(
+    // The main window, tracked explicitly. getAllWindows()[0] is no longer a safe way to find it —
+    // the island overlay is a second window — so every "the window" consumer (update push, the
+    // notification click, the island's click-to-focus, the activate guard) resolves through here.
+    let mainWin: BrowserWindow | null = null;
+    const resolveMainWindow = (): BrowserWindow | null =>
+      mainWin && !mainWin.isDestroyed() ? mainWin : null;
+    const openWindow = (): void => {
+      const win = createWindow(
         managed,
         (id) => services.provider?.resolveAdoptTarget(id) ?? null,
         registerRename,
@@ -217,14 +230,21 @@ app
         () => services.cliStatus?.resolvedPath() ?? null,
         shellTermEnv,
       );
+      mainWin = win;
+      win.on("closed", () => {
+        if (mainWin === win) mainWin = null;
+      });
+    };
     openWindow();
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) openWindow();
+      // Guard on the tracked main window, not getAllWindows().length — a live island window would
+      // otherwise satisfy the count and block the main window from ever reopening from the dock.
+      if (!resolveMainWindow()) openWindow();
     });
-    // Push update-state to whatever window is open (resolved at send-time, like the fullscreen push).
+    // Push update-state to the main window (resolved at send-time, like the fullscreen push).
     const sendUpdate = (state: import("@shared/update").UpdateState): void => {
-      const w = BrowserWindow.getAllWindows()[0];
-      if (w && !w.isDestroyed()) w.webContents.send(IPC.updateState, state);
+      const w = resolveMainWindow();
+      if (w) w.webContents.send(IPC.updateState, state);
     };
     const updater = createUpdater({
       send: sendUpdate,
@@ -359,7 +379,7 @@ app
     // awaiting-input transition), so the request/response invariant holds. A click resolves the
     // window at click time and pushes the session id back (IPC.notifyActivate); openWindow lets
     // it recreate the window when a click arrives with all windows closed (macOS dock-only state).
-    const notifier = createNotifier(openWindow);
+    const notifier = createNotifier({ openWindow, resolveMainWindow });
     const { sync } = registerIpc({
       db,
       provider,
@@ -380,6 +400,16 @@ app
       usage,
       notifier,
     });
+
+    // The notch overlay. Its IPC registers unconditionally (the Settings toggle needs the
+    // channels even while the overlay is off); the window itself is opt-in (missing reads as
+    // OFF) and macOS-only — enable() self-gates on darwin.
+    const islandController = createIslandController({
+      appSettings,
+      openWindow,
+      resolveMainWindow,
+    });
+    if (appSettings.read().islandEnabled ?? false) islandController.enable();
 
     // One-shot launch check: packaged only, and only when the user hasn't turned it off. Deferred so it
     // never blocks first paint (mirrors the setTimeout'd CLI check). No recurring timer — see the

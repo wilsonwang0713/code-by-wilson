@@ -64,6 +64,10 @@ export const IPC = {
   notifyShow: "notify:show",
   notifyGetOnAwaiting: "notify:getOnAwaiting",
   notifySetOnAwaiting: "notify:setOnAwaiting",
+  islandGetEnabled: "island:getEnabled",
+  islandSetEnabled: "island:setEnabled",
+  islandFocusSession: "island:focusSession",
+  islandSetInteractive: "island:setInteractive",
   /** PUSH: main -> renderer on every update-state transition. */
   updateState: "update:state",
   /** PUSH: main -> renderer when the user clicks a session notification — carries the session id
@@ -299,6 +303,19 @@ export interface IpcApi {
   getThemePreference(): Promise<ThemePreference>;
   /** Persist the theme preference and apply it to nativeTheme.themeSource immediately. */
   setThemePreference(pref: ThemePreference): Promise<void>;
+  /** Whether the macOS notch overlay ("island") is enabled. Missing reads as false — the island
+   *  is opt-in, unlike the other `?? true` preferences. */
+  getIslandEnabled(): Promise<boolean>;
+  /** Persist the island preference and create/destroy the overlay window immediately (no restart).
+   *  Resolves to the persisted state — main is the source of truth, mirroring setCaffeinate. */
+  setIslandEnabled(enabled: boolean): Promise<boolean>;
+  /** Island → main: bring the main window up (recreating it in the macOS zero-window state) and
+   *  select `sessionId` in it, via the same notifyActivate push the notification click uses. */
+  islandFocusSession(sessionId: string): Promise<void>;
+  /** Island → main: toggle mouse hit-testing on the overlay window. While non-interactive the
+   *  whole (mostly transparent) window forwards clicks to whatever is underneath; the island
+   *  renderer flips this on pointer enter/leave of its visible content. */
+  islandSetInteractive(interactive: boolean): Promise<void>;
 }
 
 /** Everything exposed on `window.api`: the request/response surface plus the Managed-terminal surface. */

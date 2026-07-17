@@ -51,6 +51,13 @@ const api: AppApi = {
   getThemePreference: () => ipcRenderer.invoke(IPC.themeGet),
   setThemePreference: (pref) => ipcRenderer.invoke(IPC.themeSet, pref),
   showNotification: (req) => ipcRenderer.invoke(IPC.notifyShow, req),
+  getIslandEnabled: () => ipcRenderer.invoke(IPC.islandGetEnabled),
+  setIslandEnabled: (enabled) =>
+    ipcRenderer.invoke(IPC.islandSetEnabled, enabled),
+  islandFocusSession: (sessionId) =>
+    ipcRenderer.invoke(IPC.islandFocusSession, sessionId),
+  islandSetInteractive: (interactive) =>
+    ipcRenderer.invoke(IPC.islandSetInteractive, interactive),
   getNotifyOnAwaiting: () => ipcRenderer.invoke(IPC.notifyGetOnAwaiting),
   setNotifyOnAwaiting: (enabled) =>
     ipcRenderer.invoke(IPC.notifySetOnAwaiting, enabled),

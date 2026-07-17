@@ -6,6 +6,7 @@ import { CliCard } from "./CliCard";
 import { StatuslineCard } from "./StatuslineCard";
 import { AppearanceCard } from "./AppearanceCard";
 import { NotificationsCard } from "./NotificationsCard";
+import { IslandCard } from "./IslandCard";
 import { StatsDbCard } from "./StatsDbCard";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
@@ -153,6 +154,7 @@ function SystemSection({
       <StatuslineCard />
       <AppearanceCard />
       <NotificationsCard />
+      {window.api.platform === "darwin" && <IslandCard />}
       <StatsDbCard />
     </>
   );

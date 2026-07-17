@@ -341,6 +341,12 @@ body,
      (panes own their own scroll). */
   overflow: hidden;
 }
+/* The island overlay window: its BrowserWindow is transparent, so the page must stay transparent
+   too — the app-wide opaque body background below would paint a rectangle over the desktop.
+   IslandView adds this class on mount. */
+body.island {
+  background: transparent;
+}
 body {
   margin: 0;
   background: var(--color-ink-950);

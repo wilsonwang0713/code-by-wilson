@@ -187,6 +187,7 @@ export function registerIpc({
     setStatuslineEnabled: () => {},
     setNotifyOnAwaiting: () => {},
     setThemePreference: () => {},
+    setIslandEnabled: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,
