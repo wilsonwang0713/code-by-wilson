@@ -8,8 +8,9 @@ export const THEME_PREFERENCES: readonly ThemePreference[] = [
   "dark",
 ] as const;
 
-/** Coerce an untrusted value (IPC arg, persisted JSON) to a valid preference; unknown → "system".
+/** Coerce an untrusted value (IPC arg, persisted JSON) to a valid preference; unknown → "light".
+ *  Light is the app's default look — dark and follow-system stay one Appearance-card click away.
  *  The single validation point for the theme preference, shared by main (IPC + boot) and renderer. */
 export function normalizeThemePreference(v: unknown): ThemePreference {
-  return v === "light" || v === "dark" || v === "system" ? v : "system";
+  return v === "light" || v === "dark" || v === "system" ? v : "light";
 }

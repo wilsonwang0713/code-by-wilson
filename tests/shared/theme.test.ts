@@ -10,12 +10,12 @@ describe("normalizeThemePreference", () => {
     expect(normalizeThemePreference("light")).toBe("light");
     expect(normalizeThemePreference("dark")).toBe("dark");
   });
-  it("falls back to system for anything else", () => {
-    expect(normalizeThemePreference(undefined)).toBe("system");
-    expect(normalizeThemePreference(null)).toBe("system");
-    expect(normalizeThemePreference("Light")).toBe("system");
-    expect(normalizeThemePreference(42)).toBe("system");
-    expect(normalizeThemePreference("")).toBe("system");
+  it("falls back to light (the app default) for anything else", () => {
+    expect(normalizeThemePreference(undefined)).toBe("light");
+    expect(normalizeThemePreference(null)).toBe("light");
+    expect(normalizeThemePreference("Light")).toBe("light");
+    expect(normalizeThemePreference(42)).toBe("light");
+    expect(normalizeThemePreference("")).toBe("light");
   });
   it("lists exactly the three preferences", () => {
     expect(THEME_PREFERENCES).toEqual(["system", "light", "dark"]);

@@ -4,11 +4,13 @@ import type { ThemePreference } from "@shared/theme";
 /**
  * The theme preference (System / Light / Dark). Main's app-settings file is the durable source of
  * truth and drives nativeTheme.themeSource; this atom is the in-run mirror the Appearance card
- * renders. Seeded once at mount (initThemePreference), written through on change. Defaults "system".
+ * renders. Seeded once at mount (initThemePreference), written through on change. Defaults "light"
+ * — the app's default look (normalizeThemePreference's fallback) — so the pre-seed frame can't
+ * flash the wrong segment.
  */
-export const $themePreference = atom<ThemePreference>("system");
+export const $themePreference = atom<ThemePreference>("light");
 
-/** Seed the atom from the persisted preference. A failed read keeps the default ("system"). */
+/** Seed the atom from the persisted preference. A failed read keeps the default ("light"). */
 export async function initThemePreference(): Promise<void> {
   try {
     $themePreference.set(await window.api.getThemePreference());
