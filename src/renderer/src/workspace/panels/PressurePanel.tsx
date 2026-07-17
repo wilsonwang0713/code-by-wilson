@@ -11,6 +11,7 @@ import { contextView } from "@shared/context";
 import { formatTokensShort, formatResetCountdown } from "@shared/format";
 import { cx } from "../../ui/atoms";
 import { FillGauge } from "../../ui/charts";
+import { Gauge } from "../../ui/bklit/charts/gauge";
 import { clampPct } from "../../ui/charts-geom";
 import {
   ctxColor,
@@ -116,30 +117,33 @@ export function PressurePanel({
         Pressure
       </PanelHeading>
       {view ? (
-        <>
-          <div className="flex items-baseline justify-between">
-            <div
+        <div className="flex items-center gap-3">
+          {/* The context dial (Bklit Gauge): same 70/85 color language as the bars below. */}
+          <Gauge
+            value={clampPct(view.pct)}
+            centerValue={clampPct(view.pct)}
+            suffix="%"
+            defaultLabel=""
+            activeFill={ctxColor(view.pct)}
+            inactiveFill="var(--color-ink-800)"
+            minWidth={104}
+            className="w-27 shrink-0"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span
               className={cx(
-                "font-mono text-title font-medium leading-none tabular-nums",
+                "text-xs leading-tight font-medium",
                 ctxTone(view.pct),
               )}
             >
-              {view.pct}
-              <span className="text-xs text-fg-faint">% context window</span>
-            </div>
-            <div className="font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
+              context window
+            </span>
+            <span className="font-mono text-xs tabular-nums text-(--ui-text-tertiary)">
               {formatTokensShort(view.total)} /{" "}
               {formatTokensShort(contextWindow)}
-            </div>
+            </span>
           </div>
-          <FillGauge
-            pct={view.pct}
-            fill={ctxColor(view.pct)}
-            caution={CONTEXT_WARN_PCT}
-            danger={CONTEXT_DANGER_PCT}
-            height={4}
-          />
-        </>
+        </div>
       ) : (
         <p className="text-xs text-(--ui-text-quaternary)">
           No context sampled yet.
