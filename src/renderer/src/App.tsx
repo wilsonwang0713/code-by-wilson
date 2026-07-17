@@ -490,7 +490,7 @@ export function App() {
     </MiddleNonSession>
   ) : isOverview ? (
     <MiddleNonSession title="Stats" leftEdgeExposed={leftEdgeExposed}>
-      <StatsView />
+      <StatsView account={account} />
     </MiddleNonSession>
   ) : isSettings ? (
     <MiddleNonSession title="Settings" leftEdgeExposed={leftEdgeExposed}>

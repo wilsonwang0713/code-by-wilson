@@ -9,10 +9,14 @@ import {
   isDayRange,
 } from "@shared/stats";
 import { formatDayShort } from "@shared/format";
+import type { Account } from "@shared/types";
 import { Icon } from "../ui/icons";
 import { RangeFilter } from "./shared";
 import { OverviewCard } from "./OverviewCard";
 import { ModelsCard } from "./ModelsCard";
+import { CumulativeCard } from "./CumulativeCard";
+import { ActivityHeatmapCard } from "./ActivityHeatmapCard";
+import { RateLimitCard } from "./RateLimitCard";
 import { ProjectsCard } from "./ProjectsCard";
 import { SessionsCard } from "./SessionsCard";
 
@@ -29,7 +33,12 @@ const WARM_POLL_MS = 1500;
  * cleanup stops the poll on unmount, so selecting any Session ends all scan work; the main process does
  * nothing unprompted.
  */
-export function StatsView() {
+export function StatsView({
+  account = null,
+}: {
+  /** The app-wide account (rate limits) from the overview poll; null hides the Rate-limits card. */
+  account?: Account | null;
+}) {
   const [snap, setSnap] = useState<StatsSnapshot | null>(null);
   const [range, setRange] = useState<StatsRange>(DEFAULT_RANGE);
   // The calendar's window selector: null = trailing twelve months, a number = that local year. Independent
@@ -156,11 +165,14 @@ export function StatsView() {
                   selectedDay={isDayRange(range) ? range.day : null}
                   onSelectDay={(day) => setRange({ day })}
                 />
+                <RateLimitCard account={account} />
                 <ModelsCard
                   daily={snap.daily}
                   byModel={snap.byModel}
                   range={range}
                 />
+                <CumulativeCard daily={snap.daily} range={range} />
+                <ActivityHeatmapCard hourly={snap.hourly} />
                 <ProjectsCard rows={snap.byProject} />
                 <SessionsCard rows={snap.bySession} />
               </>

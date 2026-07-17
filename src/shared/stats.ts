@@ -232,6 +232,20 @@ export interface StatsSnapshot extends StatsBreakdowns {
   calendarEnd: string;
   /** The distinct local years that hold any turn, descending — the year switcher's options. */
   calendarYears: number[];
+  /** The (weekday × hour) activity matrix, range-scoped like `daily`: sparse cells with turns,
+   *  local time. The Active-hours heatmap densifies the 7×24 grid. */
+  hourly: HourDowCell[];
+}
+
+/** One sparse (weekday × hour) activity cell — the Active-hours heatmap's unit. Local time,
+ *  matching the daily/calendar cuts' 'localtime' bucketing. */
+export interface HourDowCell {
+  /** 0 (Sunday) – 6 (Saturday). */
+  dow: number;
+  /** 0–23. */
+  hour: number;
+  /** Assistant turns that landed in this (weekday, hour) across the range. */
+  turns: number;
 }
 
 /** An empty, already-"done" snapshot: the no-store fallback and the renderer's IPC-bridge error state, so
@@ -248,6 +262,7 @@ export function emptySnapshot(): StatsSnapshot {
     calendarStart: "",
     calendarEnd: "",
     calendarYears: [],
+    hourly: [],
   };
 }
 
@@ -374,6 +389,9 @@ export function calendarWindow(
 export interface DailyBucket {
   /** Local calendar day, 'YYYY-MM-DD'. */
   day: string;
+  /** Assistant turns this day — the Composed chart's activity line (tokens measure cost;
+   *  turns measure how much back-and-forth produced it). */
+  turns: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -403,6 +421,7 @@ export interface CalendarDay {
 export function emptyDay(day: string): DailyBucket {
   return {
     day,
+    turns: 0,
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,

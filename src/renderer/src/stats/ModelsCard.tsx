@@ -10,13 +10,18 @@ import {
 import {
   formatTokensShort,
   formatTokensAxis,
-  formatDayShort,
   formatDayLong,
 } from "@shared/format";
-import { BarSeries, type DayColumn } from "../ui/charts";
 import { modelColorOf } from "../ui/meta";
 import { Swatch } from "../ui/atoms";
 import { StatsCard, CardRegion } from "./shared";
+import { ComposedChart } from "../ui/bklit/charts/composed-chart";
+import { SeriesBar } from "../ui/bklit/charts/series-bar";
+import { Line } from "../ui/bklit/charts/line";
+import { Grid } from "../ui/bklit/charts/grid";
+import { XAxis } from "../ui/bklit/charts/x-axis";
+import { YAxis } from "../ui/bklit/charts/y-axis";
+import { ChartTooltip } from "../ui/bklit/charts/tooltip";
 
 /** The Map key for the null ("Unknown") model — a single space can't be a real model id. */
 const NULL_MODEL_KEY = " ";
@@ -52,10 +57,17 @@ export function ModelsCard({
   );
 }
 
+/** 'YYYY-MM-DD' → a local-midnight Date, the x value the Bklit time scale expects. */
+function dayToDate(day: string): Date {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 /**
- * The daily usage time-series (#114, revised): one model-stacked SVG bar per local calendar day across
- * the active range. Densification, axis labeling, series order (byModel store order), and identity
- * colors are unchanged from the old DailyUsage; only the kind stacking is gone.
+ * The daily usage time-series (#114, revised again): a Bklit ComposedChart — one model-stacked bar
+ * per local calendar day (same densification, series order, and identity colors as the old SVG
+ * BarSeries) plus a turns/day line on its own right-hand scale, so cost (tokens) and activity
+ * (back-and-forth) read together. Reveal/tooltip animation comes from the vendored chart runtime.
  */
 function TokensPerDay({
   daily,
@@ -81,47 +93,49 @@ function TokensPerDay({
   for (const d of days)
     for (const e of d.byModel) presentModels.add(modelKey(e.modelRaw));
   const series = byModel
-    .map((r) => ({ modelRaw: r.modelRaw, color: modelColorOf(r.modelRaw) }))
-    .filter((s) => presentModels.has(modelKey(s.modelRaw)));
+    .map((r) => ({
+      modelRaw: r.modelRaw,
+      key: modelKey(r.modelRaw),
+      color: modelColorOf(r.modelRaw),
+    }))
+    .filter((s) => presentModels.has(s.key));
 
-  const perDayModel = days.map((d) => {
-    const m = new Map<string, number>();
-    for (const e of d.byModel) m.set(modelKey(e.modelRaw), e.totalTokens);
-    return m;
+  // One row per day: the x date, the turns line, and a column per model (zero-filled so the
+  // stack never sees undefined).
+  const rows = days.map((d) => {
+    const row: Record<string, unknown> = {
+      date: dayToDate(d.day),
+      day: d.day,
+      turns: d.turns,
+    };
+    for (const s of series) row[s.key] = 0;
+    for (const e of d.byModel) row[modelKey(e.modelRaw)] = e.totalTokens;
+    return row;
   });
 
-  const columns: DayColumn[] = days.map((d, i) => ({
-    key: d.day,
-    segments: series.map((s) => ({
-      value: perDayModel[i].get(modelKey(s.modelRaw)) ?? 0,
-      color: s.color,
-    })),
-  }));
-
-  // Thin the x labels to ~8, anchored on the last (newest) day.
-  const stride = Math.max(1, Math.ceil(days.length / 8));
-  const lastPhase = (days.length - 1) % stride;
-  const xLabels = days
-    .map((d, i) => ({ index: i, label: formatDayShort(d.day) }))
-    .filter(({ index }) => index % stride === lastPhase);
-
-  const renderTooltip = (i: number): ReactNode => {
-    const d = days[i];
-    const rows = series
+  const renderTooltip = ({
+    point,
+  }: {
+    point: Record<string, unknown>;
+  }): ReactNode => {
+    const modelRows = series
       .map((s) => ({
         label: s.modelRaw ?? "Unknown",
-        value: perDayModel[i].get(modelKey(s.modelRaw)) ?? 0,
+        value: typeof point[s.key] === "number" ? (point[s.key] as number) : 0,
         color: s.color,
       }))
       .filter((r) => r.value > 0);
-    const total = rows.reduce((sum, r) => sum + r.value, 0);
+    const total = modelRows.reduce((sum, r) => sum + r.value, 0);
+    const turns = typeof point.turns === "number" ? point.turns : 0;
     return (
-      <div className="flex flex-col gap-1">
-        <div className="font-medium text-fg">{formatDayLong(d.day)}</div>
-        {rows.length === 0 ? (
+      <div className="flex flex-col gap-1 text-meta">
+        <div className="font-medium text-fg">
+          {formatDayLong(point.day as string)}
+        </div>
+        {modelRows.length === 0 ? (
           <div className="text-fg-faint">No usage</div>
         ) : (
-          rows.map((r) => (
+          modelRows.map((r) => (
             <div key={r.label} className="flex items-center gap-1.5">
               <Swatch color={r.color} />
               <span className="text-fg-muted">{r.label}</span>
@@ -137,17 +151,40 @@ function TokensPerDay({
             {formatTokensShort(total)}
           </span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-fg-muted">Turns</span>
+          <span className="ml-auto pl-3 font-mono tabular-nums text-fg">
+            {turns}
+          </span>
+        </div>
       </div>
     );
   };
 
   return (
-    <BarSeries
-      columns={columns}
-      formatTick={formatTokensAxis}
-      xLabels={xLabels}
-      renderTooltip={renderTooltip}
-    />
+    <ComposedChart
+      data={rows}
+      stacked
+      maxBarSize={26}
+      aspectRatio="3 / 1"
+      margin={{ top: 16, right: 48, bottom: 32, left: 48 }}
+      className="text-meta"
+    >
+      <Grid horizontal />
+      {series.map((s) => (
+        <SeriesBar key={s.key} dataKey={s.key} fill={s.color} radius={2} />
+      ))}
+      <Line
+        dataKey="turns"
+        yAxisId="turns"
+        stroke="var(--chart-line-secondary)"
+        strokeWidth={2}
+      />
+      <XAxis numTicks={6} />
+      <YAxis formatValue={formatTokensAxis} />
+      <YAxis yAxisId="turns" orientation="right" />
+      <ChartTooltip content={renderTooltip} />
+    </ComposedChart>
   );
 }
 

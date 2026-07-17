@@ -341,6 +341,7 @@ describe("registerIpc stats:read", () => {
       calendarStart: "",
       calendarEnd: "",
       calendarYears: [],
+      hourly: [],
     });
   });
 

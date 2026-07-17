@@ -39,6 +39,7 @@ import {
   readTotals,
   readBreakdowns,
   readDaily,
+  readHourly,
   readCalendar,
   readCalendarYears,
   readRecords,
@@ -65,6 +66,7 @@ import type {
   ScanProgress,
   StatsRange,
   DailyBucket,
+  HourDowCell,
   CalendarDay,
   CalendarWindow,
   StatsWindow,
@@ -547,6 +549,16 @@ export function registerIpc({
       return [];
     }
   };
+  // The (weekday × hour) activity matrix, range-scoped like safeDaily and failure-tolerant the
+  // same way: a bad read serves an empty matrix, never sinks the snapshot.
+  const safeHourly = (adb: SqliteDb, win: StatsWindow): HourDowCell[] => {
+    try {
+      return readHourly(adb, win);
+    } catch (err) {
+      console.error("stats hourly read failed; serving none", err);
+      return [];
+    }
+  };
   // The contributions calendar and its year list, scoped to the calendar's OWN window (#115) — independent
   // of the page range. On a read error serve an empty series/list so a bad row never sinks the snapshot
   // (same "serve a safe default" posture as safeDaily/safeBreakdowns). A CalendarWindow's sinceMs/untilMs are
@@ -691,6 +703,7 @@ export function registerIpc({
           calendarStart: cal.startDay,
           calendarEnd: cal.endDay,
           calendarYears: safeCalendarYears(analyticsDb),
+          hourly: safeHourly(analyticsDb, win),
         },
       };
     },
