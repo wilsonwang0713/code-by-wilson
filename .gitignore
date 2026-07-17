@@ -27,3 +27,7 @@ docs/deck/
 .design-previews/
 .vercel
 .env*
+
+# Playwright
+test-results/
+playwright-report/
