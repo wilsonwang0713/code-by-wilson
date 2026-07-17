@@ -3,15 +3,49 @@
     <clipPath id="tileClip">
       <rect x="100" y="100" width="824" height="824" rx="185"/>
     </clipPath>
+    <clipPath id="dialClip">
+      <circle cx="512" cy="512" r="300"/>
+    </clipPath>
+    <radialGradient id="bgGrad" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#262B36"/>
+      <stop offset="100%" stop-color="#14161B"/>
+    </radialGradient>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#92400E"/>
+    </linearGradient>
   </defs>
 
   <g clip-path="url(#tileClip)">
-    <rect x="100" y="100" width="824" height="824" fill="#17191f"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#bgGrad)"/>
+
+    <!-- instrument face, tilted for motion -->
+    <g clip-path="url(#dialClip)" transform="rotate(-10 512 512)">
+      <rect x="142" y="142" width="740" height="370" fill="url(#sky)"/>
+      <rect x="142" y="512" width="740" height="370" fill="url(#ground)"/>
+      <rect x="142" y="507" width="740" height="10" fill="#FFFFFF"/>
+      <!-- pitch ladder -->
+      <rect x="459" y="427" width="106" height="6" rx="3" fill="#FFFFFF" opacity="0.85"/>
+      <rect x="485" y="467" width="54" height="6" rx="3" fill="#FFFFFF" opacity="0.7"/>
+      <rect x="459" y="591" width="106" height="6" rx="3" fill="#FFFFFF" opacity="0.85"/>
+      <rect x="485" y="551" width="54" height="6" rx="3" fill="#FFFFFF" opacity="0.7"/>
+    </g>
+
+    <!-- fixed wing marker -->
+    <g fill="#F97316">
+      <rect x="337" y="504" width="105" height="16" rx="8"/>
+      <rect x="582" y="504" width="105" height="16" rx="8"/>
+      <circle cx="512" cy="512" r="15"/>
+    </g>
+    <circle cx="512" cy="512" r="7" fill="#FFF7ED"/>
+
+    <!-- bezel -->
+    <circle cx="512" cy="512" r="310" fill="none" stroke="#2E333E" stroke-width="22"/>
+    <circle cx="512" cy="512" r="324" fill="none" stroke="#454B59" stroke-width="4"/>
   </g>
   <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="3"/>
-
-  <rect x="229" y="349" width="69" height="326" rx="13" fill="#ffffff" opacity="0.16"/>
-  <rect x="349" y="349" width="69" height="326" rx="13" fill="#ffffff" opacity="0.35"/>
-  <rect x="469" y="349" width="69" height="326" rx="13" fill="#ffffff" opacity="0.60"/>
-  <rect x="589" y="349" width="206" height="326" rx="17" fill="#ffffff"/>
 </svg>
