@@ -127,6 +127,19 @@ describe("deriveAccount", () => {
     });
     expect(acc?.sevenDayFable?.usedPct).toBe(67);
   });
+
+  it("keeps labeled scoped weeklies, dropping expired ones like the flat windows", () => {
+    const acc = deriveAccount([], NOW, STALE_MS, {
+      fiveHour: { usedPct: 1, resetsAt: NOW + 1000 },
+      sevenDayScoped: [
+        { label: "Fable", usedPct: 67, resetsAt: NOW + 1000 },
+        { label: "Stale", usedPct: 10, resetsAt: NOW - 1 },
+      ],
+    });
+    expect(acc?.sevenDayScoped).toEqual([
+      { label: "Fable", usedPct: 67, resetsAt: NOW + 1000 },
+    ]);
+  });
 });
 
 describe("deriveAccount — api billing", () => {

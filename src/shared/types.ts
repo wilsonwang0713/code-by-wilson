@@ -291,6 +291,12 @@ export interface RateLimit {
   resetsAt: number;
 }
 
+/** A `weekly_scoped` window from the usage API's `limits[]` array: a per-model weekly bucket that
+ *  carries its own display label ("Fable" today — the next family shows up with no code change). */
+export interface ScopedRateLimit extends RateLimit {
+  label: string;
+}
+
 /** The rate-limit windows a capture's `rate_limits` block or the usage API can carry. Shared by
  *  both sides of the per-session merge (see statusline.ts pickWindow). */
 export interface RateLimitWindows {
@@ -332,6 +338,9 @@ export interface Account {
   sevenDayFable?: RateLimit;
   sevenDaySonnet?: RateLimit;
   sevenDayOpus?: RateLimit;
+  /** Labeled per-model weekly windows from the usage API's `limits[]` (weekly_scoped entries) —
+   *  the modern replacement for the legacy flat buckets above, which the API now serves as null. */
+  sevenDayScoped?: ScopedRateLimit[];
   /** Paid extra-usage credits, from the usage API only (captures never carry it). */
   extraUsage?: ExtraUsage;
   /** Claude Code CLI version from the freshest live capture. Absent when no capture reported it. */

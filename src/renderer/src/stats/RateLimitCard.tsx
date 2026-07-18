@@ -59,6 +59,12 @@ export function RateLimitCard({ account }: { account: Account | null }) {
     { label: "7-day · Fable", w: account.sevenDayFable },
     { label: "7-day · Sonnet", w: account.sevenDaySonnet },
     { label: "7-day · Opus", w: account.sevenDayOpus },
+    // The modern limits[] weekly_scoped windows, labeled by the API ("Fable" today). The legacy
+    // flat buckets above are served as null alongside, so rows never double up.
+    ...(account.sevenDayScoped ?? []).map((s) => ({
+      label: `7-day · ${s.label}`,
+      w: s,
+    })),
   ];
   return (
     <StatsCard>

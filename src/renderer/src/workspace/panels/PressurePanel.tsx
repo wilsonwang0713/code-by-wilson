@@ -160,6 +160,15 @@ export function PressurePanel({
         {sevenDayFable && (
           <RateRow label="7d F" window={sevenDayFable} now={now} />
         )}
+        {/* limits[] weekly_scoped windows (account-wide; captures carry no scoped buckets). */}
+        {account?.sevenDayScoped?.map((s) => (
+          <RateRow
+            key={s.label}
+            label={`7d ${s.label.slice(0, 1)}`}
+            window={s}
+            now={now}
+          />
+        ))}
         {sevenDaySonnet && (
           <RateRow label="7d S" window={sevenDaySonnet} now={now} />
         )}
