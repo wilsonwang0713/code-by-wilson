@@ -1,5 +1,6 @@
 import type { HourDowCell } from "@shared/stats";
 import { CALENDAR_RAMP } from "../ui/meta";
+import { intensityThresholds, intensityLevel } from "../ui/contributions-geom";
 import { foldHourly, maxHourlyTurns } from "./hourly";
 import { StatsCard, CardRegion } from "./shared";
 import {
@@ -23,6 +24,17 @@ const MARGIN = { top: 4, right: 8, bottom: 8, left: 34 };
 export function ActivityHeatmapCard({ hourly }: { hourly: HourDowCell[] }) {
   if (hourly.length === 0) return null;
   const peak = maxHourlyTurns(hourly);
+  // Bklit's cell fill bakes in the GitHub-shaped level formula (1/2/3/≥4 caps the ramp) — raw
+  // hundreds-of-turns cells flattened the grid to solid peak-black, and the colorScale props
+  // don't reach the fill path. But that formula maps 0–4 to itself, so folding turns into the
+  // same quantile levels the contributions calendar uses (intensityThresholds) BEFORE the data
+  // goes in gives the graded ramp through the stock pipeline. The tooltip recovers real turns
+  // from the sparse cells by (weekday, hour).
+  const thresholds = intensityThresholds(
+    hourly.map((c) => c.turns),
+    CALENDAR_RAMP.length,
+  );
+  const turnsBy = new Map(hourly.map((c) => [`${c.dow}:${c.hour}`, c.turns]));
   return (
     <StatsCard>
       <CardRegion title="Active hours">
@@ -35,22 +47,24 @@ export function ActivityHeatmapCard({ hourly }: { hourly: HourDowCell[] }) {
             aspectRatio let the HEIGHT bind cell size, leaving dead space on the right while the
             hour-label row spanned the full width — every label drifted hours off its column. */}
         <HeatmapChart
-          data={foldHourly(hourly)}
+          data={foldHourly(hourly, (t) => intensityLevel(t, thresholds))}
           layout="fluid"
-          gap={2}
+          gap={3}
           margin={MARGIN}
           levelColors={CALENDAR_RAMP}
           className="text-meta"
         >
-          <HeatmapCells />
+          <HeatmapCells cornerRadius={3} />
           <HeatmapYAxis tickFilter="odd" />
           <HeatmapTooltip
             showDateHeader={false}
-            formatLabel={(count, date) =>
-              `${count} turn${count === 1 ? "" : "s"} · ${DOW_NAMES[date.getDay()]} ${String(
+            formatLabel={(_count, date) => {
+              const turns =
+                turnsBy.get(`${date.getDay()}:${date.getHours()}`) ?? 0;
+              return `${turns} turn${turns === 1 ? "" : "s"} · ${DOW_NAMES[date.getDay()]} ${String(
                 date.getHours(),
-              ).padStart(2, "0")}:00`
-            }
+              ).padStart(2, "0")}:00`;
+            }}
           />
         </HeatmapChart>
         {/* Hour labels at their true column centers ((h + 0.5) / 24 of the plot width) — an even

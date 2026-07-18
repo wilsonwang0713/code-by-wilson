@@ -32,6 +32,12 @@ describe("foldHourly", () => {
     expect(d.getDay()).toBe(5);
     expect(d.getHours()).toBe(9);
   });
+
+  it("applies mapCount to every cell, zero-fill included (the level pre-fold)", () => {
+    const cols = foldHourly([cell(3, 14, 500)], (t) => (t > 0 ? 4 : 0));
+    expect(cols[14].bins[3].count).toBe(4);
+    expect(cols[14].bins[2].count).toBe(0);
+  });
 });
 
 describe("maxHourlyTurns", () => {

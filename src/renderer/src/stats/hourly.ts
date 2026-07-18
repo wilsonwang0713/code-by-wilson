@@ -21,9 +21,15 @@ const REF_SUNDAY = { year: 2026, monthIndex: 0, date: 4 };
  * Densify the sparse (weekday × hour) cells into the Bklit heatmap's shape: 24 columns (hour of
  * day) of 7 bins (weekday rows, Sunday first — the axis component's weekStartDay 0 order). Pure,
  * so vitest owns the grid math.
+ *
+ * `mapCount` transforms each cell's turns before they land in `count`. The card passes the
+ * quantile intensityLevel here: Bklit's baked-in fill formula (getHeatmapContributionLevel) maps
+ * 0–4 to itself, so pre-folding turns into levels is what lets hundreds-of-turns cells grade
+ * instead of slamming into the GitHub-shaped ≥4 cap — with no vendored-code change.
  */
 export function foldHourly(
   cells: readonly HourDowCell[],
+  mapCount: (turns: number) => number = (t) => t,
 ): HourlyHeatmapColumn[] {
   const byKey = new Map<string, number>();
   for (const c of cells) byKey.set(`${c.dow}:${c.hour}`, c.turns);
@@ -31,7 +37,7 @@ export function foldHourly(
     bin: hour,
     bins: Array.from({ length: 7 }, (_, dow) => ({
       bin: dow,
-      count: byKey.get(`${dow}:${hour}`) ?? 0,
+      count: mapCount(byKey.get(`${dow}:${hour}`) ?? 0),
       date: new Date(
         REF_SUNDAY.year,
         REF_SUNDAY.monthIndex,
