@@ -73,7 +73,8 @@ export function CumulativeCard({
   }: {
     point: Record<string, unknown>;
   }): ReactNode => (
-    <div className="flex flex-col gap-1 text-meta">
+    // Same raw-content padding note as ModelsCard's tooltip.
+    <div className="flex flex-col gap-1 px-3.5 py-3 text-meta">
       <div className="font-medium text-fg">
         {formatDayLong(point.day as string)}
         {point.projected === true && (
@@ -116,7 +117,9 @@ export function CumulativeCard({
           />
           <XAxis numTicks={6} />
           <YAxis formatValue={formatTokensAxis} />
-          <ChartTooltip content={renderTooltip} />
+          {/* Dots stay (a single line — the hovered point marker earns its keep); the date pill
+              goes, the content already carries the full date. */}
+          <ChartTooltip content={renderTooltip} showDatePill={false} />
         </LineChart>
       </CardRegion>
     </StatsCard>

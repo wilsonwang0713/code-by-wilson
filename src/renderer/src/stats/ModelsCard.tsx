@@ -128,7 +128,9 @@ function TokensPerDay({
     const total = modelRows.reduce((sum, r) => sum + r.value, 0);
     const turns = typeof point.turns === "number" ? point.turns : 0;
     return (
-      <div className="flex flex-col gap-1 text-meta">
+      // Custom tooltip content renders raw inside the box (the default TooltipContent's px-3
+      // py-2.5 doesn't apply), so it carries its own padding.
+      <div className="flex flex-col gap-1 px-3.5 py-3 text-meta">
         <div className="font-medium text-fg">
           {formatDayLong(point.day as string)}
         </div>
@@ -183,7 +185,13 @@ function TokensPerDay({
       <XAxis numTicks={6} />
       <YAxis formatValue={formatTokensAxis} />
       <YAxis yAxisId="turns" orientation="right" />
-      <ChartTooltip content={renderTooltip} />
+      {/* No per-series dots (they float mid-bar — bars register as zero-width lines for hover
+          tracking) and no date pill (it overlaps the bar's base; the content shows the date). */}
+      <ChartTooltip
+        content={renderTooltip}
+        showDots={false}
+        showDatePill={false}
+      />
     </ComposedChart>
   );
 }
