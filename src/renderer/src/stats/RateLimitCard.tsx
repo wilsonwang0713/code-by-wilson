@@ -1,15 +1,8 @@
 import type { Account, RateLimit } from "@shared/types";
 import { formatResetCountdown, formatAgoShort } from "@shared/format";
+import { ctxColor } from "../ui/meta";
 import { StatsCard, CardRegion } from "./shared";
 import { Gauge } from "../ui/bklit/charts/gauge";
-
-/** The gauge arc warms on the same 70/85 breakpoints as ctxTone/barFill, so "how full" reads the
- *  same color language everywhere in the app. */
-function gaugeFill(pct: number): string {
-  if (pct >= 85) return "var(--color-accent-bright)";
-  if (pct >= 70) return "var(--color-accent)";
-  return "var(--color-primary)";
-}
 
 function WindowGauge({
   label,
@@ -28,7 +21,9 @@ function WindowGauge({
         centerValue={pct}
         suffix="%"
         defaultLabel={label}
-        activeFill={gaugeFill(pct)}
+        // ctxColor: neutral steel while roomy (telemetry reads as data, not a black hero),
+        // warming on the same 70/85 breakpoints as every other pressure readout.
+        activeFill={ctxColor(pct)}
         inactiveFill="var(--color-ink-800)"
         minWidth={180}
         className="w-full max-w-56"
