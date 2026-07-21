@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useStore } from "@nanostores/react";
 import type { Session, ModelSelection, Account } from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
@@ -23,7 +31,12 @@ import { useMetrics } from "./workspace/use-metrics";
 import { terminalStore } from "./terminal/terminal-store-instance";
 import { spawnGate } from "./ui/cli-gating";
 import { Icon } from "./ui/icons";
-import { StatsView } from "./stats/StatsView";
+// Lazy: the Stats view pulls in the heaviest slice of the Bklit/visx chart runtime (composed,
+// ring, heatmap, cumulative). It's never the landing view — you open on the overview or a
+// session — so splitting it into its own chunk keeps that weight out of first paint.
+const StatsView = lazy(() =>
+  import("./stats/StatsView").then((m) => ({ default: m.StatsView })),
+);
 import { OVERVIEW_ID } from "./stats/sentinel";
 import { useStatsPump } from "./stats/use-stats-pump";
 import { SettingsView, type SettingsSection } from "./settings/SettingsView";
@@ -490,7 +503,11 @@ export function App() {
     </MiddleNonSession>
   ) : isOverview ? (
     <MiddleNonSession title="Stats" leftEdgeExposed={leftEdgeExposed}>
-      <StatsView account={account} />
+      {/* Empty fallback: the chart chunk loads in a blink off local disk, and the cards already
+          have their own building-history/empty states, so a spinner would only flash. */}
+      <Suspense fallback={null}>
+        <StatsView account={account} />
+      </Suspense>
     </MiddleNonSession>
   ) : isSettings ? (
     <MiddleNonSession title="Settings" leftEdgeExposed={leftEdgeExposed}>
