@@ -36,7 +36,15 @@ export default defineConfig({
       },
     },
     build: {
-      rollupOptions: { input: { index: resolve("src/renderer/index.html") } },
+      // Two entries: the main window (index.html) and the notch overlay (island.html). Splitting
+      // the island into its own HTML/JS keeps xterm, the chart runtime, shiki, and the font out of
+      // the overlay window's bundle.
+      rollupOptions: {
+        input: {
+          index: resolve("src/renderer/index.html"),
+          island: resolve("src/renderer/island.html"),
+        },
+      },
     },
   },
 });

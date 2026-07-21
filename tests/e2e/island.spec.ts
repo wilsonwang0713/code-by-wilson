@@ -66,7 +66,7 @@ async function launchApp(opts: { islandEnabled?: boolean }): Promise<Launched> {
 }
 
 function findIslandPage(app: ElectronApplication): Page | undefined {
-  return app.windows().find((w) => w.url().includes("island=1"));
+  return app.windows().find((w) => w.url().includes("island.html"));
 }
 
 async function waitForIslandPage(app: ElectronApplication): Promise<Page> {
@@ -106,7 +106,7 @@ test("US-1/US-2/US-3: enabled island opens top-centered, glances, and expands", 
     // US-1 AC1: top-center of the primary display's work area, pinned under the menu bar.
     const geom = await app.evaluate(({ BrowserWindow, screen }) => {
       const win = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().includes("island=1"),
+        w.webContents.getURL().includes("island.html"),
       );
       if (!win) throw new Error("island BrowserWindow not found");
       return {
@@ -145,7 +145,7 @@ test("US-1/US-2/US-3: enabled island opens top-centered, glances, and expands", 
     // US-1 AC3: the island survives the main window minimizing and keeps rendering.
     await app.evaluate(({ BrowserWindow }) => {
       const main = BrowserWindow.getAllWindows().find(
-        (w) => !w.webContents.getURL().includes("island=1"),
+        (w) => !w.webContents.getURL().includes("island.html"),
       );
       main?.minimize();
     });

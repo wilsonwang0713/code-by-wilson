@@ -42,13 +42,11 @@ export function createIslandWindow(): BrowserWindow {
   });
   win.setIgnoreMouseEvents(true, { forward: true });
 
-  // Same renderer bundle as the main window; the ?island=1 query routes main.tsx to IslandView.
+  // The overlay's own entry (island.html) — a separate, lighter bundle than the main window's.
   if (process.env.ELECTRON_RENDERER_URL) {
-    void win.loadURL(process.env.ELECTRON_RENDERER_URL + "?island=1");
+    void win.loadURL(process.env.ELECTRON_RENDERER_URL + "/island.html");
   } else {
-    void win.loadFile(join(__dirname, "../renderer/index.html"), {
-      query: { island: "1" },
-    });
+    void win.loadFile(join(__dirname, "../renderer/island.html"));
   }
   return win;
 }
