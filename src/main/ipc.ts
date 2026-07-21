@@ -197,6 +197,16 @@ export function registerIpc({
     set: () => false,
   };
 
+  // The sync below walks ~/.claude and parses transcripts incrementally (mtime high-water marks).
+  // Two windows polling refresh() every 3s (the main rail + the island) would otherwise sweep the
+  // disk twice per cycle, offset by ~1.5s — and the second sweep, run right after the first, finds
+  // nothing new. coalescedSync skips the sweep when one ran within MIN_SYNC_INTERVAL_MS, so the
+  // expensive walk runs at most ~once per 2s no matter how many windows poll; each refresh() still
+  // returns a fresh overviewNow() off the already-updated index. The startup sync (called through
+  // the returned `sync`) bypasses this — only the poll-driven refresh handler coalesces.
+  const MIN_SYNC_INTERVAL_MS = 2000;
+  let lastSyncMs = 0;
+
   const sync = (): void => {
     try {
       beforeSync?.();
@@ -205,6 +215,11 @@ export function registerIpc({
       console.error("rotation reconcile failed; continuing with sync", err);
     }
     syncSessions(db, provider);
+    lastSyncMs = Date.now();
+  };
+
+  const coalescedSync = (): void => {
+    if (Date.now() - lastSyncMs >= MIN_SYNC_INTERVAL_MS) sync();
   };
 
   // cwd → linked-worktree identity: live git detection cached per cwd, seeded from (and written
@@ -352,7 +367,7 @@ export function registerIpc({
   ipcMain.handle(IPC.overview, () => overviewNow());
   ipcMain.handle(IPC.refresh, () => {
     try {
-      sync();
+      coalescedSync();
     } catch (err) {
       // A failed refresh (e.g. ~/.claude briefly unreadable) must not reject to the renderer or
       // drop the list. Serve the last-known rows and let the next Refresh retry, like launch does.

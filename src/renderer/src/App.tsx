@@ -37,9 +37,14 @@ import { Icon } from "./ui/icons";
 const StatsView = lazy(() =>
   import("./stats/StatsView").then((m) => ({ default: m.StatsView })),
 );
+// Lazy for the same reason as StatsView: Settings is never the landing view, so its subtree
+// (the cards, the statusline/theme/island controls) stays out of first paint.
+const SettingsView = lazy(() =>
+  import("./settings/SettingsView").then((m) => ({ default: m.SettingsView })),
+);
 import { OVERVIEW_ID } from "./stats/sentinel";
 import { useStatsPump } from "./stats/use-stats-pump";
-import { SettingsView, type SettingsSection } from "./settings/SettingsView";
+import type { SettingsSection } from "./settings/SettingsView";
 import { SETTINGS_ID } from "./settings/sentinel";
 import { useUpdate } from "./ui/use-update";
 import { useAwaitingNotifications } from "./notifications/use-awaiting-notifications";
@@ -511,15 +516,17 @@ export function App() {
     </MiddleNonSession>
   ) : isSettings ? (
     <MiddleNonSession title="Settings" leftEdgeExposed={leftEdgeExposed}>
-      <SettingsView
-        cliStatus={cliStatus}
-        checking={checking}
-        onRecheck={() => void recheckCli()}
-        onSetBinPath={(p) => void setClaudeBinPath(p)}
-        section={settingsSection}
-        onSectionChange={setSettingsSection}
-        update={update}
-      />
+      <Suspense fallback={null}>
+        <SettingsView
+          cliStatus={cliStatus}
+          checking={checking}
+          onRecheck={() => void recheckCli()}
+          onSetBinPath={(p) => void setClaudeBinPath(p)}
+          section={settingsSection}
+          onSectionChange={setSettingsSection}
+          update={update}
+        />
+      </Suspense>
     </MiddleNonSession>
   ) : selected ? (
     <Workspace
