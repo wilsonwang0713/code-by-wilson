@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { InboxCandidate } from "./inbox";
-import { partitionInbox } from "./inbox";
+import { partitionInbox, applyDismissals, dismissalSignature } from "./inbox";
 import { deriveGlance } from "./glance";
 import { useIslandPoll } from "./use-island-poll";
 import { cx } from "../ui/atoms";
+import { formatUsd } from "@shared/format";
 
 /** How long the pointer may leave the island before it collapses and goes click-through again
  *  (US-3 AC1, Esc removed per RD review — a non-focusable panel receives no key events). */
@@ -18,6 +19,12 @@ const COLLAPSE_DELAY_MS = 500;
 export function IslandView() {
   const sessions = useIslandPoll();
   const [expanded, setExpanded] = useState(false);
+  // Renderer-local dismissals: sessionId → the signature the attention row carried when dismissed.
+  // A dismissed row stays hidden only while its current signature matches (see applyDismissals), so
+  // a session that re-enters `waiting` after being answered surfaces again. Nothing persists to disk.
+  const [dismissed, setDismissed] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  );
   const collapseTimer = useRef<number | null>(null);
 
   // The window is transparent; the app-wide opaque body background would paint a rectangle over
@@ -29,6 +36,7 @@ export function IslandView() {
 
   const glance = deriveGlance(sessions);
   const { attention, running } = partitionInbox(sessions, Date.now());
+  const visibleAttention = applyDismissals(attention, dismissed);
 
   const setInteractive = (on: boolean): void => {
     void window.api.islandSetInteractive(on).catch(() => {});
@@ -56,6 +64,16 @@ export function IslandView() {
     void window.api.islandFocusSession(id).catch(() => {});
     setExpanded(false);
     setInteractive(false);
+  };
+  const dismissRow = (id: string): void => {
+    const target = attention.find((r) => r.id === id);
+    if (!target) return;
+    const signature = dismissalSignature(target);
+    setDismissed((prev) => {
+      const next = new Map(prev);
+      next.set(id, signature);
+      return next;
+    });
   };
 
   return (
@@ -91,7 +109,7 @@ export function IslandView() {
             <div className="px-2 pt-1 pb-1 text-[10px] font-semibold tracking-wide text-white/50 uppercase">
               Needs you
             </div>
-            {attention.length === 0 ? (
+            {visibleAttention.length === 0 ? (
               <div
                 data-testid="island-all-clear"
                 className="px-2 pb-1 text-white/60"
@@ -99,13 +117,14 @@ export function IslandView() {
                 All clear
               </div>
             ) : (
-              attention.map((row) => (
+              visibleAttention.map((row) => (
                 <IslandRow
                   key={row.id}
                   row={row}
                   detail={row.reason}
                   accent
                   onClick={focusRow}
+                  onDismiss={dismissRow}
                 />
               ))
             )}
@@ -118,7 +137,11 @@ export function IslandView() {
                   <IslandRow
                     key={row.id}
                     row={row}
-                    detail={row.state}
+                    detail={
+                      row.costUsd === undefined
+                        ? row.state
+                        : formatUsd(row.costUsd)
+                    }
                     onClick={focusRow}
                   />
                 ))}
@@ -136,31 +159,47 @@ function IslandRow({
   detail,
   accent,
   onClick,
+  onDismiss,
 }: {
   row: InboxCandidate;
   detail: string;
   accent?: boolean;
   onClick: (id: string) => void;
+  /** When set, a × appears on hover to dismiss this (attention) row. Running rows omit it. */
+  onDismiss?: (id: string) => void;
 }) {
   return (
-    <button
-      type="button"
-      data-testid="island-row"
-      onClick={() => onClick(row.id)}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/10"
-    >
-      <span className="min-w-0 flex-1 truncate">
-        <span className="text-white/90">{row.title || row.project}</span>
-        <span className="ml-1.5 text-white/40">{row.project}</span>
-      </span>
-      <span
-        className={cx(
-          "shrink-0 text-[10px]",
-          accent ? "text-[#F97316]" : "text-white/50",
-        )}
+    <div className="group flex w-full items-center rounded-lg hover:bg-white/10">
+      <button
+        type="button"
+        data-testid="island-row"
+        onClick={() => onClick(row.id)}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left"
       >
-        {detail}
-      </span>
-    </button>
+        <span className="min-w-0 flex-1 truncate">
+          <span className="text-white/90">{row.title || row.project}</span>
+          <span className="ml-1.5 text-white/40">{row.project}</span>
+        </span>
+        <span
+          className={cx(
+            "shrink-0 text-[10px]",
+            accent ? "text-[#F97316]" : "text-white/50",
+          )}
+        >
+          {detail}
+        </span>
+      </button>
+      {onDismiss && (
+        <button
+          type="button"
+          data-testid="island-row-dismiss"
+          aria-label="Dismiss"
+          onClick={() => onDismiss(row.id)}
+          className="mr-1 shrink-0 rounded p-1 text-[13px] leading-none text-white/40 opacity-0 group-hover:opacity-100 hover:text-white"
+        >
+          ×
+        </button>
+      )}
+    </div>
   );
 }

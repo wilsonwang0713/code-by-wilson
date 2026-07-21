@@ -9,6 +9,9 @@ export interface InboxCandidate {
   /** The transcript-derived reason a waiting session is waiting, when known. */
   waitingReason?: string;
   lastActivityMs: number;
+  /** Claude Code's own session cost (Session.costUsd) — the running rows' small $ readout.
+   *  Display-only; absent ⇒ no sample yet, so the row falls back to its state. */
+  costUsd?: number;
 }
 
 /** An attention row: the candidate plus the human reason line the inbox renders. */
@@ -55,4 +58,24 @@ export function partitionInbox(
     .slice()
     .sort((a, b) => b.lastActivityMs - a.lastActivityMs);
   return { attention, running };
+}
+
+/** The signature a dismissal is pinned to: the session's state plus the timestamp of the episode
+ *  that was showing. A dismissed attention row stays hidden only while this is unchanged — once the
+ *  session is answered and later re-enters `waiting` (a fresh lastActivityMs) the signature differs,
+ *  so the row re-surfaces rather than staying suppressed forever (US-3 dismiss). */
+export function dismissalSignature(s: InboxCandidate): string {
+  return `${s.state}:${s.lastActivityMs}`;
+}
+
+/** Drops the attention rows the user dismissed. `dismissed` maps sessionId → the signature the row
+ *  carried when it was dismissed; a row is hidden only while its current signature still matches, so
+ *  the filter is pure and a row reappears the instant its signature moves on. */
+export function applyDismissals(
+  attention: readonly InboxRow[],
+  dismissed: ReadonlyMap<string, string>,
+): InboxRow[] {
+  return attention.filter(
+    (row) => dismissed.get(row.id) !== dismissalSignature(row),
+  );
 }
