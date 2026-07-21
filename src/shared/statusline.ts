@@ -138,7 +138,6 @@ export function deriveAccount(
       billingMode: "subscription",
       fiveHour: liveWindow(apiUsage?.fiveHour, now),
       sevenDay: liveWindow(apiUsage?.sevenDay, now),
-      sevenDayFable: liveWindow(apiUsage?.sevenDayFable, now),
       sevenDaySonnet: liveWindow(apiUsage?.sevenDaySonnet, now),
       sevenDayOpus: liveWindow(apiUsage?.sevenDayOpus, now),
     };

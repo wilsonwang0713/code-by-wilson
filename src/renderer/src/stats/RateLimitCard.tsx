@@ -51,7 +51,6 @@ export function RateLimitCard({ account }: { account: Account | null }) {
   const windows: { label: string; w: RateLimit | undefined }[] = [
     { label: "5-hour window", w: account.fiveHour },
     { label: "7-day window", w: account.sevenDay },
-    { label: "7-day · Fable", w: account.sevenDayFable },
     { label: "7-day · Sonnet", w: account.sevenDaySonnet },
     { label: "7-day · Opus", w: account.sevenDayOpus },
     // The modern limits[] weekly_scoped windows, labeled by the API ("Fable" today). The legacy

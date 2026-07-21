@@ -65,8 +65,8 @@ function dayToDate(day: string): Date {
 
 /**
  * The daily usage time-series (#114, revised again): a Bklit ComposedChart — one model-stacked bar
- * per local calendar day (same densification, series order, and identity colors as the old SVG
- * BarSeries) plus a turns/day line on its own right-hand scale, so cost (tokens) and activity
+ * per local calendar day (densified across the range, series in byModel store order, identity
+ * colors) plus a turns/day line on its own right-hand scale, so cost (tokens) and activity
  * (back-and-forth) read together. Reveal/tooltip animation comes from the vendored chart runtime.
  */
 function TokensPerDay({

@@ -121,13 +121,6 @@ describe("deriveAccount", () => {
     expect(acc?.asOfMs).toBe(NOW - 120_000);
   });
 
-  it("passes the Fable weekly bucket through from the API", () => {
-    const acc = deriveAccount([], NOW, STALE_MS, {
-      sevenDayFable: { usedPct: 67, resetsAt: NOW + 1000 },
-    });
-    expect(acc?.sevenDayFable?.usedPct).toBe(67);
-  });
-
   it("keeps labeled scoped weeklies, dropping expired ones like the flat windows", () => {
     const acc = deriveAccount([], NOW, STALE_MS, {
       fiveHour: { usedPct: 1, resetsAt: NOW + 1000 },

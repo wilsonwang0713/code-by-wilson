@@ -302,7 +302,6 @@ export interface ScopedRateLimit extends RateLimit {
 export interface RateLimitWindows {
   fiveHour?: RateLimit;
   sevenDay?: RateLimit;
-  sevenDayFable?: RateLimit;
   sevenDaySonnet?: RateLimit;
   sevenDayOpus?: RateLimit;
 }
@@ -335,7 +334,6 @@ export interface Account {
   fiveHour?: RateLimit;
   sevenDay?: RateLimit;
   /** Weekly per-model sub-buckets, present only when the source carried them. */
-  sevenDayFable?: RateLimit;
   sevenDaySonnet?: RateLimit;
   sevenDayOpus?: RateLimit;
   /** Labeled per-model weekly windows from the usage API's `limits[]` (weekly_scoped entries) —
