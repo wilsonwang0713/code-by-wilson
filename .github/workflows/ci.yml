@@ -47,6 +47,25 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint
 
+  # The Playwright/Electron E2E suite. macOS only: the specs drive the notch
+  # island, which is a macOS-only window (they self-skip elsewhere), and they
+  # launch the real built app, so this job rebuilds the native modules against
+  # Electron's ABI and builds the renderer before running. _electron.launch
+  # uses the app's own Electron — no Playwright browser download needed.
+  e2e:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm rebuild:native
+      - run: pnpm build
+      - run: pnpm test:e2e
+
   # website/ is a standalone project (own package.json, own lockfile, not a
   # pnpm workspace member) that the jobs above never touch — only repo-wide
   # `format:check` in `lint` incidentally reaches it. This job runs its own
