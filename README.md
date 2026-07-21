@@ -1,6 +1,6 @@
 # <img src="docs/assets/logo.svg" alt="" height="64" align="center"> FlightDeck
 
-English | [简体中文](README.zh-CN.md)
+English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/wilsonwang0713/code-by-wilson/ci.yml?style=flat-square&label=CI)](https://github.com/wilsonwang0713/code-by-wilson/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -23,12 +23,20 @@ running on your machine is there.
   fork a live one, adopt one you started elsewhere, or observe it read-only.
 - **The full transcript.** Every message, tool call, and result,
   reconstructed from disk and rendered cleanly.
-- **The telemetry the CLI hides.** Context pressure, spend, token throughput,
-  duty cycle, git, tasks, subagents, and background shells, live per session.
-- **The whole story.** A cross-session Stats view with a year-long
-  contributions calendar and exact, never-estimated totals.
-- **Your rate limits in view.** Your account's rate-limit windows, read
-  straight from disk, with live reset countdowns.
+- **The telemetry the CLI hides.** Context pressure, spend, live throughput,
+  duty cycle, git, tasks, subagents, and background shells, per session.
+- **The whole story.** A cross-session Stats view — a model-stacked daily
+  chart, a model-share ring, cumulative usage with a one-week projection, a
+  weekday-by-hour activity heatmap, and a year-long contributions calendar —
+  all exact, never estimated.
+- **Your rate limits in view.** Your account's rate-limit windows and
+  per-model weekly buckets, read straight from disk, as arc gauges with live
+  reset countdowns.
+- **Light or dark.** A full light theme alongside the dark one, or follow the
+  system — set it in Settings → Appearance.
+- **The notch island (macOS).** An optional overlay under the notch: a glance
+  pill that expands into an inbox of the sessions waiting on you — click one
+  to jump straight to it.
 
 ## Download
 
@@ -43,10 +51,8 @@ One click starts the download. Always the latest release. You'll need
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 locally, so there are sessions to observe and control.
 
-On macOS, open the `.dmg` and drag FlightDeck to Applications. The app is
-signed and notarized by Apple, so it opens straight away. On Windows, run the
-`.exe`; it's unsigned for now, so if SmartScreen warns, click
-**More info → Run anyway**.
+On macOS, open the `.dmg` and drag FlightDeck to Applications. On Windows, run
+the `.exe`; if SmartScreen warns, click **More info → Run anyway**.
 
 Once installed, the app checks for new releases on launch and updates from
 Settings → About.
@@ -76,10 +82,10 @@ pnpm dev              # launch the app
 `pnpm test` runs the provider read tests over the redacted `.claude` fixtures
 in `tests/fixtures/`. `pnpm typecheck` checks the main and renderer projects.
 
-This is a personal project and isn't taking outside code, but bug reports and
-ideas are welcome. [Open an issue](https://github.com/wilsonwang0713/code-by-wilson/issues/new/choose),
+Bug reports and ideas are welcome. [Open an issue](https://github.com/wilsonwang0713/code-by-wilson/issues/new/choose),
 or see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Yihhsuan Wang. Third-party and upstream notices are retained
+in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
