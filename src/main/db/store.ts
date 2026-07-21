@@ -5,6 +5,7 @@ import {
   parseContextWindowSize,
 } from "@shared/models";
 import type { IndexOverview } from "@shared/ipc";
+import { capabilitiesOf, DEFAULT_PROVIDER_ID } from "@shared/providers";
 import { isResumable } from "@shared/resumable";
 import { transaction, type SqliteDb } from "./driver";
 
@@ -12,8 +13,9 @@ import { transaction, type SqliteDb } from "./driver";
  *  v9 forces the one-time re-summarize for the last-entry-wins usage dedup (usage_by_model rows
  *  cached under first-entry-wins undercounted subagent output). `migrate` rebuilds the index (a
  *  disposable cache) to match — v10 adds effort_level (A6 transcript scan) — v11 adds the A9
- *  compaction columns. */
-const SCHEMA_VERSION = 11;
+ *  compaction columns — v12 adds provider_id (multi-provider ownership) — v13 adds context_window
+ *  (a provider-reported window for models whose id carries no size tag, e.g. Codex). */
+const SCHEMA_VERSION = 13;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -31,6 +33,7 @@ export function migrate(db: SqliteDb): void {
       DROP TABLE IF EXISTS sessions;
       CREATE TABLE sessions (
         id TEXT PRIMARY KEY,
+        provider_id TEXT NOT NULL DEFAULT 'claude',
         title TEXT NOT NULL,
         project TEXT NOT NULL,
         cwd TEXT NOT NULL DEFAULT '',
@@ -52,6 +55,7 @@ export function migrate(db: SqliteDb): void {
         usage_by_model TEXT,
         effort_level TEXT,
         context_tokens INTEGER NOT NULL DEFAULT 0,
+        context_window INTEGER,
         compaction_count INTEGER NOT NULL DEFAULT 0,
         compaction_reclaimed_tokens INTEGER NOT NULL DEFAULT 0
       );
@@ -62,6 +66,7 @@ export function migrate(db: SqliteDb): void {
 
 interface Row {
   id: string;
+  provider_id: string;
   title: string;
   project: string;
   cwd: string;
@@ -82,6 +87,7 @@ interface Row {
   cache_creation_1h_tokens: number;
   usage_by_model: string | null;
   context_tokens: number;
+  context_window: number | null;
   effort_level: string | null;
   compaction_count: number;
   compaction_reclaimed_tokens: number;
@@ -104,6 +110,7 @@ function parseUsageByModel(json: string | null): ModelUsage[] {
 function rowToPersisted(r: Row): PersistedSession {
   return {
     id: r.id,
+    providerId: r.provider_id,
     title: r.title,
     project: r.project,
     cwd: r.cwd,
@@ -126,6 +133,7 @@ function rowToPersisted(r: Row): PersistedSession {
     },
     usageByModel: parseUsageByModel(r.usage_by_model),
     contextTokens: r.context_tokens,
+    contextWindow: r.context_window ?? undefined,
     effortLevel: r.effort_level ?? undefined,
     compactionCount: r.compaction_count,
     compactionTokensReclaimed: r.compaction_reclaimed_tokens,
@@ -145,10 +153,13 @@ function pctOfWindow(tokens: number, window: number): number {
  * (`[1m]`, A1) wins when present, else the flat per-family default.
  */
 export function hydrate(p: PersistedSession): Session {
+  // A provider-reported window (Codex's model_context_window) is authoritative when stored. Else
   // A1: a window tag in the stored raw model id (`[1m]`) beats the flat family default, so an
   // uncaptured 1M session's % isn't measured against 200k.
   const contextWindow =
-    parseContextWindowSize(p.modelRaw) ?? contextWindowFor(p.model);
+    p.contextWindow ??
+    parseContextWindowSize(p.modelRaw) ??
+    contextWindowFor(p.model);
   // The panel reads usageByModel for everything. A session summarized with the column carries its real
   // per-model breakdown; an old cached row (pre-column) or an empty transcript falls back to a single
   // main-thread entry, so the panel still renders main-only until the next re-summarize. The fallback's
@@ -168,13 +179,19 @@ export function hydrate(p: PersistedSession): Session {
       : undefined;
   return {
     id: p.id,
+    providerId: p.providerId,
     title: p.title,
     project: p.project,
     cwd: p.cwd || undefined,
     branch: p.branch,
     state: p.state,
     management: p.management,
-    resumable: isResumable(p.transcriptMtimeMs),
+    // Both resume paths (`claude --resume` / `--fork-session`) read a *Claude* transcript, so a
+    // saved conversation only makes a session resumable when its provider can be controlled at
+    // all — a Codex rollout has a positive mtime but nothing `claude` could resume.
+    resumable:
+      isResumable(p.transcriptMtimeMs) &&
+      capabilitiesOf(p.providerId).canControl,
     model: p.model,
     modelRaw: p.modelRaw,
     contextPct: pctOfWindow(p.contextTokens, contextWindow),
@@ -192,14 +209,15 @@ export function hydrate(p: PersistedSession): Session {
 
 const UPSERT = `
   INSERT INTO sessions
-    (id, title, project, cwd, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
-     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens, effort_level,
+    (id, provider_id, title, project, cwd, branch, state, management, model, model_raw, last_activity_ms, created_ms, awaiting_user, transcript_mtime_ms,
+     input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, usage_by_model, context_tokens, context_window, effort_level,
      compaction_count, compaction_reclaimed_tokens)
   VALUES
-    (@id, @title, @project, @cwd, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
-     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens, @effort_level,
+    (@id, @provider_id, @title, @project, @cwd, @branch, @state, @management, @model, @model_raw, @last_activity_ms, @created_ms, @awaiting_user, @transcript_mtime_ms,
+     @input_tokens, @output_tokens, @cache_read_tokens, @cache_creation_tokens, @cache_creation_5m_tokens, @cache_creation_1h_tokens, @usage_by_model, @context_tokens, @context_window, @effort_level,
      @compaction_count, @compaction_reclaimed_tokens)
   ON CONFLICT(id) DO UPDATE SET
+    provider_id = excluded.provider_id,
     title = excluded.title,
     project = excluded.project,
     cwd = excluded.cwd,
@@ -224,6 +242,7 @@ const UPSERT = `
     cache_creation_1h_tokens = excluded.cache_creation_1h_tokens,
     usage_by_model = excluded.usage_by_model,
     context_tokens = excluded.context_tokens,
+    context_window = excluded.context_window,
     effort_level = excluded.effort_level,
     compaction_count = excluded.compaction_count,
     compaction_reclaimed_tokens = excluded.compaction_reclaimed_tokens
@@ -243,6 +262,7 @@ export function upsertSessions(
     for (const s of snapshots) {
       stmt.run({
         id: s.id,
+        provider_id: s.providerId ?? DEFAULT_PROVIDER_ID,
         title: s.title,
         project: s.project,
         cwd: s.cwd,
@@ -263,6 +283,7 @@ export function upsertSessions(
         cache_creation_1h_tokens: s.usage.cacheCreation1hTokens,
         usage_by_model: JSON.stringify(s.usageByModel ?? []),
         context_tokens: s.contextTokens,
+        context_window: s.contextWindow ?? null,
         effort_level: s.effortLevel ?? null,
         compaction_count: s.compactionCount ?? 0,
         compaction_reclaimed_tokens: s.compactionTokensReclaimed ?? 0,

@@ -12,6 +12,8 @@ release/
 .claude/skills/*
 # ...except repo-owned skills committed here
 !.claude/skills/release/
+# Agent worktrees (created by Claude Code subagent isolation) are scratch space, never content
+.claude/worktrees/
 skills-lock.json
 
 # Superpowers plugin state and generated docs: local only, never tracked
@@ -25,3 +27,7 @@ docs/deck/
 .design-previews/
 .vercel
 .env*
+
+# Playwright
+test-results/
+playwright-report/

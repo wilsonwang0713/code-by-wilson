@@ -1,4 +1,4 @@
-import { ipcMain, shell, clipboard } from "electron";
+import { ipcMain, shell, clipboard, nativeTheme } from "electron";
 import { homedir } from "node:os";
 import { statSync } from "node:fs";
 import {
@@ -8,16 +8,19 @@ import {
   type OpenInTarget,
   type UpdateState,
   type StatsDbInfo,
+  type NotifyShowRequest,
 } from "@shared/ipc";
 import type { Provider } from "./provider/types";
 import type { SqliteDb } from "./db/driver";
 import type { StatusLineReader } from "@shared/statusline";
 import type { ModelDefaults } from "@shared/models";
 import type { CliStatus } from "@shared/cli-status";
+import { normalizeThemePreference } from "@shared/theme";
 import type { CliStatusController } from "./cli-check";
 import type { Updater } from "./updater";
 import type { AppSettingsStore } from "./app-settings";
 import type { Caffeinate } from "./caffeinate";
+import type { Notifier } from "./notify";
 import type { UsageService } from "./usage/fetch";
 import {
   deriveAccount,
@@ -36,6 +39,7 @@ import {
   readTotals,
   readBreakdowns,
   readDaily,
+  readHourly,
   readCalendar,
   readCalendarYears,
   readRecords,
@@ -62,6 +66,7 @@ import type {
   ScanProgress,
   StatsRange,
   DailyBucket,
+  HourDowCell,
   CalendarDay,
   CalendarWindow,
   StatsWindow,
@@ -118,6 +123,9 @@ export interface IpcDeps {
   /** The keep-awake toggle. Defaults to an inert off, so harnesses that don't wire it still get
    *  well-formed responses. */
   caffeinate?: Caffeinate;
+  /** Native session notifications (show + click-to-focus). Defaults to an inert no-op, so
+   *  harnesses that don't wire it still get well-formed responses. */
+  notifier?: Notifier;
   /** The OAuth usage service — the account's rate-limit fill side. Optional like accountEmail:
    *  when absent, the panel runs on capture windows alone. */
   usage?: UsageService;
@@ -148,6 +156,7 @@ export function registerIpc({
   statuslineLaunchFault,
   caffeinate,
   usage,
+  notifier,
 }: IpcDeps): { sync: () => void } {
   const reader: StatusLineReader = statusLine ?? { read: () => [] };
   const readEmail = accountEmail ?? ((): string | null => null);
@@ -178,6 +187,10 @@ export function registerIpc({
     setClaudeBinPath: () => {},
     setAutoCheckUpdates: () => {},
     setStatuslineEnabled: () => {},
+    setNotifyOnAwaiting: () => {},
+    setNotifyOnFinished: () => {},
+    setThemePreference: () => {},
+    setIslandEnabled: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,
@@ -225,6 +238,7 @@ export function registerIpc({
       now,
       CAPTURE_STALE_MS,
       usage?.read() ?? null,
+      usage?.fetchedAtMs(),
     );
     if (account?.billingMode === "subscription") {
       // Subscription identity: the oauthAccount email. Attached only here, only for a
@@ -431,6 +445,31 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.caffeinateGet, (): boolean => caff.isOn());
   ipcMain.handle(IPC.caffeinateSet, (_e, on: boolean): boolean => caff.set(on));
+  ipcMain.handle(IPC.themeGet, () =>
+    normalizeThemePreference(settings.read().themePreference),
+  );
+  ipcMain.handle(IPC.themeSet, (_e, raw: unknown): void => {
+    const pref = normalizeThemePreference(raw);
+    settings.setThemePreference(pref);
+    nativeTheme.themeSource = pref;
+  });
+  ipcMain.handle(IPC.notifyShow, (_e, req: NotifyShowRequest): void =>
+    notifier?.show(req),
+  );
+  ipcMain.handle(
+    IPC.notifyGetOnAwaiting,
+    (): boolean => settings.read().notifyOnAwaiting ?? true,
+  );
+  ipcMain.handle(IPC.notifySetOnAwaiting, (_e, enabled: boolean): void =>
+    settings.setNotifyOnAwaiting(enabled),
+  );
+  ipcMain.handle(
+    IPC.notifyGetOnFinished,
+    (): boolean => settings.read().notifyOnFinished ?? false,
+  );
+  ipcMain.handle(IPC.notifySetOnFinished, (_e, enabled: boolean): void =>
+    settings.setNotifyOnFinished(enabled),
+  );
 
   // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan
   // step (the event loop breathes between calls, so pty output and IPC stay responsive) and returns the
@@ -516,6 +555,16 @@ export function registerIpc({
       return readDaily(adb, win);
     } catch (err) {
       console.error("stats daily read failed; serving none", err);
+      return [];
+    }
+  };
+  // The (weekday × hour) activity matrix, range-scoped like safeDaily and failure-tolerant the
+  // same way: a bad read serves an empty matrix, never sinks the snapshot.
+  const safeHourly = (adb: SqliteDb, win: StatsWindow): HourDowCell[] => {
+    try {
+      return readHourly(adb, win);
+    } catch (err) {
+      console.error("stats hourly read failed; serving none", err);
       return [];
     }
   };
@@ -663,6 +712,7 @@ export function registerIpc({
           calendarStart: cal.startDay,
           calendarEnd: cal.endDay,
           calendarYears: safeCalendarYears(analyticsDb),
+          hourly: safeHourly(analyticsDb, win),
         },
       };
     },

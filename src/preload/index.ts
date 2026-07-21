@@ -48,6 +48,22 @@ const api: AppApi = {
   repairStatusline: () => ipcRenderer.invoke(IPC.statuslineRepair),
   getCaffeinate: () => ipcRenderer.invoke(IPC.caffeinateGet),
   setCaffeinate: (on) => ipcRenderer.invoke(IPC.caffeinateSet, on),
+  getThemePreference: () => ipcRenderer.invoke(IPC.themeGet),
+  setThemePreference: (pref) => ipcRenderer.invoke(IPC.themeSet, pref),
+  showNotification: (req) => ipcRenderer.invoke(IPC.notifyShow, req),
+  getIslandEnabled: () => ipcRenderer.invoke(IPC.islandGetEnabled),
+  setIslandEnabled: (enabled) =>
+    ipcRenderer.invoke(IPC.islandSetEnabled, enabled),
+  islandFocusSession: (sessionId) =>
+    ipcRenderer.invoke(IPC.islandFocusSession, sessionId),
+  islandSetInteractive: (interactive) =>
+    ipcRenderer.invoke(IPC.islandSetInteractive, interactive),
+  getNotifyOnAwaiting: () => ipcRenderer.invoke(IPC.notifyGetOnAwaiting),
+  setNotifyOnAwaiting: (enabled) =>
+    ipcRenderer.invoke(IPC.notifySetOnAwaiting, enabled),
+  getNotifyOnFinished: () => ipcRenderer.invoke(IPC.notifyGetOnFinished),
+  setNotifyOnFinished: (enabled) =>
+    ipcRenderer.invoke(IPC.notifySetOnFinished, enabled),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>
@@ -77,6 +93,11 @@ const api: AppApi = {
     ) => cb(state);
     ipcRenderer.on(IPC.updateState, handler);
     return () => ipcRenderer.removeListener(IPC.updateState, handler);
+  },
+  onNotifyActivate: (cb) => {
+    const handler = (_e: IpcRendererEvent, sessionId: string) => cb(sessionId);
+    ipcRenderer.on(IPC.notifyActivate, handler);
+    return () => ipcRenderer.removeListener(IPC.notifyActivate, handler);
   },
   terminal: {
     spawn: (req) => ipcRenderer.invoke(TERMINAL.spawn, req),

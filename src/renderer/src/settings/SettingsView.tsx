@@ -1,8 +1,12 @@
+import { useEffect } from "react";
 import type { CliStatus } from "@shared/cli-status";
 import { isUpdatePending } from "@shared/update";
 import { SoftwareUpdateCard, type UpdateControls } from "./SoftwareUpdateCard";
 import { CliCard } from "./CliCard";
 import { StatuslineCard } from "./StatuslineCard";
+import { AppearanceCard } from "./AppearanceCard";
+import { NotificationsCard } from "./NotificationsCard";
+import { IslandCard } from "./IslandCard";
 import { StatsDbCard } from "./StatsDbCard";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
@@ -10,6 +14,7 @@ import type { IconName } from "../ui/icon-names";
 import { Wordmark, cx } from "../ui/atoms";
 import { footerView } from "../ui/rail-footer";
 import { PageHeader, Card } from "../shell/page-primitives";
+import { initThemePreference } from "../appearance/store";
 
 export type SettingsSection = "system" | "about";
 
@@ -44,6 +49,12 @@ export function SettingsView({
   const cliDot = footerView(cliStatus).dot;
   const cliTrips = cliDot === "warn" || cliDot === "error";
   const updatePending = update ? isUpdatePending(update.state.phase) : false;
+
+  // Seed the theme-preference atom once per Settings visit (this view mounts/unmounts with the
+  // Settings route in App.tsx), regardless of which section (System/About) is active.
+  useEffect(() => {
+    void initThemePreference();
+  }, []);
 
   return (
     <div className="flex h-full min-w-0 flex-1 bg-ink-950 text-fg">
@@ -141,6 +152,9 @@ function SystemSection({
         onSetBinPath={onSetBinPath}
       />
       <StatuslineCard />
+      <AppearanceCard />
+      <NotificationsCard />
+      {window.api.platform === "darwin" && <IslandCard />}
       <StatsDbCard />
     </>
   );
@@ -150,7 +164,7 @@ function AboutSection({ update }: { update?: UpdateControls }) {
   return (
     <>
       <PageHeader title="About" />
-      <Card title="Code-by-wire">
+      <Card title="FlightDeck">
         <div className="flex flex-col gap-3 px-4 py-4">
           <Wordmark />
           <p className="max-w-[54ch] text-body leading-relaxed text-fg-muted">
@@ -158,7 +172,7 @@ function AboutSection({ update }: { update?: UpdateControls }) {
             manage, and review every run from one instrument panel.
           </p>
           <div className="font-mono text-meta text-fg-faint">
-            github.com/luojiahai/code-by-wire
+            github.com/wilsonwang0713/code-by-wilson
           </div>
         </div>
       </Card>

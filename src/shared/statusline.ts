@@ -3,6 +3,7 @@ import type {
   ExtraUsage,
   RateLimit,
   RateLimitWindows,
+  ScopedRateLimit,
   Session,
   SessionPr,
 } from "./types";
@@ -88,6 +89,8 @@ function liveWindow(
  *  the per-session merge — the panel never renders it without first consulting the selected session. */
 export interface AccountUsage extends RateLimitWindows {
   extraUsage?: ExtraUsage;
+  /** Labeled weekly_scoped windows from `limits[]` — see Account.sevenDayScoped. */
+  sevenDayScoped?: ScopedRateLimit[];
 }
 
 /** ccstatusline's mergeUsageData, per window: the selected session's own capture window wins, the
@@ -119,6 +122,9 @@ export function deriveAccount(
   now: number,
   staleMs: number,
   apiUsage?: AccountUsage | null,
+  /** When the usage API response was fetched (epoch ms) — the account's asOfMs when the API is
+   *  the window source. Omitted/0 falls back to the freshest capture's mtime. */
+  apiUsageAsOfMs?: number,
 ): Account | null {
   let freshest: StatusLineSample | null = null;
   let sawRateLimits = false;
@@ -135,8 +141,20 @@ export function deriveAccount(
       sevenDaySonnet: liveWindow(apiUsage?.sevenDaySonnet, now),
       sevenDayOpus: liveWindow(apiUsage?.sevenDayOpus, now),
     };
+    // Scoped weekly windows keep their labels; expired ones drop, like the flat windows above.
+    const scoped = (apiUsage?.sevenDayScoped ?? [])
+      .map((s): ScopedRateLimit | null => {
+        const live = liveWindow(s, now);
+        return live ? { ...live, label: s.label } : null;
+      })
+      .filter((s): s is ScopedRateLimit => s !== null);
+    if (scoped.length > 0) acc.sevenDayScoped = scoped;
     if (apiUsage?.extraUsage) acc.extraUsage = apiUsage.extraUsage;
     if (freshest?.version) acc.version = freshest.version;
+    // Sample freshness for the UI's "as of Xm ago": the API fetch time when the API supplied the
+    // windows, else the freshest capture's mtime (the rate_limits evidence path).
+    const asOf = apiUsage ? apiUsageAsOfMs : freshest?.capturedMtimeMs;
+    if (asOf) acc.asOfMs = asOf;
     return acc;
   }
   if (freshest) {

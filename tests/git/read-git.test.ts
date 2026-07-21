@@ -78,10 +78,10 @@ describe("readGit", () => {
       "remote",
       "add",
       "origin",
-      "git@github.com:luojiahai/code-by-wire.git",
+      "git@github.com:wilsonwang0713/code-by-wilson.git",
     );
     expect(readGit(dir)!.remoteUrl).toBe(
-      "https://github.com/luojiahai/code-by-wire",
+      "https://github.com/wilsonwang0713/code-by-wilson",
     );
   });
 

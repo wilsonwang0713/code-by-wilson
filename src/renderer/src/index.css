@@ -5,7 +5,8 @@
    red/green for failed/done. Token names kept, values re-mapped to the hermes --ui-* layer below. */
 @theme {
   /* Surface stack (neutral grayscale). */
-  --color-well: #080808; /* sunken: terminal, inputs, code blocks */
+  --color-well: #080808; /* dark-island sunken: code blocks, diffs, tool/shell output */
+  --color-field: #080808; /* form-input surface; follows theme (light branch overrides) */
   --color-ink-950: #0e0e0e; /* app canvas / middle */
   --color-ink-925: #141414; /* cards, rails, panels */
   --color-ink-900: #181818; /* raised: headers, chips, menus, popover */
@@ -57,6 +58,42 @@
   --color-model-opus: #5e9adf; /* steel-blue */
   --color-model-sonnet: #b37bd9; /* orchid */
   --color-model-haiku: #db7fa4; /* rose */
+
+  /* Bklit chart tokens (ui/bklit/**, vendored) — bridged onto the app palette instead of Bklit's
+     `.dark`-class scheme (this app themes via prefers-color-scheme). The --chart-N series routes
+     through --color-model-* / --color-data-*, so the light branch's monochrome overrides cascade
+     into the charts with no second mapping. */
+  --chart-1: var(--color-model-opus);
+  --chart-2: var(--color-model-fable);
+  --chart-3: var(--color-model-sonnet);
+  --chart-4: var(--color-model-haiku);
+  --chart-5: var(--color-data-2);
+  --chart-background: transparent;
+  --chart-foreground: var(--color-fg);
+  --chart-foreground-muted: var(--color-fg-muted);
+  --chart-label: var(--color-fg-faint);
+  --chart-grid: var(--color-ink-800);
+  --chart-crosshair: var(--color-fg-faint);
+  --chart-line-primary: var(--color-primary);
+  --chart-line-secondary: var(--color-steel);
+  --chart-brush-border: var(--color-ink-700);
+  --chart-indicator-color: var(--color-primary);
+  --chart-indicator-secondary-color: var(--color-steel);
+  --chart-marker-background: var(--color-ink-900);
+  --chart-marker-border: var(--color-ink-700);
+  --chart-marker-foreground: var(--color-fg);
+  --chart-marker-badge-background: var(--color-ink-850);
+  --chart-marker-badge-foreground: var(--color-fg-muted);
+  --chart-segment-background: color-mix(
+    in srgb,
+    var(--color-primary) 12%,
+    transparent
+  );
+  --chart-segment-line: var(--color-primary);
+  --chart-tooltip-background: var(--color-ink-900);
+  /* Bklit tooltips also read the shadcn-standard names. */
+  --foreground: var(--color-fg);
+  --muted-foreground: var(--color-fg-muted);
 
   /* Recessed sidebar — darkened surfaces for the sidebar column */
   --color-sidebar: #0a0a0a;
@@ -120,13 +157,13 @@
   --titlebar-height: 34px; /* Must stay in lockstep with HEADER_HEIGHT_PX in src/shared/chrome.ts. */
   /* Single knob for every corner radius: feeds the @theme inline ladder above
      and the `rounded-full` override below (hermes styles.css:540-545). Hermes
-     ships 0.6; code-by-wire runs compact at 0.3 (2026-07-05 spec). */
+     ships 0.6; flightdeck runs compact at 0.3 (2026-07-05 spec). */
   --radius-scalar: 0.3;
 
   /* Hermes Mono seeds — the raw grayscale values hermes's monoTheme preset
      (apps/desktop/src/themes/presets.ts) assigns to foreground/primary/midground/
      background/sidebarBackground/card. Hermes applies these at runtime per active
-     skin via applyTheme(); code-by-wire has no theme switcher, so they're
+     skin via applyTheme(); flightdeck has no theme switcher, so they're
      hardcoded here and consumed by the --ui-* layer below exactly like hermes's
      styles.css does. */
   --theme-foreground: #eaeaea;
@@ -145,7 +182,7 @@
   --theme-card-seed: var(--theme-neutral-card);
   --theme-elevated-seed: var(--theme-neutral-card);
 
-  /* Mix knobs — hermes's :root.dark values (styles.css:400-426); code-by-wire
+  /* Mix knobs — hermes's :root.dark values (styles.css:400-426); flightdeck
      is dark-only, so there's no light branch to fall back to. */
   --theme-mix-chrome: 74%;
   --theme-mix-sidebar: 100%;
@@ -295,13 +332,17 @@
   --ui-chat-surface-background: var(--ui-bg-chrome);
   --ui-editor-surface-background: var(--ui-bg-chrome);
 
+  /* Terminal/code surface pinned dark across themes (dark island); equals the editor surface in
+     dark, overridden to a fixed dark in the light branch so terminals never lighten. */
+  --color-code-surface: var(--ui-editor-surface-background);
+
   /* Sidebar aliases (hermes styles.css:379-388), using the dark 12% variant
      for --sidebar-edge-border (styles.css:415). */
   --sidebar-edge-border: color-mix(in srgb, var(--ui-base) 12%, transparent);
   --chrome-action-hover: var(--ui-control-hover-background);
 
   /* Shadows (hermes styles.css:91-116). hermes's var(--dt-foreground) is
-     resolved to its alias target var(--ui-text-primary) directly — code-by-wire
+     resolved to its alias target var(--ui-text-primary) directly — flightdeck
      doesn't carry hermes's shadcn --dt-* bridge layer. */
   --shadow-xs: 0 0.0625rem 0.125rem color-mix(in srgb, #000 5%, transparent);
   --shadow-sm:
@@ -320,6 +361,12 @@
     0 0.5rem 0.75rem -0.375rem color-mix(in srgb, #000 6%, transparent),
     0 1.25rem 1.75rem -0.875rem color-mix(in srgb, #000 6%, transparent),
     0 2.25rem 3rem -1.75rem color-mix(in srgb, #000 0%, transparent);
+
+  /* Frosted glass (overlays) + chrome tint. --tint-alpha is 100% in dark (opaque = unchanged) and
+     lowered in the light branch so sidebar/header/dock read as a soft translucent tint. */
+  --glass-blur: 14px;
+  --glass-overlay: color-mix(in srgb, var(--color-ink-900) 82%, transparent);
+  --tint-alpha: 100%;
 }
 
 html,
@@ -329,6 +376,12 @@ body,
   /* App shell, not a document: the window itself never scrolls on either axis
      (panes own their own scroll). */
   overflow: hidden;
+}
+/* The island overlay window: its BrowserWindow is transparent, so the page must stay transparent
+   too — the app-wide opaque body background below would paint a rectangle over the desktop.
+   IslandView adds this class on mount. */
+body.island {
+  background: transparent;
 }
 body {
   margin: 0;
@@ -419,7 +472,7 @@ body {
 
 /* hermes's working-session arc (styles.css:574-683, reduced-motion rule at 698-702):
    a masked 1.25px ring whose ::before slides three faint comet arcs diagonally around
-   the edge. Adapted for code-by-wire: colors pinned to the dark-only theme (bright edge
+   the edge. Adapted for flightdeck: colors pinned to the dark-only theme (bright edge
    = --color-fg, hermes's dark-mode choice; trail = the footer surface), and --arc-inset 0
    instead of hermes's -0.125rem — the footer button sits flush against the
    window's bottom edge, so an outset ring would clip its bottom arc. */
@@ -615,4 +668,106 @@ body:has([data-suppress-pane-reveal]:hover) [data-pane-reveal-trigger] {
    kept in sync from the renderer (GlobalHeader). Mirrors VS Code's `.counter-zoom` title bar. */
 .title-bar {
   zoom: calc(1 / var(--zoom-factor, 1));
+}
+
+/* Light theme — override-only branch. nativeTheme.themeSource (main) drives prefers-color-scheme,
+   so this covers both "follow system" and a forced Light choice. Dark stays the default above. */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Seeds that feed the --ui-* layer (foreground dark, neutrals light). */
+    --theme-foreground: #1a1a1a;
+    --theme-primary: #1a1a1a;
+    --theme-midground: #6b6b6b;
+    --theme-neutral-chrome: #f4f4f5;
+    --theme-neutral-sidebar: #ececed;
+    --theme-neutral-card: #ffffff;
+
+    /* Surface stack — canvas grayish, raised whiter (raised stays lighter than canvas). */
+    --color-ink-950: #f4f4f5; /* app canvas / middle */
+    --color-ink-925: #fafafa; /* cards, rails, panels */
+    --color-ink-900: #ffffff; /* raised: headers, chips, menus, popover */
+    --color-ink-850: #eeeeef; /* subtle hover / faint divider */
+    --color-ink-800: #e3e3e5; /* default hairline border */
+    --color-ink-750: #e8e8ea; /* hover on raised surfaces */
+    --color-ink-700: #d4d4d7; /* strong border */
+    --color-ink-600: #9a9a9f; /* Ended state, dim glyphs */
+
+    /* Text tiers — dark ink on light ground. */
+    --color-fg: color-mix(in srgb, #1a1a1a 92%, transparent);
+    --color-fg-muted: color-mix(in srgb, #1a1a1a 62%, transparent);
+    --color-fg-faint: color-mix(in srgb, #1a1a1a 42%, transparent);
+
+    /* Primary = foreground (grayscale). */
+    --color-primary: #1a1a1a;
+    --color-primary-bright: #000000;
+    --color-primary-deep: #3a3a3a;
+
+    /* Status hues — deepened for contrast on light. */
+    --color-working: #0d9488;
+    --color-working-bright: #14b8a6;
+    --color-accent: #b45309;
+    --color-accent-bright: #d97706;
+    --color-idle: #8a8a8a;
+    --color-danger: #dc2626;
+    --color-ok: #16a34a;
+
+    /* Data / telemetry neutrals. */
+    --color-steel: #6b6b6b;
+    --color-token-input: #5a5a5a;
+    --color-token-output: #9a9a9a;
+
+    /* Magnitude ramp — dark bars on light bg. */
+    --color-data-1: #3a3a3a;
+    --color-data-2: #6a6a6a;
+    --color-data-3: #8a8a8a;
+    --color-data-4: #b0b0b0;
+    --color-data-5: #d0d0d0;
+
+    /* Model identity — monochrome in light theme. The dark theme's jewel hues clash with the
+       light UI's black-on-paper look (the contributions ramp above the chart is already shades
+       of black via --color-primary), so models climb an ink ramp instead: assigned by typical
+       share so the dominant family reads darkest. Stacked bars stay tellable-apart at 4 steps;
+       unknown models fall to --color-data-1 (#3a3a3a) between opus and fable. */
+    --color-model-opus: #1a1a1a; /* near-black */
+    --color-model-fable: #55555a; /* dark gray */
+    --color-model-sonnet: #8e8e93; /* mid gray */
+    --color-model-haiku: #bfbfc4; /* light gray */
+
+    /* Recessed sidebar surfaces. */
+    --color-sidebar: #ececed;
+    --color-sidebar-border: #dcdce0;
+
+    --color-field: #ffffff; /* inputs go light */
+    --color-code-surface: #0e0e0e; /* terminals stay dark (dark island) */
+
+    --glass-overlay: color-mix(in srgb, #ffffff 78%, transparent);
+    --tint-alpha: 86%;
+  }
+}
+
+.glass-overlay {
+  background: var(--glass-overlay);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.tint-sidebar {
+  background: color-mix(
+    in srgb,
+    var(--ui-sidebar-surface-background) var(--tint-alpha),
+    transparent
+  );
+}
+.tint-chrome {
+  background: color-mix(
+    in srgb,
+    var(--ui-chat-surface-background) var(--tint-alpha),
+    transparent
+  );
+}
+.tint-dock {
+  background: color-mix(
+    in srgb,
+    var(--ui-surface-background) var(--tint-alpha),
+    transparent
+  );
 }

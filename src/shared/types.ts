@@ -136,6 +136,10 @@ export interface SessionWorktree {
 
 export interface Session {
   id: string;
+  /** Which provider owns this session (see @shared/providers). Absent means Claude — the only
+   *  provider before the field existed — so old cached rows and old tests read unchanged. The
+   *  renderer resolves per-session capabilities from this via capabilitiesOf. */
+  providerId?: string;
   title: string;
   project: string;
   branch?: string;
@@ -213,6 +217,9 @@ export interface Session {
  */
 export interface PersistedSession {
   id: string;
+  /** Which provider produced this snapshot (stamped by createMultiProvider, persisted so ownership
+   *  survives the SQLite round trip). Absent means Claude, matching rows cached before the field. */
+  providerId?: string;
   title: string;
   project: string;
   /** The session's working directory: the transcript's recorded cwd, else the registry
@@ -243,6 +250,11 @@ export interface PersistedSession {
   usageByModel?: ModelUsage[];
   /** Latest turn's full prompt (input + cache-read + cache-creation): the current context size, for context %. */
   contextTokens: number;
+  /** The provider-reported context window (Codex rollouts record model_context_window). When set it
+   *  beats hydrate's model-derived fallbacks, so a non-Claude model's context %% isn't measured
+   *  against a Claude family default. Absent for Claude sessions — their window derives from the
+   *  model id / capture as before. */
+  contextWindow?: number;
   /** Transcript-scanned effort level (A6); the live capture's effort overlays it. */
   effortLevel?: string;
   /** Times this session compacted (transcript compact_boundary rows, A9). Absent/0 hides the row. */
@@ -279,7 +291,13 @@ export interface RateLimit {
   resetsAt: number;
 }
 
-/** The four rate-limit windows a capture's `rate_limits` block or the usage API can carry. Shared by
+/** A `weekly_scoped` window from the usage API's `limits[]` array: a per-model weekly bucket that
+ *  carries its own display label ("Fable" today — the next family shows up with no code change). */
+export interface ScopedRateLimit extends RateLimit {
+  label: string;
+}
+
+/** The rate-limit windows a capture's `rate_limits` block or the usage API can carry. Shared by
  *  both sides of the per-session merge (see statusline.ts pickWindow). */
 export interface RateLimitWindows {
   fiveHour?: RateLimit;
@@ -315,15 +333,21 @@ export interface Account {
   /** Present only for a subscription; otherwise no account rate limits. */
   fiveHour?: RateLimit;
   sevenDay?: RateLimit;
-  /** Weekly per-model sub-buckets, present only when the capture's rate_limits carried them. */
+  /** Weekly per-model sub-buckets, present only when the source carried them. */
   sevenDaySonnet?: RateLimit;
   sevenDayOpus?: RateLimit;
+  /** Labeled per-model weekly windows from the usage API's `limits[]` (weekly_scoped entries) —
+   *  the modern replacement for the legacy flat buckets above, which the API now serves as null. */
+  sevenDayScoped?: ScopedRateLimit[];
   /** Paid extra-usage credits, from the usage API only (captures never carry it). */
   extraUsage?: ExtraUsage;
   /** Claude Code CLI version from the freshest live capture. Absent when no capture reported it. */
   version?: string;
   /** Logged-in account email, read from ~/.claude.json by the ipc layer (not derived from samples). */
   email?: string;
+  /** When the windows above were sampled (epoch ms): the usage API's fetch time, else the freshest
+   *  capture's mtime. The UI shows it as "as of Xm ago" so a lagging % never reads as wrong. */
+  asOfMs?: number;
 }
 
 /** What a Provider can do. Drives graceful degradation in the UI. */

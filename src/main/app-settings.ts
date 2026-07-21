@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readTextOrNull } from "./claude-config";
+import type { ThemePreference } from "@shared/theme";
 
-/** code-by-wire's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
+/** flightdeck's own settings, stored under Electron's userData — NOT ~/.claude (that's Claude's). */
 export interface AppSettings {
   /** Absolute path to a claude binary, overriding PATH resolution. Works for Finder launches,
    *  unlike the CBW_CLAUDE_BIN env var. */
@@ -13,6 +14,18 @@ export interface AppSettings {
   /** Whether the statusLine capture wrapper is installed at launch and active. Missing means on;
    *  callers read `read().statuslineEnabled ?? true`. */
   statuslineEnabled?: boolean;
+  /** Whether to fire a native notification when a session starts awaiting input. Missing means on;
+   *  callers read `read().notifyOnAwaiting ?? true`. */
+  notifyOnAwaiting?: boolean;
+  /** Whether to fire a native notification when a session finishes (transitions into `ended`).
+   *  Missing means OFF — a finished ping fires often, so it is opt-in; callers read
+   *  `read().notifyOnFinished ?? false`. */
+  notifyOnFinished?: boolean;
+  /** The theme choice. Missing means "system"; callers read `read().themePreference ?? "system"`. */
+  themePreference?: ThemePreference;
+  /** Whether the macOS notch overlay ("island") is shown. Missing means OFF — the island is
+   *  opt-in (spec US-5 AC4), so callers read `read().islandEnabled ?? false`. */
+  islandEnabled?: boolean;
 }
 
 export interface AppSettingsStore {
@@ -20,6 +33,10 @@ export interface AppSettingsStore {
   setClaudeBinPath(path: string | null): void;
   setAutoCheckUpdates(enabled: boolean): void;
   setStatuslineEnabled(enabled: boolean): void;
+  setNotifyOnAwaiting(enabled: boolean): void;
+  setNotifyOnFinished(enabled: boolean): void;
+  setThemePreference(pref: ThemePreference): void;
+  setIslandEnabled(enabled: boolean): void;
 }
 
 export interface AppSettingsDeps {
@@ -58,6 +75,18 @@ export function createAppSettingsStore(
     },
     setStatuslineEnabled(enabled) {
       write({ ...read(), statuslineEnabled: enabled });
+    },
+    setNotifyOnAwaiting(enabled) {
+      write({ ...read(), notifyOnAwaiting: enabled });
+    },
+    setNotifyOnFinished(enabled) {
+      write({ ...read(), notifyOnFinished: enabled });
+    },
+    setThemePreference(pref) {
+      write({ ...read(), themePreference: pref });
+    },
+    setIslandEnabled(enabled) {
+      write({ ...read(), islandEnabled: enabled });
     },
   };
 }

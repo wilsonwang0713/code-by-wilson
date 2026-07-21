@@ -9,6 +9,7 @@ import type {
   StatsRecords,
   DailyBucket,
   CalendarDay,
+  HourDowCell,
   StatsWindow,
 } from "@shared/stats";
 import {
@@ -903,6 +904,7 @@ function groupByDayAndModel(db: SqliteDb, win: StatsWindow): DayModelRow[] {
 /** A day mid-fold: the four kind sums plus a model→total-tokens map for the by-model stacking. */
 interface DayAgg {
   day: string;
+  turns: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -925,6 +927,7 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
     if (!a) {
       a = {
         day: r.day,
+        turns: 0,
         inputTokens: 0,
         outputTokens: 0,
         cacheReadTokens: 0,
@@ -935,6 +938,7 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
       };
       map.set(r.day, a);
     }
+    a.turns += r.turns;
     a.inputTokens += r.input_tokens;
     a.outputTokens += r.output_tokens;
     a.cacheReadTokens += r.cache_read_tokens;
@@ -952,6 +956,7 @@ function foldDays(rows: DayModelRow[]): DailyBucket[] {
     .map(
       (a): DailyBucket => ({
         day: a.day,
+        turns: a.turns,
         inputTokens: a.inputTokens,
         outputTokens: a.outputTokens,
         cacheReadTokens: a.cacheReadTokens,
@@ -981,6 +986,28 @@ export function readDaily(
   win: StatsWindow = ALL_TIME,
 ): DailyBucket[] {
   return foldDays(groupByDayAndModel(db, win));
+}
+
+/**
+ * The (weekday × hour) activity matrix, range-scoped: turns grouped by local weekday (0=Sunday)
+ * and local hour — the Active-hours heatmap's read. Sparse (only cells with turns); the renderer
+ * densifies the 7×24 grid. Same 'localtime' bucketing and unknown-time exclusion as the daily cut.
+ */
+export function readHourly(
+  db: SqliteDb,
+  win: StatsWindow = ALL_TIME,
+): HourDowCell[] {
+  const { where, bind } = tsWindow(win, true);
+  return db
+    .prepare(
+      `SELECT
+         CAST(strftime('%w', ts / 1000, 'unixepoch', 'localtime') AS INTEGER) AS dow,
+         CAST(strftime('%H', ts / 1000, 'unixepoch', 'localtime') AS INTEGER) AS hour,
+         COUNT(*) AS turns
+       FROM turns ${where}
+       GROUP BY dow, hour`,
+    )
+    .all(...bind) as HourDowCell[];
 }
 
 /** A calendar day mid-fold: turns and total tokens summed across the day's models. */

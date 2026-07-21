@@ -2,6 +2,7 @@ import { statSync } from "node:fs";
 import type { Provider } from "../types";
 import type { Management, PersistedSession } from "@shared/types";
 import type { Family } from "@shared/models";
+import { CLAUDE_PROVIDER_ID, PROVIDER_CAPABILITIES } from "@shared/providers";
 import { readTextOrNull, resolveClaudeDir } from "../../claude-config";
 import {
   indexTranscripts,
@@ -266,9 +267,10 @@ export function createClaudeProvider(deps: ClaudeProviderDeps = {}): Provider {
   };
 
   return {
-    id: "claude",
-    // What Claude Code can do; the surfaces land in later issues, but the capability contract is stable.
-    capabilities: { canControl: true, hasRateLimits: true, hasSubagents: true },
+    id: CLAUDE_PROVIDER_ID,
+    // What Claude Code can do, read from the shared registry so the renderer's per-session lookup
+    // (capabilitiesOf) and this provider's own contract can't drift.
+    capabilities: PROVIDER_CAPABILITIES[CLAUDE_PROVIDER_ID],
     listCandidates: () =>
       listCandidates({ claudeDir, isPidAlive, now: now(), recentWindowMs }),
     summarize: (c) => {

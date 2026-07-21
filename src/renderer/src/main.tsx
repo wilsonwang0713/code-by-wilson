@@ -7,9 +7,13 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/jetbrains-mono";
 import "./index.css";
 import { App } from "./App";
+import { IslandView } from "./island/IslandView";
+
+// The notch-overlay window loads this same bundle with ?island=1 (see main/island/window.ts) and
+// renders only the island UI — no router, same query-param branch the window itself was born with.
+const isIsland =
+  new URLSearchParams(window.location.search).get("island") === "1";
 
 createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <React.StrictMode>{isIsland ? <IslandView /> : <App />}</React.StrictMode>,
 );

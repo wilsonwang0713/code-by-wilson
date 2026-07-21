@@ -1,4 +1,10 @@
-import { app, BrowserWindow, net, powerSaveBlocker } from "electron";
+import {
+  app,
+  BrowserWindow,
+  nativeTheme,
+  net,
+  powerSaveBlocker,
+} from "electron";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { openDb } from "./db/sqlite";
@@ -6,6 +12,8 @@ import type { SqliteDb } from "./db/driver";
 import { migrate } from "./db/store";
 import { migrateAnalytics } from "./db/analytics";
 import { createClaudeProvider } from "./provider/claude";
+import { createCodexProvider } from "./provider/codex";
+import { createMultiProvider } from "./provider/multi";
 import { createManagedRegistry } from "./managed-registry";
 import type { ManagedRegistry } from "./managed-registry";
 import { applyRotations } from "./provider/claude/rotation";
@@ -24,6 +32,8 @@ import type { ModelDefaults } from "@shared/models";
 import { resolveClaudeDir } from "./claude-config";
 import { createAppSettingsStore } from "./app-settings";
 import { createCaffeinate } from "./caffeinate";
+import { createNotifier } from "./notify";
+import { createIslandController } from "./island/controller";
 import { createSessionTitleStore } from "./session-titles";
 import { createCliStatusController } from "./cli-check";
 import { createUpdater } from "./updater";
@@ -36,6 +46,7 @@ import {
 } from "./terminal/shell-path";
 import { HEADER_HEIGHT_PX, MAC_TRAFFIC_LIGHT_POSITION } from "@shared/chrome";
 import { IPC } from "@shared/ipc";
+import { normalizeThemePreference } from "@shared/theme";
 
 // Pin the whole app to the sRGB color profile. Without this, the packaged build inherits the
 // display's profile (Display P3 on modern Macs) and Chromium stretches our sRGB-authored palette
@@ -51,7 +62,7 @@ function createWindow(
   childEnv: (() => NodeJS.ProcessEnv) | undefined,
   resolveBin: (() => string | null) | undefined,
   shellEnv: () => NodeJS.ProcessEnv,
-): void {
+): BrowserWindow {
   // The renderer header is a fixed HEADER_HEIGHT_PX tall and doubles as the title bar. On macOS we hide
   // the native title bar but KEEP the traffic lights (titleBarStyle 'hidden', never frame:false — the
   // same choice VS Code makes), float them into the header, and offset native sheets (the directory
@@ -110,11 +121,17 @@ function createWindow(
   } else {
     void win.loadFile(join(__dirname, "../renderer/index.html"));
   }
+  return win;
 }
 
 app
   .whenReady()
   .then(() => {
+    // Test seam: E2E runs point userData at an isolated temp dir, so settings/db/caches never
+    // touch the real profile. Must run before the first getPath("userData") read below. Unset in
+    // normal launches — the default path is untouched.
+    if (process.env.FLIGHTDECK_USER_DATA_DIR)
+      app.setPath("userData", process.env.FLIGHTDECK_USER_DATA_DIR);
     const db = openDb(join(app.getPath("userData"), "index.db"));
     migrate(db); // bring the index schema up to date before the first sync
     // The durable, non-pruned analytics store (#107). A separate file with its own user_version, so a
@@ -181,7 +198,7 @@ app
     // later spawn/adopt (never during createWindow), so a holder populated a few lines down is enough —
     // and it lets the window open before claudeDir, which needs the synchronous login-shell probe.
     const services: {
-      provider?: ReturnType<typeof createClaudeProvider>;
+      provider?: import("./provider/types").Provider;
       cliStatus?: ReturnType<typeof createCliStatusController>;
     } = {};
     // Stand the window up FIRST, before the synchronous login-shell probe + claudeDir-dependent wiring
@@ -189,8 +206,23 @@ app
     // overview() invoke just queues until registerIpc runs a few lines down — but the window has already
     // painted, so a slow login shell no longer blanks the screen on launch. Mirrors the lazy childEnv above
     // and the setTimeout'd CLI check below.
-    const openWindow = (): void =>
-      createWindow(
+    // Create app settings early so the persisted theme can be applied before first paint. nativeTheme
+    // drives prefers-color-scheme in the renderer, so setting it here makes the window paint in the
+    // right theme with no flash. Reused by the statusline/notify wiring below.
+    const appSettings = createAppSettingsStore({
+      dir: app.getPath("userData"),
+    });
+    nativeTheme.themeSource = normalizeThemePreference(
+      appSettings.read().themePreference,
+    );
+    // The main window, tracked explicitly. getAllWindows()[0] is no longer a safe way to find it —
+    // the island overlay is a second window — so every "the window" consumer (update push, the
+    // notification click, the island's click-to-focus, the activate guard) resolves through here.
+    let mainWin: BrowserWindow | null = null;
+    const resolveMainWindow = (): BrowserWindow | null =>
+      mainWin && !mainWin.isDestroyed() ? mainWin : null;
+    const openWindow = (): void => {
+      const win = createWindow(
         managed,
         (id) => services.provider?.resolveAdoptTarget(id) ?? null,
         registerRename,
@@ -198,14 +230,21 @@ app
         () => services.cliStatus?.resolvedPath() ?? null,
         shellTermEnv,
       );
+      mainWin = win;
+      win.on("closed", () => {
+        if (mainWin === win) mainWin = null;
+      });
+    };
     openWindow();
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) openWindow();
+      // Guard on the tracked main window, not getAllWindows().length — a live island window would
+      // otherwise satisfy the count and block the main window from ever reopening from the dock.
+      if (!resolveMainWindow()) openWindow();
     });
-    // Push update-state to whatever window is open (resolved at send-time, like the fullscreen push).
+    // Push update-state to the main window (resolved at send-time, like the fullscreen push).
     const sendUpdate = (state: import("@shared/update").UpdateState): void => {
-      const w = BrowserWindow.getAllWindows()[0];
-      if (w && !w.isDestroyed()) w.webContents.send(IPC.updateState, state);
+      const w = resolveMainWindow();
+      if (w) w.webContents.send(IPC.updateState, state);
     };
     const updater = createUpdater({
       send: sendUpdate,
@@ -247,9 +286,6 @@ app
           })
         : null,
     };
-    const appSettings = createAppSettingsStore({
-      dir: app.getPath("userData"),
-    });
     // Wrap the user's statusLine so live cost/context and account rate limits flow to the app.
     // Idempotent and reversible; a failure must never cost the user a window. Gated on the user's
     // durable preference — a Settings-page Disable must survive relaunch, not silently re-install.
@@ -273,11 +309,21 @@ app
       }
     }
     const statusLine = createStatusLineReader({ claudeDir });
-    const provider = createClaudeProvider({
-      managed,
-      claudeDir,
-      recentWindowMs: readSessionWindowMs(claudeDir),
-    });
+    // The app-facing provider is the aggregate: Claude first (the primary — its capabilities remain
+    // the app-level IPC.capabilities contract, and per-session reads for pre-multi cached rows fall
+    // back to it), then the read-only Codex observer, which contributes zero sessions and zero
+    // errors when ~/.codex doesn't exist. Per-session dispatch and the providerId stamp live in
+    // createMultiProvider.
+    const provider = createMultiProvider([
+      createClaudeProvider({
+        managed,
+        claudeDir,
+        recentWindowMs: readSessionWindowMs(claudeDir),
+      }),
+      createCodexProvider({
+        recentWindowMs: readSessionWindowMs(claudeDir),
+      }),
+    ]);
     services.provider = provider;
     const sessionTitles = createSessionTitleStore({
       dir: app.getPath("userData"),
@@ -329,6 +375,11 @@ app
       );
     };
     const caffeinate = createCaffeinate({ blocker: powerSaveBlocker });
+    // Session notifications: shown on the renderer's request only (its poll detects the
+    // awaiting-input transition), so the request/response invariant holds. A click resolves the
+    // window at click time and pushes the session id back (IPC.notifyActivate); openWindow lets
+    // it recreate the window when a click arrives with all windows closed (macOS dock-only state).
+    const notifier = createNotifier({ openWindow, resolveMainWindow });
     const { sync } = registerIpc({
       db,
       provider,
@@ -347,7 +398,18 @@ app
       statuslineLaunchFault,
       caffeinate,
       usage,
+      notifier,
     });
+
+    // The notch overlay. Its IPC registers unconditionally (the Settings toggle needs the
+    // channels even while the overlay is off); the window itself is opt-in (missing reads as
+    // OFF) and macOS-only — enable() self-gates on darwin.
+    const islandController = createIslandController({
+      appSettings,
+      openWindow,
+      resolveMainWindow,
+    });
+    if (appSettings.read().islandEnabled ?? false) islandController.enable();
 
     // One-shot launch check: packaged only, and only when the user hasn't turned it off. Deferred so it
     // never blocks first paint (mirrors the setTimeout'd CLI check). No recurring timer — see the

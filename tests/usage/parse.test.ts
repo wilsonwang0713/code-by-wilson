@@ -5,7 +5,7 @@ const RESET_ISO = "2026-07-14T00:00:00Z";
 const RESET_MS = Date.parse(RESET_ISO);
 
 describe("parseUsageResponse", () => {
-  it("maps the four buckets, ISO resets_at → epoch ms", () => {
+  it("maps the four flat buckets, ISO resets_at → epoch ms", () => {
     const u = parseUsageResponse({
       five_hour: { utilization: 12, resets_at: RESET_ISO },
       seven_day: { utilization: 22.4, resets_at: RESET_ISO },
@@ -17,6 +17,62 @@ describe("parseUsageResponse", () => {
     expect(u?.sevenDay).toEqual({ usedPct: 22.4, resetsAt: RESET_MS });
     expect(u?.sevenDaySonnet?.usedPct).toBe(5);
     expect(u?.sevenDayOpus?.usedPct).toBe(7);
+  });
+
+  it("parses the limits[] array: aggregates fill null legacy buckets, scoped weeklies keep labels", () => {
+    // The real 2026-07 response shape: legacy per-model buckets null, data in limits[].
+    const u = parseUsageResponse({
+      five_hour: null,
+      seven_day: null,
+      seven_day_omelette: null,
+      limits: [
+        { kind: "session", scope: null, percent: 61, resets_at: RESET_ISO },
+        { kind: "weekly_all", scope: null, percent: 53, resets_at: RESET_ISO },
+        {
+          kind: "weekly_scoped",
+          scope: { model: { id: null, display_name: "Fable" }, surface: null },
+          percent: 67,
+          resets_at: RESET_ISO,
+        },
+      ],
+    });
+    expect(u?.fiveHour).toEqual({ usedPct: 61, resetsAt: RESET_MS });
+    expect(u?.sevenDay).toEqual({ usedPct: 53, resetsAt: RESET_MS });
+    expect(u?.sevenDayScoped).toEqual([
+      { label: "Fable", usedPct: 67, resetsAt: RESET_MS },
+    ]);
+  });
+
+  it("legacy flat buckets win over limits[] aggregates when both are present", () => {
+    const u = parseUsageResponse({
+      five_hour: { utilization: 12, resets_at: RESET_ISO },
+      limits: [
+        { kind: "session", scope: null, percent: 99, resets_at: RESET_ISO },
+      ],
+    });
+    expect(u?.fiveHour?.usedPct).toBe(12);
+  });
+
+  it("malformed limits entries drop individually", () => {
+    const u = parseUsageResponse({
+      limits: [
+        {
+          kind: "weekly_scoped",
+          scope: null,
+          percent: "67",
+          resets_at: RESET_ISO,
+        },
+        {
+          kind: "weekly_scoped",
+          scope: null,
+          percent: 10,
+          resets_at: RESET_ISO,
+        },
+      ],
+    });
+    expect(u?.sevenDayScoped).toEqual([
+      { label: "Scoped", usedPct: 10, resetsAt: RESET_MS },
+    ]);
   });
 
   it("a null (Enterprise) bucket → window absent", () => {

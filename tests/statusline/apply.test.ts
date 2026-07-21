@@ -106,7 +106,32 @@ describe("deriveAccount", () => {
       fiveHour: undefined,
       sevenDay: undefined,
       version: "2.0.14",
+      asOfMs: NOW, // capture-sourced windows: freshness = the sample's mtime
     });
+  });
+
+  it("stamps asOfMs from the API fetch time when the API supplies the windows", () => {
+    const acc = deriveAccount(
+      [],
+      NOW,
+      STALE_MS,
+      { fiveHour: { usedPct: 10, resetsAt: NOW + 1000 } },
+      NOW - 120_000,
+    );
+    expect(acc?.asOfMs).toBe(NOW - 120_000);
+  });
+
+  it("keeps labeled scoped weeklies, dropping expired ones like the flat windows", () => {
+    const acc = deriveAccount([], NOW, STALE_MS, {
+      fiveHour: { usedPct: 1, resetsAt: NOW + 1000 },
+      sevenDayScoped: [
+        { label: "Fable", usedPct: 67, resetsAt: NOW + 1000 },
+        { label: "Stale", usedPct: 10, resetsAt: NOW - 1 },
+      ],
+    });
+    expect(acc?.sevenDayScoped).toEqual([
+      { label: "Fable", usedPct: 67, resetsAt: NOW + 1000 },
+    ]);
   });
 });
 

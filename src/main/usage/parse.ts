@@ -1,4 +1,4 @@
-import type { RateLimit, ExtraUsage } from "@shared/types";
+import type { RateLimit, ScopedRateLimit, ExtraUsage } from "@shared/types";
 import type { AccountUsage } from "@shared/statusline";
 
 /** One usage-API bucket → RateLimit. `resets_at` is an ISO STRING here (epoch seconds on the
@@ -33,6 +33,50 @@ function parseExtraUsage(raw: unknown): ExtraUsage | undefined {
   return extra;
 }
 
+/** The modern `limits[]` array, one entry per window: `session` and `weekly_all` mirror the legacy
+ *  flat buckets (which the API now serves as null alongside), and `weekly_scoped` entries are the
+ *  per-model weekly windows, labeled by their scope's model display_name ("Fable"). Malformed
+ *  entries drop individually, same trust boundary as parseBucket. */
+function parseLimits(raw: unknown): {
+  session?: RateLimit;
+  weeklyAll?: RateLimit;
+  scoped: ScopedRateLimit[];
+} {
+  const out: {
+    session?: RateLimit;
+    weeklyAll?: RateLimit;
+    scoped: ScopedRateLimit[];
+  } = { scoped: [] };
+  if (!Array.isArray(raw)) return out;
+  for (const item of raw) {
+    if (item === null || typeof item !== "object") continue;
+    const r = item as Record<string, unknown>;
+    if (typeof r.percent !== "number" || !Number.isFinite(r.percent)) continue;
+    if (typeof r.resets_at !== "string") continue;
+    const resetsAt = Date.parse(r.resets_at);
+    if (Number.isNaN(resetsAt)) continue;
+    const w: RateLimit = { usedPct: r.percent, resetsAt };
+    if (r.kind === "session") out.session ??= w;
+    else if (r.kind === "weekly_all") out.weeklyAll ??= w;
+    else if (r.kind === "weekly_scoped") {
+      const scope = r.scope as
+        | { model?: { display_name?: unknown } | null; surface?: unknown }
+        | null
+        | undefined;
+      const model = scope?.model?.display_name;
+      const surface = scope?.surface;
+      const label =
+        typeof model === "string" && model
+          ? model
+          : typeof surface === "string" && surface
+            ? surface
+            : "Scoped";
+      out.scoped.push({ ...w, label });
+    }
+  }
+  return out;
+}
+
 /**
  * Map a `/api/oauth/usage` 200 body into AccountUsage. Returns null only when the body isn't an
  * object; an object with no usable bucket still parses (empty AccountUsage) — that response is
@@ -51,6 +95,12 @@ export function parseUsageResponse(body: unknown): AccountUsage | null {
   if (sevenDay) usage.sevenDay = sevenDay;
   if (sevenDaySonnet) usage.sevenDaySonnet = sevenDaySonnet;
   if (sevenDayOpus) usage.sevenDayOpus = sevenDayOpus;
+  // The limits[] array: aggregates fill in only where the legacy flat buckets were null (the API
+  // is mid-migration and serves both), scoped weeklies ride along with their labels.
+  const limits = parseLimits(b.limits);
+  if (!usage.fiveHour && limits.session) usage.fiveHour = limits.session;
+  if (!usage.sevenDay && limits.weeklyAll) usage.sevenDay = limits.weeklyAll;
+  if (limits.scoped.length > 0) usage.sevenDayScoped = limits.scoped;
   const extraUsage = parseExtraUsage(b.extra_usage);
   if (extraUsage) usage.extraUsage = extraUsage;
   return usage;

@@ -1,6 +1,6 @@
-appId: io.github.luojiahai.code-by-wire
-productName: Code-by-wire
-copyright: Copyright © 2026 luojiahai
+appId: io.github.wilsonwang0713.flightdeck
+productName: FlightDeck
+copyright: Copyright © 2026 Yihhsuan Wang
 # Native modules are rebuilt explicitly via `pnpm rebuild:native`; don't let
 # electron-builder run its own (it misbehaves under pnpm).
 npmRebuild: false
@@ -37,7 +37,7 @@ mac:
     - target: zip
 dmg:
   # Force ${arch} into the filename. electron-builder's default drops it for x64, so the Intel dmg
-  # would ship as Code-by-wire.dmg with no arch label next to Code-by-wire-arm64.dmg — distinct
+  # would ship as FlightDeck.dmg with no arch label next to FlightDeck-arm64.dmg — distinct
   # enough not to clobber, but confusing for a four-target release. Make both arches explicit.
   artifactName: ${productName}-${arch}.${ext}
   title: ${productName} ${version}
@@ -59,5 +59,5 @@ nsis:
   deleteAppDataOnUninstall: false
 publish:
   provider: github
-  owner: luojiahai
-  repo: code-by-wire
+  owner: wilsonwang0713
+  repo: code-by-wilson

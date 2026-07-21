@@ -94,3 +94,115 @@ describe("statuslineEnabled preference", () => {
     expect(store.read().claudeBinPath).toBe("/opt/claude");
   });
 });
+
+describe("notifyOnAwaiting preference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  function tmp(): string {
+    const d = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("is absent by default (callers read ?? true), persists false, and round-trips", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+
+    expect(store.read().notifyOnAwaiting).toBeUndefined();
+
+    store.setNotifyOnAwaiting(false);
+    expect(store.read().notifyOnAwaiting).toBe(false);
+    // persisted, not just in memory
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))
+        .notifyOnAwaiting,
+    ).toBe(false);
+
+    store.setNotifyOnAwaiting(true);
+    expect(store.read().notifyOnAwaiting).toBe(true);
+  });
+
+  it("preserves other keys when toggling", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    store.setClaudeBinPath("/opt/claude");
+    store.setNotifyOnAwaiting(false);
+    expect(store.read().claudeBinPath).toBe("/opt/claude");
+  });
+});
+
+describe("notifyOnFinished preference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  function tmp(): string {
+    const d = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("is absent by default (callers read ?? false), persists true, and round-trips", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+
+    expect(store.read().notifyOnFinished).toBeUndefined();
+
+    store.setNotifyOnFinished(true);
+    expect(store.read().notifyOnFinished).toBe(true);
+    // persisted, not just in memory
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))
+        .notifyOnFinished,
+    ).toBe(true);
+
+    store.setNotifyOnFinished(false);
+    expect(store.read().notifyOnFinished).toBe(false);
+  });
+
+  it("preserves other keys when toggling", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    store.setClaudeBinPath("/opt/claude");
+    store.setNotifyOnFinished(true);
+    expect(store.read().claudeBinPath).toBe("/opt/claude");
+  });
+});
+
+describe("themePreference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  function tmp(): string {
+    const d = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("is absent by default (callers read ?? system), persists, and round-trips", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    expect(store.read().themePreference).toBeUndefined();
+
+    store.setThemePreference("light");
+    expect(store.read().themePreference).toBe("light");
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))
+        .themePreference,
+    ).toBe("light");
+
+    store.setThemePreference("dark");
+    expect(store.read().themePreference).toBe("dark");
+  });
+
+  it("preserves other keys when set", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    store.setClaudeBinPath("/opt/claude");
+    store.setThemePreference("light");
+    expect(store.read().claudeBinPath).toBe("/opt/claude");
+  });
+});
