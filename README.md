@@ -9,7 +9,7 @@ English | [简体中文](README.zh-CN.md)
 **Pilot every Claude Code session, view its enriched transcript, and monitor
 the telemetry, in one interface.**
 
-![FlightDeck: a live Claude Code session with the session rail, transcript, and telemetry panels](docs/assets/cbw-screenshot.png)
+![FlightDeck: a live Claude Code session with the session rail, transcript, and telemetry panels](docs/assets/flightdeck-screenshot.png)
 
 ## Features
 

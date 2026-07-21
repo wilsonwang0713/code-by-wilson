@@ -8,7 +8,7 @@
 
 **驾驭每一个 Claude Code 会话，查看其丰富的会话记录，监控遥测数据，尽在一个界面。**
 
-![FlightDeck：一个实时 Claude Code 会话，含会话侧栏、会话记录与遥测面板](docs/assets/cbw-screenshot.png)
+![FlightDeck：一个实时 Claude Code 会话，含会话侧栏、会话记录与遥测面板](docs/assets/flightdeck-screenshot.png)
 
 ## 功能
 
