@@ -13,6 +13,9 @@ export interface AwaitingCandidate {
  *  distinguish prompt kinds (permission vs question), this becomes per-session. */
 export const AWAITING_BODY = "Waiting for your input";
 
+/** The body for the "session finished" ping — a session that just transitioned into `ended`. */
+export const FINISHED_BODY = "Finished";
+
 export interface DecideInput {
   /** Per-session awaiting flags from the LAST poll, or null before any poll has landed. Null is the
    *  no-baseline case: sessions already waiting at app start describe the past, not a transition,
@@ -46,36 +49,53 @@ function isAwaiting(s: AwaitingCandidate): boolean {
   return s.state === "waiting";
 }
 
+/** A session "just finished" when its derived state is `ended`. There is no `errored` state in the
+ *  model, so a finished ping is scoped to this transition alone. */
+function isEnded(s: AwaitingCandidate): boolean {
+  return s.state === "ended";
+}
+
 /**
- * The whole notification decision, pure and poll-shaped: compare the previous poll's awaiting flags
- * against this poll's and name the sessions that just transitioned into awaiting. Rules:
+ * The shared decision core, pure and poll-shaped: compare the previous poll's per-session flag (as
+ * computed by `isActive`) against this poll's and name the sessions that just transitioned false→true.
+ * `decideNotifications` (awaiting) and `decideFinishedNotifications` (ended) are the two bindings. Rules:
  *
- * - Only a false→true transition notifies. A session that stays waiting across polls already fired;
- *   it re-arms only by leaving waiting (answered, working, ended) first.
+ * - Only a false→true transition notifies. A session that stays active across polls already fired;
+ *   it re-arms only by leaving the active state first.
  * - A session with no baseline entry (first poll overall, or a session that just appeared) never
  *   notifies: with no prior observation there is no transition, only unknown history.
- * - Focused window + that session selected suppresses: the user is already looking at the prompt.
+ * - Focused window + that session selected suppresses: the user is already looking at that session.
  *   Focused-but-elsewhere still notifies — an OS notification is how the other session waves.
  * - `enabled` off suppresses everything but the baseline still advances (see DecideInput.enabled).
  */
-export function decideNotifications({
-  prev,
-  sessions,
-  enabled,
-  windowFocused,
-  selectedId,
-}: DecideInput): DecideResult {
-  const baseline = new Map(sessions.map((s) => [s.id, isAwaiting(s)]));
+function decide(
+  { prev, sessions, enabled, windowFocused, selectedId }: DecideInput,
+  isActive: (s: AwaitingCandidate) => boolean,
+  body: string,
+): DecideResult {
+  const baseline = new Map(sessions.map((s) => [s.id, isActive(s)]));
   if (prev === null || !enabled) return { baseline, notify: [] };
   const notify = sessions
-    .filter((s) => isAwaiting(s) && prev.get(s.id) === false)
+    .filter((s) => isActive(s) && prev.get(s.id) === false)
     .filter((s) => !(windowFocused && s.id === selectedId))
     .map((s) => ({
       sessionId: s.id,
       // A session always carries a derived title, but an empty one would render a blank
       // notification header — the project (directory basename) is the honest fallback.
       title: s.title || s.project,
-      body: AWAITING_BODY,
+      body,
     }));
   return { baseline, notify };
+}
+
+/** The awaiting-input decision: fires when a session transitions into `waiting`. */
+export function decideNotifications(input: DecideInput): DecideResult {
+  return decide(input, isAwaiting, AWAITING_BODY);
+}
+
+/** The session-finished decision, parallel to decideNotifications: fires when a session transitions
+ *  into `ended`. Its own baseline and `enabled` flag flow through DecideInput, so the caller runs it
+ *  off the same session list with an independent gate. */
+export function decideFinishedNotifications(input: DecideInput): DecideResult {
+  return decide(input, isEnded, FINISHED_BODY);
 }

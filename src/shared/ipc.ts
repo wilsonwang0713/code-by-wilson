@@ -64,6 +64,8 @@ export const IPC = {
   notifyShow: "notify:show",
   notifyGetOnAwaiting: "notify:getOnAwaiting",
   notifySetOnAwaiting: "notify:setOnAwaiting",
+  notifyGetOnFinished: "notify:getOnFinished",
+  notifySetOnFinished: "notify:setOnFinished",
   islandGetEnabled: "island:getEnabled",
   islandSetEnabled: "island:setEnabled",
   islandFocusSession: "island:focusSession",
@@ -294,6 +296,10 @@ export interface IpcApi {
   getNotifyOnAwaiting(): Promise<boolean>;
   /** Persist the awaiting-input notification preference. */
   setNotifyOnAwaiting(enabled: boolean): Promise<void>;
+  /** Whether the session-finished notification is enabled (missing setting reads as false). */
+  getNotifyOnFinished(): Promise<boolean>;
+  /** Persist the session-finished notification preference. */
+  setNotifyOnFinished(enabled: boolean): Promise<void>;
   /** Whether the keep-awake blocker is currently active (the footer button's initial paint). */
   getCaffeinate(): Promise<boolean>;
   /** Turn keep-awake on or off. Resolves to the resulting state — main is the source of truth,

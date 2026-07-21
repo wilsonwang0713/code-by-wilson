@@ -25,3 +25,28 @@ export function setNotifyOnAwaiting(enabled: boolean): void {
   $notifyOnAwaiting.set(enabled);
   void window.api.setNotifyOnAwaiting(enabled).catch(() => {});
 }
+
+/**
+ * The "Notify when a session finishes" preference — the finished-ping twin of $notifyOnAwaiting,
+ * with the same Settings-card + poll-hook consumers. Defaults OFF (unlike awaiting's default on):
+ * a session finishing is a frequent, lower-signal event, so it is opt-in — the seed only ever
+ * confirms off or turns it on.
+ */
+export const $notifyOnFinished = atom(false);
+
+/** Seed the atom from the persisted setting. Called once from the poll hook's mount effect;
+ *  a failed read keeps the default (off), matching main's `?? false` posture. */
+export async function initNotifyOnFinished(): Promise<void> {
+  try {
+    $notifyOnFinished.set(await window.api.getNotifyOnFinished());
+  } catch {
+    // Keep the default (off); a failed read must not throw for a cosmetic setting.
+  }
+}
+
+/** Flip the finished preference: atom first (immediate UI + detector reaction), then persist.
+ *  Fire-and-forget on the write — a failed persist costs durability, not this run's behavior. */
+export function setNotifyOnFinished(enabled: boolean): void {
+  $notifyOnFinished.set(enabled);
+  void window.api.setNotifyOnFinished(enabled).catch(() => {});
+}

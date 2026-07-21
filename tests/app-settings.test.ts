@@ -133,6 +133,44 @@ describe("notifyOnAwaiting preference", () => {
   });
 });
 
+describe("notifyOnFinished preference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  function tmp(): string {
+    const d = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("is absent by default (callers read ?? false), persists true, and round-trips", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+
+    expect(store.read().notifyOnFinished).toBeUndefined();
+
+    store.setNotifyOnFinished(true);
+    expect(store.read().notifyOnFinished).toBe(true);
+    // persisted, not just in memory
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))
+        .notifyOnFinished,
+    ).toBe(true);
+
+    store.setNotifyOnFinished(false);
+    expect(store.read().notifyOnFinished).toBe(false);
+  });
+
+  it("preserves other keys when toggling", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    store.setClaudeBinPath("/opt/claude");
+    store.setNotifyOnFinished(true);
+    expect(store.read().claudeBinPath).toBe("/opt/claude");
+  });
+});
+
 describe("themePreference", () => {
   const dirs: string[] = [];
   afterEach(() => {

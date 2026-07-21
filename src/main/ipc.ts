@@ -188,6 +188,7 @@ export function registerIpc({
     setAutoCheckUpdates: () => {},
     setStatuslineEnabled: () => {},
     setNotifyOnAwaiting: () => {},
+    setNotifyOnFinished: () => {},
     setThemePreference: () => {},
     setIslandEnabled: () => {},
   };
@@ -461,6 +462,13 @@ export function registerIpc({
   );
   ipcMain.handle(IPC.notifySetOnAwaiting, (_e, enabled: boolean): void =>
     settings.setNotifyOnAwaiting(enabled),
+  );
+  ipcMain.handle(
+    IPC.notifyGetOnFinished,
+    (): boolean => settings.read().notifyOnFinished ?? false,
+  );
+  ipcMain.handle(IPC.notifySetOnFinished, (_e, enabled: boolean): void =>
+    settings.setNotifyOnFinished(enabled),
   );
 
   // Slice 2 lifecycle: the Stats view polls this while open. Each call runs ONE bounded, incremental scan

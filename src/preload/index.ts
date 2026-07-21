@@ -61,6 +61,9 @@ const api: AppApi = {
   getNotifyOnAwaiting: () => ipcRenderer.invoke(IPC.notifyGetOnAwaiting),
   setNotifyOnAwaiting: (enabled) =>
     ipcRenderer.invoke(IPC.notifySetOnAwaiting, enabled),
+  getNotifyOnFinished: () => ipcRenderer.invoke(IPC.notifyGetOnFinished),
+  setNotifyOnFinished: (enabled) =>
+    ipcRenderer.invoke(IPC.notifySetOnFinished, enabled),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>

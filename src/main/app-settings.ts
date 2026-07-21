@@ -17,6 +17,10 @@ export interface AppSettings {
   /** Whether to fire a native notification when a session starts awaiting input. Missing means on;
    *  callers read `read().notifyOnAwaiting ?? true`. */
   notifyOnAwaiting?: boolean;
+  /** Whether to fire a native notification when a session finishes (transitions into `ended`).
+   *  Missing means OFF — a finished ping fires often, so it is opt-in; callers read
+   *  `read().notifyOnFinished ?? false`. */
+  notifyOnFinished?: boolean;
   /** The theme choice. Missing means "system"; callers read `read().themePreference ?? "system"`. */
   themePreference?: ThemePreference;
   /** Whether the macOS notch overlay ("island") is shown. Missing means OFF — the island is
@@ -30,6 +34,7 @@ export interface AppSettingsStore {
   setAutoCheckUpdates(enabled: boolean): void;
   setStatuslineEnabled(enabled: boolean): void;
   setNotifyOnAwaiting(enabled: boolean): void;
+  setNotifyOnFinished(enabled: boolean): void;
   setThemePreference(pref: ThemePreference): void;
   setIslandEnabled(enabled: boolean): void;
 }
@@ -73,6 +78,9 @@ export function createAppSettingsStore(
     },
     setNotifyOnAwaiting(enabled) {
       write({ ...read(), notifyOnAwaiting: enabled });
+    },
+    setNotifyOnFinished(enabled) {
+      write({ ...read(), notifyOnFinished: enabled });
     },
     setThemePreference(pref) {
       write({ ...read(), themePreference: pref });
