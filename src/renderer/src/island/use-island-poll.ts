@@ -17,12 +17,20 @@ export function useIslandPoll(): Session[] {
   const [sessions, setSessions] = useState<Session[]>([]);
   useEffect(() => {
     let alive = true;
+    let inFlight = false;
     const tick = async (): Promise<void> => {
+      // In-flight guard (mirrors the main window's poll): a slow sync must not let ticks pile up
+      // and apply out of order. The main process also coalesces the sweep itself, so when both
+      // windows poll, refresh() here is a cheap indexed read most cycles.
+      if (inFlight) return;
+      inFlight = true;
       try {
         const o = await window.api.refresh();
         if (alive) setSessions(o.sessions);
       } catch {
         // A failed poll keeps the last snapshot; the next tick retries.
+      } finally {
+        inFlight = false;
       }
     };
     void tick();
