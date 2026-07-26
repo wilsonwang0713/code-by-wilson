@@ -42,8 +42,8 @@ function fetchStub(
   status: number,
   body: Record<string, unknown>,
 ): typeof fetch {
-  return vi.fn(async () =>
-    new Response(JSON.stringify(body), { status }),
+  return vi.fn(
+    async () => new Response(JSON.stringify(body), { status }),
   ) as unknown as typeof fetch;
 }
 
@@ -78,7 +78,10 @@ describe("activate", () => {
   it("rejects a key from another store or product even when LS accepts it", async () => {
     const be = createLemonSqueezyBackend({
       ...CONFIG,
-      fetchFn: fetchStub(200, lsBody({ meta: { store_id: 999, product_id: 222 } })),
+      fetchFn: fetchStub(
+        200,
+        lsBody({ meta: { store_id: 999, product_id: 222 } }),
+      ),
     });
     const out = await be.activate("k", "dev", NOW);
     expect(out).toMatchObject({ ok: false, reason: "wrong-product" });

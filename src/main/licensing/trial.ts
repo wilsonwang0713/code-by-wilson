@@ -69,7 +69,8 @@ export function deriveLicenseState(
 ): LicenseState {
   if (file.license) {
     const v = verify(file.license);
-    if (v) return { kind: "licensed", plan: v.plan, periodEndMs: v.periodEndMs };
+    if (v)
+      return { kind: "licensed", plan: v.plan, periodEndMs: v.periodEndMs };
   }
   const { startedAtMs } = beginOrReadTrial(file, nowMs);
   const endsAtMs = startedAtMs + TRIAL_MS;

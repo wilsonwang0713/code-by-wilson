@@ -101,7 +101,10 @@ export function createLemonSqueezyBackend(
   ): Promise<{ status: number; body: any }> {
     const res = await doFetch(`${API}/${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
       body: JSON.stringify(payload),
     });
     return { status: res.status, body: await res.json() };
@@ -142,8 +145,7 @@ export function createLemonSqueezyBackend(
             typeof body.license_key?.key === "string"
               ? body.license_key.key
               : key,
-          token:
-            typeof body.instance?.id === "string" ? body.instance.id : "",
+          token: typeof body.instance?.id === "string" ? body.instance.id : "",
           plan:
             typeof body.meta?.variant_name === "string"
               ? body.meta.variant_name.toLowerCase()
