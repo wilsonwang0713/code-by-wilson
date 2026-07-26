@@ -665,7 +665,12 @@ export function registerIpc({
       const walk = scanTargets(now);
       // Targets are always supplied explicitly, so scanStep's dir-derived default list is never
       // taken — the empty-string stand-in exists only for the codex-only wiring shape.
-      let step = scanStep(analyticsDb, claudeDir ?? "", undefined, walk.targets);
+      let step = scanStep(
+        analyticsDb,
+        claudeDir ?? "",
+        undefined,
+        walk.targets,
+      );
       if (step.done && !walk.fresh) {
         walkCache = null;
         const restep = scanStep(

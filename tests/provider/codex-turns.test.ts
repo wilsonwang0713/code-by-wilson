@@ -173,7 +173,10 @@ describe("extractCodexTurns", () => {
         input: 30,
         cached: 0,
         output: 3,
-      }).replace('"timestamp":"2026-07-25T11:31:25.170Z"', '"timestamp":"nope"'),
+      }).replace(
+        '"timestamp":"2026-07-25T11:31:25.170Z"',
+        '"timestamp":"nope"',
+      ),
     ].join("\n");
     const turns = extractCodexTurns(jsonl, "s1");
     expect(turns).toHaveLength(2);

@@ -408,7 +408,10 @@ const codexTarget = (
   path,
   mtimeMs,
   sessionId: uuid,
-  keyPrefix: path.split("/").pop()!.replace(/\.jsonl$/, ""),
+  keyPrefix: path
+    .split("/")
+    .pop()!
+    .replace(/\.jsonl$/, ""),
   kind: "codex",
 });
 
