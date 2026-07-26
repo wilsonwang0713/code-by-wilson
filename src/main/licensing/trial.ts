@@ -1,5 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { LicenseState } from "@shared/license";
+
+export type { LicenseState } from "@shared/license";
 
 /** The 7-day full-featured trial (spec 2026-07-26-licensing-design). Local-only and honest-majority:
  *  the stamp lives in userData, no network is touched during the trial, and wiping the file resets
@@ -35,11 +38,6 @@ export interface VerifiedLicense {
   plan: string;
   periodEndMs: number | null;
 }
-
-export type LicenseState =
-  | { kind: "trial"; daysLeft: number; endsAtMs: number }
-  | { kind: "expired" }
-  | { kind: "licensed"; plan: string; periodEndMs: number | null };
 
 /**
  * The trial stamp, creating it when absent. A FUTURE stamp re-clamps to now: a rolled-back clock

@@ -4,11 +4,10 @@ import {
   deriveLicenseState,
   type LicenseState,
 } from "./trial";
-import {
-  verifyCachedLicense,
-  type ActivateResult,
-  type LicenseBackend,
-} from "./lemon-squeezy";
+import { verifyCachedLicense, type LicenseBackend } from "./lemon-squeezy";
+import type { ActivateOutcome } from "@shared/license";
+
+export type { ActivateOutcome } from "@shared/license";
 
 /**
  * The licensing coordinator the app wires in: owns license.json (single writer), stamps the trial
@@ -25,15 +24,6 @@ export interface LicenseControllerDeps {
   deviceName: string;
   now?: () => number;
 }
-
-/** What the renderer's activation form gets back — ok, or the reason to show. */
-export type ActivateOutcome =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: Extract<ActivateResult, { ok: false }>["reason"];
-      message: string;
-    };
 
 export interface LicenseController {
   state(): LicenseState;
