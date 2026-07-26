@@ -12,7 +12,8 @@ import {
   formatTokensAxis,
   formatDayLong,
 } from "@shared/format";
-import { modelColorOf } from "../ui/meta";
+import { modelColorOf, MODEL_OTHER_COLOR } from "../ui/meta";
+import { foldRingRows } from "./ring-rows";
 import { Swatch } from "../ui/atoms";
 import { StatsCard, CardRegion } from "./shared";
 import { ComposedChart } from "../ui/bklit/charts/composed-chart";
@@ -228,20 +229,20 @@ function TokensPerDay({
  */
 function ModelShareRing({ rows }: { rows: StatsByModel[] }) {
   const total = rows.reduce((s, r) => s + r.totalTokens, 0);
-  const models = rows
-    .filter((r) => r.totalTokens > 0)
-    .sort(
-      (a, b) =>
-        b.totalTokens - a.totalTokens ||
-        (a.modelRaw ?? "").localeCompare(b.modelRaw ?? ""),
-    );
+  // Capped at MAX_RINGS (see ring-rows.ts): every extra ring shrinks the center hole, and a
+  // multi-provider model list runs long enough to clip the center stat without the fold.
+  const models = foldRingRows(rows);
   if (total <= 0 || models.length === 0) return null;
 
   const data = models.map((r) => ({
-    label: r.modelRaw ?? "Unknown",
+    label:
+      r.otherCount !== undefined
+        ? `Other · ${r.otherCount} models`
+        : (r.modelRaw ?? "Unknown"),
     value: r.totalTokens,
     maxValue: total,
-    color: modelColorOf(r.modelRaw),
+    color:
+      r.otherCount !== undefined ? MODEL_OTHER_COLOR : modelColorOf(r.modelRaw),
   }));
 
   return (
