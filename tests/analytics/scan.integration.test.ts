@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
-import { scanAllTranscripts } from "../../src/main/analytics/scan";
+import {
+  scanAllTranscripts,
+  scanStep,
+  type ScanTarget,
+} from "../../src/main/analytics/scan";
 import { migrateAnalytics, readTotals } from "../../src/main/db/analytics";
 import { openTestDb } from "../helpers/sqlite";
 import { tempHomes } from "../helpers/temp-home";
@@ -211,5 +215,87 @@ describe("scanAllTranscripts (real disk walk, scratch analytics db)", () => {
     const first = readTotals(db);
     scanAllTranscripts(db, home); // re-run over unchanged parent + subagent files
     expect(readTotals(db)).toEqual(first);
+  });
+});
+
+/** Write a minimal codex rollout (one model, cumulative snapshots) under its dated dir. */
+function writeCodexRollout(
+  home: string,
+  uuid: string,
+  snapshots: { input: number; output: number }[],
+  mtimeMs: number,
+): string {
+  const dir = join(home, "sessions", "2026", "07", "10");
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `rollout-2026-07-10T10-00-00-${uuid}.jsonl`);
+  const rows = [
+    {
+      timestamp: "2026-07-10T10:00:00.000Z",
+      type: "session_meta",
+      payload: { session_id: uuid, cwd: "/work/codexproj" },
+    },
+    {
+      timestamp: "2026-07-10T10:00:01.000Z",
+      type: "turn_context",
+      payload: { model: "gpt-5.6-sol" },
+    },
+    ...snapshots.map((s, i) => ({
+      timestamp: `2026-07-10T10:00:${String(10 + i).padStart(2, "0")}.000Z`,
+      type: "event_msg",
+      payload: {
+        type: "token_count",
+        info: {
+          total_token_usage: {
+            input_tokens: s.input,
+            cached_input_tokens: 0,
+            cache_write_input_tokens: 0,
+            output_tokens: s.output,
+          },
+        },
+      },
+    })),
+  ];
+  writeFileSync(path, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  utimesSync(path, new Date(mtimeMs), new Date(mtimeMs));
+  return path;
+}
+
+const codexTarget = (
+  path: string,
+  mtimeMs: number,
+  uuid: string,
+): ScanTarget => ({
+  path,
+  mtimeMs,
+  sessionId: uuid,
+  keyPrefix: path
+    .split("/")
+    .pop()!
+    .replace(/\.jsonl$/, ""),
+  kind: "codex",
+});
+
+describe("codex backfill-then-recent walk contract", () => {
+  it("old turns survive leaving the walk: the recent-window target list keeps history intact", () => {
+    const codexHome = makeHome();
+    const uuid = "cccc7777-7777-4777-8777-777777777777";
+    const p = writeCodexRollout(
+      codexHome,
+      uuid,
+      [{ input: 40, output: 4 }],
+      ANCIENT,
+    );
+    const db = openTestDb();
+    migrateAnalytics(db);
+    // launch backfill: the full-sweep target list
+    const full = [codexTarget(p, ANCIENT, uuid)];
+    expect(scanStep(db, "", undefined, full).done).toBe(true);
+    expect(readTotals(db).inputTokens).toBe(40);
+    // steady state: the recent walk no longer lists the ancient file — its turns must persist
+    // and the scan must still settle done with nothing pending
+    const step = scanStep(db, "", undefined, []);
+    expect(step.done).toBe(true);
+    expect(step.wrote).toBe(false);
+    expect(readTotals(db).inputTokens).toBe(40);
   });
 });

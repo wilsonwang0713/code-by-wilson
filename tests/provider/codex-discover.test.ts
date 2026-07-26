@@ -5,6 +5,7 @@ import {
   indexRollouts,
   isRolloutLive,
   listCodexCandidates,
+  listRolloutFiles,
   readIndexTitles,
   DEFAULT_LIVE_WINDOW_MS,
 } from "../../src/main/provider/codex/discover";
@@ -137,5 +138,36 @@ describe("codex discovery", () => {
 
   it("returns no titles when session_index.jsonl is missing", () => {
     expect(readIndexTitles(makeHome()).size).toBe(0);
+  });
+});
+
+describe("listRolloutFiles (the analytics scan's non-deduping walk)", () => {
+  it("returns every file, keeping duplicate session ids", () => {
+    const home = makeHome();
+    const now = Date.now();
+    // the same uuid in two day dirs — a resumed session's second rollout; both hold real turns
+    writeRollout(home, dayDirOf(now - DAY_MS), A, now - DAY_MS);
+    writeRollout(home, dayDirOf(now), A, now - 1000);
+
+    const files = listRolloutFiles(home, now, WINDOW_MS);
+    expect(files).toHaveLength(2);
+    expect(files.every((f) => f.id === A)).toBe(true);
+    expect(new Set(files.map((f) => f.path)).size).toBe(2);
+  });
+
+  it("an Infinity window disables both the day-dir and mtime cuts", () => {
+    const home = makeHome();
+    const now = Date.now();
+    writeRollout(home, "2020/01/01", B, now - 2000 * DAY_MS);
+
+    expect(listRolloutFiles(home, now, WINDOW_MS)).toHaveLength(0);
+    const all = listRolloutFiles(home, now, Infinity);
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe(B);
+  });
+
+  it("a missing ~/.codex yields an empty list, not an error", () => {
+    const home = join(makeHome(), "does-not-exist");
+    expect(listRolloutFiles(home, Date.now(), Infinity)).toEqual([]);
   });
 });

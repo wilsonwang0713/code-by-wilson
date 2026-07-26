@@ -351,3 +351,132 @@ describe("freshTargets (walk cache)", () => {
     expect(c.targets).not.toBe(a.targets);
   });
 });
+
+/** Write sessions/2026/07/10/rollout-...-<uuid>.jsonl with cumulative token_count snapshots. */
+function writeCodexRollout(
+  home: string,
+  uuid: string,
+  snapshots: { input: number; cached: number; output: number }[],
+  mtimeMs: number,
+): string {
+  const dir = join(home, "sessions", "2026", "07", "10");
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `rollout-2026-07-10T10-00-00-${uuid}.jsonl`);
+  const rows = [
+    JSON.stringify({
+      timestamp: "2026-07-10T10:00:00.000Z",
+      type: "session_meta",
+      payload: {
+        session_id: uuid,
+        cwd: "/work/codexproj",
+        git: { branch: "dev" },
+      },
+    }),
+    JSON.stringify({
+      timestamp: "2026-07-10T10:00:01.000Z",
+      type: "turn_context",
+      payload: { model: "gpt-5.6-sol" },
+    }),
+    ...snapshots.map((s, i) =>
+      JSON.stringify({
+        timestamp: `2026-07-10T10:00:${String(10 + i).padStart(2, "0")}.000Z`,
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: {
+              input_tokens: s.input,
+              cached_input_tokens: s.cached,
+              cache_write_input_tokens: 0,
+              output_tokens: s.output,
+            },
+          },
+        },
+      }),
+    ),
+  ];
+  writeFileSync(path, rows.join("\n") + "\n");
+  utimesSync(path, new Date(mtimeMs), new Date(mtimeMs));
+  return path;
+}
+
+const codexTarget = (
+  path: string,
+  mtimeMs: number,
+  uuid: string,
+): ScanTarget => ({
+  path,
+  mtimeMs,
+  sessionId: uuid,
+  keyPrefix: path
+    .split("/")
+    .pop()!
+    .replace(/\.jsonl$/, ""),
+  kind: "codex",
+});
+
+describe("scanStep with codex targets", () => {
+  it("ingests claude and codex targets in one pass, idempotently", () => {
+    const claudeHome = makeHome();
+    const codexHome = makeHome();
+    writeTurns(claudeHome, "-a", "s1", [{ id: "a1", input: 100 }], MT);
+    const uuid = "cccc9999-9999-4999-8999-999999999999";
+    const p = writeCodexRollout(
+      codexHome,
+      uuid,
+      [
+        { input: 50, cached: 20, output: 5 },
+        { input: 120, cached: 60, output: 12 },
+      ],
+      MT,
+    );
+    const db = openTestDb();
+    migrateAnalytics(db);
+    const targets = [
+      ...collectScanTargets(claudeHome),
+      codexTarget(p, MT, uuid),
+    ];
+    const step = scanStep(db, claudeHome, undefined, targets);
+    expect(step.done).toBe(true);
+    const totals = readTotals(db);
+    // claude 100 fresh input + codex fresh input (50-20) + (70-40)
+    expect(totals.inputTokens).toBe(100 + 30 + 30);
+    expect(totals.cacheReadTokens).toBe(60);
+    expect(totals.outputTokens).toBe(12);
+    expect(totals.sessions).toBe(2);
+    // re-running with unchanged mtimes is a no-op
+    const again = scanStep(db, claudeHome, undefined, targets);
+    expect(again.wrote).toBe(false);
+    expect(readTotals(db).inputTokens).toBe(160);
+  });
+
+  it("an appended codex snapshot ingests incrementally without recounting", () => {
+    const codexHome = makeHome();
+    const uuid = "cccc8888-8888-4888-8888-888888888888";
+    let p = writeCodexRollout(
+      codexHome,
+      uuid,
+      [{ input: 50, cached: 0, output: 5 }],
+      MT,
+    );
+    const db = openTestDb();
+    migrateAnalytics(db);
+    scanStep(db, "", undefined, [codexTarget(p, MT, uuid)]);
+    expect(readTotals(db).inputTokens).toBe(50);
+    // rewrite with one MORE snapshot (an append) and a newer mtime
+    p = writeCodexRollout(
+      codexHome,
+      uuid,
+      [
+        { input: 50, cached: 0, output: 5 },
+        { input: 90, cached: 0, output: 9 },
+      ],
+      MT + 1000,
+    );
+    scanStep(db, "", undefined, [codexTarget(p, MT + 1000, uuid)]);
+    const totals = readTotals(db);
+    expect(totals.inputTokens).toBe(90);
+    expect(totals.outputTokens).toBe(9);
+    expect(totals.turns).toBe(2);
+  });
+});

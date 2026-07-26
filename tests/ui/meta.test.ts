@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   modelLabel,
+  modelColorOf,
   ctxColor,
   isContextHigh,
   CONTEXT_WARN_PCT,
@@ -105,5 +106,18 @@ describe("STATE_META — literal Tailwind classes so the scanner emits them", ()
       expect(m.dot.startsWith("bg-")).toBe(true);
       expect(m.ring.startsWith("border-")).toBe(true);
     }
+  });
+});
+
+describe("modelColorOf — GPT identity beside the Claude jewels", () => {
+  it("gives every gpt-prefixed model the GPT family hue", () => {
+    expect(modelColorOf("gpt-5.6-sol")).toBe("var(--color-model-gpt)");
+    expect(modelColorOf("GPT-5.5")).toBe("var(--color-model-gpt)");
+  });
+
+  it("keeps known families and the neutral fallback unchanged", () => {
+    expect(modelColorOf("claude-opus-4-8")).toBe("var(--color-model-opus)");
+    expect(modelColorOf(null)).toBe("var(--color-data-1)");
+    expect(modelColorOf("mystery-model")).toBe("var(--color-data-1)");
   });
 });

@@ -11,6 +11,7 @@ import {
   collectReferencedAgentIds,
 } from "../provider/claude/subagents";
 import { extractTurns } from "../provider/claude/turns";
+import { extractCodexTurns } from "../provider/codex/turns";
 import { planFileScan } from "./incremental";
 import type { ScanProgress } from "@shared/stats";
 
@@ -33,6 +34,10 @@ export interface ScanTarget {
   mtimeMs: number;
   sessionId: string;
   keyPrefix: string;
+  /** Which extractor this file needs. Absent ⇒ a Claude transcript (the original shape, so every
+   *  existing constructor stays valid); "codex" routes through extractCodexTurns with the full
+   *  content, whose head carries the running state the cumulative diff needs. */
+  kind?: "codex";
 }
 
 /** A briefly-cached target walk: the list and the wall-clock ms it was taken. The handler reuses it across
@@ -164,7 +169,16 @@ export function scanStep(
     const lines = plan.jsonl.length ? plan.jsonl.split("\n") : [];
     const take = Math.min(lines.length, budget);
     const slice = lines.slice(0, take).join("\n");
-    const turns = extractTurns(slice, t.sessionId, t.keyPrefix, plan.startLine);
+    const turns =
+      t.kind === "codex"
+        ? extractCodexTurns(
+            content,
+            t.sessionId,
+            t.keyPrefix,
+            plan.startLine,
+            take,
+          )
+        : extractTurns(slice, t.sessionId, t.keyPrefix, plan.startLine);
     if (turns.length) wrote = true;
     const full = take === lines.length;
     transaction(db, () => {

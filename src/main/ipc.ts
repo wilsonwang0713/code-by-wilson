@@ -59,6 +59,10 @@ import {
   type ScanTarget,
   type WalkCache,
 } from "./analytics/scan";
+import {
+  collectCodexScanTargets,
+  CODEX_RECENT_WALK_MS,
+} from "./analytics/codex-scan";
 import type {
   StatsTotals,
   StatsRecords,
@@ -103,6 +107,10 @@ export interface IpcDeps {
   analyticsDb?: SqliteDb;
   /** The Claude config dir, so stats:read can run a full transcript scan before aggregating. */
   claudeDir?: string;
+  /** The Codex home (default ~/.codex — the composition root passes the same dir the live provider
+   *  uses), so the analytics scan can ingest rollout usage beside the Claude transcripts. Absent in
+   *  harnesses that don't wire it: the scan then runs Claude-only, exactly as before. */
+  codexDir?: string;
   /** Where the analytics store lives on disk (userData/analytics.db), for the Settings card's
    *  location/size readout. Optional like analyticsDb — dev harnesses may wire neither. */
   analyticsDbPath?: string;
@@ -147,6 +155,7 @@ export function registerIpc({
   beforeSync,
   analyticsDb,
   claudeDir,
+  codexDir,
   analyticsDbPath,
   cliStatus,
   sessionTitles,
@@ -616,17 +625,32 @@ export function registerIpc({
   // only a rapid burst reuses the list. Lives here, not in scanStep, so scanStep stays a pure function.
   const WALK_TTL_MS = 500;
   let walkCache: WalkCache | null = null;
+  // The codex walk's two tiers: the full-history sweep runs once per launch (memoized while the
+  // backfill drains — ~18k stats is a one-time cost, not a per-poll one), then polls drop to the
+  // recent-window walk. A Stats reset re-arms the full sweep so a rebuild recovers ALL history
+  // immediately, not at next launch.
+  let codexBackfill = true;
+  let codexFullTargets: ScanTarget[] | null = null;
+  const codexTargets = (now: number): ScanTarget[] => {
+    if (!codexDir) return [];
+    if (codexBackfill) {
+      codexFullTargets ??= collectCodexScanTargets(codexDir, now, Infinity);
+      return codexFullTargets;
+    }
+    return collectCodexScanTargets(codexDir, now, CODEX_RECENT_WALK_MS);
+  };
   // Returns the (briefly-cached) target walk plus whether this call did a real disk walk. `fresh` lets the
   // handler avoid settling `done` off a stale cache hit: a session that appeared during a backfill burst is
   // absent from a cached list, so the cached set would drain to done=true while real work remains.
   const scanTargets = (
     now: number,
   ): { targets: ScanTarget[]; fresh: boolean } => {
-    if (!claudeDir) return { targets: [], fresh: true };
+    if (!claudeDir && !codexDir) return { targets: [], fresh: true };
     const fresh = !walkCache || now - walkCache.atMs >= WALK_TTL_MS;
-    walkCache = freshTargets(walkCache, now, WALK_TTL_MS, () =>
-      collectScanTargets(claudeDir),
-    );
+    walkCache = freshTargets(walkCache, now, WALK_TTL_MS, () => [
+      ...(claudeDir ? collectScanTargets(claudeDir) : []),
+      ...codexTargets(now),
+    ]);
     return { targets: walkCache.targets, fresh };
   };
   // One bounded scan step against the (briefly cached) target walk — the shared engine behind
@@ -635,19 +659,33 @@ export function registerIpc({
   // drops to its gentle cadence. Serves a done progress (wrote:false) when no store/dir is wired or
   // the step throws, so pollers idle instead of spinning on a persistent failure.
   const runScanStep = (now: number): ScanProgress & { wrote: boolean } => {
-    if (!analyticsDb || !claudeDir) return { ...doneProgress(), wrote: false };
+    if (!analyticsDb || (!claudeDir && !codexDir))
+      return { ...doneProgress(), wrote: false };
     try {
       const walk = scanTargets(now);
-      let step = scanStep(analyticsDb, claudeDir, undefined, walk.targets);
+      // Targets are always supplied explicitly, so scanStep's dir-derived default list is never
+      // taken — the empty-string stand-in exists only for the codex-only wiring shape.
+      let step = scanStep(
+        analyticsDb,
+        claudeDir ?? "",
+        undefined,
+        walk.targets,
+      );
       if (step.done && !walk.fresh) {
         walkCache = null;
         const restep = scanStep(
           analyticsDb,
-          claudeDir,
+          claudeDir ?? "",
           undefined,
           scanTargets(now).targets,
         );
         step = { ...restep, wrote: step.wrote || restep.wrote };
+      }
+      if (step.done && codexBackfill) {
+        // The launch backfill drained: drop the memoized full-history list and fall to the
+        // recent-window walk from the next poll on.
+        codexBackfill = false;
+        codexFullTargets = null;
       }
       return step;
     } catch (err) {
@@ -759,6 +797,11 @@ export function registerIpc({
       // single-step rebuild that lands back on the same max rowid recomputes the year list instead of
       // serving the pre-reset one.
       yearsCache = null;
+      // Re-arm the codex full sweep (and drop the cached walk) so the rebuild recovers the WHOLE
+      // rollout history now, not at next launch.
+      codexBackfill = true;
+      codexFullTargets = null;
+      walkCache = null;
       return { ok: true };
     } catch (err) {
       console.error("analytics reset failed", err);
