@@ -25,8 +25,8 @@ export function LicenseGate({ onChanged }: { onChanged: () => void }) {
           <div className="h-px bg-ink-800" />
           <ActivationForm onActivated={onChanged} />
           <p className="text-meta leading-relaxed text-fg-faint">
-            One license covers 3 Macs · Cancel anytime · Your key arrives by
-            email right after checkout
+            Licensed to one Mac at a time — move it anytime from Settings ·
+            Cancel anytime · Your key arrives by email right after checkout
           </p>
         </div>
       </div>

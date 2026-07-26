@@ -42,9 +42,9 @@ function fetchStub(
   status: number,
   body: Record<string, unknown>,
 ): typeof fetch {
-  return vi.fn(
-    async () => new Response(JSON.stringify(body), { status }),
-  ) as unknown as typeof fetch;
+  return vi.fn(() =>
+    Promise.resolve(new Response(JSON.stringify(body), { status })),
+  );
 }
 
 const stored = (over: Partial<StoredLicense> = {}): StoredLicense => ({
@@ -129,9 +129,7 @@ describe("activate", () => {
   it("degrades a thrown fetch to a network error", async () => {
     const be = createLemonSqueezyBackend({
       ...CONFIG,
-      fetchFn: vi.fn(async () => {
-        throw new Error("offline");
-      }) as unknown as typeof fetch,
+      fetchFn: vi.fn(() => Promise.reject(new Error("offline"))),
     });
     expect(await be.activate("k", "dev", NOW)).toMatchObject({
       ok: false,
@@ -211,9 +209,7 @@ describe("validate", () => {
   it("keeps the cache on a network failure", async () => {
     const be = createLemonSqueezyBackend({
       ...CONFIG,
-      fetchFn: vi.fn(async () => {
-        throw new Error("offline");
-      }) as unknown as typeof fetch,
+      fetchFn: vi.fn(() => Promise.reject(new Error("offline"))),
     });
     expect(await be.validate(stored(), NOW)).toMatchObject({
       ok: false,

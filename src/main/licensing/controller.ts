@@ -76,8 +76,8 @@ export function createLicenseController({
       if (!file.license) return;
       // Best-effort seat release; the local removal is what the user asked for either way.
       await backend.deactivate(file.license);
-      const { license: _dropped, ...rest } = file;
-      store.write(rest);
+      // Keep only the trial stamp — the one other thing license.json holds.
+      store.write({ trialStartedAtMs: file.trialStartedAtMs });
     },
 
     async maybeRevalidate(): Promise<void> {
@@ -92,8 +92,8 @@ export function createLicenseController({
         if (res.ok) {
           store.write({ ...store.read(), license: res.license });
         } else if (res.reason === "revoked") {
-          const { license: _dropped, ...rest } = store.read();
-          store.write(rest);
+          // Definitive backend rejection: drop the license, keep the trial stamp.
+          store.write({ trialStartedAtMs: store.read().trialStartedAtMs });
         }
         // "network": keep the cache; the grace window carries us to the next attempt.
       } finally {
