@@ -2,6 +2,7 @@ import type {
   Session,
   ProviderCapabilities,
   Account,
+  CodexRateLimits,
   Task,
   BackgroundShell,
   ShellOutput,
@@ -90,6 +91,9 @@ export interface OverviewData extends IndexOverview {
   /** App-wide account: billing mode + rate limits from the live statusLine. null when there is no
    *  statusLine data (no captures, or all stale) — the UI reads null as "no rate-limit bars". */
   account: Account | null;
+  /** Codex's account windows from the freshest rollout sample (see CodexRateLimits). null/absent
+   *  when ~/.codex isn't wired or holds no recent sample — the card then omits the section. */
+  codexLimits?: CodexRateLimits | null;
   /** The cached Claude Code CLI verdict, or null before the first check completes. */
   cliStatus: CliStatus | null;
   /** The user's home directory (os.homedir()), for ~-abbreviating paths in the renderer (the
