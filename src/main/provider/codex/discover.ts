@@ -51,23 +51,31 @@ function readDirOrEmpty(dir: string): string[] {
  *  timezone offset plus a session that ran across midnight. */
 const DAY_DIR_SLACK_MS = 48 * 60 * 60 * 1000;
 
+/** One rollout on disk: its session id (from the filename), path, and mtime. */
+export interface RolloutFile {
+  id: string;
+  path: string;
+  mtimeMs: number;
+}
+
 /**
- * Map every recent rollout to its session id and mtime. Bounded by construction: the tree is
+ * Every rollout file inside the window — the shared walk behind indexRollouts (which dedupes by id
+ * for the live index) and the analytics scan (which must see every file: two rollouts sharing a
+ * session id both hold real turns). Bounded by construction: the tree is
  * `sessions/YYYY/MM/DD/rollout-*.jsonl` (this machine holds ~18k files across months), so whole day
  * directories older than the window are skipped by their *name* — no readdir, no stat — and only
- * files inside recent days are statted, with the mtime as the real cut. The accepted residual: a
- * live session started before the window (its rollout sits in a pruned day dir) won't surface;
- * with no pid registry to vouch for it, unbounded walking would be the only alternative.
- * If an id somehow appears twice, the freshest wins (mirrors the Claude sweep).
+ * files inside recent days are statted, with the mtime as the real cut. `recentWindowMs: Infinity`
+ * disables both cuts (the cutoff is -Infinity, which nothing predates) — the analytics backfill's
+ * full-history sweep.
  */
-export function indexRollouts(
+export function listRolloutFiles(
   codexDir: string,
   nowMs: number,
   recentWindowMs: number,
-): Map<string, { path: string; mtimeMs: number }> {
+): RolloutFile[] {
   const root = join(codexDir, "sessions");
   const cutoffMs = nowMs - recentWindowMs;
-  const out = new Map<string, { path: string; mtimeMs: number }>();
+  const out: RolloutFile[] = [];
   for (const year of readDirOrEmpty(root)) {
     if (!/^\d{4}$/.test(year)) continue;
     for (const month of readDirOrEmpty(join(root, year))) {
@@ -84,7 +92,6 @@ export function indexRollouts(
         for (const name of readDirOrEmpty(dir)) {
           const m = ROLLOUT_RE.exec(name);
           if (!m) continue;
-          const id = m[1];
           const path = join(dir, name);
           let mtimeMs: number;
           try {
@@ -93,11 +100,30 @@ export function indexRollouts(
             continue; // vanished between readdir and stat
           }
           if (mtimeMs < cutoffMs) continue; // day dir is recent but this file aged out
-          const prev = out.get(id);
-          if (!prev || mtimeMs > prev.mtimeMs) out.set(id, { path, mtimeMs });
+          out.push({ id: m[1], path, mtimeMs });
         }
       }
     }
+  }
+  return out;
+}
+
+/**
+ * Map every recent rollout to its session id and mtime — the live index's view of the walk. The
+ * accepted residual: a live session started before the window (its rollout sits in a pruned day
+ * dir) won't surface; with no pid registry to vouch for it, unbounded walking would be the only
+ * alternative. If an id somehow appears twice, the freshest wins (mirrors the Claude sweep).
+ */
+export function indexRollouts(
+  codexDir: string,
+  nowMs: number,
+  recentWindowMs: number,
+): Map<string, { path: string; mtimeMs: number }> {
+  const out = new Map<string, { path: string; mtimeMs: number }>();
+  for (const f of listRolloutFiles(codexDir, nowMs, recentWindowMs)) {
+    const prev = out.get(f.id);
+    if (!prev || f.mtimeMs > prev.mtimeMs)
+      out.set(f.id, { path: f.path, mtimeMs: f.mtimeMs });
   }
   return out;
 }
