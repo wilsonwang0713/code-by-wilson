@@ -8,6 +8,8 @@ import { AppearanceCard } from "./AppearanceCard";
 import { NotificationsCard } from "./NotificationsCard";
 import { IslandCard } from "./IslandCard";
 import { StatsDbCard } from "./StatsDbCard";
+import { LicenseCard } from "../license/LicenseCard";
+import type { LicenseState } from "@shared/license";
 import { OverlayScroll } from "../ui/OverlayScroll";
 import { Icon } from "../ui/icons";
 import type { IconName } from "../ui/icon-names";
@@ -37,6 +39,8 @@ export function SettingsView({
   section,
   onSectionChange,
   update,
+  licenseState,
+  onLicenseChanged,
 }: {
   cliStatus: CliStatus | null;
   checking: boolean;
@@ -45,6 +49,10 @@ export function SettingsView({
   section: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   update?: UpdateControls;
+  /** The polled licensing state; absent hides the License card (dev harnesses). */
+  licenseState?: LicenseState | null;
+  /** Called after an activation/deactivation so the owner refreshes the overview snapshot. */
+  onLicenseChanged?: () => void;
 }) {
   const cliDot = footerView(cliStatus).dot;
   const cliTrips = cliDot === "warn" || cliDot === "error";
@@ -121,7 +129,13 @@ export function SettingsView({
               onSetBinPath={onSetBinPath}
             />
           )}
-          {section === "about" && <AboutSection update={update} />}
+          {section === "about" && (
+            <AboutSection
+              update={update}
+              licenseState={licenseState}
+              onLicenseChanged={onLicenseChanged}
+            />
+          )}
         </div>
       </OverlayScroll>
     </div>
@@ -160,10 +174,19 @@ function SystemSection({
   );
 }
 
-function AboutSection({ update }: { update?: UpdateControls }) {
+function AboutSection({
+  update,
+  licenseState,
+  onLicenseChanged,
+}: {
+  update?: UpdateControls;
+  licenseState?: LicenseState | null;
+  onLicenseChanged?: () => void;
+}) {
   return (
     <>
       <PageHeader title="About" />
+      <LicenseCard state={licenseState} onChanged={onLicenseChanged} />
       <Card title="FlightDeck">
         <div className="flex flex-col gap-3 px-4 py-4">
           <Wordmark />

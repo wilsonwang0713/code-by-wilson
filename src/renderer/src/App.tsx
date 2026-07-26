@@ -14,6 +14,8 @@ import type {
   Account,
   CodexRateLimits,
 } from "@shared/types";
+import type { LicenseState } from "@shared/license";
+import { LicenseGate } from "./license/LicenseGate";
 import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
 import {
@@ -127,6 +129,7 @@ export function App() {
   const forkingRef = useRef<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
   const [codexLimits, setCodexLimits] = useState<CodexRateLimits | null>(null);
+  const [licenseState, setLicenseState] = useState<LicenseState | null>(null);
   const [homeDir, setHomeDir] = useState("");
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
@@ -149,6 +152,7 @@ export function App() {
     setSessions(o.sessions);
     setAccount(o.account);
     setCodexLimits(o.codexLimits ?? null);
+    setLicenseState(o.licenseState ?? null);
     setCliStatus(o.cliStatus);
     setHomeDir(o.homeDir);
   }
@@ -532,6 +536,10 @@ export function App() {
           section={settingsSection}
           onSectionChange={setSettingsSection}
           update={update}
+          licenseState={licenseState}
+          onLicenseChanged={() =>
+            void window.api.overview().then(applyOverview)
+          }
         />
       </Suspense>
     </MiddleNonSession>
@@ -555,6 +563,13 @@ export function App() {
 
   return (
     <div className="app-bg flex h-screen flex-col text-fg">
+      {/* The trial-over lock: covers the whole cockpit; activation refreshes the overview and it
+          dissolves in place. Above every pane, below nothing. */}
+      {licenseState?.kind === "expired" && (
+        <LicenseGate
+          onChanged={() => void window.api.overview().then(applyOverview)}
+        />
+      )}
       <PaneShell className="min-h-0 flex-1">
         <Pane
           id={CBW_LEFT_PANE_ID}
