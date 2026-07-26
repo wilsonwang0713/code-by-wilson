@@ -6,7 +6,10 @@ import {
   powerSaveBlocker,
 } from "electron";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
+import { createLicenseController } from "./licensing/controller";
+import { createLemonSqueezyBackend } from "./licensing/lemon-squeezy";
+import { LS_STORE_ID, LS_PRODUCT_ID, LS_CONFIGURED } from "./licensing/config";
 import { openDb } from "./db/sqlite";
 import type { SqliteDb } from "./db/driver";
 import { migrate } from "./db/store";
@@ -317,6 +320,16 @@ app
     // The one place the Codex home resolves: the live provider and the analytics scan must read the
     // same tree, so neither defaults it privately.
     const codexDir = join(homedir(), ".codex");
+    // Licensing: constructing the controller stamps the 7-day trial on first launch (spec
+    // 2026-07-26-licensing-design). The device name is what the buyer sees in their activation list.
+    const license = createLicenseController({
+      dir: app.getPath("userData"),
+      backend: createLemonSqueezyBackend({
+        storeId: LS_STORE_ID,
+        productId: LS_PRODUCT_ID,
+      }),
+      deviceName: hostname().replace(/\.local$/, ""),
+    });
     const provider = createMultiProvider([
       createClaudeProvider({
         managed,
@@ -395,6 +408,8 @@ app
       analyticsDbPath,
       claudeDir,
       codexDir,
+      license,
+      licenseConfigured: LS_CONFIGURED,
       cliStatus,
       sessionTitles,
       updater,

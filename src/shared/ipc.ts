@@ -8,6 +8,7 @@ import type {
   ShellOutput,
   Monitor,
 } from "./types";
+import type { ActivateOutcome, LicenseState } from "./license";
 import type {
   TranscriptRead,
   ReadSettled,
@@ -43,6 +44,8 @@ export const IPC = {
   recheckCli: "cli:recheck",
   setClaudeBinPath: "cli:setBinPath",
   resetAnalytics: "analytics:reset",
+  licenseActivate: "license:activate",
+  licenseDeactivate: "license:deactivate",
   openExternal: "shell:openExternal",
   openIn: "shell:openIn",
   clipboardWriteText: "clipboard:writeText",
@@ -94,6 +97,9 @@ export interface OverviewData extends IndexOverview {
   /** Codex's account windows from the freshest rollout sample (see CodexRateLimits). null/absent
    *  when ~/.codex isn't wired or holds no recent sample — the card then omits the section. */
   codexLimits?: CodexRateLimits | null;
+  /** The app's licensing state (trial countdown / licensed / expired), derived main-side per poll.
+   *  Absent in harnesses that don't wire the controller — the UI then shows no licensing chrome. */
+  licenseState?: LicenseState;
   /** The cached Claude Code CLI verdict, or null before the first check completes. */
   cliStatus: CliStatus | null;
   /** The user's home directory (os.homedir()), for ~-abbreviating paths in the renderer (the
@@ -246,6 +252,12 @@ export interface IpcApi {
    *  from the transcripts on disk. Resolves `{ ok: false }` when no analytics store is wired or the clear
    *  fails; never rejects. */
   resetAnalytics(): Promise<{ ok: boolean }>;
+  /** Activate a license key on this device (Settings → License, the expired lock screen). Never
+   *  rejects — failures come back as `{ ok: false, reason, message }` for the form's error line. */
+  activateLicense(key: string): Promise<ActivateOutcome>;
+  /** Release this device's activation seat and drop the stored license (falls back to the trial
+   *  clock). Best-effort backend-side; the local removal always happens. */
+  deactivateLicense(): Promise<void>;
   /** Open an http(s) URL in the user's default browser (the Git cell's PR link). Non-http(s) URLs are
    *  ignored by the main handler. */
   openExternal(url: string): Promise<void>;

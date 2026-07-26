@@ -64,6 +64,8 @@ import {
   CODEX_RECENT_WALK_MS,
 } from "./analytics/codex-scan";
 import { readCodexRateLimits } from "./provider/codex/rate-limits";
+import type { LicenseController } from "./licensing/controller";
+import type { ActivateOutcome } from "@shared/license";
 import type {
   StatsTotals,
   StatsRecords,
@@ -112,6 +114,12 @@ export interface IpcDeps {
    *  uses), so the analytics scan can ingest rollout usage beside the Claude transcripts. Absent in
    *  harnesses that don't wire it: the scan then runs Claude-only, exactly as before. */
   codexDir?: string;
+  /** The licensing coordinator (trial clock + activation + renewal refresh). Absent in harnesses:
+   *  the overview then ships no licenseState and the UI shows no licensing chrome. */
+  license?: LicenseController;
+  /** Whether the build carries real store ids (licensing/config.ts). False fails activation with
+   *  "not-configured" instead of hitting the backend with a pin that can never match. */
+  licenseConfigured?: boolean;
   /** Where the analytics store lives on disk (userData/analytics.db), for the Settings card's
    *  location/size readout. Optional like analyticsDb — dev harnesses may wire neither. */
   analyticsDbPath?: string;
@@ -157,6 +165,8 @@ export function registerIpc({
   analyticsDb,
   claudeDir,
   codexDir,
+  license,
+  licenseConfigured,
   analyticsDbPath,
   cliStatus,
   sessionTitles,
@@ -288,6 +298,9 @@ export function registerIpc({
       const wt = s.cwd ? worktreeMap.lookup(s.cwd) : null;
       return wt ? { ...s, worktree: wt } : s;
     });
+    // Opportunistic renewal refresh: a no-op inside the subscription period; a failure rides the
+    // grace window. Fire-and-forget so the overview read stays synchronous.
+    void license?.maybeRevalidate();
     return attachCliStatus(
       {
         sessions: withWorktrees,
@@ -295,6 +308,7 @@ export function registerIpc({
         homeDir: homedir(),
         // Same sync, non-blocking posture as usage.read(): a stat + (on change) one tail read.
         codexLimits: codexDir ? readCodexRateLimits(codexDir, now) : null,
+        licenseState: license?.state(),
       },
       () => cli.get(),
     );
@@ -813,6 +827,33 @@ export function registerIpc({
     } catch (err) {
       console.error("analytics reset failed", err);
       return { ok: false };
+    }
+  });
+
+  // License activation/deactivation (Settings → License, the expired lock screen). Never rejects:
+  // failures come back as { ok, reason, message } for the form's error line, and deactivation is
+  // best-effort backend-side (the local removal always happens in the controller).
+  ipcMain.handle(
+    IPC.licenseActivate,
+    async (_e, key: string): Promise<ActivateOutcome> => {
+      if (!license || licenseConfigured === false)
+        return {
+          ok: false,
+          reason: "not-configured",
+          message: "Purchasing isn't connected to the store in this build yet.",
+        };
+      try {
+        return await license.activate(String(key ?? ""));
+      } catch (err) {
+        return { ok: false, reason: "network", message: String(err) };
+      }
+    },
+  );
+  ipcMain.handle(IPC.licenseDeactivate, async (): Promise<void> => {
+    try {
+      await license?.deactivate();
+    } catch (err) {
+      console.error("license deactivate failed", err);
     }
   });
 
