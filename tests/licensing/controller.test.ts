@@ -21,15 +21,16 @@ const LICENSE: StoredLicense = {
   lastValidatedMs: T0,
 };
 
+const okActivate = (): Promise<ActivateResult> =>
+  Promise.resolve({ ok: true, license: LICENSE });
+const okValidate = (): Promise<ValidateResult> =>
+  Promise.resolve({ ok: true, license: LICENSE });
+
 function backendStub(over: Partial<LicenseBackend> = {}): LicenseBackend {
   return {
-    activate: vi.fn(
-      async (): Promise<ActivateResult> => ({ ok: true, license: LICENSE }),
-    ),
-    validate: vi.fn(
-      async (): Promise<ValidateResult> => ({ ok: true, license: LICENSE }),
-    ),
-    deactivate: vi.fn(async () => true),
+    activate: vi.fn(okActivate),
+    validate: vi.fn(okValidate),
+    deactivate: vi.fn(() => Promise.resolve(true)),
     ...over,
   };
 }
@@ -51,7 +52,7 @@ function makeController(
 }
 
 describe("createLicenseController", () => {
-  it("stamps the trial on first state read and persists it across instances", () => {
+  it("stamps the trial on first launch and persists it across instances", () => {
     const nowRef = { now: T0 };
     const { dir, ctl } = makeController(backendStub(), nowRef);
     expect(ctl.state()).toMatchObject({ kind: "trial", daysLeft: 7 });
@@ -68,8 +69,8 @@ describe("createLicenseController", () => {
 
   it("activate persists the license and flips the state to licensed", async () => {
     const nowRef = { now: T0 };
-    const backend = backendStub();
-    const { dir, ctl } = makeController(backend, nowRef); // construction stamps the trial at T0
+    const activate = vi.fn(okActivate);
+    const { dir, ctl } = makeController(backendStub({ activate }), nowRef); // stamps the trial at T0
     nowRef.now = T0 + 10 * DAY; // ten days later: trial over
     expect(ctl.state()).toEqual({ kind: "expired" });
 
@@ -81,23 +82,24 @@ describe("createLicenseController", () => {
       periodEndMs: T0 + 365 * DAY,
     });
     // trimmed key + configured device name reach the backend
-    expect(backend.activate).toHaveBeenCalledWith(
+    expect(activate).toHaveBeenCalledWith(
       "38b1460a-5104-4067-a91d-77b872934d51",
       "Test Mac",
       nowRef.now,
     );
     // persisted: a new controller over the same dir is licensed without any network
+    const mustNotActivate = vi.fn(
+      (): Promise<ActivateResult> =>
+        Promise.reject(new Error("must not be called")),
+    );
     const again = createLicenseController({
       dir,
-      backend: backendStub({
-        activate: vi.fn(async () => {
-          throw new Error("must not be called");
-        }) as unknown as LicenseBackend["activate"],
-      }),
+      backend: backendStub({ activate: mustNotActivate }),
       deviceName: "Test Mac",
       now: () => nowRef.now,
     });
     expect(again.state()).toMatchObject({ kind: "licensed" });
+    expect(mustNotActivate).not.toHaveBeenCalled();
   });
 
   it("a failed activation surfaces the reason and leaves the state alone", async () => {
@@ -105,11 +107,12 @@ describe("createLicenseController", () => {
     const { ctl } = makeController(
       backendStub({
         activate: vi.fn(
-          async (): Promise<ActivateResult> => ({
-            ok: false,
-            reason: "limit-reached",
-            message: "This license key has reached its activation limit.",
-          }),
+          (): Promise<ActivateResult> =>
+            Promise.resolve({
+              ok: false,
+              reason: "limit-reached",
+              message: "This license key has reached its activation limit.",
+            }),
         ),
       }),
       nowRef,
@@ -121,13 +124,13 @@ describe("createLicenseController", () => {
 
   it("deactivate frees the seat and falls back to the trial clock", async () => {
     const nowRef = { now: T0 };
-    const backend = backendStub();
-    const { ctl } = makeController(backend, nowRef);
+    const deactivate = vi.fn(() => Promise.resolve(true));
+    const { ctl } = makeController(backendStub({ deactivate }), nowRef);
     await ctl.activate("k");
     expect(ctl.state()).toMatchObject({ kind: "licensed" });
 
     await ctl.deactivate();
-    expect(backend.deactivate).toHaveBeenCalledOnce();
+    expect(deactivate).toHaveBeenCalledOnce();
     expect(ctl.state()).toMatchObject({ kind: "trial" }); // trial clock still running
   });
 
@@ -138,23 +141,22 @@ describe("createLicenseController", () => {
       periodEndMs: T0 + 730 * DAY,
       lastValidatedMs: T0 + 366 * DAY,
     };
-    const backend = backendStub({
-      validate: vi.fn(
-        async (): Promise<ValidateResult> => ({ ok: true, license: renewed }),
-      ),
-    });
-    const { ctl } = makeController(backend, nowRef);
+    const validate = vi.fn(
+      (): Promise<ValidateResult> =>
+        Promise.resolve({ ok: true, license: renewed }),
+    );
+    const { ctl } = makeController(backendStub({ validate }), nowRef);
     await ctl.activate("k");
 
     // inside the period: no network
     nowRef.now = T0 + 100 * DAY;
     await ctl.maybeRevalidate();
-    expect(backend.validate).not.toHaveBeenCalled();
+    expect(validate).not.toHaveBeenCalled();
 
     // past the period end (renewal should have happened): one validate, cache refreshed
     nowRef.now = T0 + 366 * DAY;
     await ctl.maybeRevalidate();
-    expect(backend.validate).toHaveBeenCalledOnce();
+    expect(validate).toHaveBeenCalledOnce();
     expect(ctl.state()).toMatchObject({
       kind: "licensed",
       periodEndMs: T0 + 730 * DAY,
@@ -165,11 +167,12 @@ describe("createLicenseController", () => {
     const nowRef = { now: T0 };
     const revoking = backendStub({
       validate: vi.fn(
-        async (): Promise<ValidateResult> => ({
-          ok: false,
-          reason: "revoked",
-          message: "disabled",
-        }),
+        (): Promise<ValidateResult> =>
+          Promise.resolve({
+            ok: false,
+            reason: "revoked",
+            message: "disabled",
+          }),
       ),
     });
     const a = makeController(revoking, nowRef);
@@ -180,11 +183,12 @@ describe("createLicenseController", () => {
 
     const offline = backendStub({
       validate: vi.fn(
-        async (): Promise<ValidateResult> => ({
-          ok: false,
-          reason: "network",
-          message: "offline",
-        }),
+        (): Promise<ValidateResult> =>
+          Promise.resolve({
+            ok: false,
+            reason: "network",
+            message: "offline",
+          }),
       ),
     });
     const b = makeController(offline, { now: T0 });
@@ -197,7 +201,7 @@ describe("createLicenseController", () => {
       now: () => bNow.now,
     });
     await bAgain.maybeRevalidate();
-    // within the 14-day grace past period end the cached license still holds
+    // within the 14-day grace past the period end the cached license still holds
     expect(bAgain.state()).toMatchObject({ kind: "licensed" });
   });
 });
