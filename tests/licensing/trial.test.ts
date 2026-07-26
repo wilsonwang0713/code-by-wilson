@@ -17,6 +17,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const lic = (over: Partial<StoredLicense> = {}): StoredLicense => ({
   key: "FD-TEST-TEST-TEST-TEST",
   token: "tok",
+  plan: "yearly",
+  periodEndMs: T0 + 365 * DAY,
   lastValidatedMs: T0,
   ...over,
 });

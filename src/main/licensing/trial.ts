@@ -15,6 +15,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface StoredLicense {
   key: string;
   token: string;
+  /** The purchased plan label, from the backend ("monthly" / "yearly"). */
+  plan: string;
+  /** The subscription's current period end, epoch ms — null for a non-expiring license. The
+   *  offline check accepts the license until this plus the grace window. */
+  periodEndMs: number | null;
   /** When the backend last confirmed this license, epoch ms — the offline-grace anchor. */
   lastValidatedMs: number;
 }
@@ -28,13 +33,13 @@ export interface LicenseFile {
 /** What a backend adapter vouches for when a stored license verifies. */
 export interface VerifiedLicense {
   plan: string;
-  periodEndMs: number;
+  periodEndMs: number | null;
 }
 
 export type LicenseState =
   | { kind: "trial"; daysLeft: number; endsAtMs: number }
   | { kind: "expired" }
-  | { kind: "licensed"; plan: string; periodEndMs: number };
+  | { kind: "licensed"; plan: string; periodEndMs: number | null };
 
 /**
  * The trial stamp, creating it when absent. A FUTURE stamp re-clamps to now: a rolled-back clock
