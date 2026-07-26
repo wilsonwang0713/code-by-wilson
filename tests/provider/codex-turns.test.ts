@@ -156,6 +156,48 @@ describe("extractCodexTurns", () => {
     expect(turns[1].modelRaw).toBe("gpt-5.6-sol");
   });
 
+  it("attributes pre-context snapshots to the file's first declared model", () => {
+    // Codex Desktop subagent threads stream token_counts from line ~9 while the first
+    // turn_context lands hundreds of lines later — the model is declared in-file, just late.
+    const jsonl = [
+      meta("/work/proj"),
+      tokenCount("2026-07-26T13:30:20.000Z", {
+        input: 10,
+        cached: 0,
+        output: 1,
+      }),
+      tokenCount("2026-07-26T13:30:25.000Z", {
+        input: 30,
+        cached: 0,
+        output: 3,
+      }),
+      turnCtx("gpt-5.6-sol"),
+      tokenCount("2026-07-26T13:31:25.000Z", {
+        input: 60,
+        cached: 0,
+        output: 6,
+      }),
+    ].join("\n");
+    const turns = extractCodexTurns(jsonl, "s1");
+    expect(turns.map((t) => t.modelRaw)).toEqual([
+      "gpt-5.6-sol",
+      "gpt-5.6-sol",
+      "gpt-5.6-sol",
+    ]);
+  });
+
+  it("a rollout with no turn_context anywhere stays honestly unattributed", () => {
+    const jsonl = [
+      meta("/work/proj"),
+      tokenCount("2026-07-26T13:30:20.000Z", {
+        input: 10,
+        cached: 0,
+        output: 1,
+      }),
+    ].join("\n");
+    expect(extractCodexTurns(jsonl, "s1")[0].modelRaw).toBeUndefined();
+  });
+
   it("skips null-info samples, zero deltas, malformed lines, and stamps ts=0 when unparseable", () => {
     const dup = tokenCount("2026-07-25T11:30:25.170Z", {
       input: 10,
