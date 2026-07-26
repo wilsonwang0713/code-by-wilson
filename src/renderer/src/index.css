@@ -58,6 +58,7 @@
   --color-model-opus: #5e9adf; /* steel-blue */
   --color-model-sonnet: #b37bd9; /* orchid */
   --color-model-haiku: #db7fa4; /* rose */
+  --color-model-gpt: #5fb389; /* jade — Codex's GPT family, off the state hues and the teal wire */
 
   /* Bklit chart tokens (ui/bklit/**, vendored) — bridged onto the app palette instead of Bklit's
      `.dark`-class scheme (this app themes via prefers-color-scheme). The --chart-N series routes
@@ -732,6 +733,7 @@ body:has([data-suppress-pane-reveal]:hover) [data-pane-reveal-trigger] {
     --color-model-fable: #55555a; /* dark gray */
     --color-model-sonnet: #8e8e93; /* mid gray */
     --color-model-haiku: #bfbfc4; /* light gray */
+    --color-model-gpt: #6e6e74; /* ink step between fable and sonnet — GPT stays monochrome here */
 
     /* Recessed sidebar surfaces. */
     --color-sidebar: #ececed;

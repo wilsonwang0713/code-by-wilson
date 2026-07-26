@@ -129,9 +129,20 @@ export const MODEL_FAMILY_COLORS: Record<Family, string> = {
  *  white/mono, so identity color is reserved for the recognized families. */
 export const MODEL_OTHER_COLOR = "var(--color-data-1)";
 
-/** The identity color for a raw model id: its family's fixed hue when recognized, else the neutral
- *  "other" tone. Drives the By-model bars, the daily stack-by-model, and the By-session model swatch. */
+/** Codex's GPT models get one identity hue for the whole family, matched by raw-id prefix so a new
+ *  version needs no edit — the same one-hue-per-family rule the Claude jewels follow, WITHOUT
+ *  entering FAMILIES (that list is the spawn-picker contract; GPT models are observe-only). */
+const GPT_MODEL_COLOR = "var(--color-model-gpt)";
+
+function isGptModelString(raw: string): boolean {
+  return raw.toLowerCase().startsWith("gpt-");
+}
+
+/** The identity color for a raw model id: the GPT family hue for gpt-* ids, a known Claude family's
+ *  fixed hue, else the neutral "other" tone. Drives the By-model bars, the daily stack-by-model,
+ *  and the By-session model swatch. */
 export function modelColorOf(raw: string | null): string {
+  if (raw && isGptModelString(raw)) return GPT_MODEL_COLOR;
   return raw && isKnownModelString(raw)
     ? MODEL_FAMILY_COLORS[normalizeModelId(raw)]
     : MODEL_OTHER_COLOR;
