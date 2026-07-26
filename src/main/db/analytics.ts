@@ -47,8 +47,13 @@ import type { WorktreeRow } from "../git/worktrees";
  * counted at their first, near-zero snapshot, undercounting subagent output ~85%). It only clears
  * processed_files so the next scan re-walks every transcript and upserts corrected usage over the
  * stale rows in place — turns history survives.
+ *
+ * v6 ships the codex pre-context model attribution (subagent rollouts stream token_counts before
+ * their first turn_context; those turns used to land in the "Unknown" bucket). Same shape as v5:
+ * only processed_files clears, the rescan upserts the corrected model_raw onto the same
+ * line-keyed rows in place — turns history survives.
  */
-const ANALYTICS_SCHEMA_VERSION = 5;
+const ANALYTICS_SCHEMA_VERSION = 6;
 
 function userVersion(db: SqliteDb): number {
   return (db.prepare("PRAGMA user_version").get() as { user_version: number })
@@ -131,6 +136,12 @@ export function migrateAnalytics(db: SqliteDb): void {
   // from === 1 / from === 2 paths above already cleared the high-water marks, and a fresh install
   // has nothing to re-walk.
   if (from === 3 || from === 4) {
+    db.exec("DELETE FROM processed_files");
+  }
+
+  // v6: force the one-time full rescan for the codex pre-context model attribution. Scoped to
+  // exactly 5 — every earlier path above already cleared the marks on its own upgrade.
+  if (from === 5) {
     db.exec("DELETE FROM processed_files");
   }
 

@@ -28,9 +28,14 @@ export function extractCodexTurns(
   const out: AnalyticsTurn[] = [];
   let cwd = "";
   let branch: string | undefined;
-  let model: string | undefined;
-  let prev = ZERO_TOTALS;
   const lines = content.split("\n");
+  // Seed with the file's FIRST declared model: subagent threads (Codex Desktop) stream token_counts
+  // from the head while their first turn_context lands hundreds of lines later — those early
+  // snapshots belong to the model the file declares, not to an "Unknown" bucket. The running loop
+  // below still lets a mid-session /model switch re-attribute later snapshots (newest wins). A
+  // rollout with no turn_context at all stays honestly unattributed.
+  let model: string | undefined = firstDeclaredModel(lines);
+  let prev = ZERO_TOTALS;
   for (let i = 0; i < lines.length; i++) {
     if (i >= startLine + take) break;
     const trimmed = lines[i].trim();
@@ -80,6 +85,22 @@ export function extractCodexTurns(
     });
   }
   return out;
+}
+
+/** The first turn_context model the file declares anywhere, for seeding pre-context snapshots.
+ *  The includes() prefilter keeps the pre-scan a cheap substring pass over non-matching lines. */
+function firstDeclaredModel(lines: string[]): string | undefined {
+  for (const line of lines) {
+    if (!line.includes('"turn_context"')) continue;
+    try {
+      const row = JSON.parse(line);
+      const m = row?.type === "turn_context" ? row.payload?.model : undefined;
+      if (typeof m === "string" && m) return m;
+    } catch {
+      // skip a half-written or malformed line
+    }
+  }
+  return undefined;
 }
 
 /** The cumulative counters a token_count snapshot carries. */

@@ -45,14 +45,14 @@ const turn = (
 };
 
 describe("analytics store", () => {
-  it("migrates to schema v5 and is idempotent", () => {
+  it("migrates to schema v6 and is idempotent", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     migrateAnalytics(db); // second call is a no-op, not an error
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(5);
+    ).toBe(6);
   });
 
   it("creates processed_files and round-trips a high-water mark", () => {
@@ -75,7 +75,7 @@ describe("analytics store", () => {
     migrateAnalytics(db);
     upsertTurns(db, [turn()]);
     upsertProcessedFile(db, "/a.jsonl", 1, 1);
-    migrateAnalytics(db); // already at v5 → migrate returns immediately; nothing is wiped
+    migrateAnalytics(db); // already at v6 → migrate returns immediately; nothing is wiped
     expect(readTotals(db).turns).toBe(1);
     expect(readProcessedFiles(db).get("/a.jsonl")).toEqual({
       mtime: 1,
@@ -113,7 +113,7 @@ describe("analytics store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(5);
+    ).toBe(6);
   });
 
   it("only clears turns on the v1 → v2 step, never on another upgrade (no future-bump re-wipe)", () => {
@@ -142,7 +142,7 @@ describe("analytics store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(5);
+    ).toBe(6);
   });
 
   it("returns zeroed totals for an empty store", () => {
@@ -437,7 +437,7 @@ describe("analytics store", () => {
     ]);
   });
 
-  it("v3 → v5 clears processed_files (v5 rescan) but does NOT re-run the v2 cache-split seed", () => {
+  it("v3 → v6 clears processed_files (forced rescan) but does NOT re-run the v2 cache-split seed", () => {
     const db = openTestDb();
     migrateAnalytics(db); // current schema
     // A turn whose cache-creation total is un-split (5m = 1h = 0) — the exact shape the v2 seed backfills.
@@ -465,10 +465,10 @@ describe("analytics store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(5);
+    ).toBe(6);
   });
 
-  it("v2 → v5 still clears processed_files to backfill the cache split", () => {
+  it("v2 → v6 still clears processed_files to backfill the cache split", () => {
     const db = openTestDb();
     migrateAnalytics(db);
     upsertProcessedFile(db, "/a.jsonl", 111, 3);
@@ -477,7 +477,23 @@ describe("analytics store", () => {
     expect(readProcessedFiles(db).size).toBe(0);
   });
 
-  it("v4 → v5 clears processed_files (forced rescan) but preserves turns", () => {
+  it("v5 → v6 clears processed_files (codex model-attribution rescan) but preserves turns", () => {
+    const db = openTestDb();
+    migrateAnalytics(db); // creates the current schema
+    upsertTurns(db, [turn()]);
+    upsertProcessedFile(db, "/a.jsonl", 111, 5);
+    db.exec("PRAGMA user_version = 5"); // simulate a store left at v5
+
+    migrateAnalytics(db);
+    expect(readTotals(db).turns).toBe(1); // history survives; the rescan upserts corrected model_raw over it
+    expect(readProcessedFiles(db).size).toBe(0);
+    expect(
+      (db.prepare("PRAGMA user_version").get() as { user_version: number })
+        .user_version,
+    ).toBe(6);
+  });
+
+  it("v4 → v6 clears processed_files (forced rescan) but preserves turns", () => {
     const db = openTestDb();
     migrateAnalytics(db); // creates the current schema
     upsertTurns(db, [turn()]);
@@ -490,7 +506,7 @@ describe("analytics store", () => {
     expect(
       (db.prepare("PRAGMA user_version").get() as { user_version: number })
         .user_version,
-    ).toBe(5);
+    ).toBe(6);
   });
 });
 
