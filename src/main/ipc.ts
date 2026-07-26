@@ -63,6 +63,7 @@ import {
   collectCodexScanTargets,
   CODEX_RECENT_WALK_MS,
 } from "./analytics/codex-scan";
+import { readCodexRateLimits } from "./provider/codex/rate-limits";
 import type {
   StatsTotals,
   StatsRecords,
@@ -288,7 +289,13 @@ export function registerIpc({
       return wt ? { ...s, worktree: wt } : s;
     });
     return attachCliStatus(
-      { sessions: withWorktrees, account, homeDir: homedir() },
+      {
+        sessions: withWorktrees,
+        account,
+        homeDir: homedir(),
+        // Same sync, non-blocking posture as usage.read(): a stat + (on change) one tail read.
+        codexLimits: codexDir ? readCodexRateLimits(codexDir, now) : null,
+      },
       () => cli.get(),
     );
   };

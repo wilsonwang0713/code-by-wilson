@@ -297,6 +297,23 @@ export interface ScopedRateLimit extends RateLimit {
   label: string;
 }
 
+/**
+ * Codex's account rate-limit windows, parsed from the freshest rollout's `rate_limits` samples —
+ * there is no OpenAI account API to poll, so a recorded sample is the only source. `asOfMs` is the
+ * sample row's own timestamp: unlike the Claude windows these numbers only move while Codex runs,
+ * so the card must show their age and hide them entirely once stale (CODEX_LIMITS_FRESH_MS).
+ */
+export interface CodexRateLimits {
+  /** The sample's windows, shortest first, labeled by duration ("5-hour", "7-day"). */
+  windows: ScopedRateLimit[];
+  /** When the sample was recorded (the rollout row's timestamp), epoch ms. */
+  asOfMs: number;
+}
+
+/** How old a Codex rate-limit sample may be and still show as a gauge. Past this the numbers are
+ *  history, not state — the card drops the section rather than dress them up as live. */
+export const CODEX_LIMITS_FRESH_MS = 60 * 60 * 1000;
+
 /** The rate-limit windows a capture's `rate_limits` block or the usage API can carry. Shared by
  *  both sides of the per-session merge (see statusline.ts pickWindow). */
 export interface RateLimitWindows {

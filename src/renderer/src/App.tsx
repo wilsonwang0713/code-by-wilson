@@ -8,7 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { useStore } from "@nanostores/react";
-import type { Session, ModelSelection, Account } from "@shared/types";
+import type {
+  Session,
+  ModelSelection,
+  Account,
+  CodexRateLimits,
+} from "@shared/types";
 import type { CliStatus } from "@shared/cli-status";
 import type { OverviewData } from "@shared/ipc";
 import {
@@ -121,6 +126,7 @@ export function App() {
   // spawns two divergent forks. Keyed by source id; cleared when the attempt settles.
   const forkingRef = useRef<Set<string>>(new Set());
   const [account, setAccount] = useState<Account | null>(null);
+  const [codexLimits, setCodexLimits] = useState<CodexRateLimits | null>(null);
   const [homeDir, setHomeDir] = useState("");
   const [cliStatus, setCliStatus] = useState<CliStatus | null>(null);
   // The Settings sub-section to show. The Sys lamp jumps it to "system" (the CLI status home); the gear
@@ -142,6 +148,7 @@ export function App() {
   function applyOverview(o: OverviewData): void {
     setSessions(o.sessions);
     setAccount(o.account);
+    setCodexLimits(o.codexLimits ?? null);
     setCliStatus(o.cliStatus);
     setHomeDir(o.homeDir);
   }
@@ -511,7 +518,7 @@ export function App() {
       {/* Empty fallback: the chart chunk loads in a blink off local disk, and the cards already
           have their own building-history/empty states, so a spinner would only flash. */}
       <Suspense fallback={null}>
-        <StatsView account={account} />
+        <StatsView account={account} codexLimits={codexLimits} />
       </Suspense>
     </MiddleNonSession>
   ) : isSettings ? (

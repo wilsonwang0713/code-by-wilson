@@ -9,7 +9,7 @@ import {
   isDayRange,
 } from "@shared/stats";
 import { formatDayShort } from "@shared/format";
-import type { Account } from "@shared/types";
+import type { Account, CodexRateLimits } from "@shared/types";
 import { Icon } from "../ui/icons";
 import { RangeFilter } from "./shared";
 import { OverviewCard } from "./OverviewCard";
@@ -35,9 +35,12 @@ const WARM_POLL_MS = 1500;
  */
 export function StatsView({
   account = null,
+  codexLimits = null,
 }: {
   /** The app-wide account (rate limits) from the overview poll; null hides the Rate-limits card. */
   account?: Account | null;
+  /** Codex's freshest rate-limit sample from the same poll; null omits the Codex section. */
+  codexLimits?: CodexRateLimits | null;
 }) {
   const [snap, setSnap] = useState<StatsSnapshot | null>(null);
   const [range, setRange] = useState<StatsRange>(DEFAULT_RANGE);
@@ -166,7 +169,7 @@ export function StatsView({
                   onSelectDay={(day) => setRange({ day })}
                   range={range}
                 />
-                <RateLimitCard account={account} />
+                <RateLimitCard account={account} codex={codexLimits} />
                 <ModelsCard
                   daily={snap.daily}
                   byModel={snap.byModel}
