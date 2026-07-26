@@ -314,6 +314,9 @@ app
     // back to it), then the read-only Codex observer, which contributes zero sessions and zero
     // errors when ~/.codex doesn't exist. Per-session dispatch and the providerId stamp live in
     // createMultiProvider.
+    // The one place the Codex home resolves: the live provider and the analytics scan must read the
+    // same tree, so neither defaults it privately.
+    const codexDir = join(homedir(), ".codex");
     const provider = createMultiProvider([
       createClaudeProvider({
         managed,
@@ -321,6 +324,7 @@ app
         recentWindowMs: readSessionWindowMs(claudeDir),
       }),
       createCodexProvider({
+        codexDir,
         recentWindowMs: readSessionWindowMs(claudeDir),
       }),
     ]);
@@ -390,6 +394,7 @@ app
       analyticsDb,
       analyticsDbPath,
       claudeDir,
+      codexDir,
       cliStatus,
       sessionTitles,
       updater,
