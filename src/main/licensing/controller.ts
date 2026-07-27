@@ -35,6 +35,10 @@ export interface LicenseController {
   maybeRevalidate(): Promise<void>;
 }
 
+/** How often a never-expiring license re-checks with the backend. Days, not hours: the check is
+ *  about eventually catching a revocation, not about gating sessions. */
+const NULL_EXPIRY_RECHECK_MS = 3 * 24 * 60 * 60 * 1000;
+
 export function createLicenseController({
   dir,
   backend,
@@ -85,7 +89,13 @@ export function createLicenseController({
       const nowMs = now();
       const lic = store.read().license;
       if (!lic) return;
-      if (lic.periodEndMs === null || nowMs < lic.periodEndMs) return;
+      if (lic.periodEndMs === null) {
+        // A key with no expiry never crosses a period end, so nothing would ever re-check it — a
+        // refund/revocation would keep the app unlocked forever. Re-check every few days instead;
+        // offline stays harmless (network failures keep the cache, only a definitive revocation
+        // clears it).
+        if (nowMs - lic.lastValidatedMs < NULL_EXPIRY_RECHECK_MS) return;
+      } else if (nowMs < lic.periodEndMs) return;
       revalidating = true;
       try {
         const res = await backend.validate(lic, nowMs);
