@@ -20,9 +20,11 @@ export const LICENSE_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
 const API = "https://api.lemonsqueezy.com/v1/licenses";
 
 export interface LemonSqueezyConfig {
-  /** The store/product this app accepts keys from — the pin that rejects other stores' keys. */
+  /** The store this app accepts keys from — the pin that rejects other stores' keys. */
   storeId: number;
-  productId: number;
+  /** The accepted products: the live product plus its test-mode twin (LS keeps separate catalogs
+   *  per mode, so purchase rehearsals mint keys under a different product id). */
+  productIds: number[];
   /** Injectable for tests; defaults to the global fetch. */
   fetchFn?: typeof fetch;
 }
@@ -111,7 +113,8 @@ export function createLemonSqueezyBackend(
   }
 
   const wrongProduct = (meta: any): boolean =>
-    meta?.store_id !== config.storeId || meta?.product_id !== config.productId;
+    meta?.store_id !== config.storeId ||
+    !config.productIds.includes(meta?.product_id);
 
   return {
     async activate(key, deviceName, nowMs) {

@@ -10,7 +10,7 @@ const NOW = Date.parse("2026-07-26T12:00:00.000Z");
 const DAY = 24 * 60 * 60 * 1000;
 const PERIOD_END = "2026-08-26T12:00:00.000Z";
 
-const CONFIG = { storeId: 111, productId: 222 };
+const CONFIG = { storeId: 111, productIds: [222] };
 
 /** An LS /v1/licenses/* response body, overridable per test. */
 function lsBody(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -85,6 +85,26 @@ describe("activate", () => {
     });
     const out = await be.activate("k", "dev", NOW);
     expect(out).toMatchObject({ ok: false, reason: "wrong-product" });
+  });
+
+  it("accepts a key from any allowlisted product (the test-mode twin)", async () => {
+    const be = createLemonSqueezyBackend({
+      storeId: 111,
+      productIds: [222, 333],
+      fetchFn: fetchStub(
+        200,
+        lsBody({
+          meta: {
+            store_id: 111,
+            product_id: 333,
+            variant_id: 999,
+            variant_name: "Monthly",
+          },
+        }),
+      ),
+    });
+    const out = await be.activate("k", "dev", NOW);
+    expect(out).toMatchObject({ ok: true, license: { plan: "monthly" } });
   });
 
   it("maps the activation-limit error", async () => {
