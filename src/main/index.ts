@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { homedir, hostname } from "node:os";
 import { createLicenseController } from "./licensing/controller";
 import { createLemonSqueezyBackend } from "./licensing/lemon-squeezy";
-import { LS_STORE_ID, LS_PRODUCT_ID, LS_CONFIGURED } from "./licensing/config";
+import { LS_STORE_ID, LS_PRODUCT_IDS, LS_CONFIGURED } from "./licensing/config";
 import { openDb } from "./db/sqlite";
 import type { SqliteDb } from "./db/driver";
 import { migrate } from "./db/store";
@@ -326,7 +326,7 @@ app
       dir: app.getPath("userData"),
       backend: createLemonSqueezyBackend({
         storeId: LS_STORE_ID,
-        productId: LS_PRODUCT_ID,
+        productIds: LS_PRODUCT_IDS,
       }),
       deviceName: hostname().replace(/\.local$/, ""),
     });
