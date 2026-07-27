@@ -80,7 +80,7 @@ export function Wordmark() {
           ░▒▓█
         </span>
         <span>
-          Code-by-<span className="text-primary">wire</span>
+          Flight<span className="text-primary">Deck</span>
         </span>
       </span>
       {/* A quiet build badge: mono, faint, a notch smaller — it rides the brand, never competes. */}
