@@ -163,6 +163,51 @@ describe("createLicenseController", () => {
     });
   });
 
+  it("a never-expiring key still re-checks every few days, so a revocation eventually lands", async () => {
+    const nowRef = { now: T0 };
+    const lifetime: StoredLicense = { ...LICENSE, periodEndMs: null };
+    const validate = vi.fn(
+      (): Promise<ValidateResult> =>
+        Promise.resolve({
+          ok: true,
+          license: { ...lifetime, lastValidatedMs: nowRef.now },
+        }),
+    );
+    const activate = vi.fn(
+      (): Promise<ActivateResult> =>
+        Promise.resolve({ ok: true, license: lifetime }),
+    );
+    const { ctl } = makeController(backendStub({ activate, validate }), nowRef);
+    await ctl.activate("k");
+
+    // one day in: the last validation is fresh — quiet
+    nowRef.now = T0 + 1 * DAY;
+    await ctl.maybeRevalidate();
+    expect(validate).not.toHaveBeenCalled();
+
+    // four days in: past the recheck window — one validate, stamp refreshed
+    nowRef.now = T0 + 4 * DAY;
+    await ctl.maybeRevalidate();
+    expect(validate).toHaveBeenCalledOnce();
+
+    // two days after that refresh: quiet again
+    nowRef.now = T0 + 6 * DAY;
+    await ctl.maybeRevalidate();
+    expect(validate).toHaveBeenCalledOnce();
+
+    // four days after the refresh: re-check hits a revocation → license clears → trial clock
+    // (long over by now) reads expired
+    validate.mockResolvedValueOnce({
+      ok: false,
+      reason: "revoked",
+      message: "disabled",
+    });
+    nowRef.now = T0 + 8 * DAY;
+    await ctl.maybeRevalidate();
+    expect(validate).toHaveBeenCalledTimes(2);
+    expect(ctl.state()).toEqual({ kind: "expired" });
+  });
+
   it("a revoked validation clears the license; a network failure keeps the cache", async () => {
     const nowRef = { now: T0 };
     const revoking = backendStub({

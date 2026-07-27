@@ -3,8 +3,12 @@ import { Card } from "../shell/page-primitives";
 import { ReadoutRow, RailButton } from "../settings/system-primitives";
 import { ActivationForm, SubscribeLinks } from "./ActivationForm";
 
-/** "monthly" → "Monthly" for the status line (plan labels come lowercased from the backend). */
+/** The status line's plan label. Plans come through as lowercased LS variant names ("flightdeck
+ *  monthly", or "default" on a single-variant product), so normalize the two real cadences and
+ *  fall back to capitalizing whatever the store named the variant. */
 function planLabel(plan: string): string {
+  if (plan.includes("month")) return "Monthly";
+  if (plan.includes("annual") || plan.includes("year")) return "Yearly";
   return plan ? plan[0].toUpperCase() + plan.slice(1) : plan;
 }
 
