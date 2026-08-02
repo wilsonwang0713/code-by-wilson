@@ -142,11 +142,11 @@ function ToolCall({ tool, onOpen }: { tool: ToolEvent; onOpen?: () => void }) {
       <Icon
         name={toolIcon(tool.name)}
         size={13}
-        className="shrink-0 text-primary-bright"
+        className="shrink-0 text-well-primary-bright"
       />
-      <span className="shrink-0 text-primary-bright">{tool.name}</span>
-      <span className="truncate text-fg-faint">{tool.input}</span>
-      <span className="ml-auto flex shrink-0 items-center gap-2 text-fg-faint">
+      <span className="shrink-0 text-well-primary-bright">{tool.name}</span>
+      <span className="truncate text-well-fg-faint">{tool.input}</span>
+      <span className="ml-auto flex shrink-0 items-center gap-2 text-well-fg-faint">
         <span className={st.tone}>{st.char}</span>
         <span>{size}</span>
         {onOpen && (
@@ -183,10 +183,10 @@ function DiffRow({ diff, onOpen }: { diff: DiffEvent; onOpen?: () => void }) {
       <Icon
         name={toolIcon(diff.tool)}
         size={13}
-        className="shrink-0 text-primary-bright"
+        className="shrink-0 text-well-primary-bright"
       />
-      <span className="shrink-0 text-primary-bright">{diff.tool}</span>
-      <span className="truncate text-fg-faint">{diff.file}</span>
+      <span className="shrink-0 text-well-primary-bright">{diff.tool}</span>
+      <span className="truncate text-well-fg-faint">{diff.file}</span>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         <span className={st.tone}>{st.char}</span>
         <span className="text-ok">+{diff.hunk.added.length}</span>

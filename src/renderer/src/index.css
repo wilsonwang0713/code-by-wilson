@@ -26,6 +26,18 @@
   --color-primary-bright: #ffffff;
   --color-primary-deep: #c8c8c8;
 
+  /* Well text — bg-well (below) is a fixed dark "island" that stays #080808 in BOTH themes: terminal,
+     tool/diff rows, code blocks, and their detail modals. Content painted on it must stay pinned to
+     these dark-mode foreground values too, never the theme-following fg/primary tokens above — those
+     flip to near-black in the light branch (color-primary-bright even resolves to literal #000000
+     there), which reads as invisible black-on-black text on a surface that never lightens. Not
+     overridden in the light `@media` block below, by design. */
+  --color-well-fg: color-mix(in srgb, #eaeaea 94%, transparent);
+  --color-well-fg-muted: color-mix(in srgb, #eaeaea 74%, transparent);
+  --color-well-fg-faint: color-mix(in srgb, #eaeaea 54%, transparent);
+  --color-well-primary: #eaeaea;
+  --color-well-primary-bright: #ffffff;
+
   /* Status hues — reserved for session state, never decorative */
   --color-working: #2dd4bf; /* live = the teal accent (was blue #2f95f5) */
   --color-working-bright: #5eead4;
