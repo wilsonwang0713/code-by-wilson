@@ -72,6 +72,7 @@ export function registerTerminalIpc({
   resolveAdoptTarget,
   env,
   resolveBin,
+  resolveSkipPermissions,
 }: {
   window: BrowserWindow;
   managed: ManagedRegistry;
@@ -84,6 +85,10 @@ export function registerTerminalIpc({
   /** Returns the resolved absolute `claude` binary path from the CLI-status controller, or null to fall
    *  back to PATH resolution. Read at each spawn so a freshly-installed/relocated CLI is picked up. */
   resolveBin?: () => string | null;
+  /** Returns the persisted "skip permission prompts" preference (Settings → CLI card). Read at each
+   *  spawn so a toggle takes effect on the very next new session. Fresh spawns only — Adopt/Fork don't
+   *  read this, since they resume the CLI's own remembered settings. */
+  resolveSkipPermissions?: () => boolean;
 }): { rename: (from: string, to: string) => void } {
   const manager = createTerminalManager({
     send: (id, data, offset) => {
@@ -114,6 +119,7 @@ export function registerTerminalIpc({
       cols: req.cols,
       rows: req.rows,
       bin: resolveBin?.() ?? undefined,
+      skipPermissions: resolveSkipPermissions?.() ?? false,
     });
     return draftSession(req.id, req.cwd, req.model);
   });

@@ -171,6 +171,44 @@ describe("notifyOnFinished preference", () => {
   });
 });
 
+describe("skipPermissions preference", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  function tmp(): string {
+    const d = mkdtempSync(join(tmpdir(), "cbw-app-settings-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("is absent by default (callers read ?? false), persists true, and round-trips", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+
+    expect(store.read().skipPermissions).toBeUndefined();
+
+    store.setSkipPermissions(true);
+    expect(store.read().skipPermissions).toBe(true);
+    // persisted, not just in memory
+    expect(
+      JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))
+        .skipPermissions,
+    ).toBe(true);
+
+    store.setSkipPermissions(false);
+    expect(store.read().skipPermissions).toBe(false);
+  });
+
+  it("preserves other keys when toggling", () => {
+    const dir = tmp();
+    const store = createAppSettingsStore({ dir });
+    store.setClaudeBinPath("/opt/claude");
+    store.setSkipPermissions(true);
+    expect(store.read().claudeBinPath).toBe("/opt/claude");
+  });
+});
+
 describe("themePreference", () => {
   const dirs: string[] = [];
   afterEach(() => {

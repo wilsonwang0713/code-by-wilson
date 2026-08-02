@@ -66,6 +66,9 @@ const api: AppApi = {
   getNotifyOnFinished: () => ipcRenderer.invoke(IPC.notifyGetOnFinished),
   setNotifyOnFinished: (enabled) =>
     ipcRenderer.invoke(IPC.notifySetOnFinished, enabled),
+  getSkipPermissions: () => ipcRenderer.invoke(IPC.cliGetSkipPermissions),
+  setSkipPermissions: (enabled) =>
+    ipcRenderer.invoke(IPC.cliSetSkipPermissions, enabled),
   readSubagentTranscript: (id, agentId, sinceMtimeMs) =>
     ipcRenderer.invoke(IPC.readSubagentTranscript, id, agentId, sinceMtimeMs),
   readTasks: (id, sinceMtimeMs) =>

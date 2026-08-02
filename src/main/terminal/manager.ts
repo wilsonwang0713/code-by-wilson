@@ -37,6 +37,9 @@ export interface SpawnRequest {
   cols: number;
   rows: number;
   bin?: string;
+  /** Appends `--dangerously-skip-permissions` to the spawn argv (the Settings → CLI card toggle).
+   *  Fresh spawns only — AdoptSpawn/ForkSpawn carry no such field. */
+  skipPermissions?: boolean;
 }
 
 export interface AdoptSpawn {
@@ -240,7 +243,12 @@ export function createTerminalManager(
     start(
       req.id,
       launchForm(
-        buildClaudeCommand({ id: req.id, model: req.model, bin: req.bin }),
+        buildClaudeCommand({
+          id: req.id,
+          model: req.model,
+          bin: req.bin,
+          skipPermissions: req.skipPermissions,
+        }),
         platform,
       ),
       req.cwd,

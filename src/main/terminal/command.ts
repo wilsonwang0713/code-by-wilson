@@ -11,14 +11,18 @@ export interface ClaudeCommand {
  * alias (`opus`/`sonnet`/`haiku`/`fable`) the picker chose — an alias, not a dated string, so it keeps
  * working as versions roll; the session's real model is re-derived from the transcript. `"default"`
  * omits `--model` entirely rather than passing the literal alias, so the CLI's own configured default
- * applies exactly as if the flag were never given. The executable is the `CBW_CLAUDE_BIN` override else
- * `claude` on PATH, resolved by node-pty. cwd and env are spawn options, not argv, so this stays a pure
- * function of its inputs.
+ * applies exactly as if the flag were never given. `skipPermissions` appends
+ * `--dangerously-skip-permissions` (the Settings → CLI card toggle); omitted (the default) leaves the
+ * CLI's normal confirmation prompts in place. Fresh spawns only — buildResumeCommand/buildForkCommand
+ * carry no such flag, since Adopt/Fork resume the CLI's own remembered settings. The executable is the
+ * `CBW_CLAUDE_BIN` override else `claude` on PATH, resolved by node-pty. cwd and env are spawn options,
+ * not argv, so this stays a pure function of its inputs.
  */
 export function buildClaudeCommand(opts: {
   id: string;
   model: ModelSelection;
   bin?: string;
+  skipPermissions?: boolean;
 }): ClaudeCommand {
   return {
     file: opts.bin ?? process.env.CBW_CLAUDE_BIN ?? "claude",
@@ -26,6 +30,7 @@ export function buildClaudeCommand(opts: {
       "--session-id",
       opts.id,
       ...(opts.model === "default" ? [] : ["--model", opts.model]),
+      ...(opts.skipPermissions ? ["--dangerously-skip-permissions"] : []),
     ],
   };
 }

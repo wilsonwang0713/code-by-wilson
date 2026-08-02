@@ -43,6 +43,8 @@ export const IPC = {
   statsDbInfo: "stats:dbinfo",
   recheckCli: "cli:recheck",
   setClaudeBinPath: "cli:setBinPath",
+  cliGetSkipPermissions: "cli:getSkipPermissions",
+  cliSetSkipPermissions: "cli:setSkipPermissions",
   resetAnalytics: "analytics:reset",
   licenseActivate: "license:activate",
   licenseDeactivate: "license:deactivate",
@@ -316,6 +318,13 @@ export interface IpcApi {
   getNotifyOnFinished(): Promise<boolean>;
   /** Persist the session-finished notification preference. */
   setNotifyOnFinished(enabled: boolean): Promise<void>;
+  /** Whether a fresh session spawn passes `--dangerously-skip-permissions` to the CLI. Missing
+   *  reads as false — this bypasses Claude Code's own confirmation prompts, so it stays opt-in.
+   *  Only affects Spawn; Adopt/Fork resume the CLI's own remembered settings. */
+  getSkipPermissions(): Promise<boolean>;
+  /** Persist the skip-permissions preference. Takes effect on the next spawned session; sessions
+   *  already running are unaffected. */
+  setSkipPermissions(enabled: boolean): Promise<void>;
   /** Whether the keep-awake blocker is currently active (the footer button's initial paint). */
   getCaffeinate(): Promise<boolean>;
   /** Turn keep-awake on or off. Resolves to the resulting state — main is the source of truth,
