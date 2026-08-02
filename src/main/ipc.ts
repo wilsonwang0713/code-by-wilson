@@ -211,6 +211,7 @@ export function registerIpc({
     setNotifyOnFinished: () => {},
     setThemePreference: () => {},
     setIslandEnabled: () => {},
+    setSkipPermissions: () => {},
   };
   const caff: Caffeinate = caffeinate ?? {
     isOn: () => false,
@@ -424,6 +425,13 @@ export function registerIpc({
   ipcMain.handle(IPC.recheckCli, () => cli.recheck());
   ipcMain.handle(IPC.setClaudeBinPath, (_e, path: string | null) =>
     cli.setBinPath(path),
+  );
+  ipcMain.handle(
+    IPC.cliGetSkipPermissions,
+    (): boolean => settings.read().skipPermissions ?? false,
+  );
+  ipcMain.handle(IPC.cliSetSkipPermissions, (_e, enabled: boolean): void =>
+    settings.setSkipPermissions(enabled),
   );
   ipcMain.handle(IPC.readTranscript, (_e, id: string, sinceMtimeMs?: number) =>
     provider.readTranscript(id, sinceMtimeMs),

@@ -64,6 +64,7 @@ function createWindow(
   registerRename: (rename: (from: string, to: string) => void) => void,
   childEnv: (() => NodeJS.ProcessEnv) | undefined,
   resolveBin: (() => string | null) | undefined,
+  resolveSkipPermissions: () => boolean,
   shellEnv: () => NodeJS.ProcessEnv,
 ): BrowserWindow {
   // The renderer header is a fixed HEADER_HEIGHT_PX tall and doubles as the title bar. On macOS we hide
@@ -110,6 +111,7 @@ function createWindow(
     resolveAdoptTarget,
     env: childEnv,
     resolveBin,
+    resolveSkipPermissions,
   });
   registerRename(rename);
 
@@ -231,6 +233,7 @@ app
         registerRename,
         childEnv,
         () => services.cliStatus?.resolvedPath() ?? null,
+        () => appSettings.read().skipPermissions ?? false,
         shellTermEnv,
       );
       mainWin = win;

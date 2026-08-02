@@ -54,6 +54,25 @@ describe("buildClaudeCommand", () => {
       "sid-d",
     ]);
   });
+
+  it("appends --dangerously-skip-permissions when requested", () => {
+    expect(
+      buildClaudeCommand({ id: "sid-p", model: "opus", skipPermissions: true })
+        .args,
+    ).toEqual([
+      "--session-id",
+      "sid-p",
+      "--model",
+      "opus",
+      "--dangerously-skip-permissions",
+    ]);
+  });
+
+  it("omits --dangerously-skip-permissions by default", () => {
+    expect(
+      buildClaudeCommand({ id: "sid-q", model: "default" }).args,
+    ).not.toContain("--dangerously-skip-permissions");
+  });
 });
 
 describe("buildResumeCommand", () => {

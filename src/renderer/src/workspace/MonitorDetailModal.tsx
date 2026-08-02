@@ -46,7 +46,7 @@ export function MonitorDetailModal({
 
         <div className="text-meta text-fg-muted">Script</div>
         <div className="max-h-40 overflow-auto rounded-md border border-ink-800 bg-well px-3 py-2 font-mono text-meta">
-          <span className="break-all text-fg">{monitor.command}</span>
+          <span className="break-all text-well-fg">{monitor.command}</span>
         </div>
 
         <div className="text-meta text-fg-muted">Output</div>

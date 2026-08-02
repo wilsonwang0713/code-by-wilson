@@ -60,7 +60,7 @@ export function CodeBlock({
           {code}
         </ShikiHighlighter>
       ) : (
-        <pre className="overflow-x-auto bg-well p-3 font-mono text-aux leading-relaxed text-fg">
+        <pre className="overflow-x-auto bg-well p-3 font-mono text-aux leading-relaxed text-well-fg">
           <code>{code}</code>
         </pre>
       )}

@@ -50,11 +50,11 @@ export function DiffModal({
           <Icon
             name="folder"
             size={12}
-            className="mt-0.5 shrink-0 text-fg-faint"
+            className="mt-0.5 shrink-0 text-well-fg-faint"
           />
           <span className="min-w-0 flex-1 break-all leading-relaxed">
-            <span className="text-fg-faint">{file.dir}</span>
-            <span className="text-fg">{file.name}</span>
+            <span className="text-well-fg-faint">{file.dir}</span>
+            <span className="text-well-fg">{file.name}</span>
           </span>
           <span className="mt-0.5 shrink-0 text-meta">
             <span className="text-ok">+{diff.hunk.added.length}</span>{" "}
@@ -66,8 +66,8 @@ export function DiffModal({
             className={cx(
               "mt-0.5 shrink-0 rounded-sm border px-2 py-0.5 text-label transition-colors",
               pathCopy.copied
-                ? "border-ink-600 text-fg"
-                : "border-ink-700 text-fg-muted hover:border-ink-600 hover:text-fg",
+                ? "border-ink-600 text-well-fg"
+                : "border-ink-700 text-well-fg-muted hover:border-ink-600 hover:text-well-fg",
             )}
           >
             {pathCopy.copied ? "Copied" : "Copy path"}
@@ -81,7 +81,7 @@ export function DiffModal({
         contentClassName="max-h-[60vh] p-3 font-mono text-meta leading-relaxed"
       >
         {empty ? (
-          <span className="text-fg-faint">no changes</span>
+          <span className="text-well-fg-faint">no changes</span>
         ) : (
           <>
             {diff.hunk.removed.map((l, i) => (

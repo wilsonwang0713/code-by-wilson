@@ -47,8 +47,8 @@ export function ShellDetailModal({
 
         <div className="text-meta text-fg-muted">Command</div>
         <div className="max-h-40 overflow-auto rounded-md border border-ink-800 bg-well px-3 py-2 font-mono text-meta">
-          <span className="break-all text-fg">
-            <span className="text-primary">$</span> {shell.command}
+          <span className="break-all text-well-fg">
+            <span className="text-well-primary">$</span> {shell.command}
           </span>
         </div>
 

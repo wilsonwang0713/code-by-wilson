@@ -82,15 +82,18 @@ export function truncLabel(bytes: number): string {
 // ANSI color → nearest cbw hue token, mapped by hue not by name. After the teal rebrand the cool slots
 // shifted: `working` is the true blue and `primary` (wire) is the cyan-teal — so ANSI blue→working,
 // cyan→primary. Green stays on `ok`; there's no bright-green token, so bright green falls back to it.
+// black/white are the plain-text ends of the ramp and only ever render on bg-well (AnsiLine is always
+// inside a well surface), so they use the well-pinned tokens rather than text-fg-faint/text-fg — those
+// flip to near-black in the light theme and would vanish against well's permanently-dark background.
 const BASE_CLASS: Record<AnsiColor, string> = {
-  black: "text-fg-faint",
+  black: "text-well-fg-faint",
   red: "text-danger",
   green: "text-ok",
   yellow: "text-accent",
   blue: "text-working",
   magenta: "text-violet",
   cyan: "text-primary",
-  white: "text-fg",
+  white: "text-well-fg",
 };
 
 /** A few colors have a brighter cbw token; the rest reuse the base. */

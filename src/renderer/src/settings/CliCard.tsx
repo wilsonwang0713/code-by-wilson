@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useStore } from "@nanostores/react";
 import type { CliStatus } from "@shared/cli-status";
 import { footerView } from "../ui/rail-footer";
 import { cliStatusView } from "../ui/cli-status-view";
@@ -14,6 +15,11 @@ import {
   EditLink,
   type LampTone,
 } from "./system-primitives";
+import {
+  $skipPermissions,
+  initSkipPermissions,
+  setSkipPermissions,
+} from "./skip-permissions-store";
 
 /** footerView dot → lamp tone (same hues the title-bar Sys lamp uses). */
 const TONE: Record<ReturnType<typeof footerView>["dot"], LampTone> = {
@@ -53,6 +59,10 @@ export function CliCard({
   const [binPath, setBinPath] = useState(
     cliStatus?.source === "override" ? (cliStatus.path ?? "") : "",
   );
+  const skipPermissions = useStore($skipPermissions);
+  useEffect(() => {
+    void initSkipPermissions();
+  }, []);
 
   return (
     <Card title="Claude Code CLI">
@@ -115,6 +125,38 @@ export function CliCard({
               </RailButton>
             </div>
           ) : undefined
+        }
+      />
+      <ReadoutRow
+        label="Permissions"
+        value={
+          skipPermissions ? "Skipped on new sessions" : "Prompted as usual"
+        }
+        warn={
+          skipPermissions
+            ? "New sessions pass --dangerously-skip-permissions — no confirmation before risky actions. Resumed/forked sessions are unaffected."
+            : undefined
+        }
+        edit={
+          <button
+            type="button"
+            role="switch"
+            aria-checked={skipPermissions}
+            onClick={() => setSkipPermissions(!skipPermissions)}
+            className={cx(
+              "relative h-[18px] w-8 shrink-0 rounded-full transition-colors",
+              skipPermissions ? "bg-primary" : "bg-ink-700",
+            )}
+          >
+            <span
+              className={cx(
+                "absolute top-[2px] h-[14px] w-[14px] rounded-full transition-all",
+                skipPermissions
+                  ? "right-[2px] bg-ink-900"
+                  : "left-[2px] bg-white",
+              )}
+            />
+          </button>
         }
       />
       <ReadoutRow

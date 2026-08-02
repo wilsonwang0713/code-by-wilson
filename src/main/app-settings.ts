@@ -26,6 +26,11 @@ export interface AppSettings {
   /** Whether the macOS notch overlay ("island") is shown. Missing means OFF — the island is
    *  opt-in (spec US-5 AC4), so callers read `read().islandEnabled ?? false`. */
   islandEnabled?: boolean;
+  /** Whether a fresh session spawn passes `--dangerously-skip-permissions` to the CLI. Missing
+   *  means OFF — it bypasses Claude Code's own confirmation prompts, so it stays opt-in like the
+   *  island preference; callers read `read().skipPermissions ?? false`. Only Spawn honors this
+   *  (see buildClaudeCommand) — Adopt/Fork resume the CLI's own remembered settings. */
+  skipPermissions?: boolean;
 }
 
 export interface AppSettingsStore {
@@ -37,6 +42,7 @@ export interface AppSettingsStore {
   setNotifyOnFinished(enabled: boolean): void;
   setThemePreference(pref: ThemePreference): void;
   setIslandEnabled(enabled: boolean): void;
+  setSkipPermissions(enabled: boolean): void;
 }
 
 export interface AppSettingsDeps {
@@ -87,6 +93,9 @@ export function createAppSettingsStore(
     },
     setIslandEnabled(enabled) {
       write({ ...read(), islandEnabled: enabled });
+    },
+    setSkipPermissions(enabled) {
+      write({ ...read(), skipPermissions: enabled });
     },
   };
 }

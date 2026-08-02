@@ -9,13 +9,13 @@ import { truncLabel } from "./panels/shell-view";
 export function OutputBox({ output }: { output: ShellOutputState }) {
   if (output === undefined)
     return (
-      <div className="rounded-md border border-ink-800 bg-well px-3 py-2 text-meta text-fg-faint">
+      <div className="rounded-md border border-ink-800 bg-well px-3 py-2 text-meta text-well-fg-faint">
         Reading output…
       </div>
     );
   if (output === null)
     return (
-      <div className="rounded-md border border-ink-800 bg-well px-3 py-2 text-meta text-fg-faint">
+      <div className="rounded-md border border-ink-800 bg-well px-3 py-2 text-meta text-well-fg-faint">
         No output available
       </div>
     );
@@ -26,7 +26,7 @@ export function OutputBox({ output }: { output: ShellOutputState }) {
       <OverlayScroll
         axis="both"
         className="rounded-md border border-ink-800 bg-well"
-        contentClassName="max-h-[60vh] p-3 font-mono text-meta leading-relaxed text-fg-muted"
+        contentClassName="max-h-[60vh] p-3 font-mono text-meta leading-relaxed text-well-fg-muted"
       >
         {output.text.split("\n").map((line, i) => (
           <AnsiLine key={i} text={line} />

@@ -94,8 +94,8 @@ export function ToolResultModal({
       </div>
 
       <div className="flex items-start gap-2 rounded-md border border-ink-800 bg-well px-3 py-2 font-mono text-meta">
-        <pre className="flex-1 whitespace-pre-wrap break-words text-fg">
-          <span className="text-primary">$</span> {command}
+        <pre className="flex-1 whitespace-pre-wrap break-words text-well-fg">
+          <span className="text-well-primary">$</span> {command}
         </pre>
         <button
           type="button"
@@ -118,17 +118,17 @@ export function ToolResultModal({
       <OverlayScroll
         axis="both"
         className="rounded-md border border-ink-800 bg-well"
-        contentClassName="max-h-[60vh] p-3 font-mono text-meta leading-relaxed text-fg-muted"
+        contentClassName="max-h-[60vh] p-3 font-mono text-meta leading-relaxed text-well-fg-muted"
       >
         {state.phase === "loading" && (
-          <span className="text-fg-faint">Loading output…</span>
+          <span className="text-well-fg-faint">Loading output…</span>
         )}
         {state.phase === "error" && (
-          <span className="text-fg-faint">Couldn't load output.</span>
+          <span className="text-well-fg-faint">Couldn't load output.</span>
         )}
         {state.phase === "ready" &&
           (state.detail.output === "" ? (
-            <span className="text-fg-faint">
+            <span className="text-well-fg-faint">
               {state.detail.status === "pending"
                 ? "Running — no output yet."
                 : "no output"}
