@@ -54,6 +54,9 @@ describe("manager passes the resolved bin to the pty", () => {
   });
 
   it("appends --dangerously-skip-permissions when requested", () => {
+    // An absolute bin, like the "resolved path" test above — a bare "claude" would hit the
+    // PATHEXT/cmd.exe launchForm shim on a win32 CI runner (see command.ts), which prefixes the
+    // argv with ["/c", "claude", ...] and would make this assertion platform-dependent.
     const calls: SpawnOptions[] = [];
     const mgr = createTerminalManager({
       ...baseDeps,
@@ -68,6 +71,7 @@ describe("manager passes the resolved bin to the pty", () => {
       model: "opus",
       cols: 80,
       rows: 24,
+      bin: "/real/claude",
       skipPermissions: true,
     });
     expect(calls[0].args).toEqual([
@@ -88,7 +92,14 @@ describe("manager passes the resolved bin to the pty", () => {
         return fakePty();
       },
     });
-    mgr.spawn({ id: "abc", cwd: "/tmp", model: "opus", cols: 80, rows: 24 });
+    mgr.spawn({
+      id: "abc",
+      cwd: "/tmp",
+      model: "opus",
+      cols: 80,
+      rows: 24,
+      bin: "/real/claude",
+    });
     expect(calls[0].args).not.toContain("--dangerously-skip-permissions");
   });
 
